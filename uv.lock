@@ -1350,7 +1350,7 @@ requires-dist = [
     { name = "marshmallow", marker = "extra == 'dev'", specifier = "<5" },
     { name = "marshmallow", marker = "extra == 'security'", specifier = "<5" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8.0" },
-    { name = "pillow", specifier = ">=12.0.0" },
+    { name = "pillow", specifier = ">=12.0.0,<13.0.0" },
     { name = "pip-audit", marker = "extra == 'dev'", specifier = ">=2.7.0" },
     { name = "pip-audit", marker = "extra == 'security'", specifier = ">=2.7.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.6.0" },
