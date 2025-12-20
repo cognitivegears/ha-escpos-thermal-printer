@@ -135,10 +135,10 @@ class EscposCommandParser:
             self._buffer = self._buffer[2:]
             return None
 
-    def _parse_simple_command(self, command_type: str, length: int) -> dict[str, Any]:
+    def _parse_simple_command(self, command_type: str, length: int) -> dict[str, Any] | None:
         """Parse a simple command with fixed length."""
         if len(self._buffer) < length:
-            return {}  # Return empty dict instead of None
+            return None  # Insufficient data in buffer
 
         raw_data = bytes(self._buffer[:length])
         self._buffer = self._buffer[length:]

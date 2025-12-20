@@ -31,14 +31,17 @@ async def async_get_config_entry_diagnostics(
 
     runtime: dict[str, Any] = {}
     if adapter is not None:
+        # Get config once to avoid repeated nested getattr calls
+        config = getattr(adapter, "_config", None)
+        
         runtime = {
             "status": adapter.get_status(),
             "diagnostics": adapter.get_diagnostics(),
-            "profile": getattr(getattr(adapter, "_config", None), "profile", None) if getattr(adapter, "_config", None) else None,
-            "codepage": getattr(getattr(adapter, "_config", None), "codepage", None) if getattr(adapter, "_config", None) else None,
-            "line_width": getattr(getattr(adapter, "_config", None), "line_width", None) if getattr(adapter, "_config", None) else None,
-            "host": getattr(getattr(adapter, "_config", None), "host", None) if getattr(adapter, "_config", None) else None,
-            "port": getattr(getattr(adapter, "_config", None), "port", None) if getattr(adapter, "_config", None) else None,
+            "profile": config.profile if config else None,
+            "codepage": config.codepage if config else None,
+            "line_width": config.line_width if config else None,
+            "host": config.host if config else None,
+            "port": config.port if config else None,
             "keepalive": getattr(adapter, "_keepalive", None),
             "status_interval": getattr(adapter, "_status_interval", None),
         }

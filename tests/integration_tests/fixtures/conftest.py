@@ -13,6 +13,18 @@ import pytest
 
 from tests.integration_tests.emulator import VirtualPrinter, VirtualPrinterServer, set_active_server
 
+__all__ = [
+    'virtual_printer',
+    'ha_test_environment',
+    'printer_with_ha',
+    'temp_image_file',
+    'test_config',
+    'automation_config',
+    'mock_printer_server',
+    'sample_print_data',
+    'error_printer_server',
+]
+
 
 # Lazy import HA environment to avoid dependency conflicts
 def _get_ha_environment() -> Any:

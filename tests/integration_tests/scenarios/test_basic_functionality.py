@@ -182,7 +182,7 @@ async def test_service_parameter_variations(printer_with_ha) -> None:  # type: i
     for i, options in enumerate(formatting_options):
         test_text = f"Test formatting {i + 1}"
         data = {'text': test_text}
-        data.update(options) if isinstance(options, dict) else None
+        data.update(options)
 
         await ha_env.hass.services.async_call(
             'escpos_printer',

@@ -47,13 +47,16 @@ class EscposNotifyEntity(NotifyEntity):
                 - title: Optional title to print before the message
                 - data: Optional data dictionary with printer-specific options
         """
+        # Use explicit title parameter if provided, otherwise check kwargs for backward compatibility
+        if title is None:
+            title = kwargs.get("title")
+        
         _LOGGER.debug(
             "Notify send_message called: title=%s, message_len=%s, data_keys=%s",
-            kwargs.get("title"),
+            title,
             len(message or ""),
             list((kwargs.get("data") or {}).keys()),
         )
-        title = kwargs.get("title")
         data = kwargs.get("data") or {}
         defaults = self._hass.data[DOMAIN][self._entry.entry_id]["defaults"]
         adapter = self._hass.data[DOMAIN][self._entry.entry_id]["adapter"]

@@ -120,6 +120,14 @@ class EscposConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     def async_get_options_flow(config_entry: Any) -> Any:
+        """Create options flow handler.
+        
+        Args:
+            config_entry: Config entry (provided by HA, unused as base class handles it)
+            
+        Returns:
+            Options flow handler instance
+        """
         return EscposOptionsFlowHandler()
 
 
