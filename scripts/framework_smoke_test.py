@@ -10,19 +10,20 @@ Usage:
 """
 
 import asyncio
-import sys
 import importlib
 from pathlib import Path
-from typing import List, Dict, Tuple
+import sys
+from typing import Any
+
 
 class FrameworkTester:
     """Comprehensive tester for the integration test framework."""
 
-    def __init__(self):
-        self.results = []
-        self.errors = []
+    def __init__(self) -> None:
+        self.results: list[dict[str, Any]] = []
+        self.errors: list[dict[str, str]] = []
 
-    def log_result(self, test_name: str, success: bool, error: str = None):
+    def log_result(self, test_name: str, success: bool, error: str | None = None) -> None:
         """Log a test result."""
         self.results.append({
             'test': test_name,
@@ -30,19 +31,19 @@ class FrameworkTester:
             'error': error
         })
 
-    def log_error(self, test_name: str, error: str):
+    def log_error(self, test_name: str, error: str) -> None:
         """Log an error."""
         self.errors.append({
             'test': test_name,
             'error': error
         })
 
-    async def test_virtual_printer_emulator(self):
+    async def test_virtual_printer_emulator(self) -> None:
         """Test virtual printer emulator functionality."""
         try:
-            from tests.integration_tests.emulator.virtual_printer import VirtualPrinter
-            from tests.integration_tests.emulator.printer_state import PrinterState
             from tests.integration_tests.emulator.command_parser import EscposCommandParser
+            from tests.integration_tests.emulator.printer_state import PrinterState
+            from tests.integration_tests.emulator.virtual_printer import VirtualPrinter
             from tests.integration_tests.fixtures.mock_data_generator import MockDataGenerator
 
             # Test basic instantiation
@@ -51,7 +52,7 @@ class FrameworkTester:
 
             # Test printer state
             state = PrinterState()
-            state.update_state_sync('text', b'Hello World', {})
+            await state.update_state_sync('text', b'Hello World', {})
             self.log_result("Printer state synchronous update", True)
 
             # Test command parser
@@ -72,7 +73,7 @@ class FrameworkTester:
         except Exception as e:
             self.log_error("Virtual printer emulator", str(e))
 
-    async def test_printer_server_functionality(self):
+    async def test_printer_server_functionality(self) -> None:
         """Test virtual printer server functionality."""
         try:
             from tests.integration_tests.emulator.virtual_printer import VirtualPrinterServer
@@ -91,12 +92,13 @@ class FrameworkTester:
         except Exception as e:
             self.log_error("Printer server functionality", str(e))
 
-    async def test_test_utilities(self):
+    async def test_test_utilities(self) -> None:
         """Test test utilities and verification tools."""
         try:
-            from tests.integration_tests.fixtures.verification_utils import VerificationUtilities
-            from tests.integration_tests.emulator.printer_state import Command
             from datetime import datetime
+
+            from tests.integration_tests.emulator.printer_state import Command
+            from tests.integration_tests.fixtures.verification_utils import VerificationUtilities
 
             # Test verification utilities
             mock_command = Command(
@@ -113,7 +115,7 @@ class FrameworkTester:
         except Exception as e:
             self.log_error("Test utilities", str(e))
 
-    def test_import_all_framework_modules(self):
+    def test_import_all_framework_modules(self) -> None:
         """Test importing all framework modules."""
         modules_to_test = [
             'tests.integration_tests.emulator.virtual_printer',
@@ -131,7 +133,7 @@ class FrameworkTester:
             except Exception as e:
                 self.log_error(f"Import {module_name}", str(e))
 
-    def test_test_scenarios_imports(self):
+    def test_test_scenarios_imports(self) -> None:
         """Test importing all test scenario modules."""
         scenarios = [
             'tests.integration_tests.scenarios.test_basic_functionality',
@@ -149,14 +151,10 @@ class FrameworkTester:
             except Exception as e:
                 self.log_error(f"Import {scenario}", str(e))
 
-    def test_main_package_import(self):
+    def test_main_package_import(self) -> None:
         """Test importing the main integration tests package."""
         try:
             # Test the main package with lazy loading
-            from tests.integration_tests import (
-                VirtualPrinterServer, VirtualPrinter,
-                VerificationUtilities, MockDataGenerator
-            )
             self.log_result("Main package import", True)
 
             # Test lazy HA environment access
@@ -171,7 +169,7 @@ class FrameworkTester:
         except Exception as e:
             self.log_error("Main package import", str(e))
 
-    async def run_all_tests(self):
+    async def run_all_tests(self) -> bool:
         """Run all framework tests."""
         print("🧪 ESCPOS Integration Test Framework - Comprehensive Testing")
         print("=" * 70)
@@ -190,7 +188,7 @@ class FrameworkTester:
 
         return self.summarize_results()
 
-    def summarize_results(self):
+    def summarize_results(self) -> bool:
         """Summarize test results."""
         print("\n" + "=" * 70)
         print("📊 TEST RESULTS SUMMARY")
@@ -220,7 +218,7 @@ class FrameworkTester:
             return False
 
 
-async def main():
+async def main() -> int:
     """Main test runner."""
     # Ensure repository root is on sys.path so 'tests' package is importable
     repo_root = Path(__file__).resolve().parents[1]

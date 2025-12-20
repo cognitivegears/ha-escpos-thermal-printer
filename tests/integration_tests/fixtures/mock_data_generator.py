@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import random
 import string
-from typing import Dict, Any, List, Optional
+from typing import Any
+
 from PIL import Image, ImageDraw, ImageFont
+from PIL.ImageFont import FreeTypeFont, ImageFont as PILImageFont
 
 
 class MockDataGenerator:
@@ -111,10 +113,11 @@ class MockDataGenerator:
         img = Image.new('RGB', (width, height), color='white')
         draw = ImageDraw.Draw(img)
 
+        font: FreeTypeFont | PILImageFont
         try:
             # Try to use a default font
             font = ImageFont.truetype("arial.ttf", 20)
-        except (OSError, IOError):
+        except OSError:
             # Fallback to default font
             font = ImageFont.load_default()
 
@@ -159,7 +162,7 @@ class MockDataGenerator:
         return img
 
     @staticmethod
-    def generate_print_job_data(job_type: str) -> Dict[str, Any]:
+    def generate_print_job_data(job_type: str) -> dict[str, Any]:
         """Generate complete print job data for testing."""
         if job_type == "text":
             return {
@@ -231,7 +234,7 @@ class MockDataGenerator:
             }
 
     @staticmethod
-    def generate_automation_config(trigger_type: str = "state") -> Dict[str, Any]:
+    def generate_automation_config(trigger_type: str = "state") -> dict[str, Any]:
         """Generate realistic automation configuration for testing."""
         if trigger_type == "state":
             return {
@@ -291,7 +294,7 @@ class MockDataGenerator:
             }
 
     @staticmethod
-    def generate_notification_data() -> Dict[str, Any]:
+    def generate_notification_data() -> dict[str, Any]:
         """Generate realistic notification data for testing."""
         return {
             'message': MockDataGenerator.generate_text_content(50),
@@ -300,7 +303,7 @@ class MockDataGenerator:
         }
 
     @staticmethod
-    def generate_error_scenario() -> Dict[str, Any]:
+    def generate_error_scenario() -> dict[str, Any]:
         """Generate error scenario data for testing."""
         error_types = ['offline', 'paper_out', 'timeout', 'connection_error']
         error_type = random.choice(error_types)

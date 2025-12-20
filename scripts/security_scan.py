@@ -17,11 +17,11 @@ Options:
 """
 
 import argparse
+from collections.abc import Sequence
 import os
+from pathlib import Path
 import subprocess
 import sys
-from pathlib import Path
-from typing import Dict, List, Optional, Sequence
 
 
 class SecurityScanner:
@@ -31,7 +31,7 @@ class SecurityScanner:
         self.verbose = verbose
         self.project_root = Path(__file__).parent.parent
 
-    def run_command(self, cmd: List[str], description: str, tolerate_failure: bool = False) -> bool:
+    def run_command(self, cmd: list[str], description: str, tolerate_failure: bool = False) -> bool:
         """Run a command and return success status."""
         try:
             if self.verbose:
@@ -67,7 +67,7 @@ class SecurityScanner:
             print(f"❌ Error running {description}: {e}")
             return False
 
-    def _try_commands(self, candidates: Sequence[Sequence[str]]) -> Optional[List[str]]:
+    def _try_commands(self, candidates: Sequence[Sequence[str]]) -> list[str] | None:
         """Return the first candidate command that executes successfully with --version."""
         for base in candidates:
             try:
@@ -104,9 +104,9 @@ class SecurityScanner:
 
     def check_dependencies(self) -> bool:
         """Check if security tools are installed and resolve their invocation."""
-        self.tool_cmds: Dict[str, List[str]] = {}
+        self.tool_cmds: dict[str, list[str]] = {}
 
-        tool_candidates: Dict[str, List[List[str]]] = {
+        tool_candidates: dict[str, list[list[str]]] = {
             # safety CLI may not always be on PATH; support module invocation variants
             "safety": [
                 ["safety"],
@@ -119,7 +119,7 @@ class SecurityScanner:
             "pip-audit": [["pip-audit"], [sys.executable, "-m", "pip_audit"]],
         }
 
-        missing: List[str] = []
+        missing: list[str] = []
         for tool, candidates in tool_candidates.items():
             cmd = self._try_commands(candidates)
             if cmd is None:
@@ -264,7 +264,7 @@ Generated: {Path(__file__).name}
         return True
 
 
-def main():
+def main() -> None:
     """Main entry point."""
     parser = argparse.ArgumentParser(description="Security scanner for HA ESCPOS integration")
     parser.add_argument("--fix", action="store_true", help="Attempt to auto-fix issues")

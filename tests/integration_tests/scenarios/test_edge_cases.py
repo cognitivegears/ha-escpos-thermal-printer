@@ -1,20 +1,17 @@
 """Edge cases and boundary testing for ESCPOS printer integration."""
 
 import asyncio
-import pytest
-import tempfile
-import os
-from typing import Dict, Any
 
-from tests.integration_tests.emulator import VirtualPrinter
-from tests.integration_tests.fixtures import MockDataGenerator, VerificationUtilities
+import pytest
+
+from tests.integration_tests.fixtures import MockDataGenerator
 
 
 class TestEdgeCases:
     """Test edge cases and boundary conditions for the ESCPOS printer integration."""
 
     @pytest.mark.asyncio
-    async def test_very_large_text_content(self, virtual_printer):
+    async def test_very_large_text_content(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test printing very large text content that approaches memory limits."""
         # Generate a very large text content
         large_text = MockDataGenerator.generate_text_content(10000)  # 10KB of text
@@ -32,7 +29,7 @@ class TestEdgeCases:
         assert last_job.content_type == "text"
 
     @pytest.mark.asyncio
-    async def test_special_characters_and_unicode(self, virtual_printer):
+    async def test_special_characters_and_unicode(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test handling of special characters and Unicode content."""
         # Test various Unicode characters
         unicode_text = "Hello 世界 🌍 Привет ¡Hola! ñáéíóú"
@@ -54,7 +51,7 @@ class TestEdgeCases:
             assert len(history) >= i + 1
 
     @pytest.mark.asyncio
-    async def test_empty_and_null_parameters(self, virtual_printer):
+    async def test_empty_and_null_parameters(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test behavior with empty, null, or invalid parameters."""
         printer_state = virtual_printer.printer_state
 
@@ -71,7 +68,7 @@ class TestEdgeCases:
         assert 'online' in status
 
     @pytest.mark.asyncio
-    async def test_parameter_boundary_values(self, virtual_printer):
+    async def test_parameter_boundary_values(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test parameter values at their maximum and minimum limits."""
         printer_state = virtual_printer.printer_state
 
@@ -87,7 +84,7 @@ class TestEdgeCases:
         await printer_state.update_state_sync('cut', b'', {'mode': 'invalid'})  # Should handle gracefully
 
     @pytest.mark.asyncio
-    async def test_malformed_escpos_commands(self, virtual_printer):
+    async def test_malformed_escpos_commands(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test handling of malformed or invalid ESCPOS commands."""
         printer_state = virtual_printer.printer_state
 
@@ -113,7 +110,7 @@ class TestEdgeCases:
         assert status['online'] is True
 
     @pytest.mark.asyncio
-    async def test_buffer_overflow_scenarios(self, virtual_printer):
+    async def test_buffer_overflow_scenarios(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test buffer overflow and memory management scenarios."""
         printer_state = virtual_printer.printer_state
 
@@ -133,11 +130,11 @@ class TestEdgeCases:
         assert len(history) > 0
 
     @pytest.mark.asyncio
-    async def test_concurrent_operations(self, virtual_printer):
+    async def test_concurrent_operations(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test concurrent print operations and thread safety."""
         printer_state = virtual_printer.printer_state
 
-        async def send_text(text_id: int):
+        async def send_text(text_id: int) -> int:
             text = f"Concurrent text {text_id}"
             await printer_state.update_state_sync('text', text.encode(), {})
             return text_id
@@ -151,7 +148,7 @@ class TestEdgeCases:
         assert set(results) == set(range(10))
 
     @pytest.mark.asyncio
-    async def test_rapid_succession_operations(self, virtual_printer):
+    async def test_rapid_succession_operations(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test rapid succession of print operations."""
         printer_state = virtual_printer.printer_state
 
@@ -169,7 +166,7 @@ class TestEdgeCases:
         assert status['online'] is True
 
     @pytest.mark.asyncio
-    async def test_extremely_long_lines(self, virtual_printer):
+    async def test_extremely_long_lines(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test printing extremely long lines that exceed typical printer width."""
         printer_state = virtual_printer.printer_state
 
@@ -183,7 +180,7 @@ class TestEdgeCases:
         assert len(history) >= 1
 
     @pytest.mark.asyncio
-    async def test_binary_data_handling(self, virtual_printer):
+    async def test_binary_data_handling(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test handling of binary data mixed with text."""
         printer_state = virtual_printer.printer_state
 
@@ -197,11 +194,11 @@ class TestEdgeCases:
         assert len(history) >= 1
 
     @pytest.mark.asyncio
-    async def test_nested_async_operations(self, virtual_printer):
+    async def test_nested_async_operations(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test nested async operations and proper context handling."""
         printer_state = virtual_printer.printer_state
 
-        async def nested_operation(level: int):
+        async def nested_operation(level: int) -> int:
             if level > 0:
                 # Recursive nested operation
                 await nested_operation(level - 1)
@@ -219,7 +216,7 @@ class TestEdgeCases:
         assert len(history) >= 6  # One for each level plus initial
 
     @pytest.mark.asyncio
-    async def test_printer_state_persistence(self, virtual_printer):
+    async def test_printer_state_persistence(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test that printer state persists correctly across operations."""
         printer_state = virtual_printer.printer_state
 

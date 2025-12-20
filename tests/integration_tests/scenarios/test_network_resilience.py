@@ -1,12 +1,9 @@
 """Network resilience and connection failure testing for ESCPOS printer integration."""
 
 import asyncio
-import socket
-import pytest
-from unittest.mock import patch, MagicMock
-from typing import Dict, Any
 
-from tests.integration_tests.emulator import VirtualPrinter
+import pytest
+
 from tests.integration_tests.fixtures import MockDataGenerator
 
 
@@ -14,7 +11,7 @@ class TestNetworkResilience:
     """Test network resilience and connection failure handling."""
 
     @pytest.mark.asyncio
-    async def test_connection_drop_recovery(self, virtual_printer):
+    async def test_connection_drop_recovery(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test recovery from sudden connection drops."""
         printer_state = virtual_printer.printer_state
 
@@ -48,7 +45,7 @@ class TestNetworkResilience:
         assert final_status['online'] is True
 
     @pytest.mark.asyncio
-    async def test_network_timeout_handling(self, virtual_printer):
+    async def test_network_timeout_handling(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test handling of network timeouts."""
         printer_state = virtual_printer.printer_state
 
@@ -71,7 +68,7 @@ class TestNetworkResilience:
         assert final_status['online'] is True
 
     @pytest.mark.asyncio
-    async def test_intermittent_connectivity(self, virtual_printer):
+    async def test_intermittent_connectivity(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test handling of intermittent network connectivity."""
         printer_state = virtual_printer.printer_state
 
@@ -100,11 +97,11 @@ class TestNetworkResilience:
         assert final_status['online'] is True
 
     @pytest.mark.asyncio
-    async def test_concurrent_connection_failures(self, virtual_printer):
+    async def test_concurrent_connection_failures(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test handling multiple concurrent connection failures."""
         printer_state = virtual_printer.printer_state
 
-        async def operation_with_failure(worker_id: int):
+        async def operation_with_failure(worker_id: int) -> str:
             """Simulate an operation that might encounter connection failures."""
             try:
                 # Randomly simulate connection failure during operation
@@ -132,7 +129,7 @@ class TestNetworkResilience:
         assert 'online' in final_status
 
     @pytest.mark.asyncio
-    async def test_network_packet_fragmentation(self, virtual_printer):
+    async def test_network_packet_fragmentation(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test handling of fragmented network packets."""
         printer_state = virtual_printer.printer_state
 
@@ -155,7 +152,7 @@ class TestNetworkResilience:
         assert len(history) > 0
 
     @pytest.mark.asyncio
-    async def test_socket_error_recovery(self, virtual_printer):
+    async def test_socket_error_recovery(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test recovery from various socket-level errors."""
         printer_state = virtual_printer.printer_state
 
@@ -191,7 +188,7 @@ class TestNetworkResilience:
         assert final_status['online'] is True
 
     @pytest.mark.asyncio
-    async def test_dns_resolution_failures(self, virtual_printer):
+    async def test_dns_resolution_failures(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test handling of DNS resolution failures."""
         printer_state = virtual_printer.printer_state
 
@@ -216,7 +213,7 @@ class TestNetworkResilience:
         assert status['online'] is True
 
     @pytest.mark.asyncio
-    async def test_firewall_and_proxy_scenarios(self, virtual_printer):
+    async def test_firewall_and_proxy_scenarios(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test handling of firewall blocking and proxy issues."""
         printer_state = virtual_printer.printer_state
 
@@ -245,7 +242,7 @@ class TestNetworkResilience:
         assert final_status['online'] is True
 
     @pytest.mark.asyncio
-    async def test_network_latency_and_delays(self, virtual_printer):
+    async def test_network_latency_and_delays(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test performance under various network latency conditions."""
         printer_state = virtual_printer.printer_state
 
@@ -276,7 +273,7 @@ class TestNetworkResilience:
         assert status['online'] is True
 
     @pytest.mark.asyncio
-    async def test_ipv4_ipv6_compatibility(self, virtual_printer):
+    async def test_ipv4_ipv6_compatibility(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test IPv4/IPv6 address handling and compatibility."""
         printer_state = virtual_printer.printer_state
 
@@ -303,7 +300,7 @@ class TestNetworkResilience:
         assert len(history) >= len(test_addresses)
 
     @pytest.mark.asyncio
-    async def test_connection_pooling_and_reuse(self, virtual_printer):
+    async def test_connection_pooling_and_reuse(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test connection pooling and reuse under network stress."""
         printer_state = virtual_printer.printer_state
 
@@ -327,12 +324,12 @@ class TestNetworkResilience:
         assert len(command_log) > 15  # Most operations should have been logged
 
     @pytest.mark.asyncio
-    async def test_graceful_degradation_under_load(self, virtual_printer):
+    async def test_graceful_degradation_under_load(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test graceful degradation when network is under heavy load."""
         printer_state = virtual_printer.printer_state
 
         # Simulate network congestion by introducing delays
-        async def delayed_operation(text: str):
+        async def delayed_operation(text: str) -> None:
             await asyncio.sleep(0.05)  # Simulate network delay
             await printer_state.update_state_sync('text', text.encode(), {})
 

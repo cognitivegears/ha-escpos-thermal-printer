@@ -5,27 +5,27 @@ import socket
 from typing import Any
 
 from homeassistant import config_entries
-from homeassistant.data_entry_flow import FlowResult
 from homeassistant.const import CONF_HOST, CONF_PORT
+from homeassistant.config_entries import ConfigFlowResult
 import voluptuous as vol
 
 from .const import (
-    CONF_CODEPAGE,
     CODEPAGE_CHOICES,
+    CONF_CODEPAGE,
     CONF_DEFAULT_ALIGN,
     CONF_DEFAULT_CUT,
-    CONF_LINE_WIDTH,
-    LINE_WIDTH_CHOICES,
     CONF_KEEPALIVE,
+    CONF_LINE_WIDTH,
+    CONF_PROFILE,
     CONF_STATUS_INTERVAL,
     CONF_TIMEOUT,
     DEFAULT_ALIGN,
     DEFAULT_CUT,
+    DEFAULT_LINE_WIDTH,
     DEFAULT_PORT,
     DEFAULT_TIMEOUT,
-    DEFAULT_LINE_WIDTH,
     DOMAIN,
-    CONF_PROFILE,
+    LINE_WIDTH_CHOICES,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -53,7 +53,7 @@ def _can_connect(host: str, port: int, timeout: float) -> bool:
 class EscposConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
-    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle the initial step of the config flow.
 
         Args:
@@ -113,21 +113,18 @@ class EscposConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(step_id="user", data_schema=data_schema, errors=errors)
 
-    async def async_step_import(self, user_input: dict[str, Any] | None = None):
+    async def async_step_import(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         # Support YAML import if provided
         _LOGGER.debug("Config flow import step with input: %s", user_input)
         return await self.async_step_user(user_input)
 
     @staticmethod
-    def async_get_options_flow(config_entry):
-        return EscposOptionsFlowHandler(config_entry)
+    def async_get_options_flow(config_entry: Any) -> Any:
+        return EscposOptionsFlowHandler()
 
 
 class EscposOptionsFlowHandler(config_entries.OptionsFlow):
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        self.config_entry = config_entry
-
-    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle the options flow initialization.
 
         Args:

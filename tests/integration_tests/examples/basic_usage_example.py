@@ -8,11 +8,11 @@ with a virtual printer emulator and Home Assistant test environment.
 
 import asyncio
 import logging
+
 from tests.integration_tests import (
-    VirtualPrinter,
-    HATestEnvironment,
+    MockDataGenerator,
     VerificationUtilities,
-    MockDataGenerator
+    VirtualPrinter,
 )
 
 # Set up logging
@@ -20,7 +20,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-async def basic_printer_test():
+async def basic_printer_test() -> None:
     """Demonstrate basic printer functionality testing."""
     logger.info("Starting basic printer functionality test...")
 
@@ -61,7 +61,7 @@ async def basic_printer_test():
         logger.info("Basic printer test completed successfully!")
 
 
-async def mock_data_generation_example():
+async def mock_data_generation_example() -> None:
     """Demonstrate mock data generation capabilities."""
     logger.info("Demonstrating mock data generation...")
 
@@ -86,7 +86,7 @@ async def mock_data_generation_example():
     logger.info("Mock data generation demonstration completed!")
 
 
-async def verification_utilities_example():
+async def verification_utilities_example() -> None:
     """Demonstrate verification utilities."""
     logger.info("Demonstrating verification utilities...")
 
@@ -127,7 +127,7 @@ async def verification_utilities_example():
     logger.info("Verification utilities demonstration completed!")
 
 
-async def error_simulation_example():
+async def error_simulation_example() -> None:
     """Demonstrate error simulation capabilities."""
     logger.info("Demonstrating error simulation...")
 
@@ -161,7 +161,7 @@ async def error_simulation_example():
         logger.info("Error simulation demonstration completed!")
 
 
-async def main():
+async def main() -> None:
     """Run all examples."""
     logger.info("ESCPOS Printer Integration Test Framework - Usage Examples")
     logger.info("=" * 60)

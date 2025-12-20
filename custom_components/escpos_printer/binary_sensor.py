@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 import logging
-from typing import Any, Callable, Optional
+from typing import Any
 
-from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.components.binary_sensor import BinarySensorDeviceClass, BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
@@ -13,7 +14,7 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> None:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> None:  # type: ignore[no-untyped-def]
     adapter = hass.data[DOMAIN][entry.entry_id]["adapter"]
     entity = EscposOnlineSensor(hass, entry, adapter)
     async_add_entities([entity])
@@ -22,13 +23,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 class EscposOnlineSensor(BinarySensorEntity):
     _attr_has_entity_name = True
     _attr_name = "Online"
-    _attr_device_class = "connectivity"
+    _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, adapter) -> None:
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, adapter: Any) -> None:
         self._hass = hass
         self._entry = entry
         self._adapter = adapter
-        self._unsubscribe: Optional[Callable[[], None]] = None
+        self._unsubscribe: Callable[[], None] | None = None
         self._attr_unique_id = f"{entry.entry_id}_online"
         # Set initial state from adapter if available
         status = adapter.get_status()

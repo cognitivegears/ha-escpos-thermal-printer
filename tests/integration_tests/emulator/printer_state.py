@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -14,13 +14,13 @@ class PrintJob:
     timestamp: datetime
     content_type: str
     data: Any
-    parameters: Dict[str, Any]
+    parameters: dict[str, Any]
 
     def get_summary(self) -> str:
         """Get a human-readable summary of the print job."""
         return f"{self.content_type} at {self.timestamp.isoformat()}"
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """Convert print job to dictionary for serialization."""
         return {
             'timestamp': self.timestamp.isoformat(),
@@ -36,9 +36,9 @@ class Command:
     timestamp: datetime
     command_type: str
     raw_data: bytes
-    parameters: Dict[str, Any]
+    parameters: dict[str, Any]
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """Convert command to dictionary for serialization."""
         return {
             'timestamp': self.timestamp.isoformat(),
@@ -55,12 +55,12 @@ class PrinterState:
         """Initialize printer state."""
         self.online: bool = True
         self.paper_status: str = "loaded"
-        self.buffer: List[bytes] = []
-        self.print_history: List[PrintJob] = []
-        self.command_log: List[Command] = []
+        self.buffer: list[bytes] = []
+        self.print_history: list[PrintJob] = []
+        self.command_log: list[Command] = []
         self._lock = asyncio.Lock()
         # Timestamp (loop time) of the last received text command
-        self._last_text_time: Optional[float] = None
+        self._last_text_time: float | None = None
 
     async def update_state(self, command: Command) -> None:
         """Update printer state based on received command."""
@@ -114,7 +114,7 @@ class PrinterState:
                 # Barcode commands create print jobs
                 await self._add_print_job("barcode", command.raw_data, command.parameters)
 
-    async def get_status(self) -> Dict[str, Any]:
+    async def get_status(self) -> dict[str, Any]:
         """Get current printer status."""
         async with self._lock:
             return {
@@ -130,7 +130,7 @@ class PrinterState:
         async with self._lock:
             self.buffer.clear()
 
-    async def _add_print_job(self, content_type: str, data: bytes, parameters: Dict[str, Any]) -> None:
+    async def _add_print_job(self, content_type: str, data: bytes, parameters: dict[str, Any]) -> None:
         """Add a new print job to history."""
         job = PrintJob(
             timestamp=datetime.now(),
@@ -154,12 +154,12 @@ class PrinterState:
                 self.paper_status = "loaded"
                 self.buffer.clear()
 
-    async def get_print_history(self) -> List[PrintJob]:
+    async def get_print_history(self) -> list[PrintJob]:
         """Get the complete print history."""
         async with self._lock:
             return self.print_history.copy()
 
-    async def get_command_log(self) -> List[Command]:
+    async def get_command_log(self) -> list[Command]:
         """Get the complete command log."""
         async with self._lock:
             return self.command_log.copy()
@@ -170,8 +170,10 @@ class PrinterState:
             self.print_history.clear()
             self.command_log.clear()
             self.buffer.clear()
+            # Reset text timing to prevent stale state affecting future commands
+            self._last_text_time = None
 
-    async def update_state_sync(self, command_type: str, data: bytes, parameters: Dict[str, Any]) -> None:
+    async def update_state_sync(self, command_type: str, data: bytes, parameters: dict[str, Any]) -> None:
         """Compatibility wrapper used by tests to update state.
 
         Implemented as an async method so tests can `await` it directly.

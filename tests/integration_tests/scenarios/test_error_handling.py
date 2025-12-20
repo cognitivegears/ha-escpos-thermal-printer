@@ -1,13 +1,14 @@
 """Error handling integration tests for ESCPOS printer."""
 
+
 import pytest
-import asyncio
-from tests.integration_tests.fixtures import VerificationUtilities
+
 from tests.integration_tests.emulator import create_offline_error, create_paper_out_error
+from tests.integration_tests.fixtures import VerificationUtilities
 
 
 @pytest.mark.asyncio
-async def test_printer_offline_error(error_printer_server, ha_test_environment):
+async def test_printer_offline_error(error_printer_server, ha_test_environment) -> None:  # type: ignore[no-untyped-def]
     """Test handling of printer offline errors."""
     printer = error_printer_server
     ha_env = ha_test_environment
@@ -30,7 +31,7 @@ async def test_printer_offline_error(error_printer_server, ha_test_environment):
 
 
 @pytest.mark.asyncio
-async def test_connection_timeout_error(printer_with_ha):
+async def test_connection_timeout_error(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test handling of connection timeout errors."""
     printer, ha_env, config = printer_with_ha
 
@@ -53,7 +54,7 @@ async def test_connection_timeout_error(printer_with_ha):
 
 
 @pytest.mark.asyncio
-async def test_paper_out_error_simulation(printer_with_ha):
+async def test_paper_out_error_simulation(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test paper out error simulation."""
     printer, ha_env, config = printer_with_ha
 
@@ -66,7 +67,7 @@ async def test_paper_out_error_simulation(printer_with_ha):
 
 
 @pytest.mark.asyncio
-async def test_error_recovery(printer_with_ha):
+async def test_error_recovery(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test error recovery mechanisms."""
     printer, ha_env, config = printer_with_ha
 
@@ -92,7 +93,7 @@ async def test_error_recovery(printer_with_ha):
 
 
 @pytest.mark.asyncio
-async def test_programmable_error_conditions(printer_with_ha):
+async def test_programmable_error_conditions(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test programmable error conditions."""
     printer, ha_env, config = printer_with_ha
 
@@ -105,12 +106,16 @@ async def test_programmable_error_conditions(printer_with_ha):
 
     # Execute commands that should trigger the error
     for i in range(5):
-        await ha_env.hass.services.async_call(
-            'escpos_printer',
-            'print_text',
-            {'text': f'Command {i + 1}'},
-            blocking=True
-        )
+        try:
+            await ha_env.hass.services.async_call(
+                'escpos_printer',
+                'print_text',
+                {'text': f'Command {i + 1}'},
+                blocking=True
+            )
+        except Exception:
+            # Expected: errors will occur after offline condition triggers
+            pass
 
     await ha_env.async_block_till_done()
 
@@ -124,7 +129,7 @@ async def test_programmable_error_conditions(printer_with_ha):
 
 
 @pytest.mark.asyncio
-async def test_multiple_error_conditions(printer_with_ha):
+async def test_multiple_error_conditions(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test handling multiple simultaneous error conditions."""
     printer, ha_env, config = printer_with_ha
 
@@ -139,12 +144,16 @@ async def test_multiple_error_conditions(printer_with_ha):
 
     # Execute commands to trigger errors
     for i in range(6):
-        await ha_env.hass.services.async_call(
-            'escpos_printer',
-            'print_text',
-            {'text': f'Command {i + 1}'},
-            blocking=True
-        )
+        try:
+            await ha_env.hass.services.async_call(
+                'escpos_printer',
+                'print_text',
+                {'text': f'Command {i + 1}'},
+                blocking=True
+            )
+        except Exception:
+            # Expected: errors will occur after offline condition triggers
+            pass
 
     await ha_env.async_block_till_done()
 
@@ -159,7 +168,7 @@ async def test_multiple_error_conditions(printer_with_ha):
 
 
 @pytest.mark.asyncio
-async def test_error_condition_removal(printer_with_ha):
+async def test_error_condition_removal(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test removing error conditions."""
     printer, ha_env, config = printer_with_ha
 
@@ -180,7 +189,7 @@ async def test_error_condition_removal(printer_with_ha):
 
 
 @pytest.mark.asyncio
-async def test_error_simulation_reset(printer_with_ha):
+async def test_error_simulation_reset(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test resetting error simulator state."""
     printer, ha_env, config = printer_with_ha
 
@@ -208,7 +217,7 @@ async def test_error_simulation_reset(printer_with_ha):
 
 
 @pytest.mark.asyncio
-async def test_service_call_during_error(printer_with_ha):
+async def test_service_call_during_error(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test service calls during error conditions."""
     printer, ha_env, config = printer_with_ha
 
@@ -228,7 +237,7 @@ async def test_service_call_during_error(printer_with_ha):
             )
             service_calls.append(f'success_{i}')
         except Exception as e:
-            service_calls.append(f'error_{i}: {str(e)}')
+            service_calls.append(f'error_{i}: {e!s}')
 
     await ha_env.async_block_till_done()
 
@@ -241,9 +250,15 @@ async def test_service_call_during_error(printer_with_ha):
 
 
 @pytest.mark.asyncio
-async def test_error_state_persistence(printer_with_ha):
+async def test_error_state_persistence(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test that error states persist across multiple operations."""
     printer, ha_env, config = printer_with_ha
+
+    # Wait for any pending mirror operations from fixture initialization
+    await ha_env.async_block_till_done()
+
+    # Clear command history from fixture initialization
+    await printer.printer_state.clear_history()
 
     # Set initial error state
     await printer.simulate_error('paper_out')

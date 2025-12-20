@@ -1,18 +1,18 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from homeassistant.components.notify import NotifyEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from typing import Any
 
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> None:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> None:  # type: ignore[no-untyped-def]
     _LOGGER.debug("Setting up notify entity for entry %s", entry.entry_id)
     async_add_entities([EscposNotifyEntity(hass, entry)])
 
@@ -38,7 +38,7 @@ class EscposNotifyEntity(NotifyEntity):
         self._attr_name = f"ESC/POS Printer {entry.title}"
         self._attr_unique_id = f"{entry.entry_id}_notify"
 
-    async def async_send_message(self, message: str = "", **kwargs: Any) -> None:
+    async def async_send_message(self, message: str, title: str | None = None, **kwargs: Any) -> None:
         """Send a notification message to the thermal printer.
 
         Args:

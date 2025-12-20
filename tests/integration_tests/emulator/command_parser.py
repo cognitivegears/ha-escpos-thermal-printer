@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, Optional, Tuple
+from typing import Any
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ class EscposCommandParser:
         self._buffer = bytearray()
         self._current_encoding = "cp437"  # Default encoding
 
-    def parse_command(self, data: bytes) -> Optional[Dict[str, any]]:
+    def parse_command(self, data: bytes) -> dict[str, Any] | None:
         """Parse ESCPOS command from raw data.
 
         When called with an empty bytes object, this still attempts to parse
@@ -47,7 +47,7 @@ class EscposCommandParser:
 
         return commands[0] if commands else None
 
-    def _parse_single_command(self) -> Optional[Dict[str, any]]:
+    def _parse_single_command(self) -> dict[str, Any] | None:
         """Parse a single command from the buffer."""
         if len(self._buffer) < 1:
             return None
@@ -66,7 +66,7 @@ class EscposCommandParser:
             # Regular text data
             return self._parse_text_data()
 
-    def _parse_esc_command(self) -> Optional[Dict[str, any]]:
+    def _parse_esc_command(self) -> dict[str, Any] | None:
         """Parse ESC-prefixed commands."""
         if len(self._buffer) < 2:
             return None
@@ -102,7 +102,7 @@ class EscposCommandParser:
             self._buffer = self._buffer[2:]
             return None
 
-    def _parse_gs_command(self) -> Optional[Dict[str, any]]:
+    def _parse_gs_command(self) -> dict[str, Any] | None:
         """Parse GS-prefixed commands."""
         if len(self._buffer) < 2:
             return None
@@ -135,10 +135,10 @@ class EscposCommandParser:
             self._buffer = self._buffer[2:]
             return None
 
-    def _parse_simple_command(self, command_type: str, length: int) -> Dict[str, any]:
+    def _parse_simple_command(self, command_type: str, length: int) -> dict[str, Any]:
         """Parse a simple command with fixed length."""
         if len(self._buffer) < length:
-            return None
+            return {}  # Return empty dict instead of None
 
         raw_data = bytes(self._buffer[:length])
         self._buffer = self._buffer[length:]
@@ -149,7 +149,7 @@ class EscposCommandParser:
             'parameters': {}
         }
 
-    def _parse_print_mode_command(self) -> Optional[Dict[str, any]]:
+    def _parse_print_mode_command(self) -> dict[str, Any] | None:
         """Parse ESC ! n - Select print mode."""
         if len(self._buffer) < 3:
             return None
@@ -172,7 +172,7 @@ class EscposCommandParser:
             'parameters': parameters
         }
 
-    def _parse_underline_command(self) -> Optional[Dict[str, any]]:
+    def _parse_underline_command(self) -> dict[str, Any] | None:
         """Parse ESC - n - Underline mode."""
         if len(self._buffer) < 3:
             return None
@@ -189,7 +189,7 @@ class EscposCommandParser:
             'parameters': {'mode': underline_modes.get(n, 'none')}
         }
 
-    def _parse_justification_command(self) -> Optional[Dict[str, any]]:
+    def _parse_justification_command(self) -> dict[str, Any] | None:
         """Parse ESC a n - Select justification."""
         if len(self._buffer) < 3:
             return None
@@ -206,7 +206,7 @@ class EscposCommandParser:
             'parameters': {'alignment': alignments.get(n, 'left')}
         }
 
-    def _parse_feed_command(self) -> Optional[Dict[str, any]]:
+    def _parse_feed_command(self) -> dict[str, Any] | None:
         """Parse ESC d n - Print and feed n lines."""
         if len(self._buffer) < 3:
             return None
@@ -221,7 +221,7 @@ class EscposCommandParser:
             'parameters': {'lines': n}
         }
 
-    def _parse_codepage_command(self) -> Optional[Dict[str, any]]:
+    def _parse_codepage_command(self) -> dict[str, Any] | None:
         """Parse ESC t n - Select character code table."""
         if len(self._buffer) < 3:
             return None
@@ -246,7 +246,7 @@ class EscposCommandParser:
             'parameters': {'codepage': n, 'encoding': encoding}
         }
 
-    def _parse_cut_command(self) -> Optional[Dict[str, any]]:
+    def _parse_cut_command(self) -> dict[str, Any] | None:
         """Parse GS V m - Cut paper."""
         if len(self._buffer) < 3:
             return None
@@ -263,7 +263,7 @@ class EscposCommandParser:
             'parameters': {'mode': cut_modes.get(m, 'full')}
         }
 
-    def _parse_barcode_command(self) -> Optional[Dict[str, any]]:
+    def _parse_barcode_command(self) -> dict[str, Any] | None:
         """Parse GS k m d1...dk - Print barcode."""
         if len(self._buffer) < 4:
             return None
@@ -288,7 +288,7 @@ class EscposCommandParser:
             }
         }
 
-    def _parse_image_command(self) -> Optional[Dict[str, any]]:
+    def _parse_image_command(self) -> dict[str, Any] | None:
         """Parse GS ( L pL pH m d1...dk - Image command."""
         if len(self._buffer) < 6:
             return None
@@ -318,7 +318,7 @@ class EscposCommandParser:
             }
         }
 
-    def _parse_hri_position_command(self) -> Optional[Dict[str, any]]:
+    def _parse_hri_position_command(self) -> dict[str, Any] | None:
         """Parse GS H n - Select print position of HRI characters."""
         if len(self._buffer) < 3:
             return None
@@ -335,7 +335,7 @@ class EscposCommandParser:
             'parameters': {'position': positions.get(n, 'below')}
         }
 
-    def _parse_hri_font_command(self) -> Optional[Dict[str, any]]:
+    def _parse_hri_font_command(self) -> dict[str, Any] | None:
         """Parse GS f n - Select font for HRI characters."""
         if len(self._buffer) < 3:
             return None
@@ -352,7 +352,7 @@ class EscposCommandParser:
             'parameters': {'font': fonts.get(n, 'A')}
         }
 
-    def _parse_barcode_width_command(self) -> Optional[Dict[str, any]]:
+    def _parse_barcode_width_command(self) -> dict[str, Any] | None:
         """Parse GS w n - Set barcode width."""
         if len(self._buffer) < 3:
             return None
@@ -367,7 +367,7 @@ class EscposCommandParser:
             'parameters': {'width': max(2, min(6, n))}
         }
 
-    def _parse_barcode_height_command(self) -> Optional[Dict[str, any]]:
+    def _parse_barcode_height_command(self) -> dict[str, Any] | None:
         """Parse GS h n - Set barcode height."""
         if len(self._buffer) < 3:
             return None
@@ -382,7 +382,7 @@ class EscposCommandParser:
             'parameters': {'height': max(1, min(255, n))}
         }
 
-    def _parse_text_data(self) -> Optional[Dict[str, any]]:
+    def _parse_text_data(self) -> dict[str, Any] | None:
         """Parse regular text data."""
         # Find the next command or control character
         end_pos = 0

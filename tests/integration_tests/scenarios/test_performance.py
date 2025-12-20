@@ -2,24 +2,22 @@
 
 import asyncio
 import time
-import pytest
-from typing import List, Dict, Any
-from concurrent.futures import ThreadPoolExecutor
 
-from tests.integration_tests.emulator import VirtualPrinter
-from tests.integration_tests.fixtures import MockDataGenerator, VerificationUtilities
+import pytest
+
+from tests.integration_tests.fixtures import MockDataGenerator
 
 
 class TestPerformance:
     """Test performance characteristics and load handling."""
 
     @pytest.mark.asyncio
-    async def test_concurrent_print_jobs(self, virtual_printer):
+    async def test_concurrent_print_jobs(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test handling of multiple concurrent print jobs."""
         printer_state = virtual_printer.printer_state
 
         # Create multiple concurrent print tasks
-        async def print_job(job_id: int):
+        async def print_job(job_id: int) -> int:
             text = MockDataGenerator.generate_text_content(100)  # 100 chars each
             await printer_state.update_state_sync('text', text.encode(), {})
             if job_id % 5 == 0:  # Every 5th job, feed paper
@@ -48,7 +46,7 @@ class TestPerformance:
         assert len(history) > 0
 
     @pytest.mark.asyncio
-    async def test_high_frequency_operations(self, virtual_printer):
+    async def test_high_frequency_operations(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test rapid succession of print operations."""
         printer_state = virtual_printer.printer_state
 
@@ -78,7 +76,7 @@ class TestPerformance:
         assert len(history) > 0
 
     @pytest.mark.asyncio
-    async def test_memory_usage_under_load(self, virtual_printer):
+    async def test_memory_usage_under_load(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test memory usage patterns under load."""
         printer_state = virtual_printer.printer_state
 
@@ -106,7 +104,7 @@ class TestPerformance:
         assert len(history) > 0
 
     @pytest.mark.asyncio
-    async def test_batch_processing_efficiency(self, virtual_printer):
+    async def test_batch_processing_efficiency(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test efficiency of batch processing operations."""
         printer_state = virtual_printer.printer_state
 
@@ -152,7 +150,7 @@ class TestPerformance:
         assert len(history) >= batch_size  # At least one print job per batch item
 
     @pytest.mark.asyncio
-    async def test_resource_cleanup_under_load(self, virtual_printer):
+    async def test_resource_cleanup_under_load(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test proper resource cleanup during high load operations."""
         printer_state = virtual_printer.printer_state
 
@@ -187,11 +185,11 @@ class TestPerformance:
         assert final_status['online'] is True
 
     @pytest.mark.asyncio
-    async def test_thread_safety_under_concurrency(self, virtual_printer):
+    async def test_thread_safety_under_concurrency(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test thread safety when multiple threads access printer concurrently."""
         printer_state = virtual_printer.printer_state
 
-        async def concurrent_worker(worker_id: int, num_operations: int):
+        async def concurrent_worker(worker_id: int, num_operations: int) -> tuple[int, int]:
             """Worker function that performs multiple operations."""
             for i in range(num_operations):
                 text = f"Worker {worker_id}, Op {i}"
@@ -232,7 +230,7 @@ class TestPerformance:
         assert len(history) > 0
 
     @pytest.mark.asyncio
-    async def test_response_time_consistency(self, virtual_printer):
+    async def test_response_time_consistency(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test that response times remain consistent under load."""
         printer_state = virtual_printer.printer_state
 
@@ -268,7 +266,7 @@ class TestPerformance:
             assert response_ratio < 10
 
     @pytest.mark.asyncio
-    async def test_scalability_with_increasing_load(self, virtual_printer):
+    async def test_scalability_with_increasing_load(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
         """Test how performance scales with increasing load."""
         printer_state = virtual_printer.printer_state
 

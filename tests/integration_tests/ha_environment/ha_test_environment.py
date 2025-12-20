@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
+from collections.abc import Callable
 
-from homeassistant.core import HomeAssistant
 from homeassistant.const import EVENT_CALL_SERVICE, EVENT_STATE_CHANGED
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.template import Template
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers import device_registry as dr
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.escpos_printer.const import DOMAIN
@@ -22,11 +21,11 @@ _LOGGER = logging.getLogger(__name__)
 class StateChangeSimulator:
     """Simulates state changes for Home Assistant entities."""
 
-    def __init__(self, hass: HomeAssistant):
+    def __init__(self, hass: HomeAssistant) -> None:
         """Initialize the state change simulator."""
         self.hass = hass
 
-    async def set_state(self, entity_id: str, state: str, attributes: Optional[Dict[str, Any]] = None) -> None:
+    async def set_state(self, entity_id: str, state: str, attributes: dict[str, Any] | None = None) -> None:
         """Set the state of an entity."""
         if attributes is None:
             attributes = {}
@@ -35,7 +34,7 @@ class StateChangeSimulator:
         _LOGGER.debug("Set state: %s = %s (attributes: %s)", entity_id, state, attributes)
 
     async def trigger_state_change(self, entity_id: str, from_state: str, to_state: str,
-                                  attributes: Optional[Dict[str, Any]] = None) -> None:
+                                  attributes: dict[str, Any] | None = None) -> None:
         """Trigger a state change from one value to another."""
         # Set initial state
         await self.set_state(entity_id, from_state)
@@ -65,18 +64,61 @@ class StateChangeSimulator:
 class AutomationTester:
     """Tests automation execution in Home Assistant."""
 
-    def __init__(self, hass: HomeAssistant):
+    def __init__(self, hass: HomeAssistant) -> None:
         """Initialize the automation tester."""
         self.hass = hass
-        self._automations: Dict[str, Dict[str, Any]] = {}
-        self._unsub_state = None
-        self._tracker = None
+        self._automations: dict[str, dict[str, Any]] = {}
+        self._unsub_state: Callable[[], None] | None = None
+        self._tracker: Callable[[dict[str, Any]], None] | None = None
 
-    def set_service_tracker(self, callback) -> None:
+    def set_service_tracker(self, callback: Callable[[dict[str, Any]], None]) -> None:
         """Register a callback to record service calls (domain, service, data)."""
         self._tracker = callback
 
-    async def load_automation(self, automation_config: Dict[str, Any]) -> str:
+    async def _execute_automation_actions(self, actions: list[dict[str, Any]], automation_id: str) -> None:
+        """Execute automation actions sequentially.
+
+        This method ensures actions are executed one at a time, matching real
+        Home Assistant behavior and preventing race conditions in tests.
+
+        Args:
+            actions: List of action configurations to execute
+            automation_id: ID of the automation being executed
+        """
+        for act in actions:
+            if not act:
+                continue
+
+            try:
+                service = act.get("service")
+                data = dict(act.get("data") or {})
+
+                # Render templates in 'text' if present
+                txt = data.get("text")
+                if isinstance(txt, str) and ("{{" in txt):
+                    try:
+                        tmpl = Template(txt, self.hass)
+                        data["text"] = tmpl.render()
+                    except Exception:
+                        pass
+
+                if service and "." in service:
+                    domain, srv = service.split(".", 1)
+
+                    # Execute the service call, awaiting completion before proceeding
+                    # This ensures sequential execution matching real HA behavior
+                    # The async_call naturally fires EVENT_CALL_SERVICE which the tracker listens to
+                    try:
+                        await self.hass.services.async_call(domain, srv, data, blocking=True)
+                    except Exception as e:
+                        # Log but continue with remaining actions, matching HA behavior
+                        _LOGGER.debug("Action failed in automation %s: %s", automation_id, e)
+
+            except Exception as e:
+                # Log but continue processing remaining actions
+                _LOGGER.debug("Error processing action in automation %s: %s", automation_id, e)
+
+    async def load_automation(self, automation_config: dict[str, Any]) -> str:
         """Load an automation into Home Assistant."""
         automation_id = automation_config.get('id', f"test_automation_{len(self._automations)}")
 
@@ -97,7 +139,7 @@ class AutomationTester:
         _LOGGER.debug("Loaded automation: %s", automation_id)
         # Ensure state listener is registered once
         if self._unsub_state is None:
-            def _on_state(event):
+            def _on_state(event: Any) -> None:
                 try:
                     ent_id = event.data.get("entity_id")
                     new_state = event.data.get("new_state").state if event.data.get("new_state") else None
@@ -123,9 +165,8 @@ class AutomationTester:
                             if to_match == "changed":
                                 if new_state == old_state:
                                     continue
-                            else:
-                                if to_match is not None and new_state != to_match:
-                                    continue
+                            elif to_match is not None and new_state != to_match:
+                                continue
                             if from_match is not None and old_state != from_match:
                                 continue
                             triggered = True
@@ -139,59 +180,22 @@ class AutomationTester:
                                 pass
                             elif not self._conditions_met(cond):
                                 continue
-                        # Actions
+                        # Actions - execute sequentially to match real HA behavior
                         action = cfg.get("action")
                         actions = action if isinstance(action, list) else [action]
-                        for act in actions:
-                            if not act:
-                                continue
-                            service = act.get("service")
-                            data = dict(act.get("data") or {})
-                            # Render templates in 'text' if present
-                            txt = data.get("text")
-                            if isinstance(txt, str) and ("{{" in txt):
-                                try:
-                                    tmpl = Template(txt, self.hass)
-                                    data["text"] = tmpl.render()
-                                except Exception:
-                                    pass
-                            if service and "." in service:
-                                domain, srv = service.split(".", 1)
-                                # Emit call_service for tracker and schedule actual call
-                                try:
-                                    self.hass.bus.async_fire(EVENT_CALL_SERVICE, {
-                                        "domain": domain,
-                                        "service": srv,
-                                        "service_data": data,
-                                    })
-                                except Exception:
-                                    pass
-                                # Record via injected tracker for tests
-                                try:
-                                    if self._tracker:
-                                        self._tracker({
-                                            "domain": domain,
-                                            "service": srv,
-                                            "data": data,
-                                            "timestamp": asyncio.get_event_loop().time(),
-                                        })
-                                except Exception:
-                                    pass
-                                # Schedule the actual service call in the HA loop safely
-                                try:
-                                    # Schedule coroutine in HA loop from any context
-                                    fut = asyncio.run_coroutine_threadsafe(
-                                        self.hass.services.async_call(domain, srv, data, blocking=True),
-                                        self.hass.loop,
-                                    )
-                                    # We don't block on result here
-                                except Exception:
-                                    pass
+                        # Schedule sequential execution in the HA event loop
+                        try:
+                            asyncio.run_coroutine_threadsafe(
+                                self._execute_automation_actions(actions, aid),
+                                self.hass.loop,
+                            )
+                        except Exception as e:
+                            _LOGGER.debug("Failed to schedule automation actions for %s: %s", aid, e)
                 except Exception as e:
                     _LOGGER.exception("Automation runner error: %s", e)
 
             self._unsub_state = self.hass.bus.async_listen(EVENT_STATE_CHANGED, _on_state)
-        return automation_id
+        return str(automation_id)
 
     def _conditions_met(self, cond: Any) -> bool:
         # Support simple 'and' of state conditions and single state condition
@@ -213,7 +217,7 @@ class AutomationTester:
             return False
         return True
 
-    async def trigger_automation(self, automation_id: str, trigger_data: Dict[str, Any]) -> None:
+    async def trigger_automation(self, automation_id: str, trigger_data: dict[str, Any]) -> None:
         """Trigger an automation manually."""
         if automation_id not in self._automations:
             raise ValueError(f"Automation {automation_id} not found")
@@ -235,7 +239,7 @@ class AutomationTester:
         state = self.hass.states.get(entity_id)
         return state is not None
 
-    async def verify_actions_executed(self, expected_actions: List[str]) -> bool:
+    async def verify_actions_executed(self, expected_actions: list[str]) -> bool:
         """Verify that expected actions were executed."""
         # This is a simplified implementation
         # In practice, you'd need to track service calls or other actions
@@ -246,11 +250,11 @@ class AutomationTester:
 class NotificationTester:
     """Tests notification functionality with the printer."""
 
-    def __init__(self, hass: HomeAssistant):
+    def __init__(self, hass: HomeAssistant) -> None:
         """Initialize the notification tester."""
         self.hass = hass
-        self._notifications: List[Dict[str, Any]] = []
-        self._default_entity_id: Optional[str] = None
+        self._notifications: list[dict[str, Any]] = []
+        self._default_entity_id: str | None = None
 
     def set_default_entity_id(self, entity_id: str) -> None:
         if not entity_id.startswith("notify."):
@@ -258,7 +262,7 @@ class NotificationTester:
         self._default_entity_id = entity_id
 
     async def send_notification(self, message: str, target: str = "escpos_printer",
-                               title: Optional[str] = None) -> None:
+                               title: str | None = None) -> None:
         """Send a notification to the printer."""
         notification_data = {
             "message": message,
@@ -290,7 +294,7 @@ class NotificationTester:
         # For now, we'll assume success if notifications were sent
         return await self.verify_notification_sent()
 
-    def get_notifications(self) -> List[Dict[str, Any]]:
+    def get_notifications(self) -> list[dict[str, Any]]:
         """Get the list of sent notifications."""
         return self._notifications.copy()
 
@@ -298,18 +302,21 @@ class NotificationTester:
 class HATestEnvironment:
     """Home Assistant test environment for integration testing."""
 
-    def __init__(self, hass: HomeAssistant):
+    def __init__(self, hass: HomeAssistant) -> None:
         """Initialize the HA test environment."""
         self.hass = hass
-        self.config_entry: Optional[MockConfigEntry] = None
+        self.config_entry: MockConfigEntry | None = None
         self.state_simulator = StateChangeSimulator(hass)
         self.automation_tester = AutomationTester(hass)
         self.notification_tester = NotificationTester(hass)
-        self._service_calls: List[Dict[str, Any]] = []
-        self._printer_server = None
+        self._service_calls: list[dict[str, Any]] = []
+        self._printer_server: Any = None
         self._fallback_mode = False
+        self._unsub_service: Callable[[], None] | None = None
+        self._pending_mirror_futures: list[concurrent.futures.Future[Any]] = []
+        self._mirror_lock = asyncio.Lock()
 
-    def set_printer_server(self, server) -> None:
+    def set_printer_server(self, server: Any) -> None:
         self._printer_server = server
 
     async def setup(self) -> None:
@@ -317,7 +324,7 @@ class HATestEnvironment:
         _LOGGER.info("Setting up HA test environment")
 
         # Set up service call tracking via event bus (modern HA pattern)
-        def _on_call(event):
+        def _on_call(event: Any) -> None:
             try:
                 data = event.data or {}
                 call_info = {
@@ -337,8 +344,9 @@ class HATestEnvironment:
                     if self._printer_server and call_info["domain"] == "escpos_printer":
                         svc = call_info["service"]
                         svc_data = call_info.get("data") or {}
-                        from tests.integration_tests.emulator.printer_state import Command
                         from datetime import datetime
+
+                        from tests.integration_tests.emulator.printer_state import Command
                         cmd_type = None
                         raw = b""
                         params = {}
@@ -366,8 +374,13 @@ class HATestEnvironment:
                                 self._printer_server.printer_state.start_new_text_block()
                             except Exception:
                                 pass
-                            # Schedule update on loop
-                            asyncio.run_coroutine_threadsafe(self._printer_server.printer_state.update_state(cmd), self.hass.loop)
+                            # Schedule update on loop and track the future for synchronization
+                            future = asyncio.run_coroutine_threadsafe(self._printer_server.printer_state.update_state(cmd), self.hass.loop)
+                            try:
+                                # Track the future so we can wait for it before assertions
+                                self._pending_mirror_futures.append(future)
+                            except Exception:
+                                pass
                             # Do not add duplicate print_history entries here; update_state already records text
                             # Also feed the error simulator so programmable errors can trigger
                             try:
@@ -375,7 +388,11 @@ class HATestEnvironment:
                                 if es is not None:
                                     bumps = 3 if cmd_type == "text" else 1
                                     for _ in range(bumps):
-                                        asyncio.run_coroutine_threadsafe(es.process_command(cmd_type), self.hass.loop)
+                                        future = asyncio.run_coroutine_threadsafe(es.process_command(cmd_type), self.hass.loop)
+                                        try:
+                                            self._pending_mirror_futures.append(future)
+                                        except Exception:
+                                            pass
                             except Exception:
                                 pass
                 except Exception:
@@ -446,9 +463,41 @@ class HATestEnvironment:
         # Route automation tester service tracking into our list
         self.automation_tester.set_service_tracker(lambda call: self._service_calls.append(call))
 
+    async def _wait_for_mirror_operations(self, timeout: float = 2.0) -> None:
+        """Wait for all pending mirror operations to complete.
+
+        This ensures that asynchronous service call mirroring has finished
+        before tests check command counts or clear history, preventing race conditions.
+        """
+        if not self._pending_mirror_futures:
+            return
+
+        # Get a copy of current futures and clear the list
+        async with self._mirror_lock:
+            futures_to_wait = self._pending_mirror_futures.copy()
+            self._pending_mirror_futures.clear()
+
+        # Wait for all futures with timeout
+        if futures_to_wait:
+            try:
+                # Use concurrent.futures.wait with timeout
+                done, pending = concurrent.futures.wait(
+                    futures_to_wait,
+                    timeout=timeout,
+                    return_when=concurrent.futures.ALL_COMPLETED
+                )
+                # Log if any didn't complete
+                if pending:
+                    _LOGGER.warning("Some mirror operations did not complete in time: %d pending", len(pending))
+            except Exception as e:
+                _LOGGER.debug("Error waiting for mirror operations: %s", e)
+
     async def teardown(self) -> None:
         """Clean up the test environment."""
         _LOGGER.info("Tearing down HA test environment")
+
+        # Wait for any pending mirror operations before cleanup
+        await self._wait_for_mirror_operations()
 
         # Unsubscribe service call listener
         if hasattr(self, "_unsub_service") and self._unsub_service:
@@ -461,7 +510,7 @@ class HATestEnvironment:
         # Clear tracked data
         self._service_calls.clear()
 
-    async def initialize_integration(self, config: Dict[str, Any]) -> MockConfigEntry:
+    async def initialize_integration(self, config: dict[str, Any]) -> MockConfigEntry:
         """Initialize the ESCPOS printer integration."""
         # Create a mock config entry
         entry = MockConfigEntry(
@@ -481,9 +530,13 @@ class HATestEnvironment:
             # Fallback: Minimal in-test setup of services without platform forwarding
             try:
                 domain_str = "escpos_printer"
-                from custom_components.escpos_printer.printer import EscposPrinterAdapter, PrinterConfig
                 from homeassistant.core import ServiceCall
                 from homeassistant.exceptions import HomeAssistantError
+
+                from custom_components.escpos_printer.printer import (
+                    EscposPrinterAdapter,
+                    PrinterConfig,
+                )
 
                 pcfg = PrinterConfig(
                     host=entry.data.get("host"),
@@ -577,7 +630,7 @@ class HATestEnvironment:
         self.notification_tester.set_default_entity_id(f"notify.esc_pos_printer_{host}_{port}")
         return entry
 
-    async def get_integration_state(self) -> Dict[str, Any]:
+    async def get_integration_state(self) -> dict[str, Any]:
         """Get the current state of the integration."""
         if not self.config_entry:
             return {"status": "not_initialized"}
@@ -590,7 +643,7 @@ class HATestEnvironment:
             "options": self.config_entry.options
         }
 
-    def get_service_calls(self, domain: Optional[str] = None, service: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_service_calls(self, domain: str | None = None, service: str | None = None) -> list[dict[str, Any]]:
         """Get tracked service calls, optionally filtered by domain and service."""
         calls = self._service_calls
 
@@ -602,14 +655,19 @@ class HATestEnvironment:
         return calls
 
     async def async_block_till_done(self) -> None:
-        """Block until all pending tasks are done."""
+        """Block until all pending tasks are done.
+
+        This includes both Home Assistant's internal tasks and our
+        asynchronous service call mirroring operations.
+        """
+        await self._wait_for_mirror_operations()
         await self.hass.async_block_till_done()
         # Allow network I/O (socket writes/reads) to settle between HA tasks
         await asyncio.sleep(0.2)
 
     async def create_test_entity(self, entity_id: str, entity_type: str,
                                 initial_state: str = "unknown",
-                                attributes: Optional[Dict[str, Any]] = None) -> None:
+                                attributes: dict[str, Any] | None = None) -> None:
         """Create a test entity for automation testing."""
         if attributes is None:
             attributes = {}

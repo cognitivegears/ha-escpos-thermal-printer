@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import socket
-from typing import Dict, List, Optional
+from typing import Any
 
 from .command_parser import EscposCommandParser
 from .error_simulator import ErrorSimulator
@@ -19,7 +18,7 @@ class ClientConnection:
 
     def __init__(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter,
                  printer_state: PrinterState, command_parser: EscposCommandParser,
-                 error_simulator: Optional[ErrorSimulator] = None):
+                 error_simulator: ErrorSimulator | None = None) -> None:
         """Initialize client connection."""
         self.reader = reader
         self.writer = writer
@@ -56,8 +55,9 @@ class ClientConnection:
     async def _process_data(self, data: bytes) -> None:
         """Process received data and update printer state."""
         # Parse and process all commands from the buffered data
-        from .printer_state import Command
         from datetime import datetime
+
+        from .printer_state import Command
 
         command = self.command_parser.parse_command(data)
         while command:
@@ -83,7 +83,7 @@ class ClientConnection:
             # Parse next command from buffer (no new data)
             command = self.command_parser.parse_command(b"")
 
-    async def _send_response(self, command: Dict) -> None:
+    async def _send_response(self, command: dict) -> None:
         """Send appropriate response based on command type."""
         # Most ESCPOS commands don't require responses, but some do
         # For now, we'll implement basic responses for status queries
@@ -95,7 +95,7 @@ class ClientConnection:
             self.writer.write(response)
             await self.writer.drain()
 
-    def _create_status_response(self, status: Dict) -> bytes:
+    def _create_status_response(self, status: dict) -> bytes:
         """Create a status response byte sequence."""
         # This is a simplified status response
         # Real printers have specific status byte formats
@@ -116,13 +116,13 @@ class ClientConnection:
 class VirtualPrinterServer:
     """Virtual ESCPOS printer server that emulates a thermal printer."""
 
-    def __init__(self, host: str = '127.0.0.1', port: int = 9100, timeout: float = 5.0):
+    def __init__(self, host: str = '127.0.0.1', port: int = 9100, timeout: float = 5.0) -> None:
         """Initialize the virtual printer server."""
         self.host = host
         self.port = port
         self.timeout = timeout
-        self.server: Optional[asyncio.AbstractServer] = None
-        self.clients: List[ClientConnection] = []
+        self.server: asyncio.AbstractServer | None = None
+        self.clients: list[ClientConnection] = []
         self.printer_state = PrinterState()
         self.command_parser = EscposCommandParser()
         self._running = False
@@ -209,15 +209,15 @@ class VirtualPrinterServer:
         await self.printer_state.simulate_error(error_type)
         _LOGGER.info("Simulated printer error: %s", error_type)
 
-    async def get_print_history(self) -> List:
+    async def get_print_history(self) -> list:
         """Get the complete print history."""
         return await self.printer_state.get_print_history()
 
-    async def get_command_log(self) -> List:
+    async def get_command_log(self) -> list:
         """Get the complete command log."""
         return await self.printer_state.get_command_log()
 
-    async def get_status(self) -> Dict:
+    async def get_status(self) -> dict:
         """Get current printer status."""
         return await self.printer_state.get_status()
 
@@ -246,10 +246,10 @@ class VirtualPrinterServer:
 class VirtualPrinter:
     """Context manager for the virtual printer server."""
 
-    def __init__(self, host: str = '127.0.0.1', port: int = 9100, timeout: float = 5.0):
+    def __init__(self, host: str = '127.0.0.1', port: int = 9100, timeout: float = 5.0) -> None:
         """Initialize the virtual printer context manager."""
         self.server = VirtualPrinterServer(host, port, timeout)
-        self._task: Optional[asyncio.Task] = None
+        self._task: asyncio.Task | None = None
 
     async def __aenter__(self) -> VirtualPrinterServer:
         """Start the virtual printer server."""
@@ -258,7 +258,7 @@ class VirtualPrinter:
         await asyncio.sleep(0.1)
         return self.server
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Stop the virtual printer server."""
         await self.server.stop()
         if self._task and not self._task.done():

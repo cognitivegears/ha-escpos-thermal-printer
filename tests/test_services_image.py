@@ -6,7 +6,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.escpos_printer.const import DOMAIN
 
 
-async def test_print_image_service_local(hass, tmp_path):
+async def test_print_image_service_local(hass, tmp_path):  # type: ignore[no-untyped-def]
     img_path = tmp_path / "img.png"
     Image.new("RGB", (10, 10)).save(img_path)
 

@@ -1,11 +1,12 @@
 """Automation integration tests for ESCPOS printer."""
 
 import pytest
-from tests.integration_tests.fixtures import VerificationUtilities, MockDataGenerator
+
+from tests.integration_tests.fixtures import MockDataGenerator, VerificationUtilities
 
 
 @pytest.mark.asyncio
-async def test_state_triggered_print_automation(printer_with_ha, automation_config):
+async def test_state_triggered_print_automation(printer_with_ha, automation_config) -> None:  # type: ignore[no-untyped-def]
     """Test automation that prints when a state changes."""
     printer, ha_env, config = printer_with_ha
 
@@ -40,7 +41,7 @@ async def test_state_triggered_print_automation(printer_with_ha, automation_conf
 
 
 @pytest.mark.asyncio
-async def test_multiple_state_triggers(printer_with_ha):
+async def test_multiple_state_triggers(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test automation with multiple state triggers."""
     printer, ha_env, config = printer_with_ha
 
@@ -103,7 +104,7 @@ async def test_multiple_state_triggers(printer_with_ha):
 
 
 @pytest.mark.asyncio
-async def test_conditional_print_automation(printer_with_ha):
+async def test_conditional_print_automation(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test automation with conditions for printing."""
     printer, ha_env, config = printer_with_ha
 
@@ -180,7 +181,7 @@ async def test_conditional_print_automation(printer_with_ha):
 
 
 @pytest.mark.asyncio
-async def test_notification_triggered_print(printer_with_ha):
+async def test_notification_triggered_print(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test printing triggered by notifications."""
     printer, ha_env, config = printer_with_ha
 
@@ -209,9 +210,12 @@ async def test_notification_triggered_print(printer_with_ha):
 
 
 @pytest.mark.asyncio
-async def test_automation_sequence_with_multiple_services(printer_with_ha):
+async def test_automation_sequence_with_multiple_services(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test automation that calls multiple printer services in sequence."""
     printer, ha_env, config = printer_with_ha
+
+    # Clear command history from fixture initialization
+    await printer.printer_state.clear_history()
 
     # Create automation with multiple service calls
     sequence_config = {
@@ -294,7 +298,7 @@ async def test_automation_sequence_with_multiple_services(printer_with_ha):
 
 
 @pytest.mark.asyncio
-async def test_automation_with_template_data(printer_with_ha):
+async def test_automation_with_template_data(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test automation that uses template data for printing."""
     printer, ha_env, config = printer_with_ha
 
@@ -343,7 +347,7 @@ async def test_automation_with_template_data(printer_with_ha):
 
 
 @pytest.mark.asyncio
-async def test_automation_error_handling(printer_with_ha):
+async def test_automation_error_handling(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test automation behavior when printer errors occur."""
     printer, ha_env, config = printer_with_ha
 

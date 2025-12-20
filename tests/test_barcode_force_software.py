@@ -1,33 +1,33 @@
 from __future__ import annotations
 
-import asyncio
+from typing import Any
 import pytest
 
 from custom_components.escpos_printer.printer import EscposPrinterAdapter, PrinterConfig
 
 
 class HassStub:
-    async def async_add_executor_job(self, func, *args, **kwargs):
+    async def async_add_executor_job(self, func: Any, *args: Any, **kwargs: Any) -> Any:
         # Execute synchronously in tests
         return func(*args, **kwargs)
 
 
 class FakePrinterAcceptFS:
-    def __init__(self):
-        self.calls = []
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str, dict[str, Any]]] = []
 
-    def set(self, **kwargs):
+    def set(self, **kwargs: Any) -> None:
         pass
 
-    def barcode(self, code, bc, **kwargs):
+    def barcode(self, code: str, bc: str, **kwargs: Any) -> None:
         self.calls.append((code, bc, kwargs))
 
-    def close(self):
+    def close(self) -> None:
         pass
 
 
 class FakePrinterRejectFS(FakePrinterAcceptFS):
-    def barcode(self, code, bc, **kwargs):
+    def barcode(self, code: str, bc: str, **kwargs: Any) -> None:
         if "force_software" in kwargs:
             # Simulate older python-escpos rejecting the kwarg
             raise TypeError("unexpected keyword argument 'force_software'")
@@ -35,11 +35,11 @@ class FakePrinterRejectFS(FakePrinterAcceptFS):
 
 
 @pytest.mark.asyncio
-async def test_barcode_passes_force_software(monkeypatch):
-    created = []
+async def test_barcode_passes_force_software(monkeypatch: Any) -> None:
+    created: list[FakePrinterAcceptFS] = []
 
-    def fake_network():
-        def _factory(*args, **kwargs):
+    def fake_network() -> Any:
+        def _factory(*args: Any, **kwargs: Any) -> FakePrinterAcceptFS:
             inst = FakePrinterAcceptFS()
             created.append(inst)
             return inst
@@ -72,11 +72,11 @@ async def test_barcode_passes_force_software(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_barcode_retries_without_force_software(monkeypatch):
-    created = []
+async def test_barcode_retries_without_force_software(monkeypatch: Any) -> None:
+    created: list[FakePrinterRejectFS] = []
 
-    def fake_network():
-        def _factory(*args, **kwargs):
+    def fake_network() -> Any:
+        def _factory(*args: Any, **kwargs: Any) -> FakePrinterRejectFS:
             inst = FakePrinterRejectFS()
             created.append(inst)
             return inst

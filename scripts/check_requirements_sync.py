@@ -14,7 +14,6 @@ from __future__ import annotations
 import json
 import pathlib
 import sys
-from typing import Dict
 
 try:
     import tomllib  # Python 3.11+
@@ -25,24 +24,23 @@ except Exception:  # pragma: no cover
 from packaging.requirements import Requirement
 from packaging.specifiers import SpecifierSet
 
-
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
-def parse_pyproject() -> Dict[str, SpecifierSet]:
+def parse_pyproject() -> dict[str, SpecifierSet]:
     data = tomllib.loads((ROOT / "pyproject.toml").read_text())
     deps = data.get("project", {}).get("dependencies", [])
-    result: Dict[str, SpecifierSet] = {}
+    result: dict[str, SpecifierSet] = {}
     for dep in deps:
         r = Requirement(dep)
         result[r.name.lower()] = r.specifier
     return result
 
 
-def parse_manifest() -> Dict[str, SpecifierSet]:
+def parse_manifest() -> dict[str, SpecifierSet]:
     data = json.loads((ROOT / "custom_components" / "escpos_printer" / "manifest.json").read_text())
     reqs = data.get("requirements", [])
-    result: Dict[str, SpecifierSet] = {}
+    result: dict[str, SpecifierSet] = {}
     for dep in reqs:
         r = Requirement(dep)
         result[r.name.lower()] = r.specifier

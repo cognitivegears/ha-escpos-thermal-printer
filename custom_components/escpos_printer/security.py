@@ -253,7 +253,7 @@ def validate_numeric_input(value: Any, min_val: int, max_val: int, field_name: s
     return num_value
 
 
-def sanitize_log_message(message: str, sensitive_fields: list[str] = None) -> str:
+def sanitize_log_message(message: str, sensitive_fields: list[str] | None = None) -> str:
     """Sanitize log messages to prevent information disclosure.
 
     Args:
@@ -272,7 +272,7 @@ def sanitize_log_message(message: str, sensitive_fields: list[str] = None) -> st
     for field in sensitive_fields:
         # Pattern to match field=value in logs
         pattern = rf'({field})=([^\s,)]+)'
-        sanitized = re.sub(pattern, rf'\1=[REDACTED]', sanitized, flags=re.IGNORECASE)
+        sanitized = re.sub(pattern, r'\1=[REDACTED]', sanitized, flags=re.IGNORECASE)
 
     return sanitized
 
@@ -299,9 +299,9 @@ def validate_timeout(timeout: float) -> float:
 
 
 # Security-focused validation decorators
-def secure_service_call(func):
+def secure_service_call(func):  # type: ignore[no-untyped-def]
     """Decorator to add security validation to service calls."""
-    async def wrapper(*args, **kwargs):
+    async def wrapper(*args, **kwargs):  # type: ignore[no-untyped-def]
         # Add any cross-cutting security validations here
         return await func(*args, **kwargs)
     return wrapper

@@ -6,7 +6,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.escpos_printer.const import DOMAIN
 
 
-async def _setup_entry(hass):
+async def _setup_entry(hass):  # type: ignore[no-untyped-def]
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="1.2.3.4:9100",
@@ -20,7 +20,7 @@ async def _setup_entry(hass):
     return entry
 
 
-async def test_print_text_service(hass):
+async def test_print_text_service(hass):  # type: ignore[no-untyped-def]
     entry = await _setup_entry(hass)
 
     fake = MagicMock()

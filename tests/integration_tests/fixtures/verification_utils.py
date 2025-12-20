@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from tests.integration_tests.emulator import PrintJob, Command
+from tests.integration_tests.emulator import Command, PrintJob
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -14,8 +14,8 @@ class VerificationUtilities:
     """Utilities for verifying test results and printer behavior."""
 
     @staticmethod
-    def verify_printer_received(command_type: str, print_history: List[PrintJob],
-                               command_log: List[Command]) -> bool:
+    def verify_printer_received(command_type: str, print_history: list[PrintJob],
+                               command_log: list[Command]) -> bool:
         """Verify that the printer received a specific type of command."""
         # Check command log for the command type
         matching_commands = [cmd for cmd in command_log if cmd.command_type == command_type]
@@ -28,7 +28,7 @@ class VerificationUtilities:
         return True
 
     @staticmethod
-    def verify_print_content(expected_content: str, print_history: List[PrintJob]) -> bool:
+    def verify_print_content(expected_content: str, print_history: list[PrintJob]) -> bool:
         """Verify that specific content was printed."""
         for job in print_history:
             if job.content_type == "text":
@@ -42,7 +42,7 @@ class VerificationUtilities:
         return False
 
     @staticmethod
-    def compare_print_history(expected_jobs: List[Dict[str, Any]], actual_jobs: List[PrintJob]) -> bool:
+    def compare_print_history(expected_jobs: list[dict[str, Any]], actual_jobs: list[PrintJob]) -> bool:
         """Compare expected print jobs with actual print history."""
         if len(expected_jobs) != len(actual_jobs):
             _LOGGER.warning("Print history length mismatch: expected %d, got %d",
@@ -58,7 +58,7 @@ class VerificationUtilities:
         return True
 
     @staticmethod
-    def _compare_print_job(expected: Dict[str, Any], actual: PrintJob) -> bool:
+    def _compare_print_job(expected: dict[str, Any], actual: PrintJob) -> bool:
         """Compare a single expected print job with an actual print job."""
         # Check content type
         if expected.get('content_type') != actual.content_type:
@@ -79,7 +79,7 @@ class VerificationUtilities:
         return True
 
     @staticmethod
-    def verify_command_sequence(expected_sequence: List[str], command_log: List[Command]) -> bool:
+    def verify_command_sequence(expected_sequence: list[str], command_log: list[Command]) -> bool:
         """Verify that commands were executed in the expected sequence."""
         actual_sequence = [cmd.command_type for cmd in command_log]
 
@@ -97,8 +97,8 @@ class VerificationUtilities:
         return False
 
     @staticmethod
-    def verify_service_call(hass_services: List[Dict[str, Any]], domain: str,
-                           service: str, expected_data: Optional[Dict[str, Any]] = None) -> bool:
+    def verify_service_call(hass_services: list[dict[str, Any]], domain: str,
+                           service: str, expected_data: dict[str, Any] | None = None) -> bool:
         """Verify that a specific service was called."""
         matching_calls = [
             call for call in hass_services
@@ -122,7 +122,7 @@ class VerificationUtilities:
         return True
 
     @staticmethod
-    def _compare_service_data(expected: Dict[str, Any], actual: Dict[str, Any]) -> bool:
+    def _compare_service_data(expected: dict[str, Any], actual: dict[str, Any]) -> bool:
         """Compare expected service call data with actual data."""
         for key, value in expected.items():
             if key not in actual or actual[key] != value:
@@ -130,7 +130,7 @@ class VerificationUtilities:
         return True
 
     @staticmethod
-    def verify_printer_state(expected_state: Dict[str, Any], actual_state: Dict[str, Any]) -> bool:
+    def verify_printer_state(expected_state: dict[str, Any], actual_state: dict[str, Any]) -> bool:
         """Verify printer state matches expected values."""
         for key, expected_value in expected_state.items():
             if key not in actual_state:
@@ -146,7 +146,7 @@ class VerificationUtilities:
         return True
 
     @staticmethod
-    def verify_error_handling(error_type: str, error_history: List[Dict[str, Any]]) -> bool:
+    def verify_error_handling(error_type: str, error_history: list[dict[str, Any]]) -> bool:
         """Verify that specific error handling occurred."""
         for error_record in error_history:
             if error_record.get('error_type') == error_type:
@@ -157,30 +157,32 @@ class VerificationUtilities:
         return False
 
     @staticmethod
-    def get_print_summary(print_history: List[PrintJob]) -> Dict[str, Any]:
+    def get_print_summary(print_history: list[PrintJob]) -> dict[str, Any]:
         """Get a summary of print activity."""
-        summary = {
+        content_types: dict[str, int] = {}
+        summary: dict[str, Any] = {
             'total_jobs': len(print_history),
-            'content_types': {},
+            'content_types': content_types,
             'total_commands': 0
         }
 
         for job in print_history:
             content_type = job.content_type
-            summary['content_types'][content_type] = summary['content_types'].get(content_type, 0) + 1
+            content_types[content_type] = content_types.get(content_type, 0) + 1
 
         return summary
 
     @staticmethod
-    def get_command_summary(command_log: List[Command]) -> Dict[str, Any]:
+    def get_command_summary(command_log: list[Command]) -> dict[str, Any]:
         """Get a summary of command activity."""
-        summary = {
+        command_types: dict[str, int] = {}
+        summary: dict[str, Any] = {
             'total_commands': len(command_log),
-            'command_types': {}
+            'command_types': command_types
         }
 
         for cmd in command_log:
             cmd_type = cmd.command_type
-            summary['command_types'][cmd_type] = summary['command_types'].get(cmd_type, 0) + 1
+            command_types[cmd_type] = command_types.get(cmd_type, 0) + 1
 
         return summary

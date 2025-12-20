@@ -4,17 +4,17 @@ from homeassistant.const import CONF_HOST, CONF_PORT
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.escpos_printer.const import (
-    DOMAIN,
-    CONF_TIMEOUT,
     CONF_CODEPAGE,
     CONF_DEFAULT_ALIGN,
     CONF_DEFAULT_CUT,
     CONF_KEEPALIVE,
     CONF_STATUS_INTERVAL,
+    CONF_TIMEOUT,
+    DOMAIN,
 )
 
 
-async def test_options_flow_update(hass):
+async def test_options_flow_update(hass):  # type: ignore[no-untyped-def]
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="1.2.3.4:9100",
@@ -44,7 +44,7 @@ async def test_options_flow_update(hass):
     assert result2["data"][CONF_DEFAULT_ALIGN] == "center"
 
 
-async def test_duplicate_unique_id_aborts(hass):
+async def test_duplicate_unique_id_aborts(hass):  # type: ignore[no-untyped-def]
     # Existing configured entry
     entry = MockConfigEntry(
         domain=DOMAIN,

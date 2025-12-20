@@ -7,7 +7,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.escpos_printer.const import DOMAIN
 
 
-async def _setup_entry(hass):
+async def _setup_entry(hass):  # type: ignore[no-untyped-def]
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="1.2.3.4:9100",
@@ -21,12 +21,12 @@ async def _setup_entry(hass):
     return entry
 
 
-async def test_print_image_url_download_error(hass, caplog):
+async def test_print_image_url_download_error(hass, caplog):  # type: ignore[no-untyped-def]
     await _setup_entry(hass)
 
     fake = MagicMock()
     # Mock ClientSession.get to raise
-    async def _raise(*args, **kwargs):
+    async def _raise(*args, **kwargs):  # type: ignore[no-untyped-def]
         raise aiohttp.ClientError("download failed")
 
     with patch("escpos.printer.Network", return_value=fake), \
@@ -41,7 +41,7 @@ async def test_print_image_url_download_error(hass, caplog):
     assert any("Downloading image from URL" in rec.message for rec in caplog.records)
 
 
-async def test_encoding_codepage_warning(hass, caplog):
+async def test_encoding_codepage_warning(hass, caplog):  # type: ignore[no-untyped-def]
     await _setup_entry(hass)
     fake = MagicMock()
     # Cause _set_codepage to raise
@@ -56,7 +56,7 @@ async def test_encoding_codepage_warning(hass, caplog):
     assert any("Unsupported encoding/codepage" in rec.message for rec in caplog.records)
 
 
-async def test_print_barcode_service_calls_escpos(hass):
+async def test_print_barcode_service_calls_escpos(hass):  # type: ignore[no-untyped-def]
     await _setup_entry(hass)
     fake = MagicMock()
     with patch("escpos.printer.Network", return_value=fake):
@@ -69,7 +69,7 @@ async def test_print_barcode_service_calls_escpos(hass):
     fake.barcode.assert_called()
 
 
-async def test_beep_service_logs_when_unsupported(hass, caplog):
+async def test_beep_service_logs_when_unsupported(hass, caplog):  # type: ignore[no-untyped-def]
     await _setup_entry(hass)
     fake = MagicMock()
     # Simulate unsupported buzzer by raising AttributeError

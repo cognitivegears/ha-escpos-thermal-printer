@@ -14,30 +14,33 @@ just mocked components, ensuring reliable operation in production scenarios.
 """
 
 import importlib
+from typing import Any
+
 from .emulator import (
-    VirtualPrinterServer,
-    VirtualPrinter,
+    Command,
+    ErrorSimulator,
     EscposCommandParser,
     PrinterState,
-    ErrorSimulator,
     PrintJob,
-    Command,
+    VirtualPrinter,
+    VirtualPrinterServer,
+    create_connection_error,
+    create_intermittent_error,
     create_offline_error,
     create_paper_out_error,
     create_timeout_error,
-    create_connection_error,
-    create_intermittent_error
 )
 
+
 # Lazy import HA environment to avoid dependency conflicts
-def _import_ha_environment():
+def _import_ha_environment() -> tuple[type[Any], type[Any], type[Any], type[Any]]:
     """Import HA environment modules on demand."""
     try:
         from .ha_environment import (
-            HATestEnvironment,
-            StateChangeSimulator,
             AutomationTester,
-            NotificationTester
+            HATestEnvironment,
+            NotificationTester,
+            StateChangeSimulator,
         )
         return HATestEnvironment, StateChangeSimulator, AutomationTester, NotificationTester
     except ImportError as e:
@@ -48,13 +51,11 @@ def _import_ha_environment():
             "or use only the virtual printer emulator."
         ) from e
 
-from .fixtures import (
-    VerificationUtilities,
-    MockDataGenerator
-)
+from .fixtures import MockDataGenerator, VerificationUtilities
+
 
 # Provide access to HA environment without importing on module load
-def get_ha_environment():
+def get_ha_environment() -> Any:
     """Get HA environment classes, importing them only when needed."""
     return _import_ha_environment()
 

@@ -5,7 +5,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.escpos_printer.const import DOMAIN
 
 
-async def test_print_qr_service(hass):
+async def test_print_qr_service(hass):  # type: ignore[no-untyped-def]
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="1.2.3.4:9100",

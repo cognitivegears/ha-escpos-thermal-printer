@@ -1,17 +1,18 @@
 import sys
+import threading
 import types
+from typing import Any, Generator
 
 import pytest
-import threading
 
 
 @pytest.fixture(autouse=True)
-def auto_enable_custom_integrations(enable_custom_integrations):
-    yield
+def auto_enable_custom_integrations(enable_custom_integrations: Any) -> None:
+    return
 
 
 @pytest.fixture(autouse=True)
-def fake_escpos_module(request):
+def fake_escpos_module(request: Any) -> Generator[None, None, None]:
     # Do not stub escpos for integration tests; use real network path
     if request.node.get_closest_marker("integration"):
         yield
@@ -20,38 +21,38 @@ def fake_escpos_module(request):
     printer = types.ModuleType("escpos.printer")
 
     class _FakeNetwork:
-        def __init__(self, *_, **__):
+        def __init__(self, *_, **__):  # type: ignore[no-untyped-def]
             pass
 
-        def set(self, *_, **__):
+        def set(self, *_: Any, **__: Any) -> None:
             pass
 
-        def text(self, *_, **__):
+        def text(self, *_: Any, **__: Any) -> None:
             pass
 
-        def qr(self, *_, **__):
+        def qr(self, *_: Any, **__: Any) -> None:
             pass
 
-        def image(self, *_, **__):
+        def image(self, *_: Any, **__: Any) -> None:
             pass
 
-        def control(self, *_, **__):
+        def control(self, *_: Any, **__: Any) -> None:
             pass
 
-        def cut(self, *_, **__):
+        def cut(self, *_: Any, **__: Any) -> None:
             pass
 
-        def close(self):
+        def close(self) -> None:
             pass
 
-        def _set_codepage(self, *_, **__):
+        def _set_codepage(self, *_, **__):  # type: ignore[no-untyped-def]
             pass
 
-        def _raw(self, *_, **__):
+        def _raw(self, *_, **__):  # type: ignore[no-untyped-def]
             pass
 
-    printer.Network = _FakeNetwork
-    escpos.printer = printer
+    printer.Network = _FakeNetwork  # type: ignore[attr-defined]
+    escpos.printer = printer  # type: ignore[attr-defined]
 
     sys.modules.setdefault("escpos", escpos)
     sys.modules.setdefault("escpos.printer", printer)
@@ -59,7 +60,7 @@ def fake_escpos_module(request):
 
 
 @pytest.fixture(autouse=True)
-def disable_platform_forwarding_for_unit_tests(monkeypatch, request):
+def disable_platform_forwarding_for_unit_tests(monkeypatch: Any, request: Any) -> None:
     """Avoid starting HA http/notify stack in unit tests.
 
     For tests not marked as 'integration', prevent platform forwarding by
@@ -78,7 +79,7 @@ def disable_platform_forwarding_for_unit_tests(monkeypatch, request):
 
 
 @pytest.fixture(autouse=True)
-def stub_http_component_for_unit_tests(monkeypatch, request):
+def stub_http_component_for_unit_tests(monkeypatch: Any, request: Any) -> None:
     """Provide a minimal stub for the Home Assistant http component in unit tests.
 
     The real http component can spawn background threads; stubbing avoids lingering
@@ -87,17 +88,17 @@ def stub_http_component_for_unit_tests(monkeypatch, request):
     if request.node.get_closest_marker("integration"):
         return
     mod = types.ModuleType("homeassistant.components.http")
-    async def _ok(*args, **kwargs):
+    async def _ok(*args: Any, **kwargs: Any) -> bool:
         return True
     # Provide the setup entrypoints expected by HA
-    mod.async_setup = _ok
-    mod.async_setup_entry = _ok
-    mod.async_unload_entry = _ok
+    mod.async_setup = _ok  # type: ignore[attr-defined]
+    mod.async_setup_entry = _ok  # type: ignore[attr-defined]
+    mod.async_unload_entry = _ok  # type: ignore[attr-defined]
     sys.modules.setdefault("homeassistant.components.http", mod)
 
 
 @pytest.fixture(autouse=True)
-def avoid_safe_shutdown_thread(monkeypatch, request):
+def avoid_safe_shutdown_thread(monkeypatch: Any, request: Any) -> None:
     """Prevent Home Assistant's safe-shutdown background thread in unit tests.
 
     Intercepts thread starts whose target function is named '_run_safe_shutdown_loop'
@@ -109,7 +110,7 @@ def avoid_safe_shutdown_thread(monkeypatch, request):
 
     _orig_start = threading.Thread.start
 
-    def _patched_start(self, *args, **kwargs):  # type: ignore[override]
+    def _patched_start(self: Any, *args: Any, **kwargs: Any) -> Any:
         target_name = getattr(getattr(self, "_target", None), "__name__", None)
         if target_name == "_run_safe_shutdown_loop":
             # Do not start this thread in unit tests

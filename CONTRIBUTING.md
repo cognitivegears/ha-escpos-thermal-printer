@@ -3,7 +3,7 @@ Contributing
 Thanks for your interest in improving the ESC/POS Thermal Printer integration for Home Assistant!
 
 Getting Started
-- Use Python 3.12+
+- Use Python 3.13.2+
 - Install uv (https://github.com/astral-sh/uv) and pre-commit
 - Create a virtualenv and install dev tools:
   - uv sync --all-extras --group dev

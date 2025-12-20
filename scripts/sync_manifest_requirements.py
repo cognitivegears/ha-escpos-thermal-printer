@@ -4,7 +4,6 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
-from typing import Dict, List
 
 try:
     import tomllib  # Python 3.11+
@@ -20,26 +19,26 @@ UVLOCK = ROOT / "uv.lock"
 
 # Packages for which we intentionally keep a version range in the HA manifest
 # to avoid conflicts with Home Assistant's own pins.
-MANIFEST_OVERRIDES: Dict[str, str] = {
+MANIFEST_OVERRIDES: dict[str, str] = {
     # Allow HA to satisfy its own Pillow pin (e.g., 11.3.x) while keeping
     # compatibility with our integration.
     "pillow": ">=11.0.0,<12.0.0",
 }
 
 
-def parse_pyproject_dependencies() -> List[Requirement]:
+def parse_pyproject_dependencies() -> list[Requirement]:
     data = tomllib.loads(PYPROJECT.read_text())
     deps = data.get("project", {}).get("dependencies", [])
     return [Requirement(d) for d in deps]
 
 
-def parse_uv_lock_versions() -> Dict[str, str]:
+def parse_uv_lock_versions() -> dict[str, str]:
     if not UVLOCK.exists():
         return {}
     text = UVLOCK.read_text()
     # Naive parser for [[package]] sections to extract top-level pinned versions
-    versions: Dict[str, str] = {}
-    current: Dict[str, str] = {}
+    versions: dict[str, str] = {}
+    current: dict[str, str] = {}
     for line in text.splitlines():
         line = line.strip()
         if line == "[[package]]":
@@ -57,10 +56,10 @@ def parse_uv_lock_versions() -> Dict[str, str]:
     return versions
 
 
-def build_manifest_requirements() -> List[str]:
+def build_manifest_requirements() -> list[str]:
     reqs = parse_pyproject_dependencies()
     locked = parse_uv_lock_versions()
-    out: List[str] = []
+    out: list[str] = []
     for r in reqs:
         name = r.name
         lower = name.lower()
@@ -101,7 +100,7 @@ def main() -> int:
         desired_set = {Requirement(r).name.lower(): Requirement(r) for r in desired}
         current_set = {Requirement(r).name.lower(): Requirement(r) for r in current}
 
-        problems: List[str] = []
+        problems: list[str] = []
         # Ensure the same package keys exist
         if set(desired_set.keys()) != set(current_set.keys()):
             missing = sorted(set(desired_set.keys()) ^ set(current_set.keys()))

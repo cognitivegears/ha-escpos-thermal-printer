@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
+from dataclasses import dataclass
 import logging
 import random
-from dataclasses import dataclass
-from typing import Dict, List, Optional, Callable, Any
+from typing import Any
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -17,38 +18,38 @@ class ErrorCondition:
     error_type: str
     trigger_type: str  # 'immediate', 'after_commands', 'after_time', 'random'
     trigger_value: Any  # Number of commands, seconds, probability
-    duration: Optional[float] = None  # How long the error lasts (None = permanent)
+    duration: float | None = None  # How long the error lasts (None = permanent)
     recovery_type: str = 'manual'  # 'manual', 'auto', 'conditional'
-    recovery_condition: Optional[Callable] = None
+    recovery_condition: Callable | None = None
 
     def should_trigger(self, command_count: int, elapsed_time: float) -> bool:
         """Check if this error condition should be triggered."""
         if self.trigger_type == 'immediate':
             return True
         elif self.trigger_type == 'after_commands':
-            return command_count >= self.trigger_value
+            return bool(command_count >= self.trigger_value)
         elif self.trigger_type == 'after_time':
-            return elapsed_time >= self.trigger_value
+            return bool(elapsed_time >= self.trigger_value)
         elif self.trigger_type == 'random':
-            return random.random() < self.trigger_value
+            return bool(random.random() < self.trigger_value)
         return False
 
-    def should_recover(self, **kwargs) -> bool:
+    def should_recover(self, **kwargs: Any) -> bool:
         """Check if this error should recover."""
         if self.recovery_type == 'auto' and self.duration:
-            return kwargs.get('elapsed_since_error', 0) >= self.duration
+            return bool(kwargs.get('elapsed_since_error', 0) >= self.duration)
         elif self.recovery_type == 'conditional' and self.recovery_condition:
-            return self.recovery_condition(**kwargs)
+            return bool(self.recovery_condition(**kwargs))
         return False
 
 
 class ErrorSimulator:
     """Advanced error simulator for the virtual printer."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the error simulator."""
-        self.active_errors: Dict[str, ErrorCondition] = {}
-        self.error_history: List[Dict[str, Any]] = []
+        self.active_errors: dict[str, ErrorCondition] = {}
+        self.error_history: list[dict[str, Any]] = []
         self.command_count = 0
         self.start_time = asyncio.get_event_loop().time()
         self._lock = asyncio.Lock()
@@ -87,7 +88,7 @@ class ErrorSimulator:
             self.active_errors.clear()
             _LOGGER.info("Cleared all error conditions")
 
-    async def process_command(self, command_type: str, **kwargs) -> Optional[str]:
+    async def process_command(self, command_type: str, **kwargs: Any) -> str | None:
         """Process a command and check for error triggers."""
         async with self._lock:
             self.command_count += 1
@@ -95,7 +96,7 @@ class ErrorSimulator:
             elapsed_time = current_time - self.start_time
 
             # Check for error triggers; allow multiple activations in the same cycle
-            first_error: Optional[str] = None
+            first_error: str | None = None
             for error_type, condition in list(self.active_errors.items()):
                 if condition.should_trigger(self.command_count, elapsed_time):
                     await self._activate_error(condition)
@@ -150,12 +151,12 @@ class ErrorSimulator:
 
             _LOGGER.info("Recovered from error: %s", error_type)
 
-    async def get_active_errors(self) -> List[str]:
+    async def get_active_errors(self) -> list[str]:
         """Get list of currently active error types."""
         async with self._lock:
             return list(self.active_errors.keys())
 
-    async def get_error_history(self) -> List[Dict[str, Any]]:
+    async def get_error_history(self) -> list[dict[str, Any]]:
         """Get the complete error history."""
         async with self._lock:
             return self.error_history.copy()
@@ -172,7 +173,7 @@ class ErrorSimulator:
 
 # Predefined error conditions for common scenarios
 def create_offline_error(trigger_type: str = 'immediate', trigger_value: Any = None,
-                        duration: Optional[float] = None) -> ErrorCondition:
+                        duration: float | None = None) -> ErrorCondition:
     """Create a printer offline error condition."""
     return ErrorCondition(
         error_type='offline',
@@ -184,7 +185,7 @@ def create_offline_error(trigger_type: str = 'immediate', trigger_value: Any = N
 
 
 def create_paper_out_error(trigger_type: str = 'after_commands', trigger_value: int = 5,
-                          duration: Optional[float] = None) -> ErrorCondition:
+                          duration: float | None = None) -> ErrorCondition:
     """Create a paper out error condition."""
     return ErrorCondition(
         error_type='paper_out',
@@ -222,9 +223,9 @@ def create_connection_error(trigger_type: str = 'after_time', trigger_value: flo
 def create_intermittent_error(error_type: str, interval: float = 10.0,
                              duration: float = 2.0) -> ErrorCondition:
     """Create an intermittent error that occurs at regular intervals."""
-    def recovery_condition(**kwargs):
-        elapsed = kwargs.get('elapsed_since_error', 0)
-        return elapsed >= duration
+    def recovery_condition(**kwargs: Any) -> bool:
+        elapsed: float = float(kwargs.get('elapsed_since_error', 0))
+        return bool(elapsed >= duration)
 
     return ErrorCondition(
         error_type=error_type,
