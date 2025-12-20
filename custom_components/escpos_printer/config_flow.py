@@ -123,15 +123,41 @@ class EscposConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Create options flow handler.
         
         Args:
-            config_entry: Config entry (provided by HA, unused as base class handles it)
+            config_entry: Config entry to be configured
             
         Returns:
             Options flow handler instance
         """
-        return EscposOptionsFlowHandler()
+        return EscposOptionsFlowHandler(config_entry)
 
 
 class EscposOptionsFlowHandler(config_entries.OptionsFlow):
+    def __init__(self, config_entry: Any) -> None:
+        """Initialize the options flow handler.
+        
+        Args:
+            config_entry: Config entry to be configured (required for HA 2024.8-2024.10 compatibility)
+        """
+        # Store config_entry for HA 2024.8-2024.10 compatibility
+        # HA 2024.11+ provides this automatically via base class property, but older versions require explicit storage
+        # Use object.__setattr__ to bypass the read-only property in newer HA versions
+        object.__setattr__(self, '_config_entry_compat', config_entry)
+        super().__init__()
+    
+    @property
+    def config_entry(self) -> Any:
+        """Get config entry.
+        
+        Returns the config entry from the base class if available (HA 2024.11+),
+        otherwise returns our stored copy (HA 2024.8-2024.10).
+        """
+        # Try to get from base class first (HA 2024.11+)
+        try:
+            return super().config_entry
+        except AttributeError:
+            # Fall back to our stored copy (HA 2024.8-2024.10)
+            return self._config_entry_compat
+    
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle the options flow initialization.
 
