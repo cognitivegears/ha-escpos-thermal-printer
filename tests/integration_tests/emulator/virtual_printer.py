@@ -62,6 +62,10 @@ class ClientConnection:
         command = self.command_parser.parse_command(data)
         while command:
             _LOGGER.debug("Parsed command: %s", command)
+            # Mark network commands to prevent merging with other network commands
+            # This ensures each service call creates a distinct log entry
+            if isinstance(command['parameters'], dict):
+                command['parameters']['__network__'] = True
             cmd_obj = Command(
                 timestamp=datetime.now(),
                 command_type=command['type'],

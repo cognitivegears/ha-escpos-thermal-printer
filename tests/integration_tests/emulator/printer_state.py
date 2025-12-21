@@ -68,16 +68,19 @@ class PrinterState:
             # Coalesce consecutive text commands into a single logical entry
             if command.command_type == "text":
                 now = asyncio.get_event_loop().time()
+                # Use a longer window (0.5s) to detect mirrored duplicates that arrive after async operations
                 recent_text = (
-                    self._last_text_time is not None and (now - self._last_text_time) < 0.005
+                    self._last_text_time is not None and (now - self._last_text_time) < 0.5
                 )
                 force_new = bool(command.parameters.get("__force_new__")) if isinstance(command.parameters, dict) else False
+                is_network = bool(command.parameters.get("__network__")) if isinstance(command.parameters, dict) else False
                 # If this is a mirrored reflection and we very recently recorded a text op,
                 # drop this duplicate to avoid double-counting (mirror + network).
                 if isinstance(command.parameters, dict) and command.parameters.get("__mirrored__") and recent_text and self.command_log and self.command_log[-1].command_type == "text":
                     self._last_text_time = now
                     return
-                if recent_text and (not force_new) and self.command_log and self.command_log[-1].command_type == "text":
+                # Network commands and force_new commands should not merge with previous commands
+                if recent_text and (not force_new) and (not is_network) and self.command_log and self.command_log[-1].command_type == "text":
                     # Merge into previous text command
                     self.command_log[-1].raw_data += command.raw_data
                     # Also extend the most recent text print job if present

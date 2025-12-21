@@ -84,6 +84,9 @@ async def printer_with_ha(hass: Any, virtual_printer: Any) -> AsyncGenerator[tup
     }
 
     await env.initialize_integration(config)
+    
+    # Wait for all background tasks and mirror operations to complete
+    await env.async_block_till_done()
 
     try:
         yield (virtual_printer, env, config)

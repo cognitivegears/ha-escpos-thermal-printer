@@ -1,5 +1,7 @@
 """Basic functionality integration tests for ESCPOS printer."""
 
+import asyncio
+
 import pytest
 
 from tests.integration_tests.fixtures import MockDataGenerator, VerificationUtilities
@@ -168,8 +170,14 @@ async def test_service_parameter_variations(printer_with_ha) -> None:  # type: i
     """Test various parameter combinations for services."""
     printer, ha_env, config = printer_with_ha
 
+    # Wait for any pending operations from fixture initialization
+    await ha_env.async_block_till_done()
+
     # Clear any commands from fixture setup
     await printer.printer_state.clear_history()
+    
+    # Small delay to ensure TCP server finishes processing any buffered data
+    await asyncio.sleep(0.1)
 
     # Test different text formatting options
     formatting_options = [
@@ -193,10 +201,22 @@ async def test_service_parameter_variations(printer_with_ha) -> None:  # type: i
 
     # Wait for processing
     await ha_env.async_block_till_done()
+    
+    # Small delay to ensure all mirror operations complete (mirror system has 0.2s delay)
+    await asyncio.sleep(0.3)
 
     # Verify all text commands were processed
     command_log = await printer.get_command_log()
-    text_commands = [cmd for cmd in command_log if cmd.command_type == 'text']
+    
+    # Filter for mirrored text commands with meaningful content
+    # The actual text comes through the mirror system, not the network (network only has control bytes)
+    text_commands = [
+        cmd for cmd in command_log
+        if cmd.command_type == 'text'
+        and isinstance(cmd.parameters, dict)
+        and cmd.parameters.get('__mirrored__')  # Count mirrored commands (actual text)
+        and cmd.raw_data and len(cmd.raw_data) > 1  # Skip control bytes
+    ]
 
     assert len(text_commands) == len(formatting_options)
 

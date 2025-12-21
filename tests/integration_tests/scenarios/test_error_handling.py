@@ -1,5 +1,6 @@
 """Error handling integration tests for ESCPOS printer."""
 
+import asyncio
 
 import pytest
 
@@ -259,6 +260,9 @@ async def test_error_state_persistence(printer_with_ha) -> None:  # type: ignore
 
     # Clear command history from fixture initialization
     await printer.printer_state.clear_history()
+    
+    # Small delay to ensure TCP server finishes processing any buffered data
+    await asyncio.sleep(0.1)
 
     # Set initial error state
     await printer.simulate_error('paper_out')
@@ -273,6 +277,9 @@ async def test_error_state_persistence(printer_with_ha) -> None:  # type: ignore
         )
 
     await ha_env.async_block_till_done()
+    
+    # Small delay to ensure all mirror operations complete (mirror system has 0.2s delay)
+    await asyncio.sleep(0.3)
 
     # Verify error state persists
     final_status = await printer.get_status()
@@ -280,5 +287,13 @@ async def test_error_state_persistence(printer_with_ha) -> None:  # type: ignore
 
     # Verify operations were still recorded
     command_log = await printer.get_command_log()
-    text_commands = [cmd for cmd in command_log if cmd.command_type == 'text']
+    # Filter for mirrored text commands with meaningful content
+    # The actual text comes through the mirror system, not the network (network only has control bytes)
+    text_commands = [
+        cmd for cmd in command_log
+        if cmd.command_type == 'text'
+        and isinstance(cmd.parameters, dict)
+        and cmd.parameters.get('__mirrored__')  # Count mirrored commands (actual text)
+        and cmd.raw_data and len(cmd.raw_data) > 1  # Skip control bytes
+    ]
     assert len(text_commands) == 5
