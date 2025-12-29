@@ -36,7 +36,7 @@ dev = [
     "bandit>=1.7.0",
     "pip-audit>=2.7.0",
     # Pin typer for Safety CLI compatibility
-    "typer<0.21",
+    "typer<0.22",
     # Pin marshmallow for Safety schema compatibility
     "marshmallow<5",
     # Address GHSA-9548-qrrj-x5pj: ensure safe aiohttp version in dev env
@@ -56,7 +56,7 @@ security = [
   # ruff is used for security rule checks in scripts/security_scan.py
   "ruff>=0.4.0",
   # Pin typer for Safety CLI compatibility
-  "typer<0.21",
+  "typer<0.22",
   # Pin marshmallow for Safety schema compatibility
   "marshmallow<5",
   # Ensure safe aiohttp version in security scan environment
@@ -254,7 +254,7 @@ dev = [
     "safety>=3.0.0",
     "bandit>=1.7.0",
     "pip-audit>=2.7.0",
-    "typer<0.21",
+    "typer<0.22",
     "marshmallow<5",
     "aiohttp>=3.12.14",
     "cryptography>=44.0.1",
@@ -266,7 +266,7 @@ security = [
     "safety>=3.0.0",
     "bandit>=1.7.0",
     "pip-audit>=2.7.0",
-    "typer<0.21",
+    "typer<0.22",
     "marshmallow<5",
     "aiohttp>=3.12.14",
     "cryptography>=44.0.1",
