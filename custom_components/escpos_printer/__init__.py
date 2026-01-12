@@ -64,6 +64,36 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[str] = ["notify", "binary_sensor"]
 
 
+async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
+    """Migrate old entry to new format."""
+    _LOGGER.debug(
+        "Migrating from version %s.%s", config_entry.version, config_entry.minor_version
+    )
+
+    if config_entry.version == 1:
+        # Version 1 -> 2 migration
+        # In v1, all options were in data. In v2, profile is in data, encoding options in options.
+        # For backward compatibility, we keep the same data structure.
+        new_data = dict(config_entry.data)
+
+        # Ensure default values are set
+        if CONF_CODEPAGE not in new_data:
+            new_data[CONF_CODEPAGE] = "CP437"
+        if CONF_DEFAULT_ALIGN not in new_data:
+            new_data[CONF_DEFAULT_ALIGN] = "left"
+        if CONF_DEFAULT_CUT not in new_data:
+            new_data[CONF_DEFAULT_CUT] = "none"
+
+        hass.config_entries.async_update_entry(
+            config_entry, data=new_data, version=2, minor_version=0
+        )
+        _LOGGER.info(
+            "Migration to version %s.%s successful", config_entry.version, config_entry.minor_version
+        )
+
+    return True
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _LOGGER.debug("Setting up escpos_printer entry: %s", entry.entry_id)
     config = PrinterConfig(

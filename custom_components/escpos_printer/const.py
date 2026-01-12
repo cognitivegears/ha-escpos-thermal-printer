@@ -1,5 +1,6 @@
 DOMAIN = "escpos_printer"
 
+# Configuration keys
 CONF_HOST = "host"
 CONF_PORT = "port"
 CONF_TIMEOUT = "timeout"
@@ -11,13 +12,21 @@ CONF_STATUS_INTERVAL = "status_interval"
 CONF_PROFILE = "profile"
 CONF_LINE_WIDTH = "line_width"
 
+# Default values
 DEFAULT_PORT = 9100
 DEFAULT_TIMEOUT = 4.0
 DEFAULT_ALIGN = "left"
 DEFAULT_CUT = "none"
 DEFAULT_LINE_WIDTH = 48
+DEFAULT_CODEPAGE = "CP437"
 
-# Common supported codepages (not exhaustive)
+# Profile selection constants (also defined in capabilities.py, imported here for convenience)
+PROFILE_AUTO = ""  # Auto-detect (default) profile
+PROFILE_CUSTOM = "__custom__"  # Custom profile option
+OPTION_CUSTOM = "__custom__"  # Custom option for codepage/line_width dropdowns
+
+# Common supported codepages (backward compatibility fallback)
+# NOTE: Dynamic codepage loading is now available via capabilities.py
 CODEPAGE_CHOICES: list[str] = [
     "CP437",
     "CP932",
@@ -31,6 +40,8 @@ CODEPAGE_CHOICES: list[str] = [
     "ISO_8859-15",
 ]
 
+# Common line widths (backward compatibility fallback)
+# NOTE: Dynamic line width loading is now available via capabilities.py
 LINE_WIDTH_CHOICES: list[int] = [32, 42, 48, 64]
 
 SERVICE_PRINT_TEXT = "print_text"
