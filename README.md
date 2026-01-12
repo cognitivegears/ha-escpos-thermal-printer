@@ -17,6 +17,8 @@ The above is an example receipt printed using this integration.
 - **Notify Integration** - Send messages as printed receipts through Home Assistant notifications
 - **Network Printer Support** - Works with any ESC/POS compatible thermal printer on your network
 - **Flexible Formatting** - Support for text alignment, bold, underline, font sizes, and custom encoding
+- **UTF-8 Transcoding** - Automatic conversion of UTF-8 text to printer-compatible encodings with smart character mapping
+- **Dynamic Printer Profiles** - Select from 35+ printer models with automatic codepage and feature detection
 
 ## Requirements
 
@@ -74,15 +76,19 @@ The above is an example receipt printed using this integration.
    - Go to **Settings** → **Devices & services** → **Add Integration**
    - Search for "ESC/POS Thermal Printer" and click it
 
-2. **Configure Printer Connection**:
+2. **Configure Printer Connection** (Step 1):
    - **Host**: IP address or hostname of your thermal printer (e.g., `192.168.1.100`)
    - **Port**: TCP port for the printer (default: `9100`)
    - **Timeout**: Connection timeout in seconds (default: `4.0`)
-   - **Codepage**: Character encoding for your printer (optional, e.g., `cp437`, `cp1252`)
-   - **Default Alignment**: Default text alignment (`left`, `center`, or `right`)
-   - **Default Cut Mode**: Default paper cutting behavior (`none`, `partial`, or `full`)
+   - **Printer Profile**: Select your printer model from 35+ supported profiles, or use "Auto-detect" for generic printers. Choose "Custom" to enter a profile name manually from escpos-printer-db.
 
-3. **Test the Connection**:
+3. **Configure Printer Settings** (Step 2):
+   - **Codepage**: Character encoding for your printer, filtered by the selected profile. Common options include CP437 (US), CP1252 (Western European), and many others.
+   - **Line Width**: Characters per line, automatically suggested based on printer profile
+   - **Default Alignment**: Default text alignment (`left`, `center`, or `right`)
+   - **Default Cut Mode**: Default paper cutting behavior, filtered by printer capabilities
+
+4. **Test the Connection**:
    - The integration will automatically test the connection during setup
    - If successful, you'll see a new device and services in your integration list
 
@@ -95,10 +101,12 @@ After initial setup, you can modify additional settings:
    - Find your ESC/POS printer and click **Configure**
 
 2. **Available Options**:
+   - **Printer Profile**: Change printer model (resets codepage and line width to profile defaults)
    - **Timeout**: Adjust connection timeout (useful for slower networks)
-   - **Codepage**: Set character encoding for international characters
+   - **Codepage**: Set character encoding for international characters (filtered by profile)
+   - **Line Width**: Characters per line (filtered by profile fonts)
    - **Default Alignment**: Set default text alignment for all print jobs
-   - **Default Cut Mode**: Configure automatic paper cutting behavior
+   - **Default Cut Mode**: Configure automatic paper cutting behavior (filtered by profile capabilities)
    - **Keep Alive**: Maintain persistent connection to printer (experimental)
    - **Status Interval**: Enable periodic printer status checks (seconds, 0 = disabled)
 
@@ -152,6 +160,19 @@ data:
   align: center
   cut: partial
 ```
+
+#### Print UTF-8 Text
+
+```yaml
+service: escpos_printer.print_text_utf8
+data:
+  text: "Café résumé — "smart quotes" and ellipsis…"
+  align: center
+  bold: true
+  cut: partial
+```
+
+This service is ideal when your text source (such as templates, sensors, or external APIs) contains UTF-8 characters that aren't directly supported by your printer's codepage.
 
 #### Print Image
 
@@ -254,6 +275,28 @@ Print formatted text to the printer.
 - `encoding`: Character encoding override
 - `cut`: Paper cutting (`none`, `partial`, `full`)
 - `feed`: Lines to feed after printing (0-10)
+
+#### `escpos_printer.print_text_utf8`
+
+Print UTF-8 text with automatic transcoding to the printer's configured codepage. This service automatically converts special characters like curly quotes, em-dashes, and accented letters to their closest equivalents supported by the printer.
+
+**Parameters:**
+
+- `text` (required): UTF-8 text to print (special characters will be automatically converted)
+- `align`: Text alignment (`left`, `center`, `right`)
+- `bold`: Enable bold text (`true`/`false`)
+- `underline`: Underline style (`none`, `single`, `double`)
+- `width`: Font width (`normal`, `double`, `triple`)
+- `height`: Font height (`normal`, `double`, `triple`)
+- `cut`: Paper cutting (`none`, `partial`, `full`)
+- `feed`: Lines to feed after printing (0-10)
+
+**Character Conversion Examples:**
+- Curly quotes (`"..."`, `'...'`) → straight quotes (`"..."`, `'...'`)
+- Em-dashes (`—`) → double hyphen (`--`)
+- Ellipsis (`…`) → three dots (`...`)
+- Accented characters (e.g., `é`, `ñ`) → base letter if not in codepage
+- Box drawing characters (CP437) → preserved when supported by codepage
 
 #### `escpos_printer.print_qr`
 
@@ -362,7 +405,7 @@ automation:
       - service: escpos_printer.print_text
         data:
           text: |
-            ⚠️  TEMPERATURE ALERT  ⚠️
+            !! TEMPERATURE ALERT !!
             Current: {{ states('sensor.temperature') }}°F
             Time: {{ now().strftime('%H:%M') }}
             Location: Living Room
@@ -416,7 +459,7 @@ automation:
       - service: escpos_printer.print_text
         data:
           text: |
-            📢 NOTIFICATION 📢
+            - NOTIFICATION -
             {{ trigger.event.data.service_data.message }}
             ---
             {{ now().strftime('%H:%M %m/%d/%Y') }}
@@ -449,7 +492,7 @@ The integration creates a notification entity that allows you to send messages a
    data:
      entity_id: notify.esc_pos_printer_192_168_1_100_9100
      message: |
-       🚨 System Alert 🚨
+       !! System Alert !!
        {{ states('sensor.temperature') }}°F
        {{ now().strftime('%H:%M') }}
      title: "Temperature Alert"
@@ -477,6 +520,7 @@ The integration creates a notification entity that allows you to send messages a
 
 - Set the correct codepage in integration options (e.g., `cp437` for English, `cp1252` for Western European)
 - Ensure the printer supports the selected codepage
+- **Use `print_text_utf8` service** for text containing special characters (curly quotes, em-dashes, accented letters, etc.) - it automatically converts UTF-8 to your printer's codepage
 - Try different encoding options in service calls
 
 #### Image Printing Problems
