@@ -55,8 +55,10 @@ from .const import (
     SERVICE_PRINT_IMAGE,
     SERVICE_PRINT_QR,
     SERVICE_PRINT_TEXT,
+    SERVICE_PRINT_TEXT_UTF8,
 )
 from .printer import EscposPrinterAdapter, PrinterConfig
+from .text_utils import transcode_to_codepage
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -139,6 +141,43 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             )
         except Exception as err:
             _LOGGER.exception("Service print_text failed: %s", err)
+            raise HomeAssistantError(str(err)) from err
+
+    async def _handle_print_text_utf8(call: ServiceCall) -> None:
+        _LOGGER.debug("Service call: print_text_utf8 data=%s", dict(call.data))
+        try:
+            defaults = hass.data[DOMAIN][entry.entry_id]["defaults"]
+            text = cv.string(call.data[ATTR_TEXT])
+
+            # Get the configured codepage for transcoding
+            codepage = config.codepage or "CP437"
+
+            # Transcode UTF-8 text to the target codepage with look-alike mapping
+            transcoded_text = await hass.async_add_executor_job(
+                transcode_to_codepage, text, codepage
+            )
+
+            _LOGGER.debug(
+                "Transcoded text from UTF-8 to %s: %d -> %d chars",
+                codepage,
+                len(text),
+                len(transcoded_text),
+            )
+
+            await adapter.print_text(
+                hass,
+                text=transcoded_text,
+                align=call.data.get(ATTR_ALIGN, defaults.get("align")),
+                bold=call.data.get(ATTR_BOLD),
+                underline=call.data.get(ATTR_UNDERLINE),
+                width=call.data.get(ATTR_WIDTH),
+                height=call.data.get(ATTR_HEIGHT),
+                encoding=None,  # Don't override - let printer use configured codepage
+                cut=call.data.get(ATTR_CUT, defaults.get("cut")),
+                feed=call.data.get(ATTR_FEED),
+            )
+        except Exception as err:
+            _LOGGER.exception("Service print_text_utf8 failed: %s", err)
             raise HomeAssistantError(str(err)) from err
 
     async def _handle_print_qr(call: ServiceCall) -> None:
@@ -232,6 +271,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Register services under the integration domain
     hass.services.async_register(DOMAIN, SERVICE_PRINT_TEXT, _handle_print_text)
     _LOGGER.debug("Registered service %s.%s", DOMAIN, SERVICE_PRINT_TEXT)
+    hass.services.async_register(DOMAIN, SERVICE_PRINT_TEXT_UTF8, _handle_print_text_utf8)
+    _LOGGER.debug("Registered service %s.%s", DOMAIN, SERVICE_PRINT_TEXT_UTF8)
     hass.services.async_register(DOMAIN, SERVICE_PRINT_QR, _handle_print_qr)
     _LOGGER.debug("Registered service %s.%s", DOMAIN, SERVICE_PRINT_QR)
     hass.services.async_register(DOMAIN, SERVICE_PRINT_IMAGE, _handle_print_image)

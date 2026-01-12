@@ -45,6 +45,7 @@ CODEPAGE_CHOICES: list[str] = [
 LINE_WIDTH_CHOICES: list[int] = [32, 42, 48, 64]
 
 SERVICE_PRINT_TEXT = "print_text"
+SERVICE_PRINT_TEXT_UTF8 = "print_text_utf8"
 SERVICE_PRINT_QR = "print_qr"
 SERVICE_PRINT_IMAGE = "print_image"
 SERVICE_FEED = "feed"

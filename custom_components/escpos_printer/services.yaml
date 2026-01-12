@@ -58,6 +58,63 @@ print_text:
           step: 1
           mode: slider
 
+print_text_utf8:
+  name: print_text_utf8
+  description: Print UTF-8 text with automatic transcoding to printer codepage
+  target: {}
+  fields:
+    text:
+      required: true
+      example: "Hello, world! Café résumé naïve"
+      selector:
+        text:
+          multiline: true
+    align:
+      selector:
+        select:
+          options:
+            - "left"
+            - "center"
+            - "right"
+    bold:
+      selector:
+        boolean: {}
+    underline:
+      selector:
+        select:
+          options:
+            - "none"
+            - "single"
+            - "double"
+    width:
+      selector:
+        select:
+          options:
+            - "normal"
+            - "double"
+            - "triple"
+    height:
+      selector:
+        select:
+          options:
+            - "normal"
+            - "double"
+            - "triple"
+    cut:
+      selector:
+        select:
+          options:
+            - "none"
+            - "partial"
+            - "full"
+    feed:
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 1
+          mode: slider
+
 print_qr:
   name: print_qr
   description: Print a QR code

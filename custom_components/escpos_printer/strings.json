@@ -147,6 +147,20 @@
         "feed": {"name": "Feed lines", "description": "Lines to feed after printing."}
       }
     },
+    "print_text_utf8": {
+      "name": "Print text (UTF-8)",
+      "description": "Print UTF-8 text with automatic transcoding to the printer's codepage. Converts special characters like curly quotes, em-dashes, and accented letters to their closest equivalents.",
+      "fields": {
+        "text": {"name": "Text", "description": "UTF-8 text content to print. Special characters will be automatically converted."},
+        "align": {"name": "Alignment", "description": "Horizontal alignment for the text."},
+        "bold": {"name": "Bold", "description": "Render text in bold font."},
+        "underline": {"name": "Underline", "description": "Underline mode for text."},
+        "width": {"name": "Width multiplier", "description": "Text width multiplier (1–3)."},
+        "height": {"name": "Height multiplier", "description": "Text height multiplier (1–3)."},
+        "cut": {"name": "Cut", "description": "Cut mode after printing."},
+        "feed": {"name": "Feed lines", "description": "Lines to feed after printing."}
+      }
+    },
     "print_qr": {
       "name": "Print QR",
       "description": "Print a QR code.",
