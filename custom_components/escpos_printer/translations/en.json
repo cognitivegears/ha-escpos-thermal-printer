@@ -3,36 +3,130 @@
   "config": {
     "step": {
       "user": {
-        "title": "Configure printer",
+        "title": "Configure printer connection",
         "description": "Enter the connection details for your ESC/POS network printer.",
         "data": {
           "host": "Host",
           "port": "Port",
           "timeout": "Timeout (seconds)",
-          "codepage": "Encoding/codepage",
+          "profile": "Printer profile"
+        },
+        "data_description": {
+          "host": "IP address or hostname of the printer.",
+          "port": "Network port (usually 9100).",
+          "timeout": "Connection timeout in seconds.",
+          "profile": "Select your printer model or Auto-detect. Choose 'Custom' to enter a profile name manually."
+        }
+      },
+      "codepage": {
+        "title": "Printer settings",
+        "description": "Configure encoding and printing defaults for your printer.",
+        "data": {
+          "codepage": "Character encoding",
+          "line_width": "Characters per line",
           "default_align": "Default alignment",
           "default_cut": "Default cut mode"
+        },
+        "data_description": {
+          "codepage": "Character encoding/codepage for text. Choose 'Custom' to enter a codepage manually.",
+          "line_width": "Number of characters per line (columns). Choose 'Custom' to enter a value manually.",
+          "default_align": "Default text alignment for printing.",
+          "default_cut": "Default paper cut mode after printing."
+        }
+      },
+      "custom_profile": {
+        "title": "Custom printer profile",
+        "description": "Enter the profile name as defined in escpos-printer-db.",
+        "data": {
+          "custom_profile": "Profile name"
+        },
+        "data_description": {
+          "custom_profile": "The exact profile key from escpos-printer-db (e.g., 'TM-T88V', 'default')."
+        }
+      },
+      "custom_codepage": {
+        "title": "Custom character encoding",
+        "description": "Enter a custom codepage/encoding name.",
+        "data": {
+          "custom_codepage": "Codepage"
+        },
+        "data_description": {
+          "custom_codepage": "The codepage name (e.g., 'CP437', 'ISO_8859-1', 'CP932')."
+        }
+      },
+      "custom_line_width": {
+        "title": "Custom line width",
+        "description": "Enter the number of characters per line.",
+        "data": {
+          "custom_line_width": "Characters per line"
+        },
+        "data_description": {
+          "custom_line_width": "Number of characters that fit on one line (e.g., 32, 42, 48)."
         }
       }
     },
     "error": {
       "cannot_connect": "Failed to connect to printer.",
-      "already_configured": "This printer is already configured."
+      "already_configured": "This printer is already configured.",
+      "invalid_profile": "Invalid printer profile name.",
+      "invalid_codepage": "Invalid codepage/encoding.",
+      "invalid_line_width": "Invalid line width. Must be a positive number."
     }
   },
   "options": {
     "step": {
       "init": {
         "title": "Printer options",
+        "description": "Configure printer settings. Changing the profile will reset encoding options to defaults.",
         "data": {
           "timeout": "Timeout (seconds)",
-          "codepage": "Encoding/codepage",
-          "profile": "Printer profile (optional)",
-          "line_width": "Characters per line (columns)",
+          "profile": "Printer profile",
+          "codepage": "Character encoding",
+          "line_width": "Characters per line",
           "default_align": "Default alignment",
           "default_cut": "Default cut mode",
           "keepalive": "Keep persistent connection",
           "status_interval": "Status check interval (seconds)"
+        },
+        "data_description": {
+          "timeout": "Connection timeout in seconds.",
+          "profile": "Select your printer model. Changing this will reset encoding options.",
+          "codepage": "Character encoding/codepage for text.",
+          "line_width": "Number of characters per line (columns).",
+          "default_align": "Default text alignment for printing.",
+          "default_cut": "Default paper cut mode after printing.",
+          "keepalive": "Keep the connection open between print jobs.",
+          "status_interval": "How often to check printer status (0 to disable)."
+        }
+      },
+      "custom_profile": {
+        "title": "Custom printer profile",
+        "description": "Enter the profile name as defined in escpos-printer-db.",
+        "data": {
+          "custom_profile": "Profile name"
+        },
+        "data_description": {
+          "custom_profile": "The exact profile key from escpos-printer-db."
+        }
+      },
+      "custom_codepage": {
+        "title": "Custom character encoding",
+        "description": "Enter a custom codepage/encoding name.",
+        "data": {
+          "custom_codepage": "Codepage"
+        },
+        "data_description": {
+          "custom_codepage": "The codepage name (e.g., 'CP437', 'ISO_8859-1')."
+        }
+      },
+      "custom_line_width": {
+        "title": "Custom line width",
+        "description": "Enter the number of characters per line.",
+        "data": {
+          "custom_line_width": "Characters per line"
+        },
+        "data_description": {
+          "custom_line_width": "Number of characters that fit on one line."
         }
       }
     }
@@ -49,6 +143,20 @@
         "width": {"name": "Width multiplier", "description": "Text width multiplier (1–3)."},
         "height": {"name": "Height multiplier", "description": "Text height multiplier (1–3)."},
         "encoding": {"name": "Encoding", "description": "Character encoding/codepage for text."},
+        "cut": {"name": "Cut", "description": "Cut mode after printing."},
+        "feed": {"name": "Feed lines", "description": "Lines to feed after printing."}
+      }
+    },
+    "print_text_utf8": {
+      "name": "Print Text (UTF-8)",
+      "description": "Print UTF-8 text with automatic transcoding to the printer's codepage. Converts special characters like curly quotes, em-dashes, and accented letters to their closest equivalents.",
+      "fields": {
+        "text": {"name": "Text", "description": "UTF-8 text content to print. Special characters will be automatically converted."},
+        "align": {"name": "Alignment", "description": "Horizontal alignment for the text."},
+        "bold": {"name": "Bold", "description": "Render text in bold font."},
+        "underline": {"name": "Underline", "description": "Underline mode for text."},
+        "width": {"name": "Width multiplier", "description": "Text width multiplier (1–3)."},
+        "height": {"name": "Height multiplier", "description": "Text height multiplier (1–3)."},
         "cut": {"name": "Cut", "description": "Cut mode after printing."},
         "feed": {"name": "Feed lines", "description": "Lines to feed after printing."}
       }

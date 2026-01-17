@@ -148,7 +148,7 @@
       }
     },
     "print_text_utf8": {
-      "name": "Print text (UTF-8)",
+      "name": "Print Text (UTF-8)",
       "description": "Print UTF-8 text with automatic transcoding to the printer's codepage. Converts special characters like curly quotes, em-dashes, and accented letters to their closest equivalents.",
       "fields": {
         "text": {"name": "Text", "description": "UTF-8 text content to print. Special characters will be automatically converted."},
