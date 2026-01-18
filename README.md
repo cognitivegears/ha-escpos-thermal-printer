@@ -13,6 +13,7 @@ The above is an example receipt printed using this integration.
 ## Features
 
 - **UI Configuration** - No YAML required, easy setup through Home Assistant UI
+- **Multiple Printer Support** - Configure multiple printers and target them individually or broadcast to all
 - **Multiple Print Services** - Text, QR codes, barcodes, images, paper feed, cutting, and buzzer control
 - **Notify Integration** - Send messages as printed receipts through Home Assistant notifications
 - **Network Printer Support** - Works with any ESC/POS compatible thermal printer on your network
@@ -183,6 +184,90 @@ data:
   align: center
   cut: partial
   feed: 1
+```
+
+### Device Targeting (Multiple Printers)
+
+When you have multiple printers configured, you can target specific printers or broadcast to all of them.
+
+#### Using the UI (Developer Tools)
+
+1. Go to **Developer Tools** → **Actions**
+2. Select any `escpos_printer.*` service
+3. Click **Choose device** to select one or more printers
+4. Fill in the service parameters and click **Perform action**
+
+The device picker will only show ESC/POS printer devices from this integration.
+
+#### Targeting a Specific Printer (YAML)
+
+Use the `target` parameter with `device_id` to send to a specific printer:
+
+```yaml
+service: escpos_printer.print_text
+target:
+  device_id: abc123def456  # Your printer's device ID
+data:
+  text: "Hello from Kitchen Printer!"
+  cut: partial
+```
+
+You can find your printer's device ID in **Settings** → **Devices & services** → **ESC/POS Thermal Printer** → click on your printer → the device ID is shown in the URL or device info.
+
+#### Targeting Multiple Specific Printers
+
+Target multiple printers by listing their device IDs:
+
+```yaml
+service: escpos_printer.print_text
+target:
+  device_id:
+    - abc123def456  # Kitchen printer
+    - xyz789ghi012  # Office printer
+data:
+  text: "Alert: System notification"
+  bold: true
+  cut: partial
+```
+
+#### Broadcast to All Printers
+
+To print to all configured printers, simply omit the `target` parameter:
+
+```yaml
+service: escpos_printer.print_text
+data:
+  text: "Broadcast message to all printers!"
+  align: center
+  cut: partial
+```
+
+This is useful for announcements or alerts that should appear on every printer.
+
+#### Targeting by Area
+
+If your printers are assigned to areas, you can target by area:
+
+```yaml
+service: escpos_printer.print_text
+target:
+  area_id: kitchen
+data:
+  text: "Kitchen order ready!"
+  cut: partial
+```
+
+#### Targeting by Entity
+
+You can also target using the printer's binary sensor entity:
+
+```yaml
+service: escpos_printer.print_text
+target:
+  entity_id: binary_sensor.esc_pos_printer_192_168_1_100_9100_online
+data:
+  text: "Hello World!"
+  cut: partial
 ```
 
 ### Advanced Usage Examples
@@ -466,6 +551,118 @@ automation:
           align: center
           cut: partial
           feed: 1
+```
+
+### Multi-Printer Automation Examples
+
+#### Kitchen Order System (Targeted Printing)
+
+Print orders to a specific kitchen printer:
+
+```yaml
+automation:
+  - alias: "Kitchen Order Ticket"
+    trigger:
+      platform: event
+      event_type: new_order
+    action:
+      - service: escpos_printer.print_text
+        target:
+          device_id: kitchen_printer_device_id  # Target only the kitchen printer
+        data:
+          text: |
+            === KITCHEN ORDER ===
+            Order #{{ trigger.event.data.order_id }}
+            Time: {{ now().strftime('%H:%M') }}
+
+            {{ trigger.event.data.items }}
+
+            =====================
+          align: left
+          bold: true
+          cut: full
+          feed: 2
+```
+
+#### Emergency Broadcast (All Printers)
+
+Send urgent messages to all printers simultaneously:
+
+```yaml
+automation:
+  - alias: "Emergency Alert All Printers"
+    trigger:
+      platform: state
+      entity_id: binary_sensor.emergency_alert
+      to: "on"
+    action:
+      - service: escpos_printer.print_text
+        # No target = broadcast to ALL configured printers
+        data:
+          text: |
+            !!! EMERGENCY ALERT !!!
+
+            {{ states('input_text.emergency_message') }}
+
+            Time: {{ now().strftime('%H:%M:%S') }}
+            !!! TAKE ACTION NOW !!!
+          align: center
+          bold: true
+          width: double
+          height: double
+          cut: partial
+          feed: 3
+```
+
+#### Location-Based Printing (Area Targeting)
+
+Print to all printers in a specific area:
+
+```yaml
+automation:
+  - alias: "Office Announcement"
+    trigger:
+      platform: time
+      at: "09:00:00"
+    action:
+      - service: escpos_printer.print_text
+        target:
+          area_id: office  # All printers in the "office" area
+        data:
+          text: |
+            === DAILY BRIEFING ===
+            {{ now().strftime('%A, %B %d, %Y') }}
+
+            Today's meetings:
+            {{ states('sensor.calendar_meetings') }}
+          align: left
+          cut: partial
+          feed: 2
+```
+
+#### Multi-Location Receipt (Multiple Specific Printers)
+
+Print to multiple specific printers (e.g., customer receipt + kitchen copy):
+
+```yaml
+automation:
+  - alias: "Order Confirmation Multi-Print"
+    trigger:
+      platform: event
+      event_type: order_placed
+    action:
+      # Print to both front desk and kitchen
+      - service: escpos_printer.print_text
+        target:
+          device_id:
+            - front_desk_printer_id
+            - kitchen_printer_id
+        data:
+          text: |
+            Order #{{ trigger.event.data.order_number }}
+            {{ trigger.event.data.items }}
+            Total: ${{ trigger.event.data.total }}
+          cut: partial
 ```
 
 ## Notification Usage

@@ -1,15 +1,21 @@
 print_text_utf8:
   name: Print Text (UTF-8)
-  description: Print UTF-8 text with automatic transcoding to printer codepage
-  target: {}
+  description: Print UTF-8 text with automatic transcoding to printer codepage. Select one or more printer devices as the target.
+  target:
+    device:
+      integration: escpos_printer
   fields:
     text:
+      name: Text
+      description: The text to print (UTF-8 characters will be converted to printer-compatible encoding)
       required: true
       example: "Hello, world! Café résumé naïve"
       selector:
         text:
           multiline: true
     align:
+      name: Alignment
+      description: Text alignment
       selector:
         select:
           options:
@@ -17,9 +23,13 @@ print_text_utf8:
             - "center"
             - "right"
     bold:
+      name: Bold
+      description: Enable bold text
       selector:
         boolean: {}
     underline:
+      name: Underline
+      description: Underline style
       selector:
         select:
           options:
@@ -27,6 +37,8 @@ print_text_utf8:
             - "single"
             - "double"
     width:
+      name: Width
+      description: Font width
       selector:
         select:
           options:
@@ -34,6 +46,8 @@ print_text_utf8:
             - "double"
             - "triple"
     height:
+      name: Height
+      description: Font height
       selector:
         select:
           options:
@@ -41,6 +55,8 @@ print_text_utf8:
             - "double"
             - "triple"
     cut:
+      name: Cut
+      description: Paper cutting mode after printing
       selector:
         select:
           options:
@@ -48,6 +64,8 @@ print_text_utf8:
             - "partial"
             - "full"
     feed:
+      name: Feed Lines
+      description: Number of lines to feed after printing
       selector:
         number:
           min: 0
@@ -57,16 +75,22 @@ print_text_utf8:
 
 print_text:
   name: Print Text (Raw Encoding)
-  description: Print text to the ESC/POS printer using raw encoding
-  target: {}
+  description: Print text to the ESC/POS printer using raw encoding. Select one or more printer devices as the target.
+  target:
+    device:
+      integration: escpos_printer
   fields:
     text:
+      name: Text
+      description: The text to print
       required: true
       example: "Hello, world!"
       selector:
         text:
           multiline: true
     align:
+      name: Alignment
+      description: Text alignment
       selector:
         select:
           options:
@@ -74,9 +98,13 @@ print_text:
             - "center"
             - "right"
     bold:
+      name: Bold
+      description: Enable bold text
       selector:
         boolean: {}
     underline:
+      name: Underline
+      description: Underline style
       selector:
         select:
           options:
@@ -84,6 +112,8 @@ print_text:
             - "single"
             - "double"
     width:
+      name: Width
+      description: Font width
       selector:
         select:
           options:
@@ -91,6 +121,8 @@ print_text:
             - "double"
             - "triple"
     height:
+      name: Height
+      description: Font height
       selector:
         select:
           options:
@@ -98,9 +130,13 @@ print_text:
             - "double"
             - "triple"
     encoding:
+      name: Encoding
+      description: Character encoding override
       selector:
         text: {}
     cut:
+      name: Cut
+      description: Paper cutting mode after printing
       selector:
         select:
           options:
@@ -108,6 +144,8 @@ print_text:
             - "partial"
             - "full"
     feed:
+      name: Feed Lines
+      description: Number of lines to feed after printing
       selector:
         number:
           min: 0
@@ -116,16 +154,22 @@ print_text:
           mode: slider
 
 print_qr:
-  name: print_qr
-  description: Print a QR code
-  target: {}
+  name: Print QR Code
+  description: Print a QR code. Select one or more printer devices as the target.
+  target:
+    device:
+      integration: escpos_printer
   fields:
     data:
+      name: Data
+      description: Data to encode in the QR code
       required: true
       example: "https://example.com"
       selector:
         text: {}
     size:
+      name: Size
+      description: QR code size (1-16)
       selector:
         number:
           min: 1
@@ -133,6 +177,8 @@ print_qr:
           step: 1
           mode: slider
     ec:
+      name: Error Correction
+      description: Error correction level
       selector:
         select:
           options:
@@ -141,6 +187,8 @@ print_qr:
             - "Q"
             - "H"
     align:
+      name: Alignment
+      description: QR code alignment
       selector:
         select:
           options:
@@ -148,6 +196,8 @@ print_qr:
             - "center"
             - "right"
     cut:
+      name: Cut
+      description: Paper cutting mode after printing
       selector:
         select:
           options:
@@ -155,6 +205,8 @@ print_qr:
             - "partial"
             - "full"
     feed:
+      name: Feed Lines
+      description: Number of lines to feed after printing
       selector:
         number:
           min: 0
@@ -163,19 +215,27 @@ print_qr:
           mode: slider
 
 print_image:
-  name: print_image
-  description: Print an image by URL or local path
-  target: {}
+  name: Print Image
+  description: Print an image by URL or local path. Select one or more printer devices as the target.
+  target:
+    device:
+      integration: escpos_printer
   fields:
     image:
+      name: Image
+      description: Image URL or local file path
       required: true
       example: "/config/www/logo.png"
       selector:
         text: {}
     high_density:
+      name: High Density
+      description: Use high-density printing mode
       selector:
         boolean: {}
     align:
+      name: Alignment
+      description: Image alignment
       selector:
         select:
           options:
@@ -183,6 +243,8 @@ print_image:
             - "center"
             - "right"
     cut:
+      name: Cut
+      description: Paper cutting mode after printing
       selector:
         select:
           options:
@@ -190,6 +252,8 @@ print_image:
             - "partial"
             - "full"
     feed:
+      name: Feed Lines
+      description: Number of lines to feed after printing
       selector:
         number:
           min: 0
@@ -198,16 +262,22 @@ print_image:
           mode: slider
 
 print_barcode:
-  name: print_barcode
-  description: Print a barcode
-  target: {}
+  name: Print Barcode
+  description: Print a barcode. Select one or more printer devices as the target.
+  target:
+    device:
+      integration: escpos_printer
   fields:
     code:
+      name: Code
+      description: Barcode data
       required: true
       example: "4006381333931"
       selector:
         text: {}
     bc:
+      name: Barcode Type
+      description: Type of barcode to print
       required: true
       example: "EAN13"
       selector:
@@ -226,6 +296,8 @@ print_barcode:
             - "ITF14"
             - "CODABAR"
     height:
+      name: Height
+      description: Barcode height in dots
       selector:
         number:
           min: 1
@@ -233,6 +305,8 @@ print_barcode:
           step: 1
           mode: slider
     width:
+      name: Width
+      description: Barcode width (2-6)
       selector:
         number:
           min: 2
@@ -240,6 +314,8 @@ print_barcode:
           step: 1
           mode: slider
     pos:
+      name: Text Position
+      description: Position of human-readable text
       selector:
         select:
           options:
@@ -248,18 +324,26 @@ print_barcode:
             - "BOTH"
             - "OFF"
     font:
+      name: Font
+      description: Font for human-readable text
       selector:
         select:
           options:
             - "A"
             - "B"
     align_ct:
+      name: Center Align
+      description: Center align the barcode
       selector:
         boolean: {}
     check:
+      name: Checksum
+      description: Enable checksum validation
       selector:
         boolean: {}
     force_software:
+      name: Rendering Mode
+      description: Force software rendering mode
       selector:
         select:
           options:
@@ -269,6 +353,8 @@ print_barcode:
             - "bitImageColumn"
             - "bitImageRaster"
     align:
+      name: Alignment
+      description: Barcode alignment
       selector:
         select:
           options:
@@ -276,6 +362,8 @@ print_barcode:
             - "center"
             - "right"
     cut:
+      name: Cut
+      description: Paper cutting mode after printing
       selector:
         select:
           options:
@@ -283,6 +371,8 @@ print_barcode:
             - "partial"
             - "full"
     feed:
+      name: Feed Lines
+      description: Number of lines to feed after printing
       selector:
         number:
           min: 0
@@ -291,11 +381,15 @@ print_barcode:
           mode: slider
 
 feed:
-  name: feed
-  description: Feed the paper a number of lines
-  target: {}
+  name: Feed Paper
+  description: Feed the paper a number of lines. Select one or more printer devices as the target.
+  target:
+    device:
+      integration: escpos_printer
   fields:
     lines:
+      name: Lines
+      description: Number of lines to feed
       required: true
       selector:
         number:
@@ -305,11 +399,15 @@ feed:
           mode: slider
 
 cut:
-  name: cut
-  description: Cut the paper
-  target: {}
+  name: Cut Paper
+  description: Cut the paper. Select one or more printer devices as the target.
+  target:
+    device:
+      integration: escpos_printer
   fields:
     mode:
+      name: Mode
+      description: Cut type (full or partial)
       required: true
       selector:
         select:
@@ -318,11 +416,15 @@ cut:
             - "partial"
 
 beep:
-  name: beep
-  description: Trigger the printer buzzer (if supported)
-  target: {}
+  name: Beep
+  description: Trigger the printer buzzer (if supported). Select one or more printer devices as the target.
+  target:
+    device:
+      integration: escpos_printer
   fields:
     times:
+      name: Times
+      description: Number of beeps
       selector:
         number:
           min: 1
@@ -330,6 +432,8 @@ beep:
           step: 1
           mode: slider
     duration:
+      name: Duration
+      description: Duration of each beep
       selector:
         number:
           min: 1
