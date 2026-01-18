@@ -289,20 +289,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             raise HomeAssistantError(str(err)) from err
 
     # Register services under the integration domain
-    hass.services.async_register(DOMAIN, SERVICE_PRINT_TEXT, _handle_print_text)
-    _LOGGER.debug("Registered service %s.%s", DOMAIN, SERVICE_PRINT_TEXT)
+    # Note: Registration order may affect display order in the UI
     hass.services.async_register(DOMAIN, SERVICE_PRINT_TEXT_UTF8, _handle_print_text_utf8)
     _LOGGER.debug("Registered service %s.%s", DOMAIN, SERVICE_PRINT_TEXT_UTF8)
+    hass.services.async_register(DOMAIN, SERVICE_PRINT_TEXT, _handle_print_text)
+    _LOGGER.debug("Registered service %s.%s", DOMAIN, SERVICE_PRINT_TEXT)
     hass.services.async_register(DOMAIN, SERVICE_PRINT_QR, _handle_print_qr)
     _LOGGER.debug("Registered service %s.%s", DOMAIN, SERVICE_PRINT_QR)
     hass.services.async_register(DOMAIN, SERVICE_PRINT_IMAGE, _handle_print_image)
     _LOGGER.debug("Registered service %s.%s", DOMAIN, SERVICE_PRINT_IMAGE)
+    hass.services.async_register(DOMAIN, SERVICE_PRINT_BARCODE, _handle_print_barcode)
+    _LOGGER.debug("Registered service %s.%s", DOMAIN, SERVICE_PRINT_BARCODE)
     hass.services.async_register(DOMAIN, SERVICE_FEED, _handle_feed)
     _LOGGER.debug("Registered service %s.%s", DOMAIN, SERVICE_FEED)
     hass.services.async_register(DOMAIN, SERVICE_CUT, _handle_cut)
     _LOGGER.debug("Registered service %s.%s", DOMAIN, SERVICE_CUT)
-    hass.services.async_register(DOMAIN, SERVICE_PRINT_BARCODE, _handle_print_barcode)
-    _LOGGER.debug("Registered service %s.%s", DOMAIN, SERVICE_PRINT_BARCODE)
     hass.services.async_register(DOMAIN, SERVICE_BEEP, _handle_beep)
     _LOGGER.debug("Registered service %s.%s", DOMAIN, SERVICE_BEEP)
 

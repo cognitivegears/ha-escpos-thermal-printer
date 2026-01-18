@@ -131,10 +131,22 @@
       }
     }
   },
+  "device_automation": {
+    "action_type": {
+      "print_text_utf8": "Print Text (UTF-8)",
+      "print_text": "Print Text (Raw Encoding)",
+      "print_qr": "Print QR Code",
+      "print_image": "Print Image",
+      "print_barcode": "Print Barcode",
+      "feed": "Feed Paper",
+      "cut": "Cut Paper",
+      "beep": "Beep"
+    }
+  },
   "services": {
     "print_text": {
-      "name": "Print text",
-      "description": "Print text to the ESC/POS printer.",
+      "name": "Print Text (Raw Encoding)",
+      "description": "Print text to the ESC/POS printer using raw encoding.",
       "fields": {
         "text": {"name": "Text", "description": "Text content to print."},
         "align": {"name": "Alignment", "description": "Horizontal alignment for the text."},

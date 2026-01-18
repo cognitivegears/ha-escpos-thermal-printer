@@ -1,6 +1,63 @@
+print_text_utf8:
+  name: Print Text (UTF-8)
+  description: Print UTF-8 text with automatic transcoding to printer codepage
+  target: {}
+  fields:
+    text:
+      required: true
+      example: "Hello, world! Café résumé naïve"
+      selector:
+        text:
+          multiline: true
+    align:
+      selector:
+        select:
+          options:
+            - "left"
+            - "center"
+            - "right"
+    bold:
+      selector:
+        boolean: {}
+    underline:
+      selector:
+        select:
+          options:
+            - "none"
+            - "single"
+            - "double"
+    width:
+      selector:
+        select:
+          options:
+            - "normal"
+            - "double"
+            - "triple"
+    height:
+      selector:
+        select:
+          options:
+            - "normal"
+            - "double"
+            - "triple"
+    cut:
+      selector:
+        select:
+          options:
+            - "none"
+            - "partial"
+            - "full"
+    feed:
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 1
+          mode: slider
+
 print_text:
-  name: print_text
-  description: Print text to the ESC/POS printer
+  name: Print Text (Raw Encoding)
+  description: Print text to the ESC/POS printer using raw encoding
   target: {}
   fields:
     text:
@@ -43,63 +100,6 @@ print_text:
     encoding:
       selector:
         text: {}
-    cut:
-      selector:
-        select:
-          options:
-            - "none"
-            - "partial"
-            - "full"
-    feed:
-      selector:
-        number:
-          min: 0
-          max: 10
-          step: 1
-          mode: slider
-
-print_text_utf8:
-  name: print_text_utf8
-  description: Print UTF-8 text with automatic transcoding to printer codepage
-  target: {}
-  fields:
-    text:
-      required: true
-      example: "Hello, world! Café résumé naïve"
-      selector:
-        text:
-          multiline: true
-    align:
-      selector:
-        select:
-          options:
-            - "left"
-            - "center"
-            - "right"
-    bold:
-      selector:
-        boolean: {}
-    underline:
-      selector:
-        select:
-          options:
-            - "none"
-            - "single"
-            - "double"
-    width:
-      selector:
-        select:
-          options:
-            - "normal"
-            - "double"
-            - "triple"
-    height:
-      selector:
-        select:
-          options:
-            - "normal"
-            - "double"
-            - "triple"
     cut:
       selector:
         select:
@@ -197,33 +197,6 @@ print_image:
           step: 1
           mode: slider
 
-feed:
-  name: feed
-  description: Feed the paper a number of lines
-  target: {}
-  fields:
-    lines:
-      required: true
-      selector:
-        number:
-          min: 1
-          max: 10
-          step: 1
-          mode: slider
-
-cut:
-  name: cut
-  description: Cut the paper
-  target: {}
-  fields:
-    mode:
-      required: true
-      selector:
-        select:
-          options:
-            - "full"
-            - "partial"
-
 print_barcode:
   name: print_barcode
   description: Print a barcode
@@ -316,6 +289,33 @@ print_barcode:
           max: 10
           step: 1
           mode: slider
+
+feed:
+  name: feed
+  description: Feed the paper a number of lines
+  target: {}
+  fields:
+    lines:
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 10
+          step: 1
+          mode: slider
+
+cut:
+  name: cut
+  description: Cut the paper
+  target: {}
+  fields:
+    mode:
+      required: true
+      selector:
+        select:
+          options:
+            - "full"
+            - "partial"
 
 beep:
   name: beep
