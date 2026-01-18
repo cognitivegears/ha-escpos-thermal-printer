@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+
 import pytest
 
 from custom_components.escpos_printer.printer import EscposPrinterAdapter, PrinterConfig
@@ -67,7 +68,7 @@ async def test_barcode_passes_force_software(monkeypatch: Any) -> None:
             target = inst
             break
     assert target is not None, "No barcode() calls recorded on any instance"
-    code, bc, kwargs = target.calls[-1]
+    _code, _bc, kwargs = target.calls[-1]
     assert kwargs.get("force_software") is True
 
 
@@ -104,5 +105,5 @@ async def test_barcode_retries_without_force_software(monkeypatch: Any) -> None:
             target = inst
             break
     assert target is not None, "No barcode() calls recorded on any instance"
-    code, bc, kwargs = target.calls[-1]
+    _code, _bc, kwargs = target.calls[-1]
     assert "force_software" not in kwargs

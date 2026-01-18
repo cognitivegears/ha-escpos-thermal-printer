@@ -148,7 +148,33 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*" = ["S101", "T201", "PLR2004", "SLF001"]
+"tests/**/*" = [
+    "S101",    # use of assert
+    "S311",    # pseudo-random generators ok in tests
+    "T201",    # print statements
+    "PLR2004", # magic value comparisons
+    "SLF001",  # private member access
+    "G004",    # f-string in logging ok in tests
+    "B017",    # blind exception assertion ok when testing error handling
+    "PT011",   # pytest.raises too broad ok in some cases
+    "PLC0415", # imports not at top-level ok for lazy loading in tests
+    "TRY300",  # try-except-else ok in tests
+    "TRY301",  # raise within try block
+    "TRY401",  # redundant exception logging
+    "N806",    # variable naming in test functions
+    "PLR0915", # too many statements in test functions
+    "PLR0912", # too many branches in test functions
+    "PLR0911", # too many return statements
+    "SIM117",  # nested with statements ok for pytest context
+    "SIM105",  # contextlib.suppress in tests
+    "F401",    # unused imports ok in __init__ files
+    "F403",    # star imports ok in __init__ files
+    "E402",    # module level import not at top
+    "PLW0603", # global statement ok in test fixtures
+    "PYI036",  # type annotation format
+    "RUF022",  # __all__ sorting
+    "B904",    # raise from in tests
+]
 "custom_components/escpos_printer/__init__.py" = ["BLE001"]
 "custom_components/escpos_printer/printer.py" = ["BLE001", "C901"]
 
@@ -196,7 +222,7 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "tests.*"
-disable_error_code = ["import-untyped"]
+disable_error_code = ["import-untyped", "no-untyped-def", "call-overload", "unused-ignore"]
 
 [tool.coverage.run]
 source = ["custom_components/escpos_printer"]

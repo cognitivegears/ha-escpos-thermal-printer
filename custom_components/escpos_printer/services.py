@@ -129,7 +129,7 @@ def _get_adapter_and_defaults(
     return adapter, defaults, adapter._config
 
 
-async def async_setup_services(hass: HomeAssistant) -> None:
+async def async_setup_services(hass: HomeAssistant) -> None:  # noqa: PLR0915
     """Set up services for ESC/POS printer integration.
 
     This should be called once from async_setup to register services globally.

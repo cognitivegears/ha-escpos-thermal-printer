@@ -7,7 +7,8 @@ import string
 from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
-from PIL.ImageFont import FreeTypeFont, ImageFont as PILImageFont
+from PIL.ImageFont import FreeTypeFont
+from PIL.ImageFont import ImageFont as PILImageFont
 
 
 class MockDataGenerator:

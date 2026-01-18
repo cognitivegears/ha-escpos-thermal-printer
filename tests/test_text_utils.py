@@ -13,7 +13,6 @@ from custom_components.escpos_printer.text_utils import (
     transcode_to_codepage,
 )
 
-
 # =============================================================================
 # Unicode Normalization Tests
 # =============================================================================

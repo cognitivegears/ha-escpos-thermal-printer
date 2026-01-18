@@ -112,7 +112,7 @@ class TestPerformance:
         batch_size = 25
         batch_data = []
 
-        for i in range(batch_size):
+        for _i in range(batch_size):
             qr_data = MockDataGenerator.generate_qr_data()
             barcode_data = MockDataGenerator.generate_barcode_data()
             text_data = MockDataGenerator.generate_text_content(200)
@@ -156,7 +156,7 @@ class TestPerformance:
 
         # Generate high load with multiple operation types
         operations = []
-        for i in range(30):
+        for _i in range(30):
             operations.extend([
                 ('text', MockDataGenerator.generate_text_content(150).encode(), {}),
                 ('qr', MockDataGenerator.generate_qr_data().encode(), {}),
@@ -211,7 +211,7 @@ class TestPerformance:
 
         # Verify all workers completed
         assert len(results) == num_workers
-        for worker_id, ops_completed in results:
+        for _worker_id, ops_completed in results:
             assert ops_completed == operations_per_worker
 
         # Check performance

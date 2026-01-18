@@ -468,7 +468,7 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlow):
                 CONF_PROFILE
             ) or self.config_entry.data.get(CONF_PROFILE, PROFILE_AUTO)
 
-            if profile != old_profile and profile != PROFILE_CUSTOM:
+            if profile not in (old_profile, PROFILE_CUSTOM):
                 _LOGGER.info(
                     "Profile changed from %s to %s, resetting dependent options",
                     old_profile,

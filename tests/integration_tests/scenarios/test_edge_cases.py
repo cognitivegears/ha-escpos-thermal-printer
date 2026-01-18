@@ -161,7 +161,7 @@ class TestEdgeCases:
                 await printer_state.update_state_sync('cut', b'', {'mode': 'partial'})
 
         # Verify all operations were processed
-        history = await printer_state.get_print_history()
+        await printer_state.get_print_history()
         status = await printer_state.get_status()
         assert status['online'] is True
 

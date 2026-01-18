@@ -162,7 +162,7 @@ def validate_image_url(url: str) -> str:
     try:
         parsed = urlparse(url)
     except Exception as e:
-        raise HomeAssistantError(f"Invalid URL format: {e}")
+        raise HomeAssistantError(f"Invalid URL format: {e}") from e
 
     # Validate scheme
     if parsed.scheme not in VALID_URL_SCHEMES:
@@ -222,7 +222,7 @@ def validate_local_image_path(path: str, allowed_extensions: set[str] = VALID_IM
         if file_size > MAX_IMAGE_SIZE_MB * 1024 * 1024:
             raise HomeAssistantError(f"Image file too large (max {MAX_IMAGE_SIZE_MB}MB)")
     except OSError as e:
-        raise HomeAssistantError(f"Cannot access image file: {e}")
+        raise HomeAssistantError(f"Cannot access image file: {e}") from e
 
     return normalized_path
 
@@ -244,8 +244,8 @@ def validate_numeric_input(value: Any, min_val: int, max_val: int, field_name: s
     """
     try:
         num_value = int(value)
-    except (ValueError, TypeError):
-        raise HomeAssistantError(f"{field_name} must be a valid integer")
+    except (ValueError, TypeError) as e:
+        raise HomeAssistantError(f"{field_name} must be a valid integer") from e
 
     if not (min_val <= num_value <= max_val):
         raise HomeAssistantError(f"{field_name} must be between {min_val} and {max_val}")

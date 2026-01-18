@@ -3,26 +3,26 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Generator
+from collections.abc import AsyncGenerator, Generator
+import contextlib
 import os
 import tempfile
 from typing import Any
-from collections.abc import AsyncGenerator
 
 import pytest
 
 from tests.integration_tests.emulator import VirtualPrinter, VirtualPrinterServer, set_active_server
 
 __all__ = [
-    'virtual_printer',
+    'automation_config',
+    'error_printer_server',
     'ha_test_environment',
+    'mock_printer_server',
     'printer_with_ha',
+    'sample_print_data',
     'temp_image_file',
     'test_config',
-    'automation_config',
-    'mock_printer_server',
-    'sample_print_data',
-    'error_printer_server',
+    'virtual_printer',
 ]
 
 
@@ -160,10 +160,8 @@ async def mock_printer_server() -> AsyncGenerator[VirtualPrinterServer, None]:
     finally:
         await server.stop()
         server_task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await server_task
-        except asyncio.CancelledError:
-            pass
         set_active_server(None)
 
 
@@ -212,8 +210,6 @@ async def error_printer_server() -> AsyncGenerator[VirtualPrinterServer, None]:
     finally:
         await server.stop()
         server_task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await server_task
-        except asyncio.CancelledError:
-            pass
         set_active_server(None)

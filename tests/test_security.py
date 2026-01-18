@@ -111,7 +111,7 @@ class TestBarcodeDataValidation:
 
     def test_validate_barcode_data_case_insensitive(self):  # type: ignore[no-untyped-def]
         """Test barcode type case insensitivity."""
-        code, bc_type = validate_barcode_data("123", "code39")
+        _code, bc_type = validate_barcode_data("123", "code39")
         assert bc_type == "CODE39"
 
 
@@ -307,7 +307,7 @@ class TestIntegrationSecurity:
         assert feed == 5
         assert url == "https://example.com/image.png"
 
-    @pytest.mark.parametrize("invalid_input,expected_error", [
+    @pytest.mark.parametrize(("invalid_input", "expected_error"), [
         ("x" * 10001, "exceeds maximum"),
         ("", "cannot be empty"),
         ("   ", "cannot be empty"),
@@ -316,7 +316,4 @@ class TestIntegrationSecurity:
     def test_qr_validation_edge_cases(self, invalid_input, expected_error):  # type: ignore[no-untyped-def]
         """Test QR validation edge cases."""
         with pytest.raises(HomeAssistantError, match=expected_error):
-            if invalid_input is not None:
-                validate_qr_data(invalid_input)
-            else:
-                validate_qr_data(invalid_input)
+            validate_qr_data(invalid_input)

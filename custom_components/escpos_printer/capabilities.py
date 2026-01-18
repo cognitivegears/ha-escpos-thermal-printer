@@ -8,8 +8,8 @@ profiles, supported codepages, line widths, and cut modes.
 
 from __future__ import annotations
 
-import logging
 from functools import lru_cache
+import logging
 from typing import Any
 
 _LOGGER = logging.getLogger(__name__)
@@ -34,15 +34,15 @@ def _get_capabilities() -> dict[str, Any]:
         Falls back to minimal capabilities if python-escpos unavailable.
     """
     try:
-        from escpos.capabilities import CAPABILITIES
-
-        return CAPABILITIES  # type: ignore[no-any-return]
+        from escpos.capabilities import CAPABILITIES  # noqa: PLC0415
     except ImportError:
         _LOGGER.warning("python-escpos capabilities not available, using fallback")
         return _get_fallback_capabilities()
     except Exception as e:
         _LOGGER.warning("Failed to load escpos capabilities: %s", e)
         return _get_fallback_capabilities()
+    else:
+        return CAPABILITIES  # type: ignore[no-any-return]
 
 
 def _get_fallback_capabilities() -> dict[str, Any]:
@@ -100,10 +100,7 @@ def get_profile_choices() -> list[tuple[str, str]]:
     for key, profile_data in profiles.items():
         vendor = profile_data.get("vendor", "Generic")
         name = profile_data.get("name", key)
-        if vendor and vendor != "Generic":
-            display = f"{vendor} {name}"
-        else:
-            display = name
+        display = f"{vendor} {name}" if vendor and vendor != "Generic" else name
         profile_list.append((key, display))
 
     # Sort by display name, case-insensitive
@@ -245,7 +242,7 @@ def get_profile_line_widths(profile_key: str | None) -> list[int]:
     Returns:
         Sorted list of column widths from profile fonts.
     """
-    if not profile_key or profile_key == PROFILE_AUTO or profile_key == PROFILE_CUSTOM:
+    if not profile_key or profile_key in (PROFILE_AUTO, PROFILE_CUSTOM):
         return COMMON_LINE_WIDTHS.copy()
 
     capabilities = _get_capabilities()
@@ -296,7 +293,7 @@ def get_profile_cut_modes(profile_key: str | None) -> list[str]:
         List of available cut modes (always includes "none").
     """
     # Default: all cut modes available
-    if not profile_key or profile_key == PROFILE_AUTO or profile_key == PROFILE_CUSTOM:
+    if not profile_key or profile_key in (PROFILE_AUTO, PROFILE_CUSTOM):
         return DEFAULT_CUT_MODES.copy()
 
     capabilities = _get_capabilities()
@@ -334,7 +331,7 @@ def profile_supports_feature(profile_key: str | None, feature: str) -> bool:
     Returns:
         True if profile supports the feature, False otherwise.
     """
-    if not profile_key or profile_key == PROFILE_AUTO or profile_key == PROFILE_CUSTOM:
+    if not profile_key or profile_key in (PROFILE_AUTO, PROFILE_CUSTOM):
         # For auto/custom profiles, assume all features available
         return True
 
@@ -359,7 +356,7 @@ def get_profile_features(profile_key: str | None) -> dict[str, bool]:
     Returns:
         Dictionary of feature names to boolean support values.
     """
-    if not profile_key or profile_key == PROFILE_AUTO or profile_key == PROFILE_CUSTOM:
+    if not profile_key or profile_key in (PROFILE_AUTO, PROFILE_CUSTOM):
         return {}
 
     capabilities = _get_capabilities()
@@ -388,7 +385,7 @@ def get_profile_info(profile_key: str | None) -> dict[str, Any]:
     Returns:
         Profile data dictionary, or empty dict if not found.
     """
-    if not profile_key or profile_key == PROFILE_AUTO or profile_key == PROFILE_CUSTOM:
+    if not profile_key or profile_key in (PROFILE_AUTO, PROFILE_CUSTOM):
         return {}
 
     capabilities = _get_capabilities()

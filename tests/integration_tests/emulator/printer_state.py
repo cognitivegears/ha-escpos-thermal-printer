@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -194,10 +195,8 @@ class PrinterState:
         if command_type == "text":
             self.start_new_text_block()
         # Simulate minimal processing latency for more realistic timings
-        try:
+        with contextlib.suppress(Exception):
             await asyncio.sleep(0.002)
-        except Exception:
-            pass
         await self.update_state(command)
 
     def start_new_text_block(self) -> None:

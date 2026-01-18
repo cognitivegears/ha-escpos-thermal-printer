@@ -33,7 +33,7 @@ async def async_get_config_entry_diagnostics(
     if adapter is not None:
         # Get config once to avoid repeated nested getattr calls
         config = getattr(adapter, "_config", None)
-        
+
         runtime = {
             "status": adapter.get_status(),
             "diagnostics": adapter.get_diagnostics(),

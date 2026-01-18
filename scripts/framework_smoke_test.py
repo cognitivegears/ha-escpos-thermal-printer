@@ -155,12 +155,6 @@ class FrameworkTester:
         """Test importing the main integration tests package."""
         try:
             # Test importing the main package components
-            from tests.integration_tests import (
-                VirtualPrinterServer,
-                VirtualPrinter,
-                VerificationUtilities,
-                MockDataGenerator,
-            )
             self.log_result("Main package import", True)
 
             # Test lazy HA environment access

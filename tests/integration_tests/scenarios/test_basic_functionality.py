@@ -10,7 +10,7 @@ pytestmark = pytest.mark.integration
 @pytest.mark.asyncio
 async def test_print_text_service(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test basic text printing functionality."""
-    printer, ha_env, config = printer_with_ha
+    printer, ha_env, _config = printer_with_ha
 
     # Generate test data
     test_text = MockDataGenerator.generate_text_content(50)
@@ -41,7 +41,7 @@ async def test_print_text_service(printer_with_ha) -> None:  # type: ignore[no-u
 @pytest.mark.asyncio
 async def test_print_qr_service(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test QR code printing functionality."""
-    printer, ha_env, config = printer_with_ha
+    printer, ha_env, _config = printer_with_ha
 
     # Generate test QR data
     qr_data = MockDataGenerator.generate_qr_data()
@@ -71,7 +71,7 @@ async def test_print_qr_service(printer_with_ha) -> None:  # type: ignore[no-unt
 @pytest.mark.asyncio
 async def test_print_barcode_service(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test barcode printing functionality."""
-    printer, ha_env, config = printer_with_ha
+    printer, ha_env, _config = printer_with_ha
 
     # Generate test barcode data
     barcode_data = MockDataGenerator.generate_barcode_data('CODE128')
@@ -102,7 +102,7 @@ async def test_print_barcode_service(printer_with_ha) -> None:  # type: ignore[n
 @pytest.mark.asyncio
 async def test_feed_and_cut_services(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test feed and cut functionality."""
-    printer, ha_env, config = printer_with_ha
+    printer, ha_env, _config = printer_with_ha
 
     # Test feed service
     await ha_env.hass.services.async_call(
@@ -133,7 +133,7 @@ async def test_feed_and_cut_services(printer_with_ha) -> None:  # type: ignore[n
 @pytest.mark.asyncio
 async def test_multiple_services_sequence(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test a sequence of multiple print services."""
-    printer, ha_env, config = printer_with_ha
+    printer, ha_env, _config = printer_with_ha
 
     # Execute a sequence of services
     services_sequence = [
@@ -166,13 +166,13 @@ async def test_multiple_services_sequence(printer_with_ha) -> None:  # type: ign
 @pytest.mark.asyncio
 async def test_service_parameter_variations(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test various parameter combinations for services."""
-    printer, ha_env, config = printer_with_ha
+    printer, ha_env, _config = printer_with_ha
 
     # Clear any commands from fixture setup
     await printer.printer_state.clear_history()
 
     # Test different text formatting options
-    formatting_options = [
+    formatting_options: list[dict[str, object]] = [
         {'bold': True, 'underline': 'single', 'align': 'left'},
         {'bold': False, 'underline': 'double', 'align': 'center'},
         {'bold': True, 'underline': 'none', 'align': 'right'},
@@ -181,7 +181,7 @@ async def test_service_parameter_variations(printer_with_ha) -> None:  # type: i
 
     for i, options in enumerate(formatting_options):
         test_text = f"Test formatting {i + 1}"
-        data = {'text': test_text}
+        data: dict[str, object] = {'text': test_text}
         data.update(options)
 
         await ha_env.hass.services.async_call(
@@ -204,7 +204,7 @@ async def test_service_parameter_variations(printer_with_ha) -> None:  # type: i
 @pytest.mark.asyncio
 async def test_printer_state_tracking(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test that printer state is properly tracked."""
-    printer, ha_env, config = printer_with_ha
+    printer, ha_env, _config = printer_with_ha
 
     # Get initial state
     initial_state = await printer.get_status()

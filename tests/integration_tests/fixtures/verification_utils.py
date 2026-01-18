@@ -49,7 +49,7 @@ class VerificationUtilities:
                            len(expected_jobs), len(actual_jobs))
             return False
 
-        for i, (expected, actual) in enumerate(zip(expected_jobs, actual_jobs)):
+        for i, (expected, actual) in enumerate(zip(expected_jobs, actual_jobs, strict=False)):
             if not VerificationUtilities._compare_print_job(expected, actual):
                 _LOGGER.warning("Print job %d mismatch", i)
                 return False

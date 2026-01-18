@@ -50,7 +50,7 @@ class EscposNotifyEntity(NotifyEntity):
         # Use explicit title parameter if provided, otherwise check kwargs for backward compatibility
         if title is None:
             title = kwargs.get("title")
-        
+
         _LOGGER.debug(
             "Notify send_message called: title=%s, message_len=%s, data_keys=%s",
             title,

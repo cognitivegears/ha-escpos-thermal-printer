@@ -33,7 +33,7 @@ async def test_printer_offline_error(error_printer_server, ha_test_environment) 
 @pytest.mark.asyncio
 async def test_connection_timeout_error(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test handling of connection timeout errors."""
-    printer, ha_env, config = printer_with_ha
+    _printer, ha_env, config = printer_with_ha
 
     # Simulate a timeout by setting a very short timeout
     config['timeout'] = 0.001  # Very short timeout
@@ -56,7 +56,7 @@ async def test_connection_timeout_error(printer_with_ha) -> None:  # type: ignor
 @pytest.mark.asyncio
 async def test_paper_out_error_simulation(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test paper out error simulation."""
-    printer, ha_env, config = printer_with_ha
+    printer, _ha_env, _config = printer_with_ha
 
     # Manually trigger paper out error
     await printer.simulate_error('paper_out')
@@ -69,11 +69,11 @@ async def test_paper_out_error_simulation(printer_with_ha) -> None:  # type: ign
 @pytest.mark.asyncio
 async def test_error_recovery(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test error recovery mechanisms."""
-    printer, ha_env, config = printer_with_ha
+    printer, _ha_env, _config = printer_with_ha
 
     # Start with normal operation
     initial_status = await printer.get_status()
-    assert initial_status['online'] == True
+    assert initial_status['online']
     assert initial_status['paper_status'] == 'loaded'
 
     # Simulate an error
@@ -81,21 +81,21 @@ async def test_error_recovery(printer_with_ha) -> None:  # type: ignore[no-untyp
 
     # Verify error state
     error_status = await printer.get_status()
-    assert error_status['online'] == False
+    assert not error_status['online']
 
     # Reset the printer (simulate recovery)
     await printer.reset()
 
     # Verify recovery
     recovered_status = await printer.get_status()
-    assert recovered_status['online'] == True
+    assert recovered_status['online']
     assert recovered_status['paper_status'] == 'loaded'
 
 
 @pytest.mark.asyncio
 async def test_programmable_error_conditions(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test programmable error conditions."""
-    printer, ha_env, config = printer_with_ha
+    printer, ha_env, _config = printer_with_ha
 
     # Add a programmable error condition (offline after 3 commands)
     offline_condition = create_offline_error(
@@ -131,7 +131,7 @@ async def test_programmable_error_conditions(printer_with_ha) -> None:  # type: 
 @pytest.mark.asyncio
 async def test_multiple_error_conditions(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test handling multiple simultaneous error conditions."""
-    printer, ha_env, config = printer_with_ha
+    printer, ha_env, _config = printer_with_ha
 
     # Add multiple error conditions
     conditions = [
@@ -170,7 +170,7 @@ async def test_multiple_error_conditions(printer_with_ha) -> None:  # type: igno
 @pytest.mark.asyncio
 async def test_error_condition_removal(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test removing error conditions."""
-    printer, ha_env, config = printer_with_ha
+    printer, _ha_env, _config = printer_with_ha
 
     # Add an error condition
     condition = create_offline_error(trigger_type='immediate')
@@ -191,7 +191,7 @@ async def test_error_condition_removal(printer_with_ha) -> None:  # type: ignore
 @pytest.mark.asyncio
 async def test_error_simulation_reset(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test resetting error simulator state."""
-    printer, ha_env, config = printer_with_ha
+    printer, _ha_env, _config = printer_with_ha
 
     # Add some error conditions and generate history
     condition = create_offline_error(trigger_type='immediate')
@@ -219,7 +219,7 @@ async def test_error_simulation_reset(printer_with_ha) -> None:  # type: ignore[
 @pytest.mark.asyncio
 async def test_service_call_during_error(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test service calls during error conditions."""
-    printer, ha_env, config = printer_with_ha
+    printer, ha_env, _config = printer_with_ha
 
     # Simulate printer offline
     await printer.simulate_error('offline')
@@ -246,13 +246,13 @@ async def test_service_call_during_error(printer_with_ha) -> None:  # type: igno
 
     # Verify error state is maintained
     status = await printer.get_status()
-    assert status['online'] == False
+    assert not status['online']
 
 
 @pytest.mark.asyncio
 async def test_error_state_persistence(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test that error states persist across multiple operations."""
-    printer, ha_env, config = printer_with_ha
+    printer, ha_env, _config = printer_with_ha
 
     # Wait for any pending mirror operations from fixture initialization
     await ha_env.async_block_till_done()

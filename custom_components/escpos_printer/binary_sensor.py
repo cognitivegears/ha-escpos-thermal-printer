@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+import contextlib
 import logging
 from typing import Any
 
@@ -67,8 +68,6 @@ class EscposOnlineSensor(BinarySensorEntity):
 
     async def async_will_remove_from_hass(self) -> None:
         if self._unsubscribe:
-            try:
+            with contextlib.suppress(Exception):
                 self._unsubscribe()
-            except Exception:
-                pass
             self._unsubscribe = None

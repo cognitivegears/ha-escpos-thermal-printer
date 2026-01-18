@@ -21,7 +21,7 @@ async def _setup_entry(hass):  # type: ignore[no-untyped-def]
 
 
 async def test_print_text_service(hass):  # type: ignore[no-untyped-def]
-    entry = await _setup_entry(hass)
+    await _setup_entry(hass)
 
     fake = MagicMock()
     with patch("escpos.printer.Network", return_value=fake):

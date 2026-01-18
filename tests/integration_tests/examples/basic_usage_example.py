@@ -45,7 +45,7 @@ async def basic_printer_test() -> None:
         ]
 
         # Process commands (this would normally happen automatically)
-        for cmd_data in sample_commands:
+        for _cmd_data in sample_commands:
             # Get command history
             command_log = await printer.get_command_log()
             logger.info(f"Commands processed: {len(command_log)}")

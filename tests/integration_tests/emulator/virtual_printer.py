@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from typing import Any
 
@@ -69,16 +70,12 @@ class ClientConnection:
                 parameters=command['parameters']
             )
             if self.error_simulator is not None:
-                try:
+                with contextlib.suppress(Exception):
                     await self.error_simulator.process_command(command['type'])
-                except Exception:
-                    pass
             await self.printer_state.update_state(cmd_obj)
             # Simulate minimal processing time to better reflect real devices
-            try:
+            with contextlib.suppress(Exception):
                 await asyncio.sleep(0.002)
-            except Exception:
-                pass
             await self._send_response(command)
             # Parse next command from buffer (no new data)
             command = self.command_parser.parse_command(b"")
@@ -263,7 +260,5 @@ class VirtualPrinter:
         await self.server.stop()
         if self._task and not self._task.done():
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass

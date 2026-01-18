@@ -8,7 +8,7 @@ from tests.integration_tests.fixtures import MockDataGenerator, VerificationUtil
 @pytest.mark.asyncio
 async def test_state_triggered_print_automation(printer_with_ha, automation_config) -> None:  # type: ignore[no-untyped-def]
     """Test automation that prints when a state changes."""
-    printer, ha_env, config = printer_with_ha
+    printer, ha_env, _config = printer_with_ha
 
     # Load the automation
     automation_id = await ha_env.automation_tester.load_automation(automation_config)
@@ -43,7 +43,7 @@ async def test_state_triggered_print_automation(printer_with_ha, automation_conf
 @pytest.mark.asyncio
 async def test_multiple_state_triggers(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test automation with multiple state triggers."""
-    printer, ha_env, config = printer_with_ha
+    _printer, ha_env, _config = printer_with_ha
 
     # Create automation with multiple triggers
     multi_trigger_config = {
@@ -70,7 +70,7 @@ async def test_multiple_state_triggers(printer_with_ha) -> None:  # type: ignore
         }
     }
 
-    automation_id = await ha_env.automation_tester.load_automation(multi_trigger_config)
+    await ha_env.automation_tester.load_automation(multi_trigger_config)
 
     # Create trigger entities
     await ha_env.create_test_entity('sensor.trigger1', 'sensor', 'inactive')
@@ -106,7 +106,7 @@ async def test_multiple_state_triggers(printer_with_ha) -> None:  # type: ignore
 @pytest.mark.asyncio
 async def test_conditional_print_automation(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test automation with conditions for printing."""
-    printer, ha_env, config = printer_with_ha
+    _printer, ha_env, _config = printer_with_ha
 
     # Create automation with conditions
     conditional_config = {
@@ -141,7 +141,7 @@ async def test_conditional_print_automation(printer_with_ha) -> None:  # type: i
         }
     }
 
-    automation_id = await ha_env.automation_tester.load_automation(conditional_config)
+    await ha_env.automation_tester.load_automation(conditional_config)
 
     # Create entities
     await ha_env.create_test_entity('sensor.main_trigger', 'sensor', 'idle')
@@ -183,7 +183,7 @@ async def test_conditional_print_automation(printer_with_ha) -> None:  # type: i
 @pytest.mark.asyncio
 async def test_notification_triggered_print(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test printing triggered by notifications."""
-    printer, ha_env, config = printer_with_ha
+    printer, ha_env, _config = printer_with_ha
 
     # Send a notification
     test_message = MockDataGenerator.generate_text_content(30)
@@ -212,7 +212,7 @@ async def test_notification_triggered_print(printer_with_ha) -> None:  # type: i
 @pytest.mark.asyncio
 async def test_automation_sequence_with_multiple_services(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test automation that calls multiple printer services in sequence."""
-    printer, ha_env, config = printer_with_ha
+    printer, ha_env, _config = printer_with_ha
 
     # Clear command history from fixture initialization
     await printer.printer_state.clear_history()
@@ -264,7 +264,7 @@ async def test_automation_sequence_with_multiple_services(printer_with_ha) -> No
         ]
     }
 
-    automation_id = await ha_env.automation_tester.load_automation(sequence_config)
+    await ha_env.automation_tester.load_automation(sequence_config)
 
     # Create trigger entity
     await ha_env.create_test_entity('sensor.sequence_trigger', 'sensor', 'idle')
@@ -300,7 +300,7 @@ async def test_automation_sequence_with_multiple_services(printer_with_ha) -> No
 @pytest.mark.asyncio
 async def test_automation_with_template_data(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test automation that uses template data for printing."""
-    printer, ha_env, config = printer_with_ha
+    printer, ha_env, _config = printer_with_ha
 
     # Create automation with template
     template_config = {
@@ -320,7 +320,7 @@ async def test_automation_with_template_data(printer_with_ha) -> None:  # type: 
         }
     }
 
-    automation_id = await ha_env.automation_tester.load_automation(template_config)
+    await ha_env.automation_tester.load_automation(template_config)
 
     # Create temperature sensor
     await ha_env.create_test_entity('sensor.temperature', 'sensor', '20')
@@ -349,7 +349,7 @@ async def test_automation_with_template_data(printer_with_ha) -> None:  # type: 
 @pytest.mark.asyncio
 async def test_automation_error_handling(printer_with_ha) -> None:  # type: ignore[no-untyped-def]
     """Test automation behavior when printer errors occur."""
-    printer, ha_env, config = printer_with_ha
+    printer, ha_env, _config = printer_with_ha
 
     # Create automation
     error_test_config = {

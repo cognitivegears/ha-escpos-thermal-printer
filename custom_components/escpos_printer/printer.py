@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+import contextlib
 from dataclasses import dataclass
 import io
 import logging
@@ -34,7 +35,7 @@ _LOGGER = logging.getLogger(__name__)
 
 # Late import of python-escpos to avoid import errors at HA startup if deps pending
 def _get_network_printer() -> type[Any]:
-    from escpos.printer import Network
+    from escpos.printer import Network  # noqa: PLC0415
 
     return Network  # type: ignore[no-any-return]
 
@@ -69,17 +70,17 @@ class EscposPrinterAdapter:
 
     # Utilities
     def _connect(self) -> Any:
-        Network = _get_network_printer()
+        network_class = _get_network_printer()
         profile_obj = None
         if self._config.profile:
             try:
-                from escpos import profile as escpos_profile
+                from escpos import profile as escpos_profile  # noqa: PLC0415
 
                 profile_obj = escpos_profile.get_profile(self._config.profile)
             except Exception as e:
                 _LOGGER.debug("Unknown printer profile '%s': %s", self._config.profile, sanitize_log_message(str(e)))
                 profile_obj = None
-        return Network(
+        return network_class(
             self._config.host,
             port=self._config.port,
             timeout=self._config.timeout,
@@ -99,9 +100,9 @@ class EscposPrinterAdapter:
 
         # Schedule status checks
         if self._status_interval > 0:
-            from datetime import timedelta
+            from datetime import timedelta  # noqa: PLC0415
 
-            from homeassistant.helpers.event import async_track_time_interval
+            from homeassistant.helpers.event import async_track_time_interval  # noqa: PLC0415
 
             async def _tick(now: Any) -> None:
                 await self._status_check(hass)
@@ -116,10 +117,8 @@ class EscposPrinterAdapter:
             self._cancel_status()
         self._cancel_status = None
         if self._printer is not None:
-            try:
+            with contextlib.suppress(Exception):
                 self._printer.close()
-            except Exception:
-                pass
             self._printer = None
 
     async def _status_check(self, hass: HomeAssistant) -> None:
@@ -150,10 +149,8 @@ class EscposPrinterAdapter:
                 _LOGGER.warning("Printer %s:%s not reachable", self._config.host, self._config.port)
             # Notify listeners
             for cb in list(self._status_listeners):
-                try:
+                with contextlib.suppress(Exception):
                     cb(ok)
-                except Exception:
-                    pass
 
     def get_status(self) -> bool | None:
         return self._status
@@ -164,10 +161,8 @@ class EscposPrinterAdapter:
     def add_status_listener(self, callback: Callable[[bool], None]) -> Callable[[], None]:
         self._status_listeners.append(callback)
         def _remove() -> None:
-            try:
+            with contextlib.suppress(ValueError):
                 self._status_listeners.remove(callback)
-            except ValueError:
-                pass
         return _remove
 
     def get_diagnostics(self) -> dict[str, Any]:
@@ -257,7 +252,7 @@ class EscposPrinterAdapter:
             await hass.async_add_executor_job(_cut)
 
     # Operations
-    async def print_text(
+    async def print_text(  # noqa: PLR0915
         self,
         hass: HomeAssistant,
         *,
@@ -278,7 +273,7 @@ class EscposPrinterAdapter:
         hmult = self._map_multiplier(height)
         text_to_print = self._wrap_text(text)
 
-        def _do_print() -> None:
+        def _do_print() -> None:  # noqa: PLR0912
             printer = self._printer if self._keepalive and self._printer is not None else self._connect()
             try:
                 # Optional codepage
@@ -313,10 +308,8 @@ class EscposPrinterAdapter:
                     printer.text(text_to_print)
             finally:
                 if not self._keepalive:
-                    try:
+                    with contextlib.suppress(Exception):
                         printer.close()
-                    except Exception:
-                        pass
 
         async with self._lock:
             await hass.async_add_executor_job(_do_print)
@@ -325,20 +318,16 @@ class EscposPrinterAdapter:
                 await self._apply_cut_and_feed(hass, printer_for_post, cut, feed)
             finally:
                 if not self._keepalive:
-                    try:
+                    with contextlib.suppress(Exception):
                         printer_for_post.close()
-                    except Exception:
-                        pass
         # Successful operation implies reachable
         now = dt_util.utcnow()
         self._status = True
         self._last_ok = now
         self._last_check = now
         for cb in list(self._status_listeners):
-            try:
+            with contextlib.suppress(Exception):
                 cb(True)
-            except Exception:
-                pass
 
     async def print_qr(
         self,
@@ -360,7 +349,7 @@ class EscposPrinterAdapter:
             qec = "M"
         def _map_qr_ec(level: str) -> Any:
             try:
-                from escpos import escpos as _esc
+                from escpos import escpos as _esc  # noqa: PLC0415
                 return {
                     "L": getattr(_esc, "QR_ECLEVEL_L", "L"),
                     "M": getattr(_esc, "QR_ECLEVEL_M", "M"),
@@ -378,10 +367,8 @@ class EscposPrinterAdapter:
                 printer.qr(data, size=qsize, ec=_map_qr_ec(qec))
             finally:
                 if not self._keepalive:
-                    try:
+                    with contextlib.suppress(Exception):
                         printer.close()
-                    except Exception:
-                        pass
 
         async with self._lock:
             await hass.async_add_executor_job(_do_print)
@@ -390,12 +377,10 @@ class EscposPrinterAdapter:
                 await self._apply_cut_and_feed(hass, printer_for_post, cut, feed)
             finally:
                 if not self._keepalive:
-                    try:
+                    with contextlib.suppress(Exception):
                         printer_for_post.close()
-                    except Exception:
-                        pass
 
-    async def print_image(
+    async def print_image(  # noqa: PLR0915
         self,
         hass: HomeAssistant,
         *,
@@ -419,15 +404,11 @@ class EscposPrinterAdapter:
                     resp.raise_for_status()
                     content = await resp.read()
                 finally:
-                    try:
+                    with contextlib.suppress(Exception):
                         resp.close()
-                    except Exception:
-                        pass
             finally:
-                try:
+                with contextlib.suppress(Exception):
                     await session.close()
-                except Exception:
-                    pass
             img_obj = Image.open(io.BytesIO(content))
         else:
             _LOGGER.debug("Opening local image: %s", image)
@@ -461,10 +442,8 @@ class EscposPrinterAdapter:
                     printer.text("[image printing not supported by this printer]\n")
             finally:
                 if not self._keepalive:
-                    try:
+                    with contextlib.suppress(Exception):
                         printer.close()
-                    except Exception:
-                        pass
 
         async with self._lock:
             await hass.async_add_executor_job(_do_print)
@@ -473,10 +452,8 @@ class EscposPrinterAdapter:
                 await self._apply_cut_and_feed(hass, printer_for_post, cut, feed)
             finally:
                 if not self._keepalive:
-                    try:
+                    with contextlib.suppress(Exception):
                         printer_for_post.close()
-                    except Exception:
-                        pass
 
     async def feed(self, hass: HomeAssistant, *, lines: int) -> None:
         try:
@@ -488,21 +465,22 @@ class EscposPrinterAdapter:
         _LOGGER.debug("Feeding %s lines", lines_int)
 
         def _feed_inner(printer: Any) -> None:
-                if hasattr(printer, "control"):
-                    try:
-                        for _ in range(lines_int):
-                            printer.control("LF")
-                        return
-                    except Exception:
-                        pass
-                if hasattr(printer, "ln"):
-                    printer.ln(lines_int)
+            if hasattr(printer, "control"):
+                try:
+                    for _ in range(lines_int):
+                        printer.control("LF")
+                except Exception:
+                    pass  # Fall through to other methods
                 else:
-                    try:
-                        printer._raw(b"\n" * lines_int)
-                    except Exception:
-                        for _ in range(lines_int):
-                            printer.text("\n")
+                    return
+            if hasattr(printer, "ln"):
+                printer.ln(lines_int)
+            else:
+                try:
+                    printer._raw(b"\n" * lines_int)
+                except Exception:
+                    for _ in range(lines_int):
+                        printer.text("\n")
 
         async with self._lock:
             printer = self._printer if self._keepalive and self._printer is not None else self._connect()
@@ -510,10 +488,8 @@ class EscposPrinterAdapter:
                 await hass.async_add_executor_job(_feed_inner, printer)
             finally:
                 if not self._keepalive:
-                    try:
+                    with contextlib.suppress(Exception):
                         printer.close()
-                    except Exception:
-                        pass
 
     async def cut(self, hass: HomeAssistant, *, mode: str) -> None:
         cut_mode = self._map_cut(mode)
@@ -526,10 +502,8 @@ class EscposPrinterAdapter:
                 await hass.async_add_executor_job(lambda: printer.cut(mode=cut_mode))
             finally:
                 if not self._keepalive:
-                    try:
+                    with contextlib.suppress(Exception):
                         printer.close()
-                    except Exception:
-                        pass
 
     async def print_barcode(
         self,
@@ -565,14 +539,14 @@ class EscposPrinterAdapter:
                 if hasattr(printer, "set"):
                     printer.set(align=align_m)
                 # Attempt to pass 'force_software' when provided; fall back if unsupported
-                kwargs = dict(
-                    height=height_v,
-                    width=width_v,
-                    pos=pos_v,
-                    font=font_v,
-                    align_ct=bool(align_ct),
-                    check=bool(check),
-                )
+                kwargs = {
+                    "height": height_v,
+                    "width": width_v,
+                    "pos": pos_v,
+                    "font": font_v,
+                    "align_ct": bool(align_ct),
+                    "check": bool(check),
+                }
                 if force_software is not None:
                     kwargs["force_software"] = force_software
 
@@ -596,10 +570,8 @@ class EscposPrinterAdapter:
                         raise
             finally:
                 if not self._keepalive:
-                    try:
+                    with contextlib.suppress(Exception):
                         printer.close()
-                    except Exception:
-                        pass
 
         async with self._lock:
             await hass.async_add_executor_job(_do_print)
@@ -608,10 +580,8 @@ class EscposPrinterAdapter:
                 await self._apply_cut_and_feed(hass, printer_for_post, cut, feed)
             finally:
                 if not self._keepalive:
-                    try:
+                    with contextlib.suppress(Exception):
                         printer_for_post.close()
-                    except Exception:
-                        pass
 
     async def beep(self, hass: HomeAssistant, *, times: int = 2, duration: int = 4) -> None:
         times_v = validate_numeric_input(times, 1, MAX_BEEP_TIMES, "times")
@@ -638,7 +608,5 @@ class EscposPrinterAdapter:
                 await hass.async_add_executor_job(_beep_inner, printer)
             finally:
                 if not self._keepalive:
-                    try:
+                    with contextlib.suppress(Exception):
                         printer.close()
-                    except Exception:
-                        pass

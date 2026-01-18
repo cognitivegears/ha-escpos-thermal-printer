@@ -1,15 +1,19 @@
 print_text_utf8:
   name: Print Text (UTF-8)
   description: Print UTF-8 text with automatic transcoding to printer codepage. Select one or more printer devices as the target.
-  target:
-    device:
-      integration: escpos_printer
   fields:
+    device_id:
+      name: Device
+      description: Select one or more printer devices
+      required: true
+      selector:
+        device:
+          integration: escpos_printer
     text:
       name: Text
       description: The text to print (UTF-8 characters will be converted to printer-compatible encoding)
       required: true
-      example: "Hello, world! Café résumé naïve"
+      example: "Hello, world! Cafe resume naive"
       selector:
         text:
           multiline: true
@@ -76,10 +80,14 @@ print_text_utf8:
 print_text:
   name: Print Text (Raw Encoding)
   description: Print text to the ESC/POS printer using raw encoding. Select one or more printer devices as the target.
-  target:
-    device:
-      integration: escpos_printer
   fields:
+    device_id:
+      name: Device
+      description: Select one or more printer devices
+      required: true
+      selector:
+        device:
+          integration: escpos_printer
     text:
       name: Text
       description: The text to print
@@ -156,10 +164,14 @@ print_text:
 print_qr:
   name: Print QR Code
   description: Print a QR code. Select one or more printer devices as the target.
-  target:
-    device:
-      integration: escpos_printer
   fields:
+    device_id:
+      name: Device
+      description: Select one or more printer devices
+      required: true
+      selector:
+        device:
+          integration: escpos_printer
     data:
       name: Data
       description: Data to encode in the QR code
@@ -217,10 +229,14 @@ print_qr:
 print_image:
   name: Print Image
   description: Print an image by URL or local path. Select one or more printer devices as the target.
-  target:
-    device:
-      integration: escpos_printer
   fields:
+    device_id:
+      name: Device
+      description: Select one or more printer devices
+      required: true
+      selector:
+        device:
+          integration: escpos_printer
     image:
       name: Image
       description: Image URL or local file path
@@ -264,10 +280,14 @@ print_image:
 print_barcode:
   name: Print Barcode
   description: Print a barcode. Select one or more printer devices as the target.
-  target:
-    device:
-      integration: escpos_printer
   fields:
+    device_id:
+      name: Device
+      description: Select one or more printer devices
+      required: true
+      selector:
+        device:
+          integration: escpos_printer
     code:
       name: Code
       description: Barcode data
@@ -383,10 +403,14 @@ print_barcode:
 feed:
   name: Feed Paper
   description: Feed the paper a number of lines. Select one or more printer devices as the target.
-  target:
-    device:
-      integration: escpos_printer
   fields:
+    device_id:
+      name: Device
+      description: Select one or more printer devices
+      required: true
+      selector:
+        device:
+          integration: escpos_printer
     lines:
       name: Lines
       description: Number of lines to feed
@@ -401,10 +425,14 @@ feed:
 cut:
   name: Cut Paper
   description: Cut the paper. Select one or more printer devices as the target.
-  target:
-    device:
-      integration: escpos_printer
   fields:
+    device_id:
+      name: Device
+      description: Select one or more printer devices
+      required: true
+      selector:
+        device:
+          integration: escpos_printer
     mode:
       name: Mode
       description: Cut type (full or partial)
@@ -418,10 +446,14 @@ cut:
 beep:
   name: Beep
   description: Trigger the printer buzzer (if supported). Select one or more printer devices as the target.
-  target:
-    device:
-      integration: escpos_printer
   fields:
+    device_id:
+      name: Device
+      description: Select one or more printer devices
+      required: true
+      selector:
+        device:
+          integration: escpos_printer
     times:
       name: Times
       description: Number of beeps

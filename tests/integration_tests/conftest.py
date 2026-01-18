@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 
 # Import fixtures to make them available to test scenarios
-from tests.integration_tests.fixtures.conftest import (  # noqa: F401
+from tests.integration_tests.fixtures.conftest import (
     automation_config,
     error_printer_server,
     ha_test_environment,

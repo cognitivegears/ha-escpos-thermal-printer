@@ -62,25 +62,23 @@ def get_ha_environment() -> Any:
 __version__ = "1.0.0"
 
 __all__ = [
+    'Command',
+    'ErrorSimulator',
+    'EscposCommandParser',
+    'MockDataGenerator',
+    'PrintJob',
+    'PrinterState',
+    # Test Utilities
+    'VerificationUtilities',
+    'VirtualPrinter',
     # Virtual Printer Emulator
     'VirtualPrinterServer',
-    'VirtualPrinter',
-    'EscposCommandParser',
-    'PrinterState',
-    'ErrorSimulator',
-    'PrintJob',
-    'Command',
+    # Home Assistant Environment (lazy loaded)
+    '_import_ha_environment',  # Function to import HA components when needed
+    'create_connection_error',
+    'create_intermittent_error',
     'create_offline_error',
     'create_paper_out_error',
     'create_timeout_error',
-    'create_connection_error',
-    'create_intermittent_error',
-
-    # Home Assistant Environment (lazy loaded)
-    '_import_ha_environment',  # Function to import HA components when needed
-    'get_ha_environment',      # Convenience function for HA components
-
-    # Test Utilities
-    'VerificationUtilities',
-    'MockDataGenerator'
+    'get_ha_environment'      # Convenience function for HA components
 ]

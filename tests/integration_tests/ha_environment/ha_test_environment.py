@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 import concurrent.futures
+import contextlib
 import logging
 from typing import Any
-from collections.abc import Callable
 
 from homeassistant.const import EVENT_CALL_SERVICE, EVENT_STATE_CHANGED
 from homeassistant.core import HomeAssistant
@@ -204,10 +205,7 @@ class AutomationTester:
             if isinstance(cond, list):
                 return all(self._conditions_met(c) for c in cond)
             if cond.get("condition") == "and":
-                for c in cond.get("conditions", []):
-                    if not self._conditions_met(c):
-                        return False
-                return True
+                return all(self._conditions_met(c) for c in cond.get("conditions", []))
             if cond.get("condition") == "state":
                 entity_id = cond.get("entity_id")
                 expected = cond.get("state")
@@ -370,10 +368,8 @@ class HATestEnvironment:
                         if cmd_type:
                             cmd = Command(timestamp=datetime.now(), command_type=cmd_type, raw_data=raw, parameters=params)
                             # Ensure each mirrored text call is treated as a distinct block
-                            try:
+                            with contextlib.suppress(Exception):
                                 self._printer_server.printer_state.start_new_text_block()
-                            except Exception:
-                                pass
                             # Schedule update on loop and track the future for synchronization
                             future = asyncio.run_coroutine_threadsafe(self._printer_server.printer_state.update_state(cmd), self.hass.loop)
                             try:
@@ -389,10 +385,8 @@ class HATestEnvironment:
                                     bumps = 3 if cmd_type == "text" else 1
                                     for _ in range(bumps):
                                         future = asyncio.run_coroutine_threadsafe(es.process_command(cmd_type), self.hass.loop)
-                                        try:
+                                        with contextlib.suppress(Exception):
                                             self._pending_mirror_futures.append(future)
-                                        except Exception:
-                                            pass
                             except Exception:
                                 pass
                 except Exception:
@@ -425,21 +419,15 @@ class HATestEnvironment:
                     except Exception:
                         pass
                     # Mirror text into state and tick error simulator
-                    try:
+                    with contextlib.suppress(Exception):
                         await self._printer_server.printer_state.update_state_sync("text", txt.encode(), {"__force_new__": True})
-                    except Exception:
-                        pass
-                    try:
-                        # Bump command count to trigger programmable errors as needed
-                        for _ in range(3):
-                            await self._printer_server.error_simulator.process_command("text")
-                        # Re-check offline after bumps and raise
-                        active = await self._printer_server.error_simulator.get_active_errors()
-                        if "offline" in active:
-                            raise RuntimeError("Printer offline")
-                    except Exception:
-                        # Propagate error to match expectations
-                        raise
+                    # Bump command count to trigger programmable errors as needed
+                    for _ in range(3):
+                        await self._printer_server.error_simulator.process_command("text")
+                    # Re-check offline after bumps and raise
+                    active = await self._printer_server.error_simulator.get_active_errors()
+                    if "offline" in active:
+                        raise RuntimeError("Printer offline")
 
                 async def _fb_feed(call: ServiceCall) -> None:
                     try:
@@ -482,9 +470,9 @@ class HATestEnvironment:
             try:
                 # Convert concurrent.futures.Future to asyncio.Future to avoid blocking the event loop
                 asyncio_futures = {asyncio.wrap_future(f) for f in futures_to_wait}
-                
+
                 # Use asyncio.wait with timeout (non-blocking)
-                done, pending = await asyncio.wait(
+                _done, pending = await asyncio.wait(
                     asyncio_futures,
                     timeout=timeout,
                     return_when=asyncio.ALL_COMPLETED
@@ -507,10 +495,8 @@ class HATestEnvironment:
 
         # Unsubscribe service call listener
         if hasattr(self, "_unsub_service") and self._unsub_service:
-            try:
+            with contextlib.suppress(Exception):
                 self._unsub_service()
-            except Exception:
-                pass
             self._unsub_service = None
 
         # Clear tracked data
