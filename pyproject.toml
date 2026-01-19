@@ -32,7 +32,7 @@ dev = [
     "ruff==0.14.13",
     "pre-commit==4.5.1",
     "safety==3.7.0",
-    "bandit==1.9.2",
+    "bandit==1.9.3",
     "pip-audit==2.10.0",
     "typer==0.21.1",
     "marshmallow==4.2.0",
@@ -44,7 +44,7 @@ dev = [
 ]
 security = [
   "safety==3.7.0",
-  "bandit==1.9.2",
+  "bandit==1.9.3",
   "pip-audit==2.10.0",
   "ruff==0.14.13",
   "typer==0.21.1",
@@ -264,7 +264,7 @@ dev = [
     "ruff==0.14.13",
     "pre-commit==4.5.1",
     "safety==3.7.0",
-    "bandit==1.9.2",
+    "bandit==1.9.3",
     "pip-audit==2.10.0",
     "typer==0.21.1",
     "marshmallow==4.2.0",
@@ -276,7 +276,7 @@ dev = [
 ]
 security = [
     "safety==3.7.0",
-    "bandit==1.9.2",
+    "bandit==1.9.3",
     "pip-audit==2.10.0",
     "typer==0.21.1",
     "marshmallow==4.2.0",
