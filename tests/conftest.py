@@ -52,11 +52,104 @@ def fake_escpos_module(request: Any) -> Generator[None, None, None]:
         def _raw(self, *_, **__):  # type: ignore[no-untyped-def]
             pass
 
+    class _FakeUsb:
+        def __init__(self, id_vendor: int = 0, id_product: int = 0, timeout: int = 0, in_ep: int = 0x82, out_ep: int = 0x01, profile: Any = None, **__: Any):  # type: ignore[no-untyped-def]
+            self.idVendor = id_vendor  # Match real USB API
+            self.idProduct = id_product  # Match real USB API
+            self.timeout = timeout
+            self.in_ep = in_ep
+            self.out_ep = out_ep
+            self.profile = profile
+
+        def set(self, *_: Any, **__: Any) -> None:
+            pass
+
+        def text(self, *_: Any, **__: Any) -> None:
+            pass
+
+        def qr(self, *_: Any, **__: Any) -> None:
+            pass
+
+        def image(self, *_: Any, **__: Any) -> None:
+            pass
+
+        def control(self, *_: Any, **__: Any) -> None:
+            pass
+
+        def cut(self, *_: Any, **__: Any) -> None:
+            pass
+
+        def close(self) -> None:
+            pass
+
+        def _set_codepage(self, *_, **__):  # type: ignore[no-untyped-def]
+            pass
+
+        def _raw(self, *_, **__):  # type: ignore[no-untyped-def]
+            pass
+
+        def barcode(self, *_, **__):  # type: ignore[no-untyped-def]
+            pass
+
+        def buzzer(self, *_, **__):  # type: ignore[no-untyped-def]
+            pass
+
+        def beep(self, *_, **__):  # type: ignore[no-untyped-def]
+            pass
+
+        def ln(self, *_, **__):  # type: ignore[no-untyped-def]
+            pass
+
+        def charcode(self, *_, **__):  # type: ignore[no-untyped-def]
+            pass
+
     printer.Network = _FakeNetwork  # type: ignore[attr-defined]
+    printer.Usb = _FakeUsb  # type: ignore[attr-defined]
     escpos.printer = printer  # type: ignore[attr-defined]
 
     sys.modules.setdefault("escpos", escpos)
     sys.modules.setdefault("escpos.printer", printer)
+    yield
+
+
+@pytest.fixture(autouse=True)
+def fake_usb_module(request: Any) -> Generator[None, None, None]:
+    """Provide a fake usb module for unit tests."""
+    if request.node.get_closest_marker("integration"):
+        yield
+        return
+
+    usb = types.ModuleType("usb")
+    usb_core = types.ModuleType("usb.core")
+    usb_util = types.ModuleType("usb.util")
+
+    class _FakeDevice:
+        def __init__(self, id_vendor: int = 0, id_product: int = 0):
+            self.idVendor = id_vendor  # Match real USB API
+            self.idProduct = id_product  # Match real USB API
+            self.iManufacturer = 1
+            self.iProduct = 2
+
+    def _fake_find(id_vendor: int | None = None, id_product: int | None = None, find_all: bool = False, **kwargs: Any) -> Any:
+        if find_all:
+            return []  # Return empty list for unit tests
+        return None
+
+    def _fake_get_string(device: Any, index: int) -> str | None:
+        if index == 1:
+            return "Fake Manufacturer"
+        if index == 2:
+            return "Fake Product"
+        return None
+
+    usb_core.find = _fake_find  # type: ignore[attr-defined]
+    usb_util.get_string = _fake_get_string  # type: ignore[attr-defined]
+    usb.core = usb_core  # type: ignore[attr-defined]
+    usb.util = usb_util  # type: ignore[attr-defined]
+
+    sys.modules.setdefault("usb", usb)
+    sys.modules.setdefault("usb.core", usb_core)
+    sys.modules.setdefault("usb.util", usb_util)
     yield
 
 

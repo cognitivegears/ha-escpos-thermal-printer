@@ -3,7 +3,17 @@
   "config": {
     "step": {
       "user": {
-        "title": "Configure printer connection",
+        "title": "Connection Type",
+        "description": "Select how your printer is connected.",
+        "data": {
+          "connection_type": "Connection type"
+        },
+        "data_description": {
+          "connection_type": "Choose Network for TCP/IP connected printers or USB for directly connected printers."
+        }
+      },
+      "network": {
+        "title": "Configure network printer",
         "description": "Enter the connection details for your ESC/POS network printer.",
         "data": {
           "host": "Host",
@@ -16,6 +26,50 @@
           "port": "Network port (usually 9100).",
           "timeout": "Connection timeout in seconds.",
           "profile": "Select your printer model or Auto-detect. Choose 'Custom' to enter a profile name manually."
+        }
+      },
+      "usb_select": {
+        "title": "Configure USB printer",
+        "description": "Select your USB thermal printer from the list of detected devices.",
+        "data": {
+          "usb_device": "USB Device",
+          "timeout": "Timeout (seconds)",
+          "profile": "Printer profile"
+        },
+        "data_description": {
+          "usb_device": "Select your printer from the detected USB devices.",
+          "timeout": "Connection timeout in seconds.",
+          "profile": "Select your printer model or Auto-detect."
+        }
+      },
+      "usb_manual": {
+        "title": "Manual USB configuration",
+        "description": "Enter the USB Vendor ID and Product ID for your printer. These can be found using 'lsusb' on Linux or Device Manager on Windows.",
+        "data": {
+          "vendor_id": "Vendor ID",
+          "product_id": "Product ID",
+          "in_ep": "Input Endpoint",
+          "out_ep": "Output Endpoint",
+          "timeout": "Timeout (seconds)",
+          "profile": "Printer profile"
+        },
+        "data_description": {
+          "vendor_id": "USB Vendor ID (decimal, e.g., 1208 for Epson).",
+          "product_id": "USB Product ID (decimal).",
+          "in_ep": "USB input endpoint address (usually 130 / 0x82).",
+          "out_ep": "USB output endpoint address (usually 1 / 0x01).",
+          "timeout": "Connection timeout in seconds.",
+          "profile": "Select your printer model or Auto-detect."
+        }
+      },
+      "usb_confirm": {
+        "title": "Confirm USB printer",
+        "description": "A USB thermal printer was detected: {printer_name}. Configure the printer profile.",
+        "data": {
+          "profile": "Printer profile"
+        },
+        "data_description": {
+          "profile": "Select your printer model or Auto-detect."
         }
       },
       "codepage": {
@@ -66,11 +120,23 @@
       }
     },
     "error": {
-      "cannot_connect": "Failed to connect to printer.",
+      "cannot_connect": "Failed to connect to network printer.",
+      "cannot_connect_usb": "Failed to connect to USB printer. Check that the printer is connected and permissions are configured correctly.",
+      "usb_permission_denied": "Permission denied accessing USB device. On Linux, add udev rules or run with appropriate permissions. On Docker/HAOS, ensure the USB device is passed through to the container.",
+      "usb_device_not_found": "USB device not found. Verify the printer is connected and the Vendor ID/Product ID are correct.",
+      "usb_backend_missing": "USB backend (libusb) not found. Install libusb on your system.",
       "already_configured": "This printer is already configured.",
       "invalid_profile": "Invalid printer profile name.",
       "invalid_codepage": "Invalid codepage/encoding.",
-      "invalid_line_width": "Invalid line width. Must be a positive number."
+      "invalid_line_width": "Invalid line width. Must be a positive number.",
+      "invalid_usb_device": "Invalid USB device selection.",
+      "invalid_discovery_info": "Invalid USB discovery information.",
+      "invalid_endpoint": "Invalid USB endpoint address. Must be between 0x00 and 0xFF (0-255)."
+    },
+    "abort": {
+      "already_configured": "This printer is already configured.",
+      "invalid_discovery_info": "Invalid USB discovery information.",
+      "invalid_usb_device": "Invalid USB device configuration. Vendor ID and Product ID are required."
     }
   },
   "options": {
@@ -95,7 +161,7 @@
           "line_width": "Number of characters per line (columns).",
           "default_align": "Default text alignment for printing.",
           "default_cut": "Default paper cut mode after printing.",
-          "keepalive": "Keep the connection open between print jobs.",
+          "keepalive": "Keep the connection open between print jobs (network printers only).",
           "status_interval": "How often to check printer status (0 to disable)."
         }
       },
@@ -152,8 +218,8 @@
         "align": {"name": "Alignment", "description": "Horizontal alignment for the text."},
         "bold": {"name": "Bold", "description": "Render text in bold font."},
         "underline": {"name": "Underline", "description": "Underline mode for text."},
-        "width": {"name": "Width multiplier", "description": "Text width multiplier (1–3)."},
-        "height": {"name": "Height multiplier", "description": "Text height multiplier (1–3)."},
+        "width": {"name": "Width multiplier", "description": "Text width multiplier (1-3)."},
+        "height": {"name": "Height multiplier", "description": "Text height multiplier (1-3)."},
         "encoding": {"name": "Encoding", "description": "Character encoding/codepage for text."},
         "cut": {"name": "Cut", "description": "Cut mode after printing."},
         "feed": {"name": "Feed lines", "description": "Lines to feed after printing."}
@@ -167,8 +233,8 @@
         "align": {"name": "Alignment", "description": "Horizontal alignment for the text."},
         "bold": {"name": "Bold", "description": "Render text in bold font."},
         "underline": {"name": "Underline", "description": "Underline mode for text."},
-        "width": {"name": "Width multiplier", "description": "Text width multiplier (1–3)."},
-        "height": {"name": "Height multiplier", "description": "Text height multiplier (1–3)."},
+        "width": {"name": "Width multiplier", "description": "Text width multiplier (1-3)."},
+        "height": {"name": "Height multiplier", "description": "Text height multiplier (1-3)."},
         "cut": {"name": "Cut", "description": "Cut mode after printing."},
         "feed": {"name": "Feed lines", "description": "Lines to feed after printing."}
       }
@@ -178,7 +244,7 @@
       "description": "Print a QR code.",
       "fields": {
         "data": {"name": "Data", "description": "Data content to encode in the QR code."},
-        "size": {"name": "Size", "description": "Module size for the QR code (1–16)."},
+        "size": {"name": "Size", "description": "Module size for the QR code (1-16)."},
         "ec": {"name": "Error correction", "description": "QR error correction level (L/M/Q/H)."},
         "align": {"name": "Alignment", "description": "Horizontal alignment for the QR code."},
         "cut": {"name": "Cut", "description": "Cut mode after printing."},
@@ -216,8 +282,8 @@
       "fields": {
         "code": {"name": "Code", "description": "Barcode data to print."},
         "bc": {"name": "Type", "description": "Barcode symbology to use."},
-        "height": {"name": "Height", "description": "Barcode height in dots (1–255)."},
-        "width": {"name": "Width", "description": "Barcode module width (2–6)."},
+        "height": {"name": "Height", "description": "Barcode height in dots (1-255)."},
+        "width": {"name": "Width", "description": "Barcode module width (2-6)."},
         "pos": {"name": "Text position", "description": "Human-readable text position (ABOVE/BELOW/BOTH/OFF)."},
         "font": {"name": "Font", "description": "Font for human-readable text (A or B)."},
         "align_ct": {"name": "Center align", "description": "Center the barcode on the line."},

@@ -10,7 +10,12 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 
-from .const import DOMAIN
+from .const import (
+    CONF_CONNECTION_TYPE,
+    CONNECTION_TYPE_NETWORK,
+    CONNECTION_TYPE_USB,
+    DOMAIN,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -39,11 +44,14 @@ class EscposOnlineSensor(BinarySensorEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
+        connection_type = self._entry.data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
+        model = "USB Printer" if connection_type == CONNECTION_TYPE_USB else "Network Printer"
+
         return DeviceInfo(
             identifiers={(DOMAIN, self._entry.entry_id)},
             name=f"ESC/POS Printer {self._entry.title}",
             manufacturer="ESC/POS",
-            model="Network Printer",
+            model=model,
         )
 
     async def async_added_to_hass(self) -> None:
@@ -58,13 +66,22 @@ class EscposOnlineSensor(BinarySensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         diag = self._adapter.get_diagnostics()
-        return {
+        connection_type = self._entry.data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
+
+        attrs = {
+            "connection_type": connection_type,
             "last_check": diag.get("last_check"),
             "last_ok": diag.get("last_ok"),
             "last_error": diag.get("last_error"),
             "last_latency_ms": diag.get("last_latency_ms"),
             "last_error_reason": diag.get("last_error_reason"),
         }
+
+        # Add connection-specific info
+        if hasattr(self._adapter, "get_connection_info"):
+            attrs["connection_info"] = self._adapter.get_connection_info()
+
+        return attrs
 
     async def async_will_remove_from_hass(self) -> None:
         if self._unsubscribe:

@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import logging
 import socket
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_PORT
+from homeassistant.core import callback
 import voluptuous as vol
+
+if TYPE_CHECKING:
+    from homeassistant.components.usb import UsbServiceInfo
 
 from .capabilities import (
     OPTION_CUSTOM,
@@ -24,19 +28,29 @@ from .capabilities import (
 )
 from .const import (
     CONF_CODEPAGE,
+    CONF_CONNECTION_TYPE,
     CONF_DEFAULT_ALIGN,
     CONF_DEFAULT_CUT,
+    CONF_IN_EP,
     CONF_KEEPALIVE,
     CONF_LINE_WIDTH,
+    CONF_OUT_EP,
+    CONF_PRODUCT_ID,
     CONF_PROFILE,
     CONF_STATUS_INTERVAL,
     CONF_TIMEOUT,
+    CONF_VENDOR_ID,
+    CONNECTION_TYPE_NETWORK,
+    CONNECTION_TYPE_USB,
     DEFAULT_ALIGN,
     DEFAULT_CUT,
+    DEFAULT_IN_EP,
     DEFAULT_LINE_WIDTH,
+    DEFAULT_OUT_EP,
     DEFAULT_PORT,
     DEFAULT_TIMEOUT,
     DOMAIN,
+    THERMAL_PRINTER_VIDS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -61,19 +75,228 @@ def _can_connect(host: str, port: int, timeout: float) -> bool:
         return False
 
 
+def _can_connect_usb(
+    vendor_id: int,
+    product_id: int,
+    timeout: float,
+    in_ep: int = DEFAULT_IN_EP,
+    out_ep: int = DEFAULT_OUT_EP,
+) -> tuple[bool, str | None]:
+    """Test USB connectivity to a device.
+
+    Args:
+        vendor_id: USB Vendor ID
+        product_id: USB Product ID
+        timeout: Connection timeout in seconds
+        in_ep: USB input endpoint address
+        out_ep: USB output endpoint address
+
+    Returns:
+        Tuple of (success, error_message). error_message is None on success.
+    """
+    try:
+        from escpos.printer import Usb  # noqa: PLC0415
+
+        printer = Usb(
+            vendor_id,
+            product_id,
+            timeout=int(timeout * 1000),
+            in_ep=in_ep,
+            out_ep=out_ep,
+        )
+        printer.close()
+    except PermissionError:
+        return False, "permission_denied"
+    except FileNotFoundError:
+        return False, "device_not_found"
+    except Exception as ex:
+        # Check for libusb permission errors (varies by platform)
+        error_str = str(ex).lower()
+        if "access" in error_str or "permission" in error_str:
+            return False, "permission_denied"
+        if "not found" in error_str or "no backend" in error_str:
+            return False, "usb_backend_missing"
+        _LOGGER.debug("USB connection test failed: %s", ex)
+        return False, None
+    else:
+        return True, None
+
+
+def _generate_usb_unique_id(
+    vendor_id: int, product_id: int, serial_number: str | None = None
+) -> str:
+    """Generate a unique ID for a USB device.
+
+    Uses serial number when available to distinguish identical printers.
+
+    Args:
+        vendor_id: USB Vendor ID
+        product_id: USB Product ID
+        serial_number: Device serial number (optional)
+
+    Returns:
+        Unique ID string
+    """
+    base_id = f"usb:{vendor_id:04x}:{product_id:04x}"
+    if serial_number:
+        # Include serial for uniqueness when multiple identical printers exist
+        return f"{base_id}:{serial_number}"
+    return base_id
+
+
+def _usb_error_to_key(error_code: str | None) -> str:
+    """Convert USB error code to form error key.
+
+    Args:
+        error_code: Error code from _can_connect_usb
+
+    Returns:
+        Error key for strings.json
+    """
+    error_map = {
+        "permission_denied": "usb_permission_denied",
+        "device_not_found": "usb_device_not_found",
+        "usb_backend_missing": "usb_backend_missing",
+    }
+    return error_map.get(error_code or "", "cannot_connect_usb")
+
+
+def _discover_usb_printers() -> list[dict[str, Any]]:
+    """Discover connected USB thermal printers.
+
+    Returns:
+        List of dictionaries containing printer information
+    """
+    try:
+        import usb.core  # noqa: PLC0415
+        import usb.util  # noqa: PLC0415
+    except ImportError:
+        _LOGGER.warning("pyusb not installed, USB printer discovery unavailable")
+        return []
+
+    printers: list[dict[str, Any]] = []
+    try:
+        for device in usb.core.find(find_all=True):
+            if device.idVendor in THERMAL_PRINTER_VIDS:
+                try:
+                    manufacturer = usb.util.get_string(device, device.iManufacturer) or "Unknown"
+                    product = usb.util.get_string(device, device.iProduct) or "Thermal Printer"
+                    # Try to get serial number for unique identification
+                    serial = None
+                    try:
+                        if device.iSerialNumber:
+                            serial = usb.util.get_string(device, device.iSerialNumber)
+                    except Exception:
+                        pass
+                    printers.append({
+                        "vendor_id": device.idVendor,
+                        "product_id": device.idProduct,
+                        "manufacturer": manufacturer,
+                        "product": product,
+                        "serial_number": serial,
+                        "label": f"{manufacturer} {product} ({device.idVendor:04X}:{device.idProduct:04X})",
+                    })
+                except Exception:
+                    printers.append({
+                        "vendor_id": device.idVendor,
+                        "product_id": device.idProduct,
+                        "manufacturer": "Unknown",
+                        "product": "Thermal Printer",
+                        "serial_number": None,
+                        "label": f"Thermal Printer ({device.idVendor:04X}:{device.idProduct:04X})",
+                    })
+    except Exception as e:
+        _LOGGER.debug("USB device enumeration failed: %s", e)
+
+    return printers
+
+
+def _build_usb_device_choices(printers: list[dict[str, Any]]) -> dict[str, str]:
+    """Build device choice dictionary from discovered printers.
+
+    Generates unique keys for each printer to handle multiple devices with
+    the same VID/PID. Uses serial number when available, otherwise adds an
+    index suffix.
+
+    Args:
+        printers: List of discovered printer dictionaries
+
+    Returns:
+        Dictionary mapping choice keys to display labels
+    """
+    device_choices: dict[str, str] = {}
+    vid_pid_counts: dict[str, int] = {}  # Track devices without serial by VID:PID
+
+    for printer in printers:
+        vid_pid = f"{printer['vendor_id']:04X}:{printer['product_id']:04X}"
+        serial = printer.get("serial_number")
+
+        if serial:
+            # Use serial number to distinguish devices
+            key = f"{vid_pid}:{serial}"
+        else:
+            # Use index suffix for devices without serial that share VID:PID
+            count = vid_pid_counts.get(vid_pid, 0)
+            vid_pid_counts[vid_pid] = count + 1
+            # Include count suffix to make each device selectable
+            key = f"{vid_pid}#{count}"
+
+        # Store the key in the printer dict for later lookup
+        printer["_choice_key"] = key
+        device_choices[key] = printer["label"]
+
+    # Add manual entry option
+    device_choices["__manual__"] = "Manual entry (VID:PID)..."
+
+    return device_choices
+
+
 class EscposConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Config flow for ESC/POS Thermal Printer."""
 
-    VERSION = 2
+    VERSION = 3
 
     def __init__(self) -> None:
         """Initialize config flow."""
         self._user_data: dict[str, Any] = {}
+        self._discovered_printers: list[dict[str, Any]] = []
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Handle step 1: Connection details and profile selection.
+        """Handle step 1: Connection type selection.
+
+        Args:
+            user_input: User provided configuration data
+
+        Returns:
+            FlowResult containing the next step or final result
+        """
+        if user_input is not None:
+            connection_type = user_input.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
+            self._user_data[CONF_CONNECTION_TYPE] = connection_type
+
+            if connection_type == CONNECTION_TYPE_USB:
+                return await self.async_step_usb_select()
+            return await self.async_step_network()
+
+        data_schema = vol.Schema(
+            {
+                vol.Required(CONF_CONNECTION_TYPE, default=CONNECTION_TYPE_NETWORK): vol.In(
+                    {
+                        CONNECTION_TYPE_NETWORK: "Network (TCP/IP)",
+                        CONNECTION_TYPE_USB: "USB (Direct)",
+                    }
+                ),
+            }
+        )
+
+        return self.async_show_form(step_id="user", data_schema=data_schema)
+
+    async def async_step_network(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle network printer configuration.
 
         Args:
             user_input: User provided configuration data
@@ -83,7 +306,7 @@ class EscposConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """
         errors: dict[str, str] = {}
         if user_input is not None:
-            _LOGGER.debug("Config flow user step input: %s", user_input)
+            _LOGGER.debug("Config flow network step input: %s", user_input)
             host = user_input[CONF_HOST]
             port = user_input.get(CONF_PORT, DEFAULT_PORT)
             timeout = float(user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
@@ -101,6 +324,7 @@ class EscposConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # Store data and determine next step
                 profile = user_input.get(CONF_PROFILE, PROFILE_AUTO)
                 self._user_data = {
+                    CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK,
                     CONF_HOST: host,
                     CONF_PORT: port,
                     CONF_TIMEOUT: timeout,
@@ -129,7 +353,287 @@ class EscposConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             }
         )
 
-        return self.async_show_form(step_id="user", data_schema=data_schema, errors=errors)
+        return self.async_show_form(step_id="network", data_schema=data_schema, errors=errors)
+
+    async def async_step_usb_select(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle USB printer selection/configuration.
+
+        Args:
+            user_input: User provided configuration data
+
+        Returns:
+            FlowResult containing the next step or final result
+        """
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            _LOGGER.debug("Config flow USB step input: %s", user_input)
+
+            # Handle manual entry option
+            selected_device = user_input.get("usb_device")
+            if selected_device == "__manual__":
+                return await self.async_step_usb_manual()
+
+            # Find the exact printer by matching the choice key
+            selected_printer = None
+            for printer in self._discovered_printers:
+                if printer.get("_choice_key") == selected_device:
+                    selected_printer = printer
+                    break
+
+            if selected_printer is None:
+                errors["base"] = "invalid_usb_device"
+                vendor_id, product_id = 0, 0
+                printer_name = ""
+                serial_number = None
+            else:
+                vendor_id = selected_printer["vendor_id"]
+                product_id = selected_printer["product_id"]
+                printer_name = f"{selected_printer['manufacturer']} {selected_printer['product']}"
+                serial_number = selected_printer.get("serial_number")
+
+            if not errors:
+                timeout = float(user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
+
+                # Only set unique ID if we have a serial number to distinguish devices
+                # Without serial, allow duplicates (like manual entry) since we can't
+                # reliably identify which physical device is which
+                if serial_number:
+                    unique_id = _generate_usb_unique_id(vendor_id, product_id, serial_number)
+                    await self.async_set_unique_id(unique_id)
+                    self._abort_if_unique_id_configured()
+
+                _LOGGER.debug(
+                    "Attempting USB connection test to %04X:%04X", vendor_id, product_id
+                )
+                ok, error_code = await self.hass.async_add_executor_job(
+                    _can_connect_usb, vendor_id, product_id, timeout
+                )
+                if ok:
+                    _LOGGER.debug("USB connection test succeeded for %04X:%04X", vendor_id, product_id)
+
+                    profile = user_input.get(CONF_PROFILE, PROFILE_AUTO)
+                    self._user_data = {
+                        CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+                        CONF_VENDOR_ID: vendor_id,
+                        CONF_PRODUCT_ID: product_id,
+                        CONF_IN_EP: user_input.get(CONF_IN_EP, DEFAULT_IN_EP),
+                        CONF_OUT_EP: user_input.get(CONF_OUT_EP, DEFAULT_OUT_EP),
+                        CONF_TIMEOUT: timeout,
+                        CONF_PROFILE: profile,
+                        "_printer_name": printer_name,  # For entry title
+                    }
+
+                    # If custom profile selected, go to custom profile step
+                    if profile == PROFILE_CUSTOM:
+                        return await self.async_step_custom_profile()
+
+                    return await self.async_step_codepage()
+
+                _LOGGER.warning("USB connection test failed for %04X:%04X: %s", vendor_id, product_id, error_code)
+                errors["base"] = _usb_error_to_key(error_code)
+
+        # Discover USB printers
+        self._discovered_printers = await self.hass.async_add_executor_job(_discover_usb_printers)
+
+        # Build device choices - handles multiple devices with same VID/PID
+        device_choices = _build_usb_device_choices(self._discovered_printers)
+
+        if not self._discovered_printers:
+            # No printers found, show manual entry message
+            _LOGGER.info("No USB thermal printers discovered")
+
+        # Build profile choices dynamically
+        profile_choices = await self.hass.async_add_executor_job(get_profile_choices_dict)
+
+        # Build schema based on whether printers were found
+        if device_choices:
+            default_device = next(iter(device_choices.keys())) if self._discovered_printers else "__manual__"
+            data_schema = vol.Schema(
+                {
+                    vol.Required("usb_device", default=default_device): vol.In(device_choices),
+                    vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
+                    vol.Optional(CONF_PROFILE, default=PROFILE_AUTO): vol.In(profile_choices),
+                }
+            )
+        else:
+            # Redirect to manual entry if no devices found
+            return await self.async_step_usb_manual()
+
+        return self.async_show_form(step_id="usb_select", data_schema=data_schema, errors=errors)
+
+    async def async_step_usb_manual(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle manual USB printer configuration.
+
+        Args:
+            user_input: User provided configuration data
+
+        Returns:
+            FlowResult containing the next step or final result
+        """
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            _LOGGER.debug("Config flow USB manual step input: %s", user_input)
+
+            try:
+                vendor_id = int(user_input.get(CONF_VENDOR_ID, 0))
+                product_id = int(user_input.get(CONF_PRODUCT_ID, 0))
+                # VID/PID must be in range 0x0001-0xFFFF (1-65535)
+                if not (0x0001 <= vendor_id <= 0xFFFF) or not (0x0001 <= product_id <= 0xFFFF):
+                    errors["base"] = "invalid_usb_device"
+            except (ValueError, TypeError):
+                errors["base"] = "invalid_usb_device"
+                vendor_id, product_id = 0, 0
+
+            if not errors:
+                timeout = float(user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
+                in_ep = int(user_input.get(CONF_IN_EP, DEFAULT_IN_EP))
+                out_ep = int(user_input.get(CONF_OUT_EP, DEFAULT_OUT_EP))
+
+                # Validate endpoint addresses (0x00-0xFF)
+                if not (0x00 <= in_ep <= 0xFF) or not (0x00 <= out_ep <= 0xFF):
+                    errors["base"] = "invalid_endpoint"
+
+            if not errors:
+                # Note: No unique_id set for manual entry - allows multiple identical printers
+                # since we don't have serial number info to distinguish them
+
+                _LOGGER.debug(
+                    "Attempting USB connection test to %04X:%04X (in_ep=%02X, out_ep=%02X)",
+                    vendor_id, product_id, in_ep, out_ep
+                )
+                ok, error_code = await self.hass.async_add_executor_job(
+                    _can_connect_usb, vendor_id, product_id, timeout, in_ep, out_ep
+                )
+                if ok:
+                    _LOGGER.debug("USB connection test succeeded for %04X:%04X", vendor_id, product_id)
+
+                    profile = user_input.get(CONF_PROFILE, PROFILE_AUTO)
+                    self._user_data = {
+                        CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+                        CONF_VENDOR_ID: vendor_id,
+                        CONF_PRODUCT_ID: product_id,
+                        CONF_IN_EP: in_ep,
+                        CONF_OUT_EP: out_ep,
+                        CONF_TIMEOUT: timeout,
+                        CONF_PROFILE: profile,
+                        "_printer_name": f"USB Printer {vendor_id:04X}:{product_id:04X}",
+                    }
+
+                    # If custom profile selected, go to custom profile step
+                    if profile == PROFILE_CUSTOM:
+                        return await self.async_step_custom_profile()
+
+                    return await self.async_step_codepage()
+
+                _LOGGER.warning("USB connection test failed for %04X:%04X: %s", vendor_id, product_id, error_code)
+                errors["base"] = _usb_error_to_key(error_code)
+
+        # Build profile choices dynamically
+        profile_choices = await self.hass.async_add_executor_job(get_profile_choices_dict)
+
+        data_schema = vol.Schema(
+            {
+                vol.Required(CONF_VENDOR_ID): int,
+                vol.Required(CONF_PRODUCT_ID): int,
+                vol.Optional(CONF_IN_EP, default=DEFAULT_IN_EP): int,
+                vol.Optional(CONF_OUT_EP, default=DEFAULT_OUT_EP): int,
+                vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
+                vol.Optional(CONF_PROFILE, default=PROFILE_AUTO): vol.In(profile_choices),
+            }
+        )
+
+        return self.async_show_form(step_id="usb_manual", data_schema=data_schema, errors=errors)
+
+    async def async_step_usb(
+        self, discovery_info: UsbServiceInfo
+    ) -> ConfigFlowResult:
+        """Handle USB discovery from Home Assistant.
+
+        This method is called by HA when a USB device matching the manifest's
+        usb section is detected.
+
+        Args:
+            discovery_info: UsbServiceInfo from HA USB discovery
+
+        Returns:
+            FlowResult containing the next step
+        """
+        _LOGGER.debug("USB discovery info: %s", discovery_info)
+
+        # Extract VID/PID from discovery info
+        # HA provides these as hex strings (e.g., "04B8") in UsbServiceInfo
+        try:
+            vendor_id = int(discovery_info.vid, 16) if discovery_info.vid else 0
+            product_id = int(discovery_info.pid, 16) if discovery_info.pid else 0
+        except (ValueError, TypeError):
+            vendor_id, product_id = 0, 0
+
+        if not vendor_id or not product_id:
+            return self.async_abort(reason="invalid_discovery_info")
+
+        # Set unique ID (includes serial if available to distinguish identical printers)
+        serial_number = discovery_info.serial_number
+        unique_id = _generate_usb_unique_id(vendor_id, product_id, serial_number)
+        await self.async_set_unique_id(unique_id)
+        self._abort_if_unique_id_configured()
+
+        # Store discovery info
+        self._user_data = {
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+            CONF_VENDOR_ID: vendor_id,
+            CONF_PRODUCT_ID: product_id,
+            CONF_IN_EP: DEFAULT_IN_EP,
+            CONF_OUT_EP: DEFAULT_OUT_EP,
+            CONF_TIMEOUT: DEFAULT_TIMEOUT,
+            "_printer_name": discovery_info.description or f"USB Printer {vendor_id:04X}:{product_id:04X}",
+        }
+
+        # Show confirmation step
+        return await self.async_step_usb_confirm()
+
+    async def async_step_usb_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Confirm USB printer discovered by Home Assistant.
+
+        Args:
+            user_input: User confirmation
+
+        Returns:
+            FlowResult containing the next step
+        """
+        if user_input is not None:
+            # User confirmed, proceed to codepage configuration
+            profile = user_input.get(CONF_PROFILE, PROFILE_AUTO)
+            self._user_data[CONF_PROFILE] = profile
+
+            if profile == PROFILE_CUSTOM:
+                return await self.async_step_custom_profile()
+
+            return await self.async_step_codepage()
+
+        # Build profile choices dynamically
+        profile_choices = await self.hass.async_add_executor_job(get_profile_choices_dict)
+
+        printer_name = self._user_data.get("_printer_name", "USB Printer")
+
+        data_schema = vol.Schema(
+            {
+                vol.Optional(CONF_PROFILE, default=PROFILE_AUTO): vol.In(profile_choices),
+            }
+        )
+
+        return self.async_show_form(
+            step_id="usb_confirm",
+            data_schema=data_schema,
+            description_placeholders={"printer_name": printer_name},
+        )
 
     async def async_step_custom_profile(
         self, user_input: dict[str, Any] | None = None
@@ -214,7 +718,7 @@ class EscposConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
                 return await self.async_step_custom_line_width()
 
-            # Merge with data from step 1 and create entry
+            # Merge with data from previous steps and create entry
             data = {
                 **self._user_data,
                 CONF_CODEPAGE: codepage if codepage else "",
@@ -223,18 +727,29 @@ class EscposConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 CONF_DEFAULT_CUT: user_input.get(CONF_DEFAULT_CUT, DEFAULT_CUT),
             }
 
-            host = data[CONF_HOST]
-            port = data[CONF_PORT]
+            # Remove internal keys
+            data.pop("_printer_name", None)
+
+            # Generate title based on connection type
+            connection_type = data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
+            if connection_type == CONNECTION_TYPE_USB:
+                title = self._user_data.get(
+                    "_printer_name",
+                    f"USB Printer {data.get(CONF_VENDOR_ID, 0):04X}:{data.get(CONF_PRODUCT_ID, 0):04X}"
+                )
+            else:
+                host = data[CONF_HOST]
+                port = data[CONF_PORT]
+                title = f"{host}:{port}"
 
             _LOGGER.debug(
-                "Creating config entry for %s:%s with profile=%s codepage=%s",
-                host,
-                port,
+                "Creating config entry for %s with profile=%s codepage=%s",
+                title,
                 data.get(CONF_PROFILE),
                 data.get(CONF_CODEPAGE),
             )
 
-            return self.async_create_entry(title=f"{host}:{port}", data=data)
+            return self.async_create_entry(title=title, data=data)
 
         # Get profile-specific options
         profile = self._user_data.get(CONF_PROFILE, PROFILE_AUTO)
@@ -313,10 +828,22 @@ class EscposConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_CODEPAGE: custom_codepage,
                 }
 
-                host = data[CONF_HOST]
-                port = data[CONF_PORT]
+                # Remove internal keys
+                data.pop("_printer_name", None)
 
-                return self.async_create_entry(title=f"{host}:{port}", data=data)
+                # Generate title based on connection type
+                connection_type = data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
+                if connection_type == CONNECTION_TYPE_USB:
+                    title = self._user_data.get(
+                        "_printer_name",
+                        f"USB Printer {data.get(CONF_VENDOR_ID, 0):04X}:{data.get(CONF_PRODUCT_ID, 0):04X}"
+                    )
+                else:
+                    host = data[CONF_HOST]
+                    port = data[CONF_PORT]
+                    title = f"{host}:{port}"
+
+                return self.async_create_entry(title=title, data=data)
 
         data_schema = vol.Schema(
             {
@@ -364,10 +891,22 @@ class EscposConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_LINE_WIDTH: width_int,
                 }
 
-                host = data[CONF_HOST]
-                port = data[CONF_PORT]
+                # Remove internal keys
+                data.pop("_printer_name", None)
 
-                return self.async_create_entry(title=f"{host}:{port}", data=data)
+                # Generate title based on connection type
+                connection_type = data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
+                if connection_type == CONNECTION_TYPE_USB:
+                    title = self._user_data.get(
+                        "_printer_name",
+                        f"USB Printer {data.get(CONF_VENDOR_ID, 0):04X}:{data.get(CONF_PRODUCT_ID, 0):04X}"
+                    )
+                else:
+                    host = data[CONF_HOST]
+                    port = data[CONF_PORT]
+                    title = f"{host}:{port}"
+
+                return self.async_create_entry(title=title, data=data)
 
         data_schema = vol.Schema(
             {
@@ -393,10 +932,75 @@ class EscposConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             FlowResult
         """
         _LOGGER.debug("Config flow import step with input: %s", user_input)
-        return await self.async_step_user(user_input)
+
+        if not user_input:
+            return await self.async_step_network(None)
+
+        # Default to network type if not specified
+        connection_type = user_input.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
+        user_input[CONF_CONNECTION_TYPE] = connection_type
+
+        if connection_type == CONNECTION_TYPE_USB:
+            # USB YAML import - create entry directly if all required fields present
+            raw_vid = user_input.get(CONF_VENDOR_ID)
+            raw_pid = user_input.get(CONF_PRODUCT_ID)
+
+            if not raw_vid or not raw_pid:
+                _LOGGER.error("USB YAML import missing vendor_id or product_id")
+                return self.async_abort(reason="invalid_usb_device")
+
+            # Coerce VID/PID to integers - handle strings like "0x04b8", "04b8", or "1208"
+            try:
+                if isinstance(raw_vid, str):
+                    vendor_id = int(raw_vid, 16) if raw_vid.startswith("0x") or raw_vid.startswith("0X") else int(raw_vid, 0)
+                else:
+                    vendor_id = int(raw_vid)
+
+                if isinstance(raw_pid, str):
+                    product_id = int(raw_pid, 16) if raw_pid.startswith("0x") or raw_pid.startswith("0X") else int(raw_pid, 0)
+                else:
+                    product_id = int(raw_pid)
+            except (ValueError, TypeError) as ex:
+                _LOGGER.error("USB YAML import invalid vendor_id or product_id: %s", ex)
+                return self.async_abort(reason="invalid_usb_device")
+
+            # Validate VID/PID range
+            if not (0x0001 <= vendor_id <= 0xFFFF) or not (0x0001 <= product_id <= 0xFFFF):
+                _LOGGER.error("USB YAML import VID/PID out of range: %s/%s", vendor_id, product_id)
+                return self.async_abort(reason="invalid_usb_device")
+
+            # Set unique ID only if serial_number provided (allows multiple identical printers)
+            serial_number = user_input.get("serial_number")
+            if serial_number:
+                unique_id = _generate_usb_unique_id(vendor_id, product_id, serial_number)
+                await self.async_set_unique_id(unique_id)
+                self._abort_if_unique_id_configured()
+            # Note: Without serial_number, no unique_id is set - duplicates allowed
+
+            # Build complete entry data with defaults
+            data = {
+                CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+                CONF_VENDOR_ID: vendor_id,
+                CONF_PRODUCT_ID: product_id,
+                CONF_IN_EP: user_input.get(CONF_IN_EP, DEFAULT_IN_EP),
+                CONF_OUT_EP: user_input.get(CONF_OUT_EP, DEFAULT_OUT_EP),
+                CONF_TIMEOUT: user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT),
+                CONF_PROFILE: user_input.get(CONF_PROFILE, PROFILE_AUTO),
+                CONF_CODEPAGE: user_input.get(CONF_CODEPAGE, ""),
+                CONF_LINE_WIDTH: user_input.get(CONF_LINE_WIDTH, DEFAULT_LINE_WIDTH),
+                CONF_DEFAULT_ALIGN: user_input.get(CONF_DEFAULT_ALIGN, DEFAULT_ALIGN),
+                CONF_DEFAULT_CUT: user_input.get(CONF_DEFAULT_CUT, DEFAULT_CUT),
+            }
+
+            title = f"USB Printer {vendor_id:04X}:{product_id:04X}"
+            return self.async_create_entry(title=title, data=data)
+
+        # Network import - use existing flow
+        return await self.async_step_network(user_input)
 
     @staticmethod
-    def async_get_options_flow(config_entry: Any) -> Any:
+    @callback
+    def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> config_entries.OptionsFlow:
         """Create options flow handler.
 
         Args:
@@ -551,41 +1155,78 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlow):
         if current_cut not in cut_choices:
             cut_choices[current_cut] = f"{current_cut.title()} (current)"
 
-        data_schema = vol.Schema(
-            {
-                vol.Optional(
-                    CONF_TIMEOUT,
-                    default=self.config_entry.options.get(
-                        CONF_TIMEOUT, self.config_entry.data.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)
+        # Check connection type to show appropriate options
+        connection_type = self.config_entry.data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
+
+        # Build schema - USB printers don't have keepalive option
+        if connection_type == CONNECTION_TYPE_USB:
+            data_schema = vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_TIMEOUT,
+                        default=self.config_entry.options.get(
+                            CONF_TIMEOUT, self.config_entry.data.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)
+                        ),
+                    ): vol.Coerce(float),
+                    vol.Optional(CONF_PROFILE, default=current_profile): vol.In(
+                        profile_choices
                     ),
-                ): vol.Coerce(float),
-                vol.Optional(CONF_PROFILE, default=current_profile): vol.In(
-                    profile_choices
-                ),
-                vol.Optional(CONF_CODEPAGE, default=current_codepage): vol.In(
-                    codepage_choices
-                ),
-                vol.Optional(CONF_LINE_WIDTH, default=current_line_width): vol.In(
-                    width_choices
-                ),
-                vol.Optional(
-                    CONF_DEFAULT_ALIGN,
-                    default=self.config_entry.options.get(
+                    vol.Optional(CONF_CODEPAGE, default=current_codepage): vol.In(
+                        codepage_choices
+                    ),
+                    vol.Optional(CONF_LINE_WIDTH, default=current_line_width): vol.In(
+                        width_choices
+                    ),
+                    vol.Optional(
                         CONF_DEFAULT_ALIGN,
-                        self.config_entry.data.get(CONF_DEFAULT_ALIGN, DEFAULT_ALIGN),
+                        default=self.config_entry.options.get(
+                            CONF_DEFAULT_ALIGN,
+                            self.config_entry.data.get(CONF_DEFAULT_ALIGN, DEFAULT_ALIGN),
+                        ),
+                    ): vol.In(["left", "center", "right"]),
+                    vol.Optional(CONF_DEFAULT_CUT, default=current_cut): vol.In(cut_choices),
+                    vol.Optional(
+                        CONF_STATUS_INTERVAL,
+                        default=self.config_entry.options.get(CONF_STATUS_INTERVAL, 0),
+                    ): int,
+                }
+            )
+        else:
+            data_schema = vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_TIMEOUT,
+                        default=self.config_entry.options.get(
+                            CONF_TIMEOUT, self.config_entry.data.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)
+                        ),
+                    ): vol.Coerce(float),
+                    vol.Optional(CONF_PROFILE, default=current_profile): vol.In(
+                        profile_choices
                     ),
-                ): vol.In(["left", "center", "right"]),
-                vol.Optional(CONF_DEFAULT_CUT, default=current_cut): vol.In(cut_choices),
-                vol.Optional(
-                    CONF_KEEPALIVE,
-                    default=self.config_entry.options.get(CONF_KEEPALIVE, False),
-                ): bool,
-                vol.Optional(
-                    CONF_STATUS_INTERVAL,
-                    default=self.config_entry.options.get(CONF_STATUS_INTERVAL, 0),
-                ): int,
-            }
-        )
+                    vol.Optional(CONF_CODEPAGE, default=current_codepage): vol.In(
+                        codepage_choices
+                    ),
+                    vol.Optional(CONF_LINE_WIDTH, default=current_line_width): vol.In(
+                        width_choices
+                    ),
+                    vol.Optional(
+                        CONF_DEFAULT_ALIGN,
+                        default=self.config_entry.options.get(
+                            CONF_DEFAULT_ALIGN,
+                            self.config_entry.data.get(CONF_DEFAULT_ALIGN, DEFAULT_ALIGN),
+                        ),
+                    ): vol.In(["left", "center", "right"]),
+                    vol.Optional(CONF_DEFAULT_CUT, default=current_cut): vol.In(cut_choices),
+                    vol.Optional(
+                        CONF_KEEPALIVE,
+                        default=self.config_entry.options.get(CONF_KEEPALIVE, False),
+                    ): bool,
+                    vol.Optional(
+                        CONF_STATUS_INTERVAL,
+                        default=self.config_entry.options.get(CONF_STATUS_INTERVAL, 0),
+                    ): int,
+                }
+            )
 
         _LOGGER.debug("Showing options form for entry %s", self.config_entry.entry_id)
         return self.async_show_form(step_id="init", data_schema=data_schema)

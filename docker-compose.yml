@@ -12,6 +12,23 @@ services:
     ports:
       - "8123:8123"
     restart: unless-stopped
+    # USB device access for thermal printers
+    # Option 1: Privileged mode (grants access to all devices)
+    privileged: true
+    # Option 2: Specific USB device passthrough (recommended)
+    # Uncomment and adjust the device path for your printer
+    # devices:
+    #   - /dev/bus/usb:/dev/bus/usb  # All USB devices
+    #   # Or specific device (find with `lsusb`):
+    #   # - /dev/bus/usb/001/002:/dev/bus/usb/001/002
+    # Required for USB access without privileged mode
+    group_add:
+      - dialout  # Serial/USB access on most Linux systems
+    # Note: For USB thermal printers, you may also need to:
+    # 1. Create udev rules on the host: /etc/udev/rules.d/99-escpos.rules
+    #    SUBSYSTEM=="usb", ATTR{idVendor}=="04b8", MODE="0666"
+    # 2. Or run with --privileged flag for testing
+    # 3. Or use devices: mapping above with specific device paths
 
 volumes:
   ha_config:

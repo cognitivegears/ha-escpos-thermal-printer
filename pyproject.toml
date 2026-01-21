@@ -9,6 +9,7 @@ dependencies = [
   "Pillow==12.0.0",
   "qrcode==8.2",
   "python-barcode==0.16.1",
+  "pyusb>=1.2.1",
 ]
 
 [build-system]
@@ -163,6 +164,7 @@ ignore = [
 ]
 "custom_components/escpos_printer/__init__.py" = ["BLE001"]
 "custom_components/escpos_printer/printer.py" = ["BLE001", "C901"]
+"custom_components/escpos_printer/config_flow.py" = ["PLR0912"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["custom_components.escpos_printer"]
@@ -203,6 +205,7 @@ module = [
     "qrcode.*",
     "barcode.*",
     "pytest_homeassistant_custom_component.*",
+    "usb.*",
 ]
 ignore_missing_imports = true
 

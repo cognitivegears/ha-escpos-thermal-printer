@@ -16,7 +16,32 @@
     "python-escpos==3.1",
     "Pillow==12.0.0",
     "qrcode==8.2",
-    "python-barcode==0.16.1"
+    "python-barcode==0.16.1",
+    "pyusb>=1.2.1"
+  ],
+  "usb": [
+    {"vid": "0404", "description": "*"},
+    {"vid": "04B8", "description": "*"},
+    {"vid": "04C5", "description": "*thermal*"},
+    {"vid": "04C5", "description": "*printer*"},
+    {"vid": "0519", "description": "*"},
+    {"vid": "06BC", "description": "*"},
+    {"vid": "0828", "description": "*"},
+    {"vid": "08BD", "description": "*"},
+    {"vid": "0922", "description": "*"},
+    {"vid": "0A5F", "description": "*"},
+    {"vid": "0AA7", "description": "*"},
+    {"vid": "0B0B", "description": "*"},
+    {"vid": "0DD4", "description": "*"},
+    {"vid": "1203", "description": "*"},
+    {"vid": "1504", "description": "*"},
+    {"vid": "154F", "description": "*"},
+    {"vid": "1D90", "description": "*"},
+    {"vid": "2730", "description": "*"},
+    {"vid": "2D84", "description": "*"},
+    {"vid": "0416", "description": "*thermal*"},
+    {"vid": "0416", "description": "*receipt*"},
+    {"vid": "0416", "description": "*POS*"}
   ],
   "version": "0.1.1"
 }
