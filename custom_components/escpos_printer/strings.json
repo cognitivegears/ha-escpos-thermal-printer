@@ -42,6 +42,24 @@
           "profile": "Select your printer model or Auto-detect."
         }
       },
+      "usb_all_devices": {
+        "title": "Select USB device",
+        "description": "Browse all connected USB devices. Note: Not all USB devices are thermal printers - select your printer from the list below.",
+        "data": {
+          "usb_device": "USB Device",
+          "in_ep": "Input Endpoint",
+          "out_ep": "Output Endpoint",
+          "timeout": "Timeout (seconds)",
+          "profile": "Printer profile"
+        },
+        "data_description": {
+          "usb_device": "Select your printer from all connected USB devices.",
+          "in_ep": "USB input endpoint address (usually 130 / 0x82).",
+          "out_ep": "USB output endpoint address (usually 1 / 0x01).",
+          "timeout": "Connection timeout in seconds.",
+          "profile": "Select your printer model or Auto-detect."
+        }
+      },
       "usb_manual": {
         "title": "Manual USB configuration",
         "description": "Enter the USB Vendor ID and Product ID for your printer. These can be found using 'lsusb' on Linux or Device Manager on Windows.",

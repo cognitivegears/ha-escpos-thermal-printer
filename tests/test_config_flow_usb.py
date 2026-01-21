@@ -623,10 +623,11 @@ class TestMultipleIdenticalPrinters:
         usb_device_schema = schema.get("usb_device")
         choices = usb_device_schema.container
 
-        # Should have 3 entries: two printers + manual entry
-        assert len(choices) == 3
+        # Should have 4 entries: two printers + browse all + manual entry
+        assert len(choices) == 4
         assert "04B8:0202#0" in choices
         assert "04B8:0202#1" in choices
+        assert "__browse_all__" in choices
         assert "__manual__" in choices
 
     @pytest.mark.asyncio
@@ -667,10 +668,11 @@ class TestMultipleIdenticalPrinters:
         usb_device_schema = schema.get("usb_device")
         choices = usb_device_schema.container
 
-        # Should have 3 entries: two printers + manual entry
-        assert len(choices) == 3
+        # Should have 4 entries: two printers + browse all + manual entry
+        assert len(choices) == 4
         assert "04B8:0202:SERIAL001" in choices
         assert "04B8:0202:SERIAL002" in choices
+        assert "__browse_all__" in choices
         assert "__manual__" in choices
 
     @pytest.mark.asyncio
@@ -768,12 +770,257 @@ class TestMultipleIdenticalPrinters:
         usb_device_schema = schema.get("usb_device")
         choices = usb_device_schema.container
 
-        # Should have 4 entries: 3 printers + manual entry
-        assert len(choices) == 4
+        # Should have 5 entries: 3 printers + browse all + manual entry
+        assert len(choices) == 5
         # Printer with serial uses serial in key
         assert "04B8:0202:ABC123" in choices
         # Printer without serial uses index
         assert "04B8:0202#0" in choices
         # Different VID:PID printer uses index
         assert "0416:5011#0" in choices
+        assert "__browse_all__" in choices
         assert "__manual__" in choices
+
+
+class TestBrowseAllUsbDevices:
+    """Tests for browsing all USB devices functionality."""
+
+    @pytest.mark.asyncio
+    async def test_browse_all_option_redirects_to_all_devices_step(self, hass, mock_usb_printers):
+        """Test that browse all option redirects to usb_all_devices step."""
+        flow = EscposConfigFlow()
+        flow.hass = hass
+        flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB}
+        flow._discovered_printers = mock_usb_printers
+
+        # Mock all USB devices discovery
+        mock_all_devices = [
+            {
+                "vendor_id": 0x04B8,
+                "product_id": 0x0202,
+                "manufacturer": "Epson",
+                "product": "TM-T88V",
+                "serial_number": None,
+                "is_known_printer": True,
+                "label": "Epson TM-T88V (04B8:0202)",
+            },
+            {
+                "vendor_id": 0x1234,
+                "product_id": 0x5678,
+                "manufacturer": "Unknown",
+                "product": "USB Device",
+                "serial_number": None,
+                "is_known_printer": False,
+                "label": "Unknown USB Device (1234:5678)",
+            },
+        ]
+
+        with patch(
+            "custom_components.escpos_printer.config_flow._discover_all_usb_devices",
+            return_value=mock_all_devices,
+        ):
+            result = await flow.async_step_usb_select({"usb_device": "__browse_all__"})
+
+        assert result["type"] == "form"
+        assert result["step_id"] == "usb_all_devices"
+
+    @pytest.mark.asyncio
+    async def test_all_devices_step_shows_all_usb_devices(self, hass):
+        """Test that usb_all_devices step shows all connected USB devices."""
+        flow = EscposConfigFlow()
+        flow.hass = hass
+        flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB}
+
+        # Mock all USB devices (including non-printers)
+        mock_all_devices = [
+            {
+                "vendor_id": 0x04B8,
+                "product_id": 0x0202,
+                "manufacturer": "Epson",
+                "product": "TM-T88V",
+                "serial_number": None,
+                "is_known_printer": True,
+                "label": "Epson TM-T88V (04B8:0202)",
+            },
+            {
+                "vendor_id": 0x1234,
+                "product_id": 0x5678,
+                "manufacturer": "Generic",
+                "product": "Unknown Device",
+                "serial_number": None,
+                "is_known_printer": False,
+                "label": "Generic Unknown Device (1234:5678)",
+            },
+            {
+                "vendor_id": 0xABCD,
+                "product_id": 0xEF01,
+                "manufacturer": "Other",
+                "product": "Keyboard",
+                "serial_number": None,
+                "is_known_printer": False,
+                "label": "Other Keyboard (ABCD:EF01)",
+            },
+        ]
+
+        with patch(
+            "custom_components.escpos_printer.config_flow._discover_all_usb_devices",
+            return_value=mock_all_devices,
+        ):
+            result = await flow.async_step_usb_all_devices()
+
+        assert result["type"] == "form"
+        assert result["step_id"] == "usb_all_devices"
+
+        # Check that all devices are in choices
+        schema = result["data_schema"].schema
+        usb_device_schema = schema.get("usb_device")
+        choices = usb_device_schema.container
+
+        # Should have 4 entries: 3 devices + manual entry (no browse_all in this step)
+        assert len(choices) == 4
+        assert "04B8:0202#0" in choices
+        assert "1234:5678#0" in choices
+        assert "ABCD:EF01#0" in choices
+        assert "__manual__" in choices
+        # Should NOT have browse_all option in this step
+        assert "__browse_all__" not in choices
+
+    @pytest.mark.asyncio
+    async def test_all_devices_step_includes_endpoint_config(self, hass):
+        """Test that usb_all_devices step includes endpoint configuration."""
+        flow = EscposConfigFlow()
+        flow.hass = hass
+        flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB}
+
+        mock_all_devices = [
+            {
+                "vendor_id": 0x1234,
+                "product_id": 0x5678,
+                "manufacturer": "Generic",
+                "product": "Device",
+                "serial_number": None,
+                "is_known_printer": False,
+                "label": "Generic Device (1234:5678)",
+            },
+        ]
+
+        with patch(
+            "custom_components.escpos_printer.config_flow._discover_all_usb_devices",
+            return_value=mock_all_devices,
+        ):
+            result = await flow.async_step_usb_all_devices()
+
+        # Should include endpoint configuration since devices may not be standard printers
+        schema = result["data_schema"].schema
+        assert CONF_IN_EP in schema
+        assert CONF_OUT_EP in schema
+
+    @pytest.mark.asyncio
+    async def test_all_devices_step_selection_success(self, hass):
+        """Test successful device selection from all devices step."""
+        flow = EscposConfigFlow()
+        flow.hass = hass
+        flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB}
+        flow._all_usb_devices = [
+            {
+                "vendor_id": 0x1234,
+                "product_id": 0x5678,
+                "manufacturer": "Generic",
+                "product": "Thermal Printer",
+                "serial_number": None,
+                "is_known_printer": False,
+                "label": "Generic Thermal Printer (1234:5678)",
+                "_choice_key": "1234:5678#0",
+            },
+        ]
+
+        with (
+            patch(
+                "custom_components.escpos_printer.config_flow._can_connect_usb",
+                return_value=(True, None),
+            ),
+            patch.object(flow, "async_set_unique_id", return_value=None),
+            patch.object(flow, "_abort_if_unique_id_configured"),
+        ):
+            result = await flow.async_step_usb_all_devices({
+                "usb_device": "1234:5678#0",
+                CONF_IN_EP: DEFAULT_IN_EP,
+                CONF_OUT_EP: DEFAULT_OUT_EP,
+                "timeout": 4.0,
+                "profile": "",
+            })
+
+        assert result["type"] == "form"
+        assert result["step_id"] == "codepage"
+        assert flow._user_data["_printer_name"] == "Generic Thermal Printer"
+
+    @pytest.mark.asyncio
+    async def test_all_devices_step_manual_entry_redirect(self, hass):
+        """Test that manual entry option redirects from all devices step."""
+        flow = EscposConfigFlow()
+        flow.hass = hass
+        flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB}
+        flow._all_usb_devices = []
+
+        result = await flow.async_step_usb_all_devices({"usb_device": "__manual__"})
+
+        assert result["type"] == "form"
+        assert result["step_id"] == "usb_manual"
+
+    @pytest.mark.asyncio
+    async def test_all_devices_step_no_devices_redirects_to_manual(self, hass):
+        """Test that empty device list redirects to manual entry."""
+        flow = EscposConfigFlow()
+        flow.hass = hass
+        flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB}
+
+        with patch(
+            "custom_components.escpos_printer.config_flow._discover_all_usb_devices",
+            return_value=[],
+        ):
+            result = await flow.async_step_usb_all_devices()
+
+        assert result["type"] == "form"
+        assert result["step_id"] == "usb_manual"
+
+    @pytest.mark.asyncio
+    async def test_all_devices_step_connection_failure(self, hass):
+        """Test connection failure handling in all devices step."""
+        flow = EscposConfigFlow()
+        flow.hass = hass
+        flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB}
+        flow._all_usb_devices = [
+            {
+                "vendor_id": 0x1234,
+                "product_id": 0x5678,
+                "manufacturer": "Generic",
+                "product": "Device",
+                "serial_number": None,
+                "is_known_printer": False,
+                "label": "Generic Device (1234:5678)",
+                "_choice_key": "1234:5678#0",
+            },
+        ]
+
+        mock_all_devices = flow._all_usb_devices.copy()
+
+        with (
+            patch(
+                "custom_components.escpos_printer.config_flow._discover_all_usb_devices",
+                return_value=mock_all_devices,
+            ),
+            patch(
+                "custom_components.escpos_printer.config_flow._can_connect_usb",
+                return_value=(False, "permission_denied"),
+            ),
+        ):
+            result = await flow.async_step_usb_all_devices({
+                "usb_device": "1234:5678#0",
+                CONF_IN_EP: DEFAULT_IN_EP,
+                CONF_OUT_EP: DEFAULT_OUT_EP,
+                "timeout": 4.0,
+                "profile": "",
+            })
+
+        assert result["type"] == "form"
+        assert result["errors"]["base"] == "usb_permission_denied"

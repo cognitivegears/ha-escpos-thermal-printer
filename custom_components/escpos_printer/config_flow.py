@@ -211,7 +211,62 @@ def _discover_usb_printers() -> list[dict[str, Any]]:
     return printers
 
 
-def _build_usb_device_choices(printers: list[dict[str, Any]]) -> dict[str, str]:
+def _discover_all_usb_devices() -> list[dict[str, Any]]:
+    """Discover all connected USB devices (not filtered by vendor).
+
+    Returns:
+        List of dictionaries containing device information
+    """
+    try:
+        import usb.core  # noqa: PLC0415
+        import usb.util  # noqa: PLC0415
+    except ImportError:
+        _LOGGER.warning("pyusb not installed, USB device discovery unavailable")
+        return []
+
+    devices: list[dict[str, Any]] = []
+    try:
+        for device in usb.core.find(find_all=True):
+            try:
+                manufacturer = usb.util.get_string(device, device.iManufacturer) or "Unknown"
+                product = usb.util.get_string(device, device.iProduct) or "USB Device"
+                # Try to get serial number for unique identification
+                serial = None
+                try:
+                    if device.iSerialNumber:
+                        serial = usb.util.get_string(device, device.iSerialNumber)
+                except Exception:
+                    pass
+                # Note if this is a known thermal printer vendor
+                is_known_printer = device.idVendor in THERMAL_PRINTER_VIDS
+                devices.append({
+                    "vendor_id": device.idVendor,
+                    "product_id": device.idProduct,
+                    "manufacturer": manufacturer,
+                    "product": product,
+                    "serial_number": serial,
+                    "is_known_printer": is_known_printer,
+                    "label": f"{manufacturer} {product} ({device.idVendor:04X}:{device.idProduct:04X})",
+                })
+            except Exception:
+                devices.append({
+                    "vendor_id": device.idVendor,
+                    "product_id": device.idProduct,
+                    "manufacturer": "Unknown",
+                    "product": "USB Device",
+                    "serial_number": None,
+                    "is_known_printer": device.idVendor in THERMAL_PRINTER_VIDS,
+                    "label": f"USB Device ({device.idVendor:04X}:{device.idProduct:04X})",
+                })
+    except Exception as e:
+        _LOGGER.debug("USB device enumeration failed: %s", e)
+
+    return devices
+
+
+def _build_usb_device_choices(
+    printers: list[dict[str, Any]], include_browse_all: bool = True
+) -> dict[str, str]:
     """Build device choice dictionary from discovered printers.
 
     Generates unique keys for each printer to handle multiple devices with
@@ -220,6 +275,7 @@ def _build_usb_device_choices(printers: list[dict[str, Any]]) -> dict[str, str]:
 
     Args:
         printers: List of discovered printer dictionaries
+        include_browse_all: Whether to include "Browse all USB devices..." option
 
     Returns:
         Dictionary mapping choice keys to display labels
@@ -245,6 +301,10 @@ def _build_usb_device_choices(printers: list[dict[str, Any]]) -> dict[str, str]:
         printer["_choice_key"] = key
         device_choices[key] = printer["label"]
 
+    # Add browse all devices option
+    if include_browse_all:
+        device_choices["__browse_all__"] = "Browse all USB devices..."
+
     # Add manual entry option
     device_choices["__manual__"] = "Manual entry (VID:PID)..."
 
@@ -260,6 +320,7 @@ class EscposConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Initialize config flow."""
         self._user_data: dict[str, Any] = {}
         self._discovered_printers: list[dict[str, Any]] = []
+        self._all_usb_devices: list[dict[str, Any]] = []
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -371,10 +432,12 @@ class EscposConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             _LOGGER.debug("Config flow USB step input: %s", user_input)
 
-            # Handle manual entry option
+            # Handle special options
             selected_device = user_input.get("usb_device")
             if selected_device == "__manual__":
                 return await self.async_step_usb_manual()
+            if selected_device == "__browse_all__":
+                return await self.async_step_usb_all_devices()
 
             # Find the exact printer by matching the choice key
             selected_printer = None
@@ -463,6 +526,121 @@ class EscposConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return await self.async_step_usb_manual()
 
         return self.async_show_form(step_id="usb_select", data_schema=data_schema, errors=errors)
+
+    async def async_step_usb_all_devices(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle selection from all USB devices (not just known printers).
+
+        Args:
+            user_input: User provided configuration data
+
+        Returns:
+            FlowResult containing the next step or final result
+        """
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            _LOGGER.debug("Config flow USB all devices step input: %s", user_input)
+
+            # Handle manual entry option
+            selected_device = user_input.get("usb_device")
+            if selected_device == "__manual__":
+                return await self.async_step_usb_manual()
+
+            # Find the exact device by matching the choice key
+            selected_usb_device = None
+            for device in self._all_usb_devices:
+                if device.get("_choice_key") == selected_device:
+                    selected_usb_device = device
+                    break
+
+            if selected_usb_device is None:
+                errors["base"] = "invalid_usb_device"
+                vendor_id, product_id = 0, 0
+                device_name = ""
+                serial_number = None
+            else:
+                vendor_id = selected_usb_device["vendor_id"]
+                product_id = selected_usb_device["product_id"]
+                device_name = f"{selected_usb_device['manufacturer']} {selected_usb_device['product']}"
+                serial_number = selected_usb_device.get("serial_number")
+
+            if not errors:
+                timeout = float(user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
+                in_ep = int(user_input.get(CONF_IN_EP, DEFAULT_IN_EP))
+                out_ep = int(user_input.get(CONF_OUT_EP, DEFAULT_OUT_EP))
+
+                # Validate endpoint addresses (0x00-0xFF)
+                if not (0x00 <= in_ep <= 0xFF) or not (0x00 <= out_ep <= 0xFF):
+                    errors["base"] = "invalid_endpoint"
+
+            if not errors:
+                # Only set unique ID if we have a serial number to distinguish devices
+                if serial_number:
+                    unique_id = _generate_usb_unique_id(vendor_id, product_id, serial_number)
+                    await self.async_set_unique_id(unique_id)
+                    self._abort_if_unique_id_configured()
+
+                _LOGGER.debug(
+                    "Attempting USB connection test to %04X:%04X (in_ep=%02X, out_ep=%02X)",
+                    vendor_id, product_id, in_ep, out_ep
+                )
+                ok, error_code = await self.hass.async_add_executor_job(
+                    _can_connect_usb, vendor_id, product_id, timeout, in_ep, out_ep
+                )
+                if ok:
+                    _LOGGER.debug("USB connection test succeeded for %04X:%04X", vendor_id, product_id)
+
+                    profile = user_input.get(CONF_PROFILE, PROFILE_AUTO)
+                    self._user_data = {
+                        CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+                        CONF_VENDOR_ID: vendor_id,
+                        CONF_PRODUCT_ID: product_id,
+                        CONF_IN_EP: in_ep,
+                        CONF_OUT_EP: out_ep,
+                        CONF_TIMEOUT: timeout,
+                        CONF_PROFILE: profile,
+                        "_printer_name": device_name,  # For entry title
+                    }
+
+                    # If custom profile selected, go to custom profile step
+                    if profile == PROFILE_CUSTOM:
+                        return await self.async_step_custom_profile()
+
+                    return await self.async_step_codepage()
+
+                _LOGGER.warning("USB connection test failed for %04X:%04X: %s", vendor_id, product_id, error_code)
+                errors["base"] = _usb_error_to_key(error_code)
+
+        # Discover all USB devices
+        self._all_usb_devices = await self.hass.async_add_executor_job(_discover_all_usb_devices)
+
+        # Build device choices - no "Browse all" option since we're already showing all
+        device_choices = _build_usb_device_choices(self._all_usb_devices, include_browse_all=False)
+
+        if not self._all_usb_devices:
+            # No devices found at all
+            _LOGGER.info("No USB devices discovered")
+            return await self.async_step_usb_manual()
+
+        # Build profile choices dynamically
+        profile_choices = await self.hass.async_add_executor_job(get_profile_choices_dict)
+
+        # Show form with all USB devices - include endpoint configuration
+        # since these may not be standard thermal printers
+        default_device = next(iter(device_choices.keys()))
+        data_schema = vol.Schema(
+            {
+                vol.Required("usb_device", default=default_device): vol.In(device_choices),
+                vol.Optional(CONF_IN_EP, default=DEFAULT_IN_EP): int,
+                vol.Optional(CONF_OUT_EP, default=DEFAULT_OUT_EP): int,
+                vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
+                vol.Optional(CONF_PROFILE, default=PROFILE_AUTO): vol.In(profile_choices),
+            }
+        )
+
+        return self.async_show_form(step_id="usb_all_devices", data_schema=data_schema, errors=errors)
 
     async def async_step_usb_manual(
         self, user_input: dict[str, Any] | None = None
