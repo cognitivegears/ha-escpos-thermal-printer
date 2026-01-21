@@ -513,7 +513,7 @@ class EscposConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         # Build schema based on whether printers were found
         if device_choices:
-            default_device = next(iter(device_choices.keys())) if self._discovered_printers else "__manual__"
+            default_device = next(iter(device_choices.keys())) if self._discovered_printers else "__browse_all__"
             data_schema = vol.Schema(
                 {
                     vol.Required("usb_device", default=default_device): vol.In(device_choices),

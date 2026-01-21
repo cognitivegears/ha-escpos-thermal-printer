@@ -47,15 +47,15 @@
         "description": "Browse all connected USB devices. Note: Not all USB devices are thermal printers - select your printer from the list below.",
         "data": {
           "usb_device": "USB Device",
-          "in_ep": "Input Endpoint",
-          "out_ep": "Output Endpoint",
+          "in_ep": "Input endpoint (advanced)",
+          "out_ep": "Output endpoint (advanced)",
           "timeout": "Timeout (seconds)",
           "profile": "Printer profile"
         },
         "data_description": {
           "usb_device": "Select your printer from all connected USB devices.",
-          "in_ep": "USB input endpoint address (usually 130 / 0x82).",
-          "out_ep": "USB output endpoint address (usually 1 / 0x01).",
+          "in_ep": "Leave at default (130) unless your printer doesn't work. This is the USB address for receiving status from the printer.",
+          "out_ep": "Leave at default (1) unless your printer doesn't work. This is the USB address for sending data to the printer.",
           "timeout": "Connection timeout in seconds.",
           "profile": "Select your printer model or Auto-detect."
         }
@@ -66,16 +66,16 @@
         "data": {
           "vendor_id": "Vendor ID",
           "product_id": "Product ID",
-          "in_ep": "Input Endpoint",
-          "out_ep": "Output Endpoint",
+          "in_ep": "Input endpoint (advanced)",
+          "out_ep": "Output endpoint (advanced)",
           "timeout": "Timeout (seconds)",
           "profile": "Printer profile"
         },
         "data_description": {
           "vendor_id": "USB Vendor ID (decimal, e.g., 1208 for Epson).",
           "product_id": "USB Product ID (decimal).",
-          "in_ep": "USB input endpoint address (usually 130 / 0x82).",
-          "out_ep": "USB output endpoint address (usually 1 / 0x01).",
+          "in_ep": "Leave at default (130) unless your printer doesn't work. This is the USB address for receiving status from the printer.",
+          "out_ep": "Leave at default (1) unless your printer doesn't work. This is the USB address for sending data to the printer.",
           "timeout": "Connection timeout in seconds.",
           "profile": "Select your printer model or Auto-detect."
         }
