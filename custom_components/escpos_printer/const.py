@@ -50,6 +50,7 @@ THERMAL_PRINTER_VIDS: set[int] = {
     0x0AA7,  # Wincor Nixdorf (TH210, TH220, TH320, TH420 POS Printers)
     0x0B0B,  # Datamax-O'Neil (E-4304 Label Printer)
     0x0DD4,  # Custom Engineering SPA (K80 80mm Thermal Printer)
+    0x0FE6,  # Generic POS Printers (USB Receipt Printer)
     0x1203,  # TSC Auto ID Technology (TTP-245C)
     0x1504,  # Bixolon CO LTD (SRP series)
     0x154F,  # SNBC CO., Ltd (BTP series)
