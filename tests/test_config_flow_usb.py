@@ -89,7 +89,7 @@ class TestConnectionTypeStep:
         flow.hass = hass
 
         with patch(
-            "custom_components.escpos_printer.config_flow.main_flow._discover_usb_printers",
+            "custom_components.escpos_printer.config_flow.usb_steps._discover_usb_printers",
             return_value=mock_usb_printers,
         ):
             result = await flow.async_step_user({CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB})
@@ -109,7 +109,7 @@ class TestUsbStep:
         flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB}
 
         with patch(
-            "custom_components.escpos_printer.config_flow.main_flow._discover_usb_printers",
+            "custom_components.escpos_printer.config_flow.usb_steps._discover_usb_printers",
             return_value=mock_usb_printers,
         ):
             result = await flow.async_step_usb_select()
@@ -126,7 +126,7 @@ class TestUsbStep:
         flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB}
 
         with patch(
-            "custom_components.escpos_printer.config_flow.main_flow._discover_usb_printers",
+            "custom_components.escpos_printer.config_flow.usb_steps._discover_usb_printers",
             return_value=[],
         ):
             result = await flow.async_step_usb_select()
@@ -160,7 +160,7 @@ class TestUsbStep:
 
         with (
             patch(
-                "custom_components.escpos_printer.config_flow.main_flow._can_connect_usb",
+                "custom_components.escpos_printer.config_flow.usb_steps._can_connect_usb",
                 return_value=(True, None),
             ),
             patch.object(flow, "async_set_unique_id", return_value=None),
@@ -185,11 +185,11 @@ class TestUsbStep:
 
         with (
             patch(
-                "custom_components.escpos_printer.config_flow.main_flow._discover_usb_printers",
+                "custom_components.escpos_printer.config_flow.usb_steps._discover_usb_printers",
                 return_value=mock_usb_printers,
             ),
             patch(
-                "custom_components.escpos_printer.config_flow.main_flow._can_connect_usb",
+                "custom_components.escpos_printer.config_flow.usb_steps._can_connect_usb",
                 return_value=(False, None),
             ),
             patch.object(flow, "async_set_unique_id", return_value=None),
@@ -252,7 +252,7 @@ class TestUsbManualStep:
 
         with (
             patch(
-                "custom_components.escpos_printer.config_flow.main_flow._can_connect_usb",
+                "custom_components.escpos_printer.config_flow.usb_steps._can_connect_usb",
                 return_value=(True, None),
             ),
             patch.object(flow, "async_set_unique_id", return_value=None),
@@ -337,7 +337,7 @@ class TestUsbUniqueId:
 
         with (
             patch(
-                "custom_components.escpos_printer.config_flow.main_flow._can_connect_usb",
+                "custom_components.escpos_printer.config_flow.usb_steps._can_connect_usb",
                 return_value=(True, None),
             ),
             patch.object(flow, "async_set_unique_id", side_effect=capture_unique_id),
@@ -377,7 +377,7 @@ class TestUsbUniqueId:
 
         with (
             patch(
-                "custom_components.escpos_printer.config_flow.main_flow._can_connect_usb",
+                "custom_components.escpos_printer.config_flow.usb_steps._can_connect_usb",
                 return_value=(True, None),
             ),
             patch.object(flow, "async_set_unique_id", side_effect=capture_unique_id),
@@ -406,7 +406,7 @@ class TestUsbUniqueId:
 
         with (
             patch(
-                "custom_components.escpos_printer.config_flow.main_flow._can_connect_usb",
+                "custom_components.escpos_printer.config_flow.usb_steps._can_connect_usb",
                 return_value=(True, None),
             ),
             patch.object(flow, "async_set_unique_id", side_effect=capture_unique_id),
@@ -565,7 +565,7 @@ class TestUsbYamlImport:
 
         with (
             patch(
-                "custom_components.escpos_printer.config_flow.main_flow._can_connect",
+                "custom_components.escpos_printer.config_flow.network_steps._can_connect",
                 return_value=True,
             ),
             patch.object(flow, "async_set_unique_id", return_value=None),
@@ -612,7 +612,7 @@ class TestMultipleIdenticalPrinters:
         ]
 
         with patch(
-            "custom_components.escpos_printer.config_flow.main_flow._discover_usb_printers",
+            "custom_components.escpos_printer.config_flow.usb_steps._discover_usb_printers",
             return_value=mock_printers,
         ):
             result = await flow.async_step_usb_select()
@@ -657,7 +657,7 @@ class TestMultipleIdenticalPrinters:
         ]
 
         with patch(
-            "custom_components.escpos_printer.config_flow.main_flow._discover_usb_printers",
+            "custom_components.escpos_printer.config_flow.usb_steps._discover_usb_printers",
             return_value=mock_printers,
         ):
             result = await flow.async_step_usb_select()
@@ -705,7 +705,7 @@ class TestMultipleIdenticalPrinters:
 
         with (
             patch(
-                "custom_components.escpos_printer.config_flow.main_flow._can_connect_usb",
+                "custom_components.escpos_printer.config_flow.usb_steps._can_connect_usb",
                 return_value=(True, None),
             ),
             patch.object(flow, "async_set_unique_id", return_value=None),
@@ -760,7 +760,7 @@ class TestMultipleIdenticalPrinters:
         ]
 
         with patch(
-            "custom_components.escpos_printer.config_flow.main_flow._discover_usb_printers",
+            "custom_components.escpos_printer.config_flow.usb_steps._discover_usb_printers",
             return_value=mock_printers,
         ):
             result = await flow.async_step_usb_select()
@@ -815,7 +815,7 @@ class TestBrowseAllUsbDevices:
         ]
 
         with patch(
-            "custom_components.escpos_printer.config_flow.main_flow._discover_all_usb_devices",
+            "custom_components.escpos_printer.config_flow.usb_steps._discover_all_usb_devices",
             return_value=mock_all_devices,
         ):
             result = await flow.async_step_usb_select({"usb_device": "__browse_all__"})
@@ -862,7 +862,7 @@ class TestBrowseAllUsbDevices:
         ]
 
         with patch(
-            "custom_components.escpos_printer.config_flow.main_flow._discover_all_usb_devices",
+            "custom_components.escpos_printer.config_flow.usb_steps._discover_all_usb_devices",
             return_value=mock_all_devices,
         ):
             result = await flow.async_step_usb_all_devices()
@@ -904,7 +904,7 @@ class TestBrowseAllUsbDevices:
         ]
 
         with patch(
-            "custom_components.escpos_printer.config_flow.main_flow._discover_all_usb_devices",
+            "custom_components.escpos_printer.config_flow.usb_steps._discover_all_usb_devices",
             return_value=mock_all_devices,
         ):
             result = await flow.async_step_usb_all_devices()
@@ -935,7 +935,7 @@ class TestBrowseAllUsbDevices:
 
         with (
             patch(
-                "custom_components.escpos_printer.config_flow.main_flow._can_connect_usb",
+                "custom_components.escpos_printer.config_flow.usb_steps._can_connect_usb",
                 return_value=(True, None),
             ),
             patch.object(flow, "async_set_unique_id", return_value=None),
@@ -974,7 +974,7 @@ class TestBrowseAllUsbDevices:
         flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB}
 
         with patch(
-            "custom_components.escpos_printer.config_flow.main_flow._discover_all_usb_devices",
+            "custom_components.escpos_printer.config_flow.usb_steps._discover_all_usb_devices",
             return_value=[],
         ):
             result = await flow.async_step_usb_all_devices()
@@ -1005,11 +1005,11 @@ class TestBrowseAllUsbDevices:
 
         with (
             patch(
-                "custom_components.escpos_printer.config_flow.main_flow._discover_all_usb_devices",
+                "custom_components.escpos_printer.config_flow.usb_steps._discover_all_usb_devices",
                 return_value=mock_all_devices,
             ),
             patch(
-                "custom_components.escpos_printer.config_flow.main_flow._can_connect_usb",
+                "custom_components.escpos_printer.config_flow.usb_steps._can_connect_usb",
                 return_value=(False, "permission_denied"),
             ),
         ):
