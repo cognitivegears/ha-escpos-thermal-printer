@@ -41,7 +41,7 @@
     {"vid": "2D84", "description": "*"},
     {"vid": "0416", "description": "*thermal*"},
     {"vid": "0416", "description": "*receipt*"},
-    {"vid": "0416", "description": "*POS*"}
+    {"vid": "0416", "description": "*pos*"}
   ],
   "version": "0.1.1"
 }
