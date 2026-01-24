@@ -226,6 +226,7 @@ class PrintOperationsMixin:
                 img_obj = img_obj.resize(new_size)
                 _LOGGER.debug("Resized image from %sx%s to %sx%s", orig_w, orig_h, new_size[0], new_size[1])
         except Exception:
+            # If resizing fails for any reason, continue with the original image
             pass
 
         def _do_print() -> None:
