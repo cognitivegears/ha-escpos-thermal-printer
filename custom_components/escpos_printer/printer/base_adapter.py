@@ -1,29 +1,23 @@
+"""Base adapter class for ESC/POS printers."""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import asyncio
 from collections.abc import Callable
 import contextlib
-from dataclasses import dataclass, field
 import io
 import logging
-import socket
 import textwrap
-import time
-from typing import Any, Literal
+from typing import Any
 
 import aiohttp
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 from PIL import Image
 
-from .const import (
-    DEFAULT_ALIGN,
-    DEFAULT_CUT,
-    DEFAULT_IN_EP,
-    DEFAULT_OUT_EP,
-)
-from .security import (
+from ..const import DEFAULT_ALIGN, DEFAULT_CUT
+from ..security import (
     MAX_BEEP_TIMES,
     MAX_FEED_LINES,
     sanitize_log_message,
@@ -35,6 +29,7 @@ from .security import (
     validate_text_input,
     validate_timeout,
 )
+from .config import BasePrinterConfig
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -50,45 +45,6 @@ def _get_usb_printer() -> type[Any]:
     from escpos.printer import Usb  # noqa: PLC0415
 
     return Usb  # type: ignore[no-any-return]
-
-
-# Configuration dataclasses
-@dataclass
-class BasePrinterConfig:
-    """Base printer configuration shared by all connection types."""
-
-    codepage: str | None = None
-    profile: str | None = None
-    line_width: int = 48
-    timeout: float = 4.0
-
-
-@dataclass
-class NetworkPrinterConfig(BasePrinterConfig):
-    """Configuration for network (TCP/IP) printers."""
-
-    connection_type: Literal["network"] = field(default="network", repr=False)
-    host: str = ""
-    port: int = 9100
-
-
-@dataclass
-class UsbPrinterConfig(BasePrinterConfig):
-    """Configuration for USB printers."""
-
-    connection_type: Literal["usb"] = field(default="usb", repr=False)
-    vendor_id: int = 0
-    product_id: int = 0
-    in_ep: int = DEFAULT_IN_EP
-    out_ep: int = DEFAULT_OUT_EP
-
-
-# Type alias for config union (use for type hints)
-PrinterConfigTypes = NetworkPrinterConfig | UsbPrinterConfig
-
-# Backward-compatible alias: PrinterConfig(...) still works and creates NetworkPrinterConfig
-# This maintains API compatibility for existing code that instantiates PrinterConfig directly
-PrinterConfig = NetworkPrinterConfig
 
 
 class EscposPrinterAdapterBase(ABC):
@@ -667,153 +623,3 @@ class EscposPrinterAdapterBase(ABC):
                 if not self._keepalive:
                     with contextlib.suppress(Exception):
                         printer.close()
-
-
-class NetworkPrinterAdapter(EscposPrinterAdapterBase):
-    """Adapter for network (TCP/IP) ESC/POS printers."""
-
-    def __init__(self, config: NetworkPrinterConfig) -> None:
-        super().__init__(config)
-        self._network_config = config
-
-    @property
-    def config(self) -> NetworkPrinterConfig:
-        """Return the network printer configuration."""
-        return self._network_config
-
-    def _connect(self) -> Any:
-        """Create and return a network printer connection."""
-        network_class = _get_network_printer()
-        profile_obj = self._get_profile_obj()
-        return network_class(
-            self._network_config.host,
-            port=self._network_config.port,
-            timeout=self._network_config.timeout,
-            profile=profile_obj,
-        )
-
-    async def _status_check(self, hass: HomeAssistant) -> None:
-        """Non-invasive TCP reachability check for network printers."""
-        def _probe() -> tuple[bool, str | None, int | None]:
-            start = time.perf_counter()
-            try:
-                with socket.create_connection((self._network_config.host, self._network_config.port), timeout=min(self._network_config.timeout, 3.0)):
-                    latency_ms = int((time.perf_counter() - start) * 1000)
-                    return True, None, latency_ms
-            except OSError as e:
-                latency_ms = int((time.perf_counter() - start) * 1000)
-                return False, str(e), latency_ms
-
-        ok, err, latency_ms = await hass.async_add_executor_job(_probe)
-        now = dt_util.utcnow()
-        self._last_check = now
-        self._last_latency_ms = latency_ms
-        if ok:
-            self._last_ok = now
-            self._last_error_reason = None
-        else:
-            self._last_error = now
-            self._last_error_reason = sanitize_log_message(err or "unreachable")
-        if self._status != ok:
-            self._status = ok
-            if not ok:
-                _LOGGER.warning("Printer %s:%s not reachable", self._network_config.host, self._network_config.port)
-            # Notify listeners
-            for cb in list(self._status_listeners):
-                with contextlib.suppress(Exception):
-                    cb(ok)
-
-    def get_connection_info(self) -> str:
-        """Return a human-readable connection info string."""
-        return f"{self._network_config.host}:{self._network_config.port}"
-
-
-class UsbPrinterAdapter(EscposPrinterAdapterBase):
-    """Adapter for USB ESC/POS printers."""
-
-    def __init__(self, config: UsbPrinterConfig) -> None:
-        super().__init__(config)
-        self._usb_config = config
-        # USB printers don't support keepalive - reconnect per operation
-        self._keepalive = False
-
-    @property
-    def config(self) -> UsbPrinterConfig:
-        """Return the USB printer configuration."""
-        return self._usb_config
-
-    def _connect(self) -> Any:
-        """Create and return a USB printer connection."""
-        usb_class = _get_usb_printer()
-        profile_obj = self._get_profile_obj()
-        return usb_class(
-            self._usb_config.vendor_id,
-            self._usb_config.product_id,
-            timeout=int(self._usb_config.timeout * 1000),  # USB timeout in milliseconds
-            in_ep=self._usb_config.in_ep,
-            out_ep=self._usb_config.out_ep,
-            profile=profile_obj,
-        )
-
-    async def _status_check(self, hass: HomeAssistant) -> None:
-        """Check USB device availability via device enumeration."""
-        def _probe() -> tuple[bool, str | None, int | None]:
-            start = time.perf_counter()
-            try:
-                import usb.core  # noqa: PLC0415
-
-                device = usb.core.find(
-                    idVendor=self._usb_config.vendor_id,
-                    idProduct=self._usb_config.product_id,
-                )
-                latency_ms = int((time.perf_counter() - start) * 1000)
-            except Exception as e:
-                latency_ms = int((time.perf_counter() - start) * 1000)
-                return False, str(e), latency_ms
-            else:
-                if device is not None:
-                    return True, None, latency_ms
-                return False, "USB device not found", latency_ms
-
-        ok, err, latency_ms = await hass.async_add_executor_job(_probe)
-        now = dt_util.utcnow()
-        self._last_check = now
-        self._last_latency_ms = latency_ms
-        if ok:
-            self._last_ok = now
-            self._last_error_reason = None
-        else:
-            self._last_error = now
-            self._last_error_reason = sanitize_log_message(err or "USB device unavailable")
-        if self._status != ok:
-            self._status = ok
-            if not ok:
-                _LOGGER.warning(
-                    "USB Printer %04X:%04X not available",
-                    self._usb_config.vendor_id,
-                    self._usb_config.product_id,
-                )
-            # Notify listeners
-            for cb in list(self._status_listeners):
-                with contextlib.suppress(Exception):
-                    cb(ok)
-
-    def get_connection_info(self) -> str:
-        """Return a human-readable connection info string."""
-        return f"USB {self._usb_config.vendor_id:04X}:{self._usb_config.product_id:04X}"
-
-    async def start(self, hass: HomeAssistant, *, keepalive: bool, status_interval: int) -> None:
-        """Start the adapter (USB ignores keepalive)."""
-        # USB doesn't support persistent connections, override keepalive to False
-        await super().start(hass, keepalive=False, status_interval=status_interval)
-
-
-# Legacy alias for backward compatibility
-EscposPrinterAdapter = NetworkPrinterAdapter
-
-
-def create_printer_adapter(config: PrinterConfigTypes) -> EscposPrinterAdapterBase:
-    """Factory function to create the appropriate printer adapter based on configuration."""
-    if isinstance(config, UsbPrinterConfig):
-        return UsbPrinterAdapter(config)
-    return NetworkPrinterAdapter(config)

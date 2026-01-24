@@ -13,7 +13,7 @@ from custom_components.escpos_printer.const import (
 async def test_config_flow_cannot_connect(hass):  # type: ignore[no-untyped-def]
     """Test config flow with connection failure shows error."""
     with patch(
-        "custom_components.escpos_printer.config_flow._can_connect",
+        "custom_components.escpos_printer.config_flow.main_flow._can_connect",
         return_value=False,
     ):
         # Step 1: Connection type selection
