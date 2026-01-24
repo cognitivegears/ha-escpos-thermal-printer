@@ -123,13 +123,6 @@ def fake_usb_module(request: Any) -> Generator[None, None, None]:
     usb_core = types.ModuleType("usb.core")
     usb_util = types.ModuleType("usb.util")
 
-    class _FakeDevice:
-        def __init__(self, id_vendor: int = 0, id_product: int = 0):
-            self.idVendor = id_vendor  # Match real USB API
-            self.idProduct = id_product  # Match real USB API
-            self.iManufacturer = 1
-            self.iProduct = 2
-
     def _fake_find(id_vendor: int | None = None, id_product: int | None = None, find_all: bool = False, **kwargs: Any) -> Any:
         if find_all:
             return []  # Return empty list for unit tests

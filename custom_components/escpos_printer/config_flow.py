@@ -56,6 +56,46 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
+def _parse_vid_pid(value: int | str) -> int:
+    """Parse a VID or PID value from various formats.
+
+    Handles:
+    - Integer values: returned as-is
+    - "0x04b8" or "0X04B8": parsed as hex with prefix
+    - "04b8": parsed as hex (contains hex letters a-f)
+    - "1208": parsed as decimal (pure digits)
+
+    Args:
+        value: The VID/PID value as int or string
+
+    Returns:
+        The parsed integer value
+
+    Raises:
+        ValueError: If the value cannot be parsed
+    """
+    if isinstance(value, int):
+        return value
+
+    if not isinstance(value, str):
+        raise TypeError(f"Expected int or str, got {type(value).__name__}")
+
+    value = value.strip()
+    if not value:
+        raise ValueError("Empty string")
+
+    # Check for 0x/0X prefix - parse as hex
+    if value.lower().startswith("0x"):
+        return int(value, 16)
+
+    # Check if string contains hex letters (a-f) - parse as hex
+    if any(c in value.lower() for c in "abcdef"):
+        return int(value, 16)
+
+    # Pure digits - parse as decimal
+    return int(value, 10)
+
+
 def _can_connect(host: str, port: int, timeout: float) -> bool:
     """Test TCP connectivity to a host and port.
 
@@ -187,6 +227,8 @@ def _discover_usb_printers() -> list[dict[str, Any]]:
                         if device.iSerialNumber:
                             serial = usb.util.get_string(device, device.iSerialNumber)
                     except Exception:
+                        # Serial number access may fail due to permissions or device quirks;
+                        # it's optional and used only to distinguish identical printers
                         pass
                     printers.append({
                         "vendor_id": device.idVendor,
@@ -236,6 +278,8 @@ def _discover_all_usb_devices() -> list[dict[str, Any]]:
                     if device.iSerialNumber:
                         serial = usb.util.get_string(device, device.iSerialNumber)
                 except Exception:
+                    # Serial number access may fail due to permissions or device quirks;
+                    # it's optional and used only to distinguish identical devices
                     pass
                 # Note if this is a known thermal printer vendor
                 is_known_printer = device.idVendor in THERMAL_PRINTER_VIDS
@@ -1129,15 +1173,8 @@ class EscposConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             # Coerce VID/PID to integers - handle strings like "0x04b8", "04b8", or "1208"
             try:
-                if isinstance(raw_vid, str):
-                    vendor_id = int(raw_vid, 16) if raw_vid.startswith("0x") or raw_vid.startswith("0X") else int(raw_vid, 0)
-                else:
-                    vendor_id = int(raw_vid)
-
-                if isinstance(raw_pid, str):
-                    product_id = int(raw_pid, 16) if raw_pid.startswith("0x") or raw_pid.startswith("0X") else int(raw_pid, 0)
-                else:
-                    product_id = int(raw_pid)
+                vendor_id = _parse_vid_pid(raw_vid)
+                product_id = _parse_vid_pid(raw_pid)
             except (ValueError, TypeError) as ex:
                 _LOGGER.error("USB YAML import invalid vendor_id or product_id: %s", ex)
                 return self.async_abort(reason="invalid_usb_device")

@@ -16,7 +16,6 @@ from custom_components.escpos_printer.const import (
     CONNECTION_TYPE_USB,
     DEFAULT_IN_EP,
     DEFAULT_OUT_EP,
-    DOMAIN,
 )
 
 
@@ -1024,3 +1023,198 @@ class TestBrowseAllUsbDevices:
 
         assert result["type"] == "form"
         assert result["errors"]["base"] == "usb_permission_denied"
+
+
+class TestParseVidPid:
+    """Tests for the _parse_vid_pid helper function."""
+
+    def test_parse_integer(self):
+        """Test parsing integer values."""
+        from custom_components.escpos_printer.config_flow import _parse_vid_pid
+
+        assert _parse_vid_pid(0x04B8) == 0x04B8
+        assert _parse_vid_pid(1208) == 1208
+        assert _parse_vid_pid(0) == 0
+
+    def test_parse_hex_with_prefix(self):
+        """Test parsing hex strings with 0x prefix."""
+        from custom_components.escpos_printer.config_flow import _parse_vid_pid
+
+        assert _parse_vid_pid("0x04B8") == 0x04B8
+        assert _parse_vid_pid("0X04B8") == 0x04B8
+        assert _parse_vid_pid("0x04b8") == 0x04B8
+        assert _parse_vid_pid("0x0202") == 0x0202
+        assert _parse_vid_pid("0xFFFF") == 0xFFFF
+
+    def test_parse_hex_without_prefix(self):
+        """Test parsing hex strings without prefix (containing a-f)."""
+        from custom_components.escpos_printer.config_flow import _parse_vid_pid
+
+        assert _parse_vid_pid("04b8") == 0x04B8
+        assert _parse_vid_pid("04B8") == 0x04B8
+        assert _parse_vid_pid("ABCD") == 0xABCD
+        assert _parse_vid_pid("abcd") == 0xABCD
+        assert _parse_vid_pid("0a0b") == 0x0A0B
+
+    def test_parse_decimal_string(self):
+        """Test parsing decimal strings (pure digits)."""
+        from custom_components.escpos_printer.config_flow import _parse_vid_pid
+
+        assert _parse_vid_pid("1208") == 1208
+        assert _parse_vid_pid("514") == 514
+        assert _parse_vid_pid("0") == 0
+        assert _parse_vid_pid("65535") == 65535
+
+    def test_parse_with_whitespace(self):
+        """Test parsing strings with leading/trailing whitespace."""
+        from custom_components.escpos_printer.config_flow import _parse_vid_pid
+
+        assert _parse_vid_pid("  1208  ") == 1208
+        assert _parse_vid_pid(" 0x04B8 ") == 0x04B8
+        assert _parse_vid_pid("\t04b8\n") == 0x04B8
+
+    def test_parse_invalid_string(self):
+        """Test that invalid strings raise ValueError."""
+        from custom_components.escpos_printer.config_flow import _parse_vid_pid
+
+        with pytest.raises(ValueError):
+            _parse_vid_pid("not_a_number")
+
+        with pytest.raises(ValueError):
+            _parse_vid_pid("xyz123")
+
+        with pytest.raises(ValueError):
+            _parse_vid_pid("")
+
+        with pytest.raises(ValueError):
+            _parse_vid_pid("   ")
+
+    def test_parse_invalid_type(self):
+        """Test that invalid types raise TypeError."""
+        from custom_components.escpos_printer.config_flow import _parse_vid_pid
+
+        with pytest.raises(TypeError):
+            _parse_vid_pid(None)  # type: ignore[arg-type]
+
+        with pytest.raises(TypeError):
+            _parse_vid_pid([1, 2, 3])  # type: ignore[arg-type]
+
+
+class TestUsbYamlImportEdgeCases:
+    """Additional edge case tests for USB YAML import VID/PID parsing."""
+
+    @pytest.mark.asyncio
+    async def test_import_usb_hex_string_without_prefix(self, hass):
+        """Test importing USB printer with hex string VID/PID (no 0x prefix)."""
+        flow = EscposConfigFlow()
+        flow.hass = hass
+
+        with (
+            patch.object(flow, "async_set_unique_id", return_value=None),
+            patch.object(flow, "_abort_if_unique_id_configured"),
+        ):
+            result = await flow.async_step_import({
+                CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+                CONF_VENDOR_ID: "04b8",  # Hex without prefix
+                CONF_PRODUCT_ID: "0202",  # This will be parsed as decimal since no hex letters
+            })
+
+        assert result["type"] == "create_entry"
+        assert result["data"][CONF_VENDOR_ID] == 0x04B8
+        # "0202" has no hex letters, so parsed as decimal 202
+        assert result["data"][CONF_PRODUCT_ID] == 202
+
+    @pytest.mark.asyncio
+    async def test_import_usb_uppercase_hex_letters(self, hass):
+        """Test importing USB printer with uppercase hex letters."""
+        flow = EscposConfigFlow()
+        flow.hass = hass
+
+        with (
+            patch.object(flow, "async_set_unique_id", return_value=None),
+            patch.object(flow, "_abort_if_unique_id_configured"),
+        ):
+            result = await flow.async_step_import({
+                CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+                CONF_VENDOR_ID: "ABCD",
+                CONF_PRODUCT_ID: "EF01",
+            })
+
+        assert result["type"] == "create_entry"
+        assert result["data"][CONF_VENDOR_ID] == 0xABCD
+        assert result["data"][CONF_PRODUCT_ID] == 0xEF01
+
+    @pytest.mark.asyncio
+    async def test_import_usb_mixed_formats(self, hass):
+        """Test importing USB printer with mixed VID/PID formats."""
+        flow = EscposConfigFlow()
+        flow.hass = hass
+
+        with (
+            patch.object(flow, "async_set_unique_id", return_value=None),
+            patch.object(flow, "_abort_if_unique_id_configured"),
+        ):
+            result = await flow.async_step_import({
+                CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+                CONF_VENDOR_ID: "0x04B8",  # Hex with prefix
+                CONF_PRODUCT_ID: "514",     # Decimal
+            })
+
+        assert result["type"] == "create_entry"
+        assert result["data"][CONF_VENDOR_ID] == 0x04B8
+        assert result["data"][CONF_PRODUCT_ID] == 514
+
+    @pytest.mark.asyncio
+    async def test_import_usb_whitespace_in_strings(self, hass):
+        """Test importing USB printer with whitespace in VID/PID strings."""
+        flow = EscposConfigFlow()
+        flow.hass = hass
+
+        with (
+            patch.object(flow, "async_set_unique_id", return_value=None),
+            patch.object(flow, "_abort_if_unique_id_configured"),
+        ):
+            result = await flow.async_step_import({
+                CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+                CONF_VENDOR_ID: "  0x04B8  ",
+                CONF_PRODUCT_ID: " 514 ",
+            })
+
+        assert result["type"] == "create_entry"
+        assert result["data"][CONF_VENDOR_ID] == 0x04B8
+        assert result["data"][CONF_PRODUCT_ID] == 514
+
+    @pytest.mark.asyncio
+    async def test_import_usb_empty_string_aborts(self, hass):
+        """Test that empty string VID/PID aborts."""
+        flow = EscposConfigFlow()
+        flow.hass = hass
+
+        result = await flow.async_step_import({
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+            CONF_VENDOR_ID: "",
+            CONF_PRODUCT_ID: "0x0202",
+        })
+
+        assert result["type"] == "abort"
+        assert result["reason"] == "invalid_usb_device"
+
+    @pytest.mark.asyncio
+    async def test_import_usb_lowercase_0x_prefix(self, hass):
+        """Test importing USB printer with lowercase 0x prefix."""
+        flow = EscposConfigFlow()
+        flow.hass = hass
+
+        with (
+            patch.object(flow, "async_set_unique_id", return_value=None),
+            patch.object(flow, "_abort_if_unique_id_configured"),
+        ):
+            result = await flow.async_step_import({
+                CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+                CONF_VENDOR_ID: "0x04b8",
+                CONF_PRODUCT_ID: "0x0202",
+            })
+
+        assert result["type"] == "create_entry"
+        assert result["data"][CONF_VENDOR_ID] == 0x04B8
+        assert result["data"][CONF_PRODUCT_ID] == 0x0202
