@@ -20,7 +20,7 @@ from custom_components.escpos_printer.const import (
 async def test_config_flow_success(hass):  # type: ignore[no-untyped-def]
     """Test successful three-step config flow for network printer."""
     with patch(
-        "custom_components.escpos_printer.config_flow.network_steps._can_connect", return_value=True
+        "custom_components.escpos_printer._config_flow.network_steps._can_connect", return_value=True
     ):
         # Step 1: Connection type selection
         result = await hass.config_entries.flow.async_init(
@@ -73,7 +73,7 @@ async def test_config_flow_success(hass):  # type: ignore[no-untyped-def]
 async def test_config_flow_connection_failure(hass):  # type: ignore[no-untyped-def]
     """Test config flow with connection failure."""
     with patch(
-        "custom_components.escpos_printer.config_flow.network_steps._can_connect", return_value=False
+        "custom_components.escpos_printer._config_flow.network_steps._can_connect", return_value=False
     ):
         # Step 1: Connection type selection
         result = await hass.config_entries.flow.async_init(
@@ -107,7 +107,7 @@ async def test_config_flow_connection_failure(hass):  # type: ignore[no-untyped-
 async def test_config_flow_with_profile_selection(hass):  # type: ignore[no-untyped-def]
     """Test config flow with profile selection."""
     with patch(
-        "custom_components.escpos_printer.config_flow.network_steps._can_connect", return_value=True
+        "custom_components.escpos_printer._config_flow.network_steps._can_connect", return_value=True
     ):
         # Step 1: Connection type selection
         result = await hass.config_entries.flow.async_init(
@@ -151,10 +151,10 @@ async def test_config_flow_custom_profile(hass):  # type: ignore[no-untyped-def]
     """Test config flow with custom profile entry."""
     with (
         patch(
-            "custom_components.escpos_printer.config_flow.network_steps._can_connect", return_value=True
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect", return_value=True
         ),
         patch(
-            "custom_components.escpos_printer.config_flow.settings_steps.is_valid_profile", return_value=True
+            "custom_components.escpos_printer._config_flow.settings_steps.is_valid_profile", return_value=True
         ),
     ):
         # Step 1: Connection type selection
@@ -206,10 +206,10 @@ async def test_config_flow_custom_codepage(hass):  # type: ignore[no-untyped-def
     """Test config flow with custom codepage entry."""
     with (
         patch(
-            "custom_components.escpos_printer.config_flow.network_steps._can_connect", return_value=True
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect", return_value=True
         ),
         patch(
-            "custom_components.escpos_printer.config_flow.settings_steps.is_valid_codepage_for_profile",
+            "custom_components.escpos_printer._config_flow.settings_steps.is_valid_codepage_for_profile",
             return_value=True,
         ),
     ):
@@ -257,7 +257,7 @@ async def test_config_flow_custom_codepage(hass):  # type: ignore[no-untyped-def
 async def test_config_flow_custom_line_width(hass):  # type: ignore[no-untyped-def]
     """Test config flow with custom line width entry."""
     with patch(
-        "custom_components.escpos_printer.config_flow.network_steps._can_connect", return_value=True
+        "custom_components.escpos_printer._config_flow.network_steps._can_connect", return_value=True
     ):
         # Step 1: Connection type selection
         result = await hass.config_entries.flow.async_init(
