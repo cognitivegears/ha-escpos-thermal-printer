@@ -5,7 +5,7 @@
 [![HACS Validation](https://github.com/cognitivegears/ha-escpos-thermal-printer/actions/workflows/hacs.yml/badge.svg)](https://github.com/cognitivegears/ha-escpos-thermal-printer/actions/workflows/hacs.yml)
 
 Print receipts, labels, QR codes, and more from Home Assistant automations.
-Connect any network thermal printer and start printing in minutes.
+Connect any network or USB thermal printer and start printing in minutes.
 
 ![Printed Receipt Example](docs/assets/receipt.png)
 
@@ -13,11 +13,11 @@ Connect any network thermal printer and start printing in minutes.
 
 - **Automate physical output** - Print door access logs, temperature alerts,
 todo lists, daily reports, or shopping lists automatically
-- **Works with cheap hardware** - Any $30+ network thermal printer that supports
+- **Works with cheap hardware** - Any $30+ thermal printer (network or USB) that supports
 ESC/POS will work
+- **Network and USB support** - Connect via TCP/IP or plug directly via USB
 - **Multiple printers** - Set up as many printers as you need and target them individually or broadcast to all
-- **No cloud required** - Direct network connection to your printers,
-everything stays local
+- **No cloud required** - Direct connection to your printers, everything stays local
 
 ## Features
 
@@ -34,8 +34,9 @@ everything stays local
 ### Requirements
 
 - Home Assistant 2024.8 or later
-- Network thermal printer with ESC/POS support (most receipt printers)
-- Printer accessible on your network (typically port 9100)
+- Thermal printer with ESC/POS support (most receipt printers)
+- **Network printers:** Accessible on your network (typically port 9100)
+- **USB printers:** Connected directly to your Home Assistant host (requires libusb)
 
 ### Install via HACS
 
@@ -50,9 +51,13 @@ everything stays local
 
 1. Go to **Settings** > **Devices & services** > **Add Integration**
 2. Search for "ESC/POS Thermal Printer"
-3. Enter your printer's IP address and port (default: 9100)
+3. Select your connection type:
+   - **Network:** Enter your printer's IP address and port (default: 9100)
+   - **USB:** Select from auto-discovered printers or enter VID:PID manually
 4. Select your printer model or use "Auto-detect"
 5. Done! Your printer is ready to use
+
+**Note:** USB printers may be auto-discovered when connected. Check your Home Assistant notifications.
 
 ## Basic Examples
 

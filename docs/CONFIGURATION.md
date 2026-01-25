@@ -5,6 +5,7 @@ This guide covers all configuration options for the ESC/POS Thermal Printer inte
 ## Table of Contents
 
 - [Initial Setup](#initial-setup)
+- [USB Printers](#usb-printers)
 - [Configuration Options](#configuration-options)
 - [Printer Profiles](#printer-profiles)
 - [Service Parameters](#service-parameters)
@@ -18,9 +19,17 @@ This guide covers all configuration options for the ESC/POS Thermal Printer inte
 
 1. Go to **Settings** > **Devices & services** > **Add Integration**
 2. Search for "ESC/POS Thermal Printer"
-3. Enter the connection details
+3. Select your connection type: **Network** or **USB**
+4. Enter the connection details (see below)
 
-### Connection Settings (Step 1)
+### Connection Type Selection
+
+| Type | Best For |
+|------|----------|
+| Network | Printers with Ethernet/WiFi, shared printers, remote locations |
+| USB | Direct connection, dedicated printers, simpler setup |
+
+### Network Connection Settings
 
 | Setting | Description | Default |
 |---------|-------------|---------|
@@ -29,7 +38,19 @@ This guide covers all configuration options for the ESC/POS Thermal Printer inte
 | Timeout | Connection timeout in seconds | 4.0 |
 | Printer Profile | Your printer model (see [Printer Profiles](#printer-profiles)) | Auto-detect |
 
-### Printer Settings (Step 2)
+### USB Connection Settings
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Printer | Select from discovered printers | Required |
+| Vendor ID | USB Vendor ID (hex, e.g., 04B8) | From discovery |
+| Product ID | USB Product ID (hex, e.g., 0E03) | From discovery |
+| Input Endpoint | USB input endpoint address | 0x82 |
+| Output Endpoint | USB output endpoint address | 0x01 |
+| Timeout | Connection timeout in seconds | 4.0 |
+| Printer Profile | Your printer model | Auto-detect |
+
+### Common Settings (Step 2)
 
 | Setting | Description | Default |
 |---------|-------------|---------|
@@ -38,7 +59,7 @@ This guide covers all configuration options for the ESC/POS Thermal Printer inte
 | Default Alignment | Text alignment for all print jobs | left |
 | Default Cut Mode | Paper cutting after print jobs | none |
 
-### Finding Your Printer's IP Address
+### Finding Your Printer's IP Address (Network)
 
 Most thermal printers can print a network status page:
 
@@ -48,6 +69,65 @@ Most thermal printers can print a network status page:
 4. Look for the IP address on the printout
 
 Alternatively, check your router's DHCP client list.
+
+---
+
+## USB Printers
+
+### Requirements
+
+- libusb library installed on the Home Assistant host
+- Printer connected directly via USB
+- Proper USB permissions (udev rules on Linux)
+
+### Auto-Discovery
+
+USB printers from known manufacturers are automatically discovered when connected. Home Assistant will show a notification prompting you to configure the printer.
+
+Supported brands for auto-discovery:
+- Epson (0x04B8)
+- Star Micronics (0x0519)
+- Citizen (0x08BD, 0x1D90, 0x2730)
+- Bixolon (0x1504)
+- Zebra (0x0A5F)
+- And 15+ other thermal printer manufacturers
+
+### Manual USB Configuration
+
+If your printer isn't auto-discovered:
+
+1. Choose **USB** connection type
+2. Select **Browse all USB devices** or **Manual entry**
+3. For manual entry, provide:
+   - **Vendor ID:** Find using `lsusb` on Linux or Device Manager on Windows
+   - **Product ID:** Listed alongside Vendor ID
+   - **Endpoints:** Usually 0x82 (in) and 0x01 (out) - adjust if printing fails
+
+### USB Permissions (Linux)
+
+If you see "Permission denied" errors, create a udev rule:
+
+```bash
+# /etc/udev/rules.d/99-escpos.rules
+SUBSYSTEM=="usb", ATTR{idVendor}=="04b8", MODE="0666"
+```
+
+Replace `04b8` with your printer's vendor ID. Reload rules:
+
+```bash
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
+
+### USB vs Network Differences
+
+| Aspect | Network | USB |
+|--------|---------|-----|
+| Discovery | Manual IP entry | Auto-discovery by vendor ID |
+| Persistent Connection | Optional (keepalive) | Always reconnects per operation |
+| Status Check | TCP probe | USB device enumeration |
+| Multiple Printers | Yes (different IPs) | Yes (different VID:PID or serial) |
+| Remote Access | Yes | No (local only) |
 
 ---
 
@@ -121,14 +201,16 @@ Applied when a service call doesn't specify cut mode:
 - `partial` - Partial cut (leaves a small connection)
 - `full` - Full cut
 
-### Keep Alive (Experimental)
+### Keep Alive (Network Only, Experimental)
 
-Maintains a persistent connection to the printer. This can:
+Maintains a persistent connection to network printers. This can:
 
 - Reduce print latency
 - Cause issues if the printer goes offline
 
 Leave disabled unless you have a specific need.
+
+**Note:** This option is not available for USB printers. USB connections always reconnect per operation.
 
 ### Status Interval
 
