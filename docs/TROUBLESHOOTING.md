@@ -5,6 +5,7 @@ Solutions for common issues with the ESC/POS Thermal Printer integration.
 ## Table of Contents
 
 - [Connection Issues](#connection-issues)
+- [USB Connection Issues](#usb-connection-issues)
 - [Print Quality Problems](#print-quality-problems)
 - [Service Errors](#service-errors)
 - [Image Issues](#image-issues)
@@ -74,6 +75,116 @@ The printer is reachable but rejecting connections.
 - The printer might be in an error state (paper out, cover open)
 
 Try power cycling the printer.
+
+---
+
+## USB Connection Issues
+
+### "Permission denied" / "Access denied"
+
+The Home Assistant process doesn't have permission to access the USB device.
+
+**On Linux (most HA installations):**
+
+Create a udev rule to grant access:
+
+```bash
+# Create file: /etc/udev/rules.d/99-escpos.rules
+SUBSYSTEM=="usb", ATTR{idVendor}=="04b8", MODE="0666"
+```
+
+Replace `04b8` with your printer's vendor ID. Then reload:
+
+```bash
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
+
+**On Home Assistant OS:**
+
+USB access is typically allowed, but some devices may need additional configuration.
+Try unplugging and re-plugging the printer, then restart Home Assistant.
+
+**On Docker:**
+
+Make sure the USB device is passed through to the container:
+
+```yaml
+devices:
+  - /dev/bus/usb:/dev/bus/usb
+```
+
+Or pass the specific device (e.g., `/dev/usb/lp0`).
+
+### "Device not found"
+
+The printer is not detected via USB.
+
+**Check:**
+
+1. Printer is powered on and connected via USB
+2. USB cable is working (try a different cable)
+3. Verify the device appears in the system:
+   ```bash
+   # Linux
+   lsusb | grep -i printer
+
+   # Look for your printer's vendor ID (e.g., 04b8 for Epson)
+   lsusb
+   ```
+
+### "USB backend missing"
+
+The libusb library is not installed.
+
+**Solutions:**
+
+- **Home Assistant OS:** libusb is included; try restarting HA
+- **Docker:** Ensure libusb is in your container image
+- **Linux:** Install libusb: `sudo apt install libusb-1.0-0`
+- **macOS:** Install via Homebrew: `brew install libusb`
+
+### "Cannot connect" with wrong endpoints
+
+USB endpoint configuration is incorrect.
+
+**Solutions:**
+
+1. Try the default endpoints (in: 0x82, out: 0x01)
+2. If those don't work, find correct endpoints:
+   ```bash
+   # Linux - find your device
+   lsusb -v -d VENDOR:PRODUCT | grep Endpoint
+   ```
+3. Look for "bEndpointAddress" values - OUT endpoint for sending, IN for receiving
+
+### Printer not auto-discovered
+
+Your printer's vendor ID might not be in the known list.
+
+**Solutions:**
+
+1. Use **Browse all USB devices** when adding the printer
+2. Use **Manual entry** with your printer's VID:PID
+3. Find VID:PID using `lsusb` or Device Manager
+
+### USB printer works intermittently
+
+**Possible causes:**
+
+- Power management putting the USB device to sleep
+- Loose USB connection
+- USB hub issues
+
+**Solutions:**
+
+1. Connect directly to the computer (not through a hub)
+2. Use a powered USB hub if you must use a hub
+3. Check USB cable quality
+4. On Linux, disable USB autosuspend:
+   ```bash
+   echo -1 > /sys/bus/usb/devices/usb*/power/autosuspend
+   ```
 
 ---
 

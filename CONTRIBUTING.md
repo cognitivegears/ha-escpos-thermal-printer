@@ -142,17 +142,25 @@ ha-escpos-thermal-printer/
 │       ├── __init__.py          # Integration setup, entry points
 │       ├── binary_sensor.py     # Printer status sensor
 │       ├── capabilities.py      # Printer profile detection
-│       ├── config_flow.py       # UI configuration wizard
 │       ├── const.py             # Constants and defaults
 │       ├── diagnostics.py       # Debug info collection
 │       ├── manifest.json        # Integration metadata
 │       ├── notify.py            # Notification platform
-│       ├── printer.py           # Printer adapter (core logic)
 │       ├── security.py          # Input validation
 │       ├── services.py          # Service handlers
 │       ├── services.yaml        # Service definitions
 │       ├── strings.json         # UI strings
-│       └── text_utils.py        # UTF-8 transcoding
+│       ├── text_utils.py        # UTF-8 transcoding
+│       ├── _config_flow/        # Configuration flow subpackage
+│       │   ├── flow.py          # Main ConfigFlow class
+│       │   ├── usb_helpers.py   # USB discovery and validation
+│       │   └── network_helpers.py # Network validation
+│       └── printer/             # Printer adapter subpackage
+│           ├── base.py          # Abstract adapter base class
+│           ├── network_adapter.py # Network (TCP/IP) adapter
+│           ├── usb_adapter.py   # USB adapter
+│           ├── config.py        # Config dataclasses
+│           └── factory.py       # Adapter factory
 ├── tests/
 │   ├── integration_tests/       # Full integration tests
 │   └── test_*.py                # Unit tests
@@ -178,6 +186,17 @@ Services are registered globally once (not per config entry) and resolve device 
 ### Security Validation
 
 All user input is validated before reaching the printer. See `security.py` for validation functions.
+
+### Printer Adapters
+
+The integration uses a factory pattern for printer adapters:
+
+- `EscposPrinterAdapterBase` - Abstract base class defining the interface
+- `NetworkPrinterAdapter` - TCP/IP network connections
+- `UsbPrinterAdapter` - Direct USB connections
+- `create_printer_adapter()` - Factory function that instantiates the correct adapter
+
+Both adapters implement identical operations, allowing services to work transparently with either connection type.
 
 ## Dependency Management
 
@@ -232,8 +251,10 @@ The test suite uses mocks for all printer operations. You don't need a physical 
 For manual testing, you can:
 
 1. Use a virtual printer emulator (see `tests/integration_tests/`)
-2. Connect a real printer to your network
+2. Connect a real printer to your network or via USB
 3. Use the binary sensor to verify connectivity without printing
+
+**Note:** USB discovery functions are mocked in tests. To test USB functionality manually, connect a real USB printer.
 
 ## Troubleshooting Development Issues
 

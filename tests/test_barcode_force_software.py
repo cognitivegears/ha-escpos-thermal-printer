@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from custom_components.escpos_printer.printer import EscposPrinterAdapter, PrinterConfig
+from custom_components.escpos_printer.printer import NetworkPrinterAdapter, NetworkPrinterConfig
 
 
 class HassStub:
@@ -46,11 +46,11 @@ async def test_barcode_passes_force_software(monkeypatch: Any) -> None:
             return inst
         return _factory
 
-    from custom_components.escpos_printer import printer as printer_mod
+    from custom_components.escpos_printer.printer import network_adapter as printer_mod
 
     monkeypatch.setattr(printer_mod, "_get_network_printer", fake_network)
 
-    adapter = EscposPrinterAdapter(PrinterConfig(host="127.0.0.1", port=9100))
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="127.0.0.1", port=9100))
     hass = HassStub()
 
     await adapter.print_barcode(
@@ -83,11 +83,11 @@ async def test_barcode_retries_without_force_software(monkeypatch: Any) -> None:
             return inst
         return _factory
 
-    from custom_components.escpos_printer import printer as printer_mod
+    from custom_components.escpos_printer.printer import network_adapter as printer_mod
 
     monkeypatch.setattr(printer_mod, "_get_network_printer", fake_network)
 
-    adapter = EscposPrinterAdapter(PrinterConfig(host="127.0.0.1", port=9100))
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="127.0.0.1", port=9100))
     hass = HassStub()
 
     await adapter.print_barcode(

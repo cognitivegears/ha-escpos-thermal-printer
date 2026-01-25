@@ -422,7 +422,7 @@ class TestGracefulDegradation:
     def test_fallback_when_import_fails(self):
         """Should use fallback when escpos import fails."""
         with patch(
-            "custom_components.escpos_printer.capabilities._get_capabilities"
+            "custom_components.escpos_printer.capabilities.profiles._get_capabilities"
         ) as mock_cap:
             mock_cap.return_value = {
                 "profiles": {},
@@ -435,18 +435,28 @@ class TestGracefulDegradation:
 
     def test_handles_missing_profile_data(self):
         """Should handle profiles with missing data gracefully."""
-        with patch(
-            "custom_components.escpos_printer.capabilities._get_capabilities"
-        ) as mock_cap:
-            mock_cap.return_value = {
-                "profiles": {
-                    "incomplete": {
-                        # Missing name, vendor, codePages, fonts, features
-                    }
-                },
-                "encodings": {},
-            }
-
+        mock_data = {
+            "profiles": {
+                "incomplete": {
+                    # Missing name, vendor, codePages, fonts, features
+                }
+            },
+            "encodings": {},
+        }
+        with (
+            patch(
+                "custom_components.escpos_printer.capabilities.codepages._get_capabilities",
+                return_value=mock_data,
+            ),
+            patch(
+                "custom_components.escpos_printer.capabilities.line_widths._get_capabilities",
+                return_value=mock_data,
+            ),
+            patch(
+                "custom_components.escpos_printer.capabilities.features._get_capabilities",
+                return_value=mock_data,
+            ),
+        ):
             # Should not crash
             codepages = get_profile_codepages("incomplete")
             assert codepages == COMMON_CODEPAGES
