@@ -1,0 +1,132 @@
+# Home Assistant Script to Test ESC/POS Printer
+# Add this to your scripts.yaml or create via UI
+#
+# Usage: Call the script from Developer Tools > Services
+# or create an automation to trigger it
+
+test_escpos_printer:
+  alias: "Test ESC/POS Printer"
+  description: "Tests all printer functionality"
+  sequence:
+    # 1. Print header text
+    - service: escpos_printer.print_text
+      data:
+        text: "=== PRINTER TEST ==="
+        align: center
+        bold: true
+        width: 2
+        height: 2
+
+    # 2. Print regular text
+    - service: escpos_printer.print_text
+      data:
+        text: "This is a test print from Home Assistant."
+        align: left
+
+    # 3. Print UTF-8 text with special characters
+    - service: escpos_printer.print_text_utf8
+      data:
+        text: "UTF-8 Test: Café, naïve, résumé, €100"
+        align: left
+
+    # 4. Print styled text
+    - service: escpos_printer.print_text
+      data:
+        text: "Bold Text"
+        bold: true
+
+    - service: escpos_printer.print_text
+      data:
+        text: "Underlined Text"
+        underline: 1
+
+    # 5. Print centered text
+    - service: escpos_printer.print_text
+      data:
+        text: "--- Centered ---"
+        align: center
+
+    # 6. Feed some lines
+    - service: escpos_printer.feed
+      data:
+        lines: 1
+
+    # 7. Print a QR code
+    - service: escpos_printer.print_text
+      data:
+        text: "QR Code Test:"
+        align: left
+
+    - service: escpos_printer.print_qr
+      data:
+        data: "https://www.home-assistant.io"
+        size: 6
+        align: center
+
+    # 8. Feed and print barcode
+    - service: escpos_printer.feed
+      data:
+        lines: 1
+
+    - service: escpos_printer.print_text
+      data:
+        text: "Barcode Test:"
+        align: left
+
+    - service: escpos_printer.print_barcode
+      data:
+        code: "123456789012"
+        bc: EAN13
+        align: center
+        height: 80
+        pos: BELOW
+
+    # 9. Print timestamp
+    - service: escpos_printer.feed
+      data:
+        lines: 1
+
+    - service: escpos_printer.print_text
+      data:
+        text: "Printed: {{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+        align: center
+
+    # 10. Final separator and cut
+    - service: escpos_printer.print_text
+      data:
+        text: "================================"
+        align: center
+
+    - service: escpos_printer.feed
+      data:
+        lines: 3
+
+    - service: escpos_printer.cut
+      data:
+        mode: partial
+
+  mode: single
+
+# Simpler quick test script
+test_escpos_quick:
+  alias: "Quick Printer Test"
+  description: "Quick test - just prints a line and cuts"
+  sequence:
+    - service: escpos_printer.print_text
+      data:
+        text: "Quick Test: {{ now().strftime('%H:%M:%S') }}"
+        align: center
+        feed: 3
+        cut: partial
+  mode: single
+
+# Test beep (if printer supports it)
+test_escpos_beep:
+  alias: "Test Printer Beep"
+  description: "Tests the printer buzzer"
+  sequence:
+    - service: escpos_printer.beep
+      data:
+        times: 2
+        duration: 100
+  mode: single
