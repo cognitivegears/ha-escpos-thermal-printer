@@ -1,132 +1,424 @@
-# Home Assistant Script to Test ESC/POS Printer
-# Add this to your scripts.yaml or create via UI
+# ESC/POS Printer Integration Test Script
+# Add this to your Home Assistant scripts.yaml or create via UI
 #
-# Usage: Call the script from Developer Tools > Services
-# or create an automation to trigger it
+# Usage: Call the script "script.test_escpos_printer" from Developer Tools > Services
+# or create an automation/button to trigger it.
 
 test_escpos_printer:
-  alias: "Test ESC/POS Printer"
-  description: "Tests all printer functionality"
+  alias: "Test ESC/POS Printer - Full"
+  description: "Comprehensive test of ESC/POS thermal printer functionality"
   sequence:
-    # 1. Print header text
+    # --- Header ---
     - service: escpos_printer.print_text
       data:
-        text: "=== PRINTER TEST ==="
+        text: |
+          ================================
+                  PRINTER TEST
+          ================================
         align: center
         bold: true
-        width: 2
-        height: 2
+        cut: none
+        feed: 1
 
-    # 2. Print regular text
+    # --- Basic Text Test ---
     - service: escpos_printer.print_text
       data:
-        text: "This is a test print from Home Assistant."
-        align: left
-
-    # 3. Print UTF-8 text with special characters
-    - service: escpos_printer.print_text_utf8
-      data:
-        text: "UTF-8 Test: Café, naïve, résumé, €100"
-        align: left
-
-    # 4. Print styled text
-    - service: escpos_printer.print_text
-      data:
-        text: "Bold Text"
+        text: "1. Basic Text Test"
         bold: true
+        cut: none
+        feed: 0
 
     - service: escpos_printer.print_text
       data:
-        text: "Underlined Text"
-        underline: 1
+        text: "Normal text printing works!"
+        cut: none
+        feed: 1
 
-    # 5. Print centered text
+    # --- Text Alignment Test ---
     - service: escpos_printer.print_text
       data:
-        text: "--- Centered ---"
-        align: center
+        text: "2. Alignment Test"
+        bold: true
+        cut: none
+        feed: 0
 
-    # 6. Feed some lines
-    - service: escpos_printer.feed
-      data:
-        lines: 1
-
-    # 7. Print a QR code
     - service: escpos_printer.print_text
       data:
-        text: "QR Code Test:"
+        text: "Left aligned"
         align: left
+        cut: none
+        feed: 0
+
+    - service: escpos_printer.print_text
+      data:
+        text: "Center aligned"
+        align: center
+        cut: none
+        feed: 0
+
+    - service: escpos_printer.print_text
+      data:
+        text: "Right aligned"
+        align: right
+        cut: none
+        feed: 1
+
+    # --- Text Formatting Test ---
+    - service: escpos_printer.print_text
+      data:
+        text: "3. Formatting Test"
+        bold: true
+        cut: none
+        feed: 0
+
+    - service: escpos_printer.print_text
+      data:
+        text: "Bold text"
+        bold: true
+        cut: none
+        feed: 0
+
+    - service: escpos_printer.print_text
+      data:
+        text: "Underlined text"
+        underline: single
+        cut: none
+        feed: 0
+
+    - service: escpos_printer.print_text
+      data:
+        text: "Double underline"
+        underline: double
+        cut: none
+        feed: 0
+
+    - service: escpos_printer.print_text
+      data:
+        text: "DOUBLE WIDTH"
+        width: double
+        align: center
+        cut: none
+        feed: 0
+
+    - service: escpos_printer.print_text
+      data:
+        text: "DOUBLE HEIGHT"
+        height: double
+        align: center
+        cut: none
+        feed: 1
+
+    # --- QR Code Test ---
+    - service: escpos_printer.print_text
+      data:
+        text: "4. QR Code Test"
+        bold: true
+        cut: none
+        feed: 0
 
     - service: escpos_printer.print_qr
       data:
         data: "https://www.home-assistant.io"
         size: 6
         align: center
-
-    # 8. Feed and print barcode
-    - service: escpos_printer.feed
-      data:
-        lines: 1
+        cut: none
+        feed: 0
 
     - service: escpos_printer.print_text
       data:
-        text: "Barcode Test:"
-        align: left
+        text: "Scan: home-assistant.io"
+        align: center
+        cut: none
+        feed: 1
+
+    # --- Barcode Test ---
+    - service: escpos_printer.print_text
+      data:
+        text: "5. Barcode Test"
+        bold: true
+        cut: none
+        feed: 0
 
     - service: escpos_printer.print_barcode
       data:
-        code: "123456789012"
+        code: "4006381333931"
         bc: EAN13
-        align: center
         height: 80
+        width: 3
         pos: BELOW
+        align: center
+        cut: none
+        feed: 1
 
-    # 9. Print timestamp
-    - service: escpos_printer.feed
+    # --- Image Test ---
+    # Using Home Assistant logo from GitHub (small PNG)
+    - service: escpos_printer.print_text
       data:
-        lines: 1
+        text: "6. Image Test"
+        bold: true
+        cut: none
+        feed: 0
+
+    - service: escpos_printer.print_image
+      data:
+        image: "https://raw.githubusercontent.com/home-assistant/assets/master/logo/logo-small.png"
+        align: center
+        cut: none
+        feed: 1
+
+    # --- Special Characters Test ---
+    - service: escpos_printer.print_text
+      data:
+        text: "7. Special Characters"
+        bold: true
+        cut: none
+        feed: 0
 
     - service: escpos_printer.print_text
       data:
-        text: "Printed: {{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
-        align: center
+        text: "Symbols: @ # $ % & * + ="
+        cut: none
+        feed: 0
 
-    # 10. Final separator and cut
     - service: escpos_printer.print_text
       data:
-        text: "================================"
-        align: center
+        text: "Currency: $99.99 / 89.99"
+        cut: none
+        feed: 1
 
-    - service: escpos_printer.feed
+    # --- Timestamp ---
+    - service: escpos_printer.print_text
       data:
-        lines: 3
+        text: "--------------------------------"
+        cut: none
+        feed: 0
 
+    - service: escpos_printer.print_text
+      data:
+        text: >
+          Test completed at:
+          {{ now().strftime('%Y-%m-%d %H:%M:%S') }}
+        align: center
+        cut: none
+        feed: 0
+
+    - service: escpos_printer.print_text
+      data:
+        text: "--------------------------------"
+        cut: none
+        feed: 2
+
+    # --- Final Cut ---
     - service: escpos_printer.cut
       data:
         mode: partial
 
   mode: single
 
-# Simpler quick test script
+
+# --- Individual Test Scripts ---
+# These can be used to test specific features independently
+
 test_escpos_quick:
-  alias: "Quick Printer Test"
-  description: "Quick test - just prints a line and cuts"
+  alias: "Test ESC/POS - Quick"
+  description: "Quick text print test"
   sequence:
     - service: escpos_printer.print_text
       data:
-        text: "Quick Test: {{ now().strftime('%H:%M:%S') }}"
+        text: |
+          Quick Text Test
+          ----------------
+          If you can read this,
+          text printing works!
+
+          Time: {{ now().strftime('%H:%M:%S') }}
         align: center
-        feed: 3
         cut: partial
+        feed: 2
   mode: single
 
-# Test beep (if printer supports it)
+
+test_escpos_qr:
+  alias: "Test ESC/POS - QR Code"
+  description: "Quick QR code test"
+  sequence:
+    - service: escpos_printer.print_text
+      data:
+        text: "QR Code Test"
+        align: center
+        bold: true
+        cut: none
+        feed: 0
+
+    - service: escpos_printer.print_qr
+      data:
+        data: "Hello from Home Assistant!"
+        size: 8
+        align: center
+        cut: partial
+        feed: 2
+  mode: single
+
+
+test_escpos_barcode:
+  alias: "Test ESC/POS - Barcode"
+  description: "Quick barcode test"
+  sequence:
+    - service: escpos_printer.print_text
+      data:
+        text: "Barcode Test"
+        align: center
+        bold: true
+        cut: none
+        feed: 0
+
+    - service: escpos_printer.print_barcode
+      data:
+        code: "012345678905"
+        bc: UPC-A
+        height: 100
+        align: center
+        cut: partial
+        feed: 2
+  mode: single
+
+
+test_escpos_image:
+  alias: "Test ESC/POS - Image"
+  description: "Quick image print test"
+  sequence:
+    - service: escpos_printer.print_text
+      data:
+        text: "Image Test"
+        align: center
+        bold: true
+        cut: none
+        feed: 0
+
+    # Home Assistant logo from GitHub
+    - service: escpos_printer.print_image
+      data:
+        image: "https://raw.githubusercontent.com/home-assistant/assets/master/logo/logo-small.png"
+        align: center
+        cut: partial
+        feed: 2
+  mode: single
+
+
 test_escpos_beep:
-  alias: "Test Printer Beep"
-  description: "Tests the printer buzzer"
+  alias: "Test ESC/POS - Beep"
+  description: "Test printer buzzer (if supported)"
   sequence:
     - service: escpos_printer.beep
       data:
         times: 2
-        duration: 100
+        duration: 4
+  mode: single
+
+
+test_escpos_receipt_demo:
+  alias: "Test ESC/POS - Receipt Demo"
+  description: "Demo receipt-style printout"
+  sequence:
+    - service: escpos_printer.print_text
+      data:
+        text: |
+          ================================
+               HOME ASSISTANT SHOP
+          ================================
+        align: center
+        bold: true
+        cut: none
+        feed: 0
+
+    - service: escpos_printer.print_text
+      data:
+        text: |
+          123 Smart Home Lane
+          Automation City, HA 12345
+          Tel: (555) 123-4567
+        align: center
+        cut: none
+        feed: 1
+
+    - service: escpos_printer.print_text
+      data:
+        text: "--------------------------------"
+        cut: none
+        feed: 0
+
+    - service: escpos_printer.print_text
+      data:
+        text: |
+          Smart Bulb x2          $29.98
+          Motion Sensor          $24.99
+          Door Sensor x3         $44.97
+          Smart Plug             $19.99
+        cut: none
+        feed: 0
+
+    - service: escpos_printer.print_text
+      data:
+        text: "--------------------------------"
+        cut: none
+        feed: 0
+
+    - service: escpos_printer.print_text
+      data:
+        text: |
+          Subtotal:             $119.93
+          Tax (8%):               $9.59
+        cut: none
+        feed: 0
+
+    - service: escpos_printer.print_text
+      data:
+        text: "================================"
+        cut: none
+        feed: 0
+
+    - service: escpos_printer.print_text
+      data:
+        text: "TOTAL:               $129.52"
+        bold: true
+        height: double
+        cut: none
+        feed: 1
+
+    - service: escpos_printer.print_text
+      data:
+        text: "================================"
+        cut: none
+        feed: 1
+
+    - service: escpos_printer.print_text
+      data:
+        text: "Scan for digital receipt:"
+        align: center
+        cut: none
+        feed: 0
+
+    - service: escpos_printer.print_qr
+      data:
+        data: "https://receipt.example.com/12345"
+        size: 5
+        align: center
+        cut: none
+        feed: 1
+
+    - service: escpos_printer.print_text
+      data:
+        text: |
+          Thank you for shopping!
+          Powered by Home Assistant
+        align: center
+        cut: none
+        feed: 0
+
+    - service: escpos_printer.print_text
+      data:
+        text: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+        align: center
+        cut: partial
+        feed: 3
   mode: single
