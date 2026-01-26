@@ -201,8 +201,10 @@ class EscposPrinterAdapter:
 
         # Set the CUPS server if configured
         if self._config.cups_server:
+            _LOGGER.debug("Setting CUPS server to: %s", self._config.cups_server)
             cups.setServer(self._config.cups_server)
 
+        _LOGGER.debug("Connecting to CUPS printer: %s", self._config.printer_name)
         cups_class = _get_cups_printer()
         profile_obj = None
         if self._config.profile:
@@ -213,10 +215,13 @@ class EscposPrinterAdapter:
             except Exception as e:
                 _LOGGER.debug("Unknown printer profile '%s': %s", self._config.profile, sanitize_log_message(str(e)))
                 profile_obj = None
-        return cups_class(
+
+        printer = cups_class(
             self._config.printer_name,
             profile=profile_obj,
         )
+        _LOGGER.debug("CUPS printer connection created: %s", printer)
+        return printer
 
     async def start(self, hass: HomeAssistant, *, keepalive: bool, status_interval: int) -> None:
         self._keepalive = bool(keepalive)
@@ -401,6 +406,7 @@ class EscposPrinterAdapter:
         text_to_print = self._wrap_text(text)
 
         def _do_print() -> None:  # noqa: PLR0912
+            _LOGGER.debug("print_text begin: text=%r, align=%s", text_to_print[:50] if len(text_to_print) > 50 else text_to_print, align_m)
             printer = self._printer if self._keepalive and self._printer is not None else self._connect()
             try:
                 # Optional codepage
@@ -413,6 +419,7 @@ class EscposPrinterAdapter:
 
                 # Set style
                 if hasattr(printer, "set"):
+                    _LOGGER.debug("Setting printer style: align=%s, bold=%s", align_m, bold)
                     printer.set(align=align_m, bold=bool(bold), underline=ul, width=wmult, height=hmult)
 
                 # Encoding is best-effort; python-escpos handles str internally.
@@ -429,12 +436,19 @@ class EscposPrinterAdapter:
                             printer._raw(text_bytes)
                         else:
                             printer.text(text_to_print)
-                    except Exception:
+                    except Exception as e:
+                        _LOGGER.debug("Encoding error, falling back: %s", e)
                         printer.text(text_to_print)
                 else:
+                    _LOGGER.debug("Sending text to printer...")
                     printer.text(text_to_print)
+                    _LOGGER.debug("Text sent successfully")
+            except Exception as e:
+                _LOGGER.error("print_text failed: %s", sanitize_log_message(str(e)))
+                raise
             finally:
                 if not self._keepalive:
+                    _LOGGER.debug("Closing printer connection")
                     with contextlib.suppress(Exception):
                         printer.close()
 
