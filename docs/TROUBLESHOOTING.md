@@ -143,23 +143,23 @@ usb.core.USBError: [Errno 5] Input/Output Error
 
 This is libusb's generic I/O error. In python-escpos it can be raised during
 USB open and then wrapped as a `DeviceNotFoundError`, so it can look like
-"Device not found" even if the device was just detected. citeturn1search5turn9search2
+"Device not found" even if the device was just detected.
 
 **Common causes:**
 
 - **Device reset or transient disconnect.** Some USB printers reset or briefly
   drop off the bus when waking up or during power management. The kernel docs
-  note that some devices misbehave on autosuspend/resume, especially printers. citeturn0search1
+  note that some devices misbehave on autosuspend/resume, especially printers.
 - **Another program or kernel driver has claimed the interface.** libusb
   cannot claim an interface if another app or a kernel driver already owns it.
-  You may need to stop the other app or detach the kernel driver. citeturn0search0
+  You may need to stop the other app or detach the kernel driver.
 
 **Things to try:**
 
 1. Replug the printer and retry the print.
 2. Disable USB autosuspend for the device (see "USB printer works intermittently").
 3. Ensure no other service is holding the device (e.g., other printing or
-   monitoring tools), or detach the kernel driver where appropriate. citeturn0search0
+   monitoring tools), or detach the kernel driver where appropriate.
 
 ### "USB backend missing"
 
