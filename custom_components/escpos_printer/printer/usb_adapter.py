@@ -45,6 +45,7 @@ class UsbPrinterAdapter(EscposPrinterAdapterBase):
                 if isinstance(exc, usb.core.USBError):
                     return exc.errno in {5, 16, 19}  # EIO, EBUSY, ENODEV
             except Exception:
+                # usb library not available or unexpected error; fall back to string-based matching below
                 pass
             err = str(exc).lower()
             return any(token in err for token in ("input/output error", "resource busy", "no device"))
