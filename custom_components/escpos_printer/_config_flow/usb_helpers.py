@@ -93,7 +93,11 @@ def _can_connect_usb(  # noqa: PLR0911, PLR0912
             if isinstance(exc, usb.core.USBError):
                 return exc.errno in {5, 16, 19}  # EIO, EBUSY, ENODEV
         except Exception:
-            pass
+            _LOGGER.debug(
+                "Could not use usb.core to determine if USB error is retryable; "
+                "falling back to string-based heuristic.",
+                exc_info=True,
+            )
         err = str(exc).lower()
         return any(token in err for token in ("input/output error", "resource busy", "no device"))
 
