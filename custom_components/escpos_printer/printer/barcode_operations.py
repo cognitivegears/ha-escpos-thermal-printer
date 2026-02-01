@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -30,6 +29,14 @@ class BarcodeOperationsMixin:
 
     def _connect(self) -> Any:
         """Create and return a printer connection (abstract in base)."""
+        raise NotImplementedError
+
+    async def _acquire_printer(self, hass: Any) -> tuple[Any, bool]:
+        """Return a printer instance and whether it should be closed by the caller."""
+        raise NotImplementedError
+
+    async def _release_printer(self, hass: Any, printer: Any, *, owned: bool) -> None:
+        """Close a printer instance if owned by the caller."""
         raise NotImplementedError
 
     async def _apply_cut_and_feed(
@@ -67,52 +74,44 @@ class BarcodeOperationsMixin:
             font_v = "A"
         align_m = map_align(align)
 
-        def _do_print() -> None:
-            printer = self._printer if self._keepalive and self._printer is not None else self._connect()
-            try:
-                if hasattr(printer, "set"):
-                    printer.set(align=align_m)
-                # Attempt to pass 'force_software' when provided; fall back if unsupported
-                kwargs = {
-                    "height": height_v,
-                    "width": width_v,
-                    "pos": pos_v,
-                    "font": font_v,
-                    "align_ct": bool(align_ct),
-                    "check": bool(check),
-                }
-                if force_software is not None:
-                    kwargs["force_software"] = force_software
+        def _do_print(printer: Any) -> None:
+            if hasattr(printer, "set"):
+                printer.set(align=align_m)
+            # Attempt to pass 'force_software' when provided; fall back if unsupported
+            kwargs = {
+                "height": height_v,
+                "width": width_v,
+                "pos": pos_v,
+                "font": font_v,
+                "align_ct": bool(align_ct),
+                "check": bool(check),
+            }
+            if force_software is not None:
+                kwargs["force_software"] = force_software
 
-                try:
+            try:
+                printer.barcode(
+                    v_code,
+                    v_bc,
+                    **kwargs,
+                )
+            except TypeError as e:
+                # Older python-escpos may not accept force_software; retry without it
+                if "force_software" in kwargs:
+                    _LOGGER.debug("force_software unsupported; retrying without it: %s", sanitize_log_message(str(e)))
+                    kwargs.pop("force_software", None)
                     printer.barcode(
                         v_code,
                         v_bc,
                         **kwargs,
                     )
-                except TypeError as e:
-                    # Older python-escpos may not accept force_software; retry without it
-                    if "force_software" in kwargs:
-                        _LOGGER.debug("force_software unsupported; retrying without it: %s", sanitize_log_message(str(e)))
-                        kwargs.pop("force_software", None)
-                        printer.barcode(
-                            v_code,
-                            v_bc,
-                            **kwargs,
-                        )
-                    else:
-                        raise
-            finally:
-                if not self._keepalive:
-                    with contextlib.suppress(Exception):
-                        printer.close()
+                else:
+                    raise
 
         async with self._lock:
-            await hass.async_add_executor_job(_do_print)
-            printer_for_post = self._printer if self._keepalive and self._printer is not None else self._connect()
+            printer, owned = await self._acquire_printer(hass)
             try:
-                await self._apply_cut_and_feed(hass, printer_for_post, cut, feed)
+                await hass.async_add_executor_job(_do_print, printer)
+                await self._apply_cut_and_feed(hass, printer, cut, feed)
             finally:
-                if not self._keepalive:
-                    with contextlib.suppress(Exception):
-                        printer_for_post.close()
+                await self._release_printer(hass, printer, owned=owned)

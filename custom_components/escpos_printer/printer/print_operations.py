@@ -53,6 +53,14 @@ class PrintOperationsMixin:
         """Mark a successful operation (implemented in base)."""
         raise NotImplementedError
 
+    async def _acquire_printer(self, hass: Any) -> tuple[Any, bool]:
+        """Return a printer instance and whether it should be closed by the caller."""
+        raise NotImplementedError
+
+    async def _release_printer(self, hass: Any, printer: Any, *, owned: bool) -> None:
+        """Close a printer instance if owned by the caller."""
+        raise NotImplementedError
+
     async def print_text(
         self,
         hass: HomeAssistant,
@@ -75,53 +83,45 @@ class PrintOperationsMixin:
         hmult = map_multiplier(height)
         text_to_print = self._wrap_text(text)
 
-        def _do_print() -> None:  # noqa: PLR0912
-            printer = self._printer if self._keepalive and self._printer is not None else self._connect()
-            try:
-                # Optional codepage
-                if self._config.codepage:
-                    try:
-                        if hasattr(printer, "charcode"):
-                            printer.charcode(self._config.codepage)
-                    except Exception as e:
-                        _LOGGER.debug("Codepage set failed: %s", sanitize_log_message(str(e)))
+        def _do_print(printer: Any) -> None:
+            # Optional codepage
+            if self._config.codepage:
+                try:
+                    if hasattr(printer, "charcode"):
+                        printer.charcode(self._config.codepage)
+                except Exception as e:
+                    _LOGGER.debug("Codepage set failed: %s", sanitize_log_message(str(e)))
 
-                # Set style
-                if hasattr(printer, "set"):
-                    printer.set(align=align_m, bold=bool(bold), underline=ul, width=wmult, height=hmult)
+            # Set style
+            if hasattr(printer, "set"):
+                printer.set(align=align_m, bold=bool(bold), underline=ul, width=wmult, height=hmult)
 
-                # Encoding is best-effort; python-escpos handles str internally.
-                if encoding:
-                    try:
-                        # Try to set codepage if printer exposes helper
-                        if hasattr(printer, "_set_codepage"):
-                            try:
-                                printer._set_codepage(encoding)
-                            except Exception:
-                                _LOGGER.warning("Unsupported encoding/codepage: %s", encoding)
-                        text_bytes = text_to_print.encode(encoding, errors="replace")
-                        if hasattr(printer, "_raw"):
-                            printer._raw(text_bytes)
-                        else:
-                            printer.text(text_to_print)
-                    except Exception:
+            # Encoding is best-effort; python-escpos handles str internally.
+            if encoding:
+                try:
+                    # Try to set codepage if printer exposes helper
+                    if hasattr(printer, "_set_codepage"):
+                        try:
+                            printer._set_codepage(encoding)
+                        except Exception:
+                            _LOGGER.warning("Unsupported encoding/codepage: %s", encoding)
+                    text_bytes = text_to_print.encode(encoding, errors="replace")
+                    if hasattr(printer, "_raw"):
+                        printer._raw(text_bytes)
+                    else:
                         printer.text(text_to_print)
-                else:
+                except Exception:
                     printer.text(text_to_print)
-            finally:
-                if not self._keepalive:
-                    with contextlib.suppress(Exception):
-                        printer.close()
+            else:
+                printer.text(text_to_print)
 
         async with self._lock:
-            await hass.async_add_executor_job(_do_print)
-            printer_for_post = self._printer if self._keepalive and self._printer is not None else self._connect()
+            printer, owned = await self._acquire_printer(hass)
             try:
-                await self._apply_cut_and_feed(hass, printer_for_post, cut, feed)
+                await hass.async_add_executor_job(_do_print, printer)
+                await self._apply_cut_and_feed(hass, printer, cut, feed)
             finally:
-                if not self._keepalive:
-                    with contextlib.suppress(Exception):
-                        printer_for_post.close()
+                await self._release_printer(hass, printer, owned=owned)
         # Successful operation implies reachable
         await self._mark_success()
 
@@ -157,28 +157,20 @@ class PrintOperationsMixin:
             except Exception:
                 return level
 
-        def _do_print() -> None:
-            printer = self._printer if self._keepalive and self._printer is not None else self._connect()
-            try:
-                if hasattr(printer, "set"):
-                    printer.set(align=align_m)
-                printer.qr(data, size=qsize, ec=_map_qr_ec(qec))
-            finally:
-                if not self._keepalive:
-                    with contextlib.suppress(Exception):
-                        printer.close()
+        def _do_print(printer: Any) -> None:
+            if hasattr(printer, "set"):
+                printer.set(align=align_m)
+            printer.qr(data, size=qsize, ec=_map_qr_ec(qec))
 
         async with self._lock:
-            await hass.async_add_executor_job(_do_print)
-            printer_for_post = self._printer if self._keepalive and self._printer is not None else self._connect()
+            printer, owned = await self._acquire_printer(hass)
             try:
-                await self._apply_cut_and_feed(hass, printer_for_post, cut, feed)
+                await hass.async_add_executor_job(_do_print, printer)
+                await self._apply_cut_and_feed(hass, printer, cut, feed)
             finally:
-                if not self._keepalive:
-                    with contextlib.suppress(Exception):
-                        printer_for_post.close()
+                await self._release_printer(hass, printer, owned=owned)
 
-    async def print_image(  # noqa: PLR0915
+    async def print_image(
         self,
         hass: HomeAssistant,
         *,
@@ -229,28 +221,20 @@ class PrintOperationsMixin:
             # If resizing fails for any reason, continue with the original image
             pass
 
-        def _do_print() -> None:
-            printer = self._printer if self._keepalive and self._printer is not None else self._connect()
-            try:
-                if hasattr(printer, "set"):
-                    printer.set(align=align_m)
-                # Some printers need conversion; python-escpos handles PIL.Image
-                if hasattr(printer, "image"):
-                    printer.image(img_obj, high_density_vertical=high_density, high_density_horizontal=high_density)
-                else:
-                    # Fallback: convert to bytes via ESC/POS raster if possible
-                    printer.text("[image printing not supported by this printer]\n")
-            finally:
-                if not self._keepalive:
-                    with contextlib.suppress(Exception):
-                        printer.close()
+        def _do_print(printer: Any) -> None:
+            if hasattr(printer, "set"):
+                printer.set(align=align_m)
+            # Some printers need conversion; python-escpos handles PIL.Image
+            if hasattr(printer, "image"):
+                printer.image(img_obj, high_density_vertical=high_density, high_density_horizontal=high_density)
+            else:
+                # Fallback: convert to bytes via ESC/POS raster if possible
+                printer.text("[image printing not supported by this printer]\n")
 
         async with self._lock:
-            await hass.async_add_executor_job(_do_print)
-            printer_for_post = self._printer if self._keepalive and self._printer is not None else self._connect()
+            printer, owned = await self._acquire_printer(hass)
             try:
-                await self._apply_cut_and_feed(hass, printer_for_post, cut, feed)
+                await hass.async_add_executor_job(_do_print, printer)
+                await self._apply_cut_and_feed(hass, printer, cut, feed)
             finally:
-                if not self._keepalive:
-                    with contextlib.suppress(Exception):
-                        printer_for_post.close()
+                await self._release_printer(hass, printer, owned=owned)

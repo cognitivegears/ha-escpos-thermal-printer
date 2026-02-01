@@ -161,7 +161,7 @@ class TestUsbStep:
         with (
             patch(
                 "custom_components.escpos_printer._config_flow.usb_steps._can_connect_usb",
-                return_value=(True, None),
+                return_value=(True, None, None),
             ),
             patch.object(flow, "async_set_unique_id", return_value=None),
             patch.object(flow, "_abort_if_unique_id_configured"),
@@ -190,7 +190,7 @@ class TestUsbStep:
             ),
             patch(
                 "custom_components.escpos_printer._config_flow.usb_steps._can_connect_usb",
-                return_value=(False, None),
+                return_value=(False, None, None),
             ),
             patch.object(flow, "async_set_unique_id", return_value=None),
             patch.object(flow, "_abort_if_unique_id_configured"),
@@ -253,7 +253,7 @@ class TestUsbManualStep:
         with (
             patch(
                 "custom_components.escpos_printer._config_flow.usb_steps._can_connect_usb",
-                return_value=(True, None),
+                return_value=(True, None, None),
             ),
             patch.object(flow, "async_set_unique_id", return_value=None),
             patch.object(flow, "_abort_if_unique_id_configured"),
@@ -338,7 +338,7 @@ class TestUsbUniqueId:
         with (
             patch(
                 "custom_components.escpos_printer._config_flow.usb_steps._can_connect_usb",
-                return_value=(True, None),
+                return_value=(True, None, None),
             ),
             patch.object(flow, "async_set_unique_id", side_effect=capture_unique_id),
             patch.object(flow, "_abort_if_unique_id_configured"),
@@ -378,7 +378,7 @@ class TestUsbUniqueId:
         with (
             patch(
                 "custom_components.escpos_printer._config_flow.usb_steps._can_connect_usb",
-                return_value=(True, None),
+                return_value=(True, None, None),
             ),
             patch.object(flow, "async_set_unique_id", side_effect=capture_unique_id),
             patch.object(flow, "_abort_if_unique_id_configured"),
@@ -407,7 +407,7 @@ class TestUsbUniqueId:
         with (
             patch(
                 "custom_components.escpos_printer._config_flow.usb_steps._can_connect_usb",
-                return_value=(True, None),
+                return_value=(True, None, None),
             ),
             patch.object(flow, "async_set_unique_id", side_effect=capture_unique_id),
             patch.object(flow, "_abort_if_unique_id_configured"),
@@ -706,7 +706,7 @@ class TestMultipleIdenticalPrinters:
         with (
             patch(
                 "custom_components.escpos_printer._config_flow.usb_steps._can_connect_usb",
-                return_value=(True, None),
+                return_value=(True, None, None),
             ),
             patch.object(flow, "async_set_unique_id", return_value=None),
             patch.object(flow, "_abort_if_unique_id_configured"),
@@ -936,7 +936,7 @@ class TestBrowseAllUsbDevices:
         with (
             patch(
                 "custom_components.escpos_printer._config_flow.usb_steps._can_connect_usb",
-                return_value=(True, None),
+                return_value=(True, None, None),
             ),
             patch.object(flow, "async_set_unique_id", return_value=None),
             patch.object(flow, "_abort_if_unique_id_configured"),
@@ -1010,7 +1010,7 @@ class TestBrowseAllUsbDevices:
             ),
             patch(
                 "custom_components.escpos_printer._config_flow.usb_steps._can_connect_usb",
-                return_value=(False, "permission_denied"),
+                return_value=(False, "permission_denied", 13),
             ),
         ):
             result = await flow.async_step_usb_all_devices({

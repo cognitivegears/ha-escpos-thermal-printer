@@ -7,8 +7,8 @@ import pathlib
 
 try:
     import tomllib  # Python 3.11+
-except Exception:  # pragma: no cover
-    raise SystemExit("Python 3.11+ required for tomllib")
+except Exception as exc:  # pragma: no cover
+    raise SystemExit("Python 3.11+ required for tomllib") from exc
 
 from packaging.requirements import Requirement
 
@@ -40,15 +40,15 @@ def parse_uv_lock_versions() -> dict[str, str]:
     versions: dict[str, str] = {}
     current: dict[str, str] = {}
     for line in text.splitlines():
-        line = line.strip()
-        if line == "[[package]]":
+        stripped_line = line.strip()
+        if stripped_line == "[[package]]":
             current = {}
             continue
-        if line.startswith("name = "):
-            current["name"] = line.split("=", 1)[1].strip().strip('"')
+        if stripped_line.startswith("name = "):
+            current["name"] = stripped_line.split("=", 1)[1].strip().strip('"')
             continue
-        if line.startswith("version = "):
-            current["version"] = line.split("=", 1)[1].strip().strip('"')
+        if stripped_line.startswith("version = "):
+            current["version"] = stripped_line.split("=", 1)[1].strip().strip('"')
             # When we see version, we can store if name present
             if "name" in current:
                 versions[current["name"].lower()] = current["version"]
@@ -71,10 +71,10 @@ def build_manifest_requirements() -> list[str]:
         version = None
         if r.specifier and "==" in str(r.specifier):
             # Find exact equality
-            for spec in str(r.specifier).split(","):
-                spec = spec.strip()
-                if spec.startswith("=="):
-                    version = spec[2:]
+            for spec_item in str(r.specifier).split(","):
+                stripped_spec = spec_item.strip()
+                if stripped_spec.startswith("=="):
+                    version = stripped_spec[2:]
                     break
         # Fallback to uv.lock resolved version
         if not version:
@@ -112,9 +112,11 @@ def main() -> int:
                 # If desired has exact '==' pins, they must be allowed by current
                 eqs = [s.strip()[2:] for s in str(want).split(',') if s.strip().startswith('==')]
                 if eqs:
-                    for v in eqs:
-                        if v not in have:
-                            problems.append(f"{k}: manifest does not allow pinned version {v}")
+                    problems.extend(
+                        f"{k}: manifest does not allow pinned version {v}"
+                        for v in eqs
+                        if v not in have
+                    )
                 # Otherwise, accept any range in current
 
         if problems:

@@ -50,13 +50,13 @@ def _parse_vid_pid(value: int | str) -> int:
     return int(value, 10)
 
 
-def _can_connect_usb(
+def _can_connect_usb(  # noqa: PLR0911, PLR0912
     vendor_id: int,
     product_id: int,
     timeout: float,
     in_ep: int = DEFAULT_IN_EP,
     out_ep: int = DEFAULT_OUT_EP,
-) -> tuple[bool, str | None]:
+) -> tuple[bool, str | None, int | None]:
     """Test USB connectivity to a device.
 
     Args:
@@ -67,34 +67,86 @@ def _can_connect_usb(
         out_ep: USB output endpoint address
 
     Returns:
-        Tuple of (success, error_message). error_message is None on success.
+        Tuple of (success, error_message, errno). error_message and errno are None on success.
     """
+    def _get_errno(exc: Exception) -> int | None:
+        return getattr(exc, "errno", None)
+
+    def _get_kernel_driver_active() -> bool | None:
+        try:
+            import usb.core  # noqa: PLC0415
+
+            device = usb.core.find(idVendor=vendor_id, idProduct=product_id)
+            if device is None or not hasattr(device, "is_kernel_driver_active"):
+                return None
+            try:
+                return bool(device.is_kernel_driver_active(0))
+            except Exception:
+                return None
+        except Exception:
+            return None
+
+    def _is_retryable(exc: Exception) -> bool:
+        try:
+            import usb.core  # noqa: PLC0415
+
+            if isinstance(exc, usb.core.USBError):
+                return exc.errno in {5, 16, 19}  # EIO, EBUSY, ENODEV
+        except Exception:
+            pass
+        err = str(exc).lower()
+        return any(token in err for token in ("input/output error", "resource busy", "no device"))
+
     try:
         from escpos.printer import Usb  # noqa: PLC0415
 
-        printer = Usb(
-            vendor_id,
-            product_id,
-            timeout=int(timeout * 1000),
-            in_ep=in_ep,
-            out_ep=out_ep,
-        )
-        printer.close()
+        for attempt in range(3):
+            try:
+                printer = Usb(
+                    vendor_id,
+                    product_id,
+                    timeout=int(timeout * 1000),
+                    in_ep=in_ep,
+                    out_ep=out_ep,
+                )
+                printer.close()
+                break
+            except Exception as exc:
+                if attempt >= 2 or not _is_retryable(exc):
+                    raise
+                import time  # noqa: PLC0415
+
+                time.sleep(0.3)
     except PermissionError:
-        return False, "permission_denied"
+        return False, "permission_denied", None
     except FileNotFoundError:
-        return False, "device_not_found"
+        return False, "device_not_found", None
     except Exception as ex:
+        errno = _get_errno(ex)
+        kernel_driver_active = _get_kernel_driver_active()
         # Check for libusb permission errors (varies by platform)
         error_str = str(ex).lower()
-        if "access" in error_str or "permission" in error_str:
-            return False, "permission_denied"
-        if "not found" in error_str or "no backend" in error_str:
-            return False, "usb_backend_missing"
-        _LOGGER.debug("USB connection test failed: %s", ex)
-        return False, None
+        if errno == 13 or "access" in error_str or "permission" in error_str:
+            return False, "permission_denied", errno
+        if errno == 16:
+            if kernel_driver_active:
+                return False, "kernel_driver_active", errno
+            return False, "device_busy", errno
+        if errno == 19 or "not found" in error_str:
+            return False, "device_not_found", errno
+        if "no backend" in error_str:
+            return False, "usb_backend_missing", errno
+        if errno == 5 or "input/output error" in error_str:
+            return False, "io_error", errno
+        _LOGGER.debug(
+            "USB connection test failed (errno=%s kernel_driver_active=%s): %s",
+            errno,
+            kernel_driver_active,
+            ex,
+        )
+        return False, None, errno
     else:
-        return True, None
+        return True, None, None
 
 
 def _generate_usb_unique_id(
@@ -130,6 +182,9 @@ def _usb_error_to_key(error_code: str | None) -> str:
     """
     error_map = {
         "permission_denied": "usb_permission_denied",
+        "kernel_driver_active": "usb_kernel_driver_active",
+        "device_busy": "usb_device_busy",
+        "io_error": "usb_io_error",
         "device_not_found": "usb_device_not_found",
         "usb_backend_missing": "usb_backend_missing",
     }

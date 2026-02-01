@@ -65,10 +65,7 @@ def compatible(spec_py: SpecifierSet, spec_mani: SpecifierSet) -> bool:
     if not str(spec_mani):
         return True
     # Any version allowed by pyproject but not allowed by manifest => incompatible
-    for v in probes:
-        if v in spec_py and v not in spec_mani:
-            return False
-    return True
+    return all(not (v in spec_py and v not in spec_mani) for v in probes)
 
 
 def main() -> int:
@@ -80,10 +77,11 @@ def main() -> int:
         print(f"❌ Package sets differ between pyproject and manifest: {sorted(missing)}", file=sys.stderr)
         return 1
 
-    problems = []
-    for name in sorted(py.keys()):
-        if not compatible(py[name], mf[name]):
-            problems.append((name, str(py[name]), str(mf[name])))
+    problems = [
+        (name, str(py[name]), str(mf[name]))
+        for name in sorted(py.keys())
+        if not compatible(py[name], mf[name])
+    ]
 
     if problems:
         print("❌ Version specifiers incompatible:", file=sys.stderr)
@@ -97,4 +95,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -20,6 +20,9 @@ _LOGGER = logging.getLogger(__name__)
 class UsbPrinterAdapter(EscposPrinterAdapterBase):
     """Adapter for USB ESC/POS printers."""
 
+    _CONNECT_RETRIES = 2
+    _CONNECT_RETRY_DELAY_S = 0.3
+
     def __init__(self, config: UsbPrinterConfig) -> None:
         super().__init__(config)
         self._usb_config = config
@@ -35,14 +38,72 @@ class UsbPrinterAdapter(EscposPrinterAdapterBase):
         """Create and return a USB printer connection."""
         usb_class = _get_usb_printer()
         profile_obj = self._get_profile_obj()
-        return usb_class(
-            self._usb_config.vendor_id,
-            self._usb_config.product_id,
-            timeout=int(self._usb_config.timeout * 1000),  # USB timeout in milliseconds
-            in_ep=self._usb_config.in_ep,
-            out_ep=self._usb_config.out_ep,
-            profile=profile_obj,
-        )
+        def _is_retryable(exc: Exception) -> bool:
+            try:
+                import usb.core  # noqa: PLC0415
+
+                if isinstance(exc, usb.core.USBError):
+                    return exc.errno in {5, 16, 19}  # EIO, EBUSY, ENODEV
+            except Exception:
+                pass
+            err = str(exc).lower()
+            return any(token in err for token in ("input/output error", "resource busy", "no device"))
+
+        def _get_kernel_driver_active() -> bool | None:
+            try:
+                import usb.core  # noqa: PLC0415
+
+                device = usb.core.find(
+                    idVendor=self._usb_config.vendor_id,
+                    idProduct=self._usb_config.product_id,
+                )
+                if device is None or not hasattr(device, "is_kernel_driver_active"):
+                    return None
+                try:
+                    return bool(device.is_kernel_driver_active(0))
+                except Exception:
+                    return None
+            except Exception:
+                return None
+
+        last_exc: Exception | None = None
+        for attempt in range(self._CONNECT_RETRIES + 1):
+            try:
+                return usb_class(
+                    self._usb_config.vendor_id,
+                    self._usb_config.product_id,
+                    timeout=int(self._usb_config.timeout * 1000),  # USB timeout in milliseconds
+                    in_ep=self._usb_config.in_ep,
+                    out_ep=self._usb_config.out_ep,
+                    profile=profile_obj,
+                )
+            except Exception as exc:
+                last_exc = exc
+                kernel_driver_active = _get_kernel_driver_active()
+                errno = getattr(exc, "errno", None)
+                self._last_error_errno = errno
+                _LOGGER.debug(
+                    "USB open failed for %04X:%04X (attempt %s/%s errno=%s kernel_driver_active=%s): %s",
+                    self._usb_config.vendor_id,
+                    self._usb_config.product_id,
+                    attempt + 1,
+                    self._CONNECT_RETRIES + 1,
+                    errno,
+                    kernel_driver_active,
+                    sanitize_log_message(str(exc)),
+                )
+                if attempt >= self._CONNECT_RETRIES or not _is_retryable(exc):
+                    _LOGGER.warning(
+                        "USB open failed for %04X:%04X (errno=%s kernel_driver_active=%s): %s",
+                        self._usb_config.vendor_id,
+                        self._usb_config.product_id,
+                        errno,
+                        kernel_driver_active,
+                        sanitize_log_message(str(exc)),
+                    )
+                    raise
+                time.sleep(self._CONNECT_RETRY_DELAY_S)
+        raise last_exc  # pragma: no cover
 
     async def _status_check(self, hass: HomeAssistant) -> None:
         """Check USB device availability via device enumeration."""
@@ -71,6 +132,7 @@ class UsbPrinterAdapter(EscposPrinterAdapterBase):
         if ok:
             self._last_ok = now
             self._last_error_reason = None
+            self._last_error_errno = None
         else:
             self._last_error = now
             self._last_error_reason = sanitize_log_message(err or "USB device unavailable")
