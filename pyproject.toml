@@ -28,7 +28,7 @@ include = ["custom_components*", "scripts*"]
 # `pip install -e .[dev,security]`
 dev = [
     "pytest==9.0.0",
-    "pytest-homeassistant-custom-component==0.13.308",
+    "pytest-homeassistant-custom-component==0.13.310",
     "mypy==1.19.1",
     "ruff==0.14.14",
     "pre-commit==4.5.1",
@@ -262,7 +262,7 @@ output = "coverage.json"
 [dependency-groups]
 dev = [
     "pytest==9.0.0",
-    "pytest-homeassistant-custom-component==0.13.308",
+    "pytest-homeassistant-custom-component==0.13.310",
     "mypy==1.19.1",
     "ruff==0.14.14",
     "pre-commit==4.5.1",
