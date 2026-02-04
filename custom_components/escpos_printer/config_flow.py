@@ -101,7 +101,15 @@ class EscposConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         # Get available CUPS printers from the configured server
-        available_printers = await self.hass.async_add_executor_job(get_cups_printers, self._cups_server)
+        try:
+            available_printers = await self.hass.async_add_executor_job(get_cups_printers, self._cups_server)
+        except Exception as e:
+            _LOGGER.warning("Failed to enumerate CUPS printers: %s", e)
+            available_printers = []
+
+        if not available_printers and user_input is None:
+            _LOGGER.warning("No printers found on CUPS server '%s'", self._cups_server or "localhost")
+            errors["base"] = "no_printers"
 
         if user_input is not None:
             _LOGGER.debug("Config flow printer step input: %s", user_input)

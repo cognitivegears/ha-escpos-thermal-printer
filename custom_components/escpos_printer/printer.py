@@ -92,8 +92,9 @@ def _get_cups_connection(server: str | None = None) -> Any:
     """
     import cups  # noqa: PLC0415
 
-    if server:
-        cups.setServer(server)
+    # Always explicitly set the server to avoid stale global state from previous calls.
+    # pycups stores the server globally, so we must reset it every time.
+    cups.setServer(server or "")
     return cups.Connection()
 
 

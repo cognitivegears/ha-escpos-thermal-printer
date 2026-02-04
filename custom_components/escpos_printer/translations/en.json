@@ -76,6 +76,7 @@
     "error": {
       "cannot_connect": "CUPS printer not available.",
       "cups_unavailable": "CUPS server not available. Please check the server address and ensure CUPS is running.",
+      "no_printers": "No printers found on the CUPS server. Please check that printers are configured in CUPS.",
       "already_configured": "This printer is already configured.",
       "invalid_profile": "Invalid printer profile name.",
       "invalid_codepage": "Invalid codepage/encoding.",
