@@ -3,18 +3,26 @@
   "config": {
     "step": {
       "user": {
-        "title": "Configure printer connection",
-        "description": "Enter the connection details for your ESC/POS network printer.",
+        "title": "Configure CUPS server",
+        "description": "Enter the CUPS server address. Leave empty for localhost.",
         "data": {
-          "host": "Host",
-          "port": "Port",
+          "cups_server": "CUPS Server"
+        },
+        "data_description": {
+          "cups_server": "CUPS server address (e.g., 'printserver.local' or '192.168.1.100'). Leave empty to use localhost."
+        }
+      },
+      "printer": {
+        "title": "Select printer",
+        "description": "Select your ESC/POS printer from the available CUPS printers.",
+        "data": {
+          "printer_name": "CUPS Printer",
           "timeout": "Timeout (seconds)",
           "profile": "Printer profile"
         },
         "data_description": {
-          "host": "IP address or hostname of the printer.",
-          "port": "Network port (usually 9100).",
-          "timeout": "Connection timeout in seconds.",
+          "printer_name": "Select the CUPS printer to use.",
+          "timeout": "Operation timeout in seconds.",
           "profile": "Select your printer model or Auto-detect. Choose 'Custom' to enter a profile name manually."
         }
       },
@@ -66,7 +74,9 @@
       }
     },
     "error": {
-      "cannot_connect": "Failed to connect to printer.",
+      "cannot_connect": "CUPS printer not available.",
+      "cups_unavailable": "CUPS printing system is not available. Please ensure CUPS is installed and running.",
+      "no_printers": "No printers found on the CUPS server. Please check that printers are configured in CUPS.",
       "already_configured": "This printer is already configured.",
       "invalid_profile": "Invalid printer profile name.",
       "invalid_codepage": "Invalid codepage/encoding.",
@@ -89,13 +99,13 @@
           "status_interval": "Status check interval (seconds)"
         },
         "data_description": {
-          "timeout": "Connection timeout in seconds.",
+          "timeout": "Operation timeout in seconds.",
           "profile": "Select your printer model. Changing this will reset encoding options.",
           "codepage": "Character encoding/codepage for text.",
           "line_width": "Number of characters per line (columns).",
           "default_align": "Default text alignment for printing.",
           "default_cut": "Default paper cut mode after printing.",
-          "keepalive": "Keep the connection open between print jobs.",
+          "keepalive": "Keep the CUPS connection open between print jobs.",
           "status_interval": "How often to check printer status (0 to disable)."
         }
       },

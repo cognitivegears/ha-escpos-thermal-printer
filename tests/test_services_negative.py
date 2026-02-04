@@ -3,18 +3,18 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.escpos_printer.const import DOMAIN
+from custom_components.escpos_printer.const import CONF_PRINTER_NAME, DOMAIN
 
 
 async def _setup_entry(hass):  # type: ignore[no-untyped-def]
     entry = MockConfigEntry(
         domain=DOMAIN,
-        title="1.2.3.4:9100",
-        data={"host": "1.2.3.4", "port": 9100},
-        unique_id="1.2.3.4:9100",
+        title="TestPrinter",
+        data={CONF_PRINTER_NAME: "TestPrinter"},
+        unique_id="cups_TestPrinter",
     )
     entry.add_to_hass(hass)
-    with patch("escpos.printer.Network"):
+    with patch("escpos.printer.Dummy"):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
     return entry
@@ -25,7 +25,7 @@ async def test_print_text_service_raises_homeassistanterror(hass, caplog):  # ty
 
     fake = MagicMock()
     fake.text.side_effect = RuntimeError("boom")
-    with patch("escpos.printer.Network", return_value=fake), pytest.raises(Exception):
+    with patch("escpos.printer.Dummy", return_value=fake), pytest.raises(Exception):
         # HomeAssistantError bubbles up from service call
         await hass.services.async_call(
             DOMAIN,
@@ -40,7 +40,7 @@ async def test_print_text_service_raises_homeassistanterror(hass, caplog):  # ty
 async def test_print_image_service_bad_path(hass, caplog):  # type: ignore[no-untyped-def]
     await _setup_entry(hass)
     fake = MagicMock()
-    with patch("escpos.printer.Network", return_value=fake), pytest.raises(Exception):
+    with patch("escpos.printer.Dummy", return_value=fake), pytest.raises(Exception):
         await hass.services.async_call(
             DOMAIN,
             "print_image",
@@ -53,7 +53,7 @@ async def test_print_image_service_bad_path(hass, caplog):  # type: ignore[no-un
 async def test_cut_invalid_mode_logs_warning(hass, caplog):  # type: ignore[no-untyped-def]
     await _setup_entry(hass)
     fake = MagicMock()
-    with patch("escpos.printer.Network", return_value=fake):
+    with patch("escpos.printer.Dummy", return_value=fake):
         await hass.services.async_call(
             DOMAIN,
             "cut",
@@ -68,7 +68,7 @@ async def test_cut_invalid_mode_logs_warning(hass, caplog):  # type: ignore[no-u
 async def test_feed_clamps_and_executes(hass, caplog):  # type: ignore[no-untyped-def]
     await _setup_entry(hass)
     fake = MagicMock()
-    with patch("escpos.printer.Network", return_value=fake):
+    with patch("escpos.printer.Dummy", return_value=fake):
         await hass.services.async_call(
             DOMAIN,
             "feed",

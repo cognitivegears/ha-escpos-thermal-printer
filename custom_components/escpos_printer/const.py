@@ -1,8 +1,8 @@
 DOMAIN = "escpos_printer"
 
 # Configuration keys
-CONF_HOST = "host"
-CONF_PORT = "port"
+CONF_CUPS_SERVER = "cups_server"
+CONF_PRINTER_NAME = "printer_name"
 CONF_TIMEOUT = "timeout"
 CONF_CODEPAGE = "codepage"
 CONF_DEFAULT_ALIGN = "default_align"
@@ -13,7 +13,6 @@ CONF_PROFILE = "profile"
 CONF_LINE_WIDTH = "line_width"
 
 # Default values
-DEFAULT_PORT = 9100
 DEFAULT_TIMEOUT = 4.0
 DEFAULT_ALIGN = "left"
 DEFAULT_CUT = "none"

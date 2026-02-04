@@ -88,7 +88,14 @@ async def _async_get_target_entries(
 
     # If no device_id specified, fall back to all configured printers
     if not device_id_list:
-        all_entries = list(hass.config_entries.async_loaded_entries(DOMAIN))
+        # async_loaded_entries is available in HA 2024.8+; fall back to async_entries
+        if hasattr(hass.config_entries, "async_loaded_entries"):
+            all_entries = list(hass.config_entries.async_loaded_entries(DOMAIN))
+        else:
+            all_entries = [
+                e for e in hass.config_entries.async_entries(DOMAIN)
+                if e.state.name == "LOADED"  # type: ignore[union-attr]
+            ]
         if not all_entries:
             raise ServiceValidationError(
                 "No valid ESC/POS printer targets found. Please select a printer device.",
@@ -115,9 +122,16 @@ async def _async_get_target_entries(
                 target_entry_ids.add(config_entry_id)
 
     # Get the actual config entry objects
+    if hasattr(hass.config_entries, "async_loaded_entries"):
+        loaded_entries = list(hass.config_entries.async_loaded_entries(DOMAIN))
+    else:
+        loaded_entries = [
+            e for e in hass.config_entries.async_entries(DOMAIN)
+            if e.state.name == "LOADED"  # type: ignore[union-attr]
+        ]
     target_entries: list[ConfigEntry] = [
         loaded_entry
-        for loaded_entry in hass.config_entries.async_loaded_entries(DOMAIN)
+        for loaded_entry in loaded_entries
         if loaded_entry.entry_id in target_entry_ids
     ]
 

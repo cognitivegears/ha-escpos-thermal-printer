@@ -14,33 +14,55 @@ def auto_enable_custom_integrations(enable_custom_integrations: Any) -> None:
 
 @pytest.fixture(autouse=True)
 def fake_escpos_module(request: Any) -> Generator[None, None, None]:
-    # Do not stub escpos for integration tests; use real network path
+    # Do not stub escpos for integration tests; use real CUPS path
     if request.node.get_closest_marker("integration"):
         yield
         return
     escpos = types.ModuleType("escpos")
     printer = types.ModuleType("escpos.printer")
 
-    class _FakeNetwork:
+    class _FakeDummyPrinter:
+        """Fake Dummy printer that collects ESC/POS commands."""
+
         def __init__(self, *_, **__):  # type: ignore[no-untyped-def]
-            pass
+            self._buffer = b""
+
+        @property
+        def output(self) -> bytes:
+            """Return accumulated ESC/POS data."""
+            return self._buffer
 
         def set(self, *_: Any, **__: Any) -> None:
-            pass
+            self._buffer += b"\x1b@"  # ESC @ (initialize)
 
-        def text(self, *_: Any, **__: Any) -> None:
-            pass
+        def text(self, text: str = "", *_: Any, **__: Any) -> None:
+            self._buffer += text.encode("utf-8", errors="replace")
 
         def qr(self, *_: Any, **__: Any) -> None:
-            pass
+            self._buffer += b"\x1dQR"  # Fake QR command
 
         def image(self, *_: Any, **__: Any) -> None:
-            pass
+            self._buffer += b"\x1dIMG"  # Fake image command
 
         def control(self, *_: Any, **__: Any) -> None:
-            pass
+            self._buffer += b"\n"
 
         def cut(self, *_: Any, **__: Any) -> None:
+            self._buffer += b"\x1dV"  # ESC/POS cut
+
+        def ln(self, lines: int = 1) -> None:
+            self._buffer += b"\n" * lines
+
+        def barcode(self, *_: Any, **__: Any) -> None:
+            self._buffer += b"\x1dBC"  # Fake barcode
+
+        def buzzer(self, *_: Any, **__: Any) -> None:
+            self._buffer += b"\x1bBZ"  # Fake buzzer
+
+        def beep(self, *_: Any, **__: Any) -> None:
+            self._buffer += b"\x1bBZ"  # Fake buzzer
+
+        def charcode(self, *_: Any, **__: Any) -> None:
             pass
 
         def close(self) -> None:
@@ -49,14 +71,54 @@ def fake_escpos_module(request: Any) -> Generator[None, None, None]:
         def _set_codepage(self, *_, **__):  # type: ignore[no-untyped-def]
             pass
 
-        def _raw(self, *_, **__):  # type: ignore[no-untyped-def]
-            pass
+        def _raw(self, data: bytes = b"", *_, **__):  # type: ignore[no-untyped-def]
+            self._buffer += data
 
-    printer.Network = _FakeNetwork  # type: ignore[attr-defined]
+    # Keep CupsPrinter for backwards compatibility in tests
+    printer.CupsPrinter = _FakeDummyPrinter  # type: ignore[attr-defined]
+    printer.Dummy = _FakeDummyPrinter  # type: ignore[attr-defined]
     escpos.printer = printer  # type: ignore[attr-defined]
 
     sys.modules.setdefault("escpos", escpos)
     sys.modules.setdefault("escpos.printer", printer)
+    yield
+
+
+@pytest.fixture(autouse=True)
+def fake_cups_module(request: Any) -> Generator[None, None, None]:
+    """Provide a fake cups module for unit tests."""
+    if request.node.get_closest_marker("integration"):
+        yield
+        return
+
+    cups = types.ModuleType("cups")
+
+    class _FakeConnection:
+        _job_counter = 0
+
+        def __init__(self, *_, **__):  # type: ignore[no-untyped-def]
+            pass
+
+        def getPrinters(self) -> dict[str, dict[str, Any]]:
+            return {
+                "TestPrinter": {
+                    "printer-state": 3,  # idle
+                    "printer-state-reasons": ["none"],
+                }
+            }
+
+        def printFile(self, printer: str, filename: str, title: str, options: dict[str, str]) -> int:
+            """Fake printFile that returns a job ID."""
+            _FakeConnection._job_counter += 1
+            return _FakeConnection._job_counter
+
+    def _setServer(server: str) -> None:
+        """Fake setServer function."""
+        pass
+
+    cups.Connection = _FakeConnection  # type: ignore[attr-defined]
+    cups.setServer = _setServer  # type: ignore[attr-defined]
+    sys.modules.setdefault("cups", cups)
     yield
 
 

@@ -2,13 +2,12 @@
 
 from unittest.mock import patch
 
-from homeassistant.const import CONF_HOST, CONF_PORT
-
 from custom_components.escpos_printer.const import (
     CONF_CODEPAGE,
     CONF_DEFAULT_ALIGN,
     CONF_DEFAULT_CUT,
     CONF_LINE_WIDTH,
+    CONF_PRINTER_NAME,
     CONF_PROFILE,
     DEFAULT_LINE_WIDTH,
     DOMAIN,
@@ -17,10 +16,17 @@ from custom_components.escpos_printer.const import (
 
 async def test_config_flow_success(hass):  # type: ignore[no-untyped-def]
     """Test successful two-step config flow."""
-    with patch(
-        "custom_components.escpos_printer.config_flow._can_connect", return_value=True
+    with (
+        patch(
+            "custom_components.escpos_printer.config_flow.get_cups_printers",
+            return_value=["TestPrinter", "OtherPrinter"],
+        ),
+        patch(
+            "custom_components.escpos_printer.config_flow.is_cups_printer_available",
+            return_value=True,
+        ),
     ):
-        # Step 1: User step - connection details and profile
+        # Step 1: User step - CUPS printer selection and profile
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": "user"}
         )
@@ -29,7 +35,7 @@ async def test_config_flow_success(hass):  # type: ignore[no-untyped-def]
 
         result2 = await hass.config_entries.flow.async_configure(
             result["flow_id"],
-            {CONF_HOST: "1.2.3.4", CONF_PORT: 9100},
+            {CONF_PRINTER_NAME: "TestPrinter"},
         )
 
         # Should move to codepage step
@@ -49,8 +55,7 @@ async def test_config_flow_success(hass):  # type: ignore[no-untyped-def]
 
         # Should create entry
         assert result3["type"] == "create_entry"
-        assert result3["data"][CONF_HOST] == "1.2.3.4"
-        assert result3["data"][CONF_PORT] == 9100
+        assert result3["data"][CONF_PRINTER_NAME] == "TestPrinter"
         assert result3["data"].get(CONF_PROFILE) == ""  # Auto-detect default
         assert result3["data"].get(CONF_CODEPAGE) == ""
         assert result3["data"].get(CONF_LINE_WIDTH) == DEFAULT_LINE_WIDTH
@@ -58,8 +63,15 @@ async def test_config_flow_success(hass):  # type: ignore[no-untyped-def]
 
 async def test_config_flow_connection_failure(hass):  # type: ignore[no-untyped-def]
     """Test config flow with connection failure."""
-    with patch(
-        "custom_components.escpos_printer.config_flow._can_connect", return_value=False
+    with (
+        patch(
+            "custom_components.escpos_printer.config_flow.get_cups_printers",
+            return_value=["TestPrinter"],
+        ),
+        patch(
+            "custom_components.escpos_printer.config_flow.is_cups_printer_available",
+            return_value=False,
+        ),
     ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": "user"}
@@ -69,7 +81,7 @@ async def test_config_flow_connection_failure(hass):  # type: ignore[no-untyped-
 
         result2 = await hass.config_entries.flow.async_configure(
             result["flow_id"],
-            {CONF_HOST: "1.2.3.4", CONF_PORT: 9100},
+            {CONF_PRINTER_NAME: "TestPrinter"},
         )
 
         # Should show form again with error
@@ -80,8 +92,15 @@ async def test_config_flow_connection_failure(hass):  # type: ignore[no-untyped-
 
 async def test_config_flow_with_profile_selection(hass):  # type: ignore[no-untyped-def]
     """Test config flow with profile selection."""
-    with patch(
-        "custom_components.escpos_printer.config_flow._can_connect", return_value=True
+    with (
+        patch(
+            "custom_components.escpos_printer.config_flow.get_cups_printers",
+            return_value=["TestPrinter"],
+        ),
+        patch(
+            "custom_components.escpos_printer.config_flow.is_cups_printer_available",
+            return_value=True,
+        ),
     ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": "user"}
@@ -90,7 +109,7 @@ async def test_config_flow_with_profile_selection(hass):  # type: ignore[no-unty
         # Configure with a profile (using fallback 'default' profile)
         result2 = await hass.config_entries.flow.async_configure(
             result["flow_id"],
-            {CONF_HOST: "1.2.3.4", CONF_PORT: 9100, CONF_PROFILE: "default"},
+            {CONF_PRINTER_NAME: "TestPrinter", CONF_PROFILE: "default"},
         )
 
         assert result2["type"] == "form"
@@ -119,7 +138,12 @@ async def test_config_flow_custom_profile(hass):  # type: ignore[no-untyped-def]
     """Test config flow with custom profile entry."""
     with (
         patch(
-            "custom_components.escpos_printer.config_flow._can_connect", return_value=True
+            "custom_components.escpos_printer.config_flow.get_cups_printers",
+            return_value=["TestPrinter"],
+        ),
+        patch(
+            "custom_components.escpos_printer.config_flow.is_cups_printer_available",
+            return_value=True,
         ),
         patch(
             "custom_components.escpos_printer.config_flow.is_valid_profile", return_value=True
@@ -132,7 +156,7 @@ async def test_config_flow_custom_profile(hass):  # type: ignore[no-untyped-def]
         # Select custom profile
         result2 = await hass.config_entries.flow.async_configure(
             result["flow_id"],
-            {CONF_HOST: "1.2.3.4", CONF_PORT: 9100, CONF_PROFILE: "__custom__"},
+            {CONF_PRINTER_NAME: "TestPrinter", CONF_PROFILE: "__custom__"},
         )
 
         # Should show custom profile form
@@ -168,7 +192,12 @@ async def test_config_flow_custom_codepage(hass):  # type: ignore[no-untyped-def
     """Test config flow with custom codepage entry."""
     with (
         patch(
-            "custom_components.escpos_printer.config_flow._can_connect", return_value=True
+            "custom_components.escpos_printer.config_flow.get_cups_printers",
+            return_value=["TestPrinter"],
+        ),
+        patch(
+            "custom_components.escpos_printer.config_flow.is_cups_printer_available",
+            return_value=True,
         ),
         patch(
             "custom_components.escpos_printer.config_flow.is_valid_codepage_for_profile",
@@ -181,7 +210,7 @@ async def test_config_flow_custom_codepage(hass):  # type: ignore[no-untyped-def
 
         result2 = await hass.config_entries.flow.async_configure(
             result["flow_id"],
-            {CONF_HOST: "1.2.3.4", CONF_PORT: 9100},
+            {CONF_PRINTER_NAME: "TestPrinter"},
         )
 
         # Select custom codepage
@@ -211,8 +240,15 @@ async def test_config_flow_custom_codepage(hass):  # type: ignore[no-untyped-def
 
 async def test_config_flow_custom_line_width(hass):  # type: ignore[no-untyped-def]
     """Test config flow with custom line width entry."""
-    with patch(
-        "custom_components.escpos_printer.config_flow._can_connect", return_value=True
+    with (
+        patch(
+            "custom_components.escpos_printer.config_flow.get_cups_printers",
+            return_value=["TestPrinter"],
+        ),
+        patch(
+            "custom_components.escpos_printer.config_flow.is_cups_printer_available",
+            return_value=True,
+        ),
     ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": "user"}
@@ -220,7 +256,7 @@ async def test_config_flow_custom_line_width(hass):  # type: ignore[no-untyped-d
 
         result2 = await hass.config_entries.flow.async_configure(
             result["flow_id"],
-            {CONF_HOST: "1.2.3.4", CONF_PORT: 9100},
+            {CONF_PRINTER_NAME: "TestPrinter"},
         )
 
         # Select custom line width

@@ -39,7 +39,7 @@ class FakePrinterRejectFS(FakePrinterAcceptFS):
 async def test_barcode_passes_force_software(monkeypatch: Any) -> None:
     created: list[FakePrinterAcceptFS] = []
 
-    def fake_network() -> Any:
+    def fake_cups() -> Any:
         def _factory(*args: Any, **kwargs: Any) -> FakePrinterAcceptFS:
             inst = FakePrinterAcceptFS()
             created.append(inst)
@@ -48,9 +48,9 @@ async def test_barcode_passes_force_software(monkeypatch: Any) -> None:
 
     from custom_components.escpos_printer import printer as printer_mod
 
-    monkeypatch.setattr(printer_mod, "_get_network_printer", fake_network)
+    monkeypatch.setattr(printer_mod, "_get_cups_printer", fake_cups)
 
-    adapter = EscposPrinterAdapter(PrinterConfig(host="127.0.0.1", port=9100))
+    adapter = EscposPrinterAdapter(PrinterConfig(printer_name="TestPrinter"))
     hass = HassStub()
 
     await adapter.print_barcode(
@@ -76,7 +76,7 @@ async def test_barcode_passes_force_software(monkeypatch: Any) -> None:
 async def test_barcode_retries_without_force_software(monkeypatch: Any) -> None:
     created: list[FakePrinterRejectFS] = []
 
-    def fake_network() -> Any:
+    def fake_cups() -> Any:
         def _factory(*args: Any, **kwargs: Any) -> FakePrinterRejectFS:
             inst = FakePrinterRejectFS()
             created.append(inst)
@@ -85,9 +85,9 @@ async def test_barcode_retries_without_force_software(monkeypatch: Any) -> None:
 
     from custom_components.escpos_printer import printer as printer_mod
 
-    monkeypatch.setattr(printer_mod, "_get_network_printer", fake_network)
+    monkeypatch.setattr(printer_mod, "_get_cups_printer", fake_cups)
 
-    adapter = EscposPrinterAdapter(PrinterConfig(host="127.0.0.1", port=9100))
+    adapter = EscposPrinterAdapter(PrinterConfig(printer_name="TestPrinter"))
     hass = HassStub()
 
     await adapter.print_barcode(

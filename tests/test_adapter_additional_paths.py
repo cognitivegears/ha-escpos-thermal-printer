@@ -3,18 +3,18 @@ from unittest.mock import MagicMock, patch
 from PIL import Image
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.escpos_printer.const import DOMAIN
+from custom_components.escpos_printer.const import CONF_PRINTER_NAME, DOMAIN
 
 
 async def _setup_entry(hass):  # type: ignore[no-untyped-def]
     entry = MockConfigEntry(
         domain=DOMAIN,
-        title="1.2.3.4:9100",
-        data={"host": "1.2.3.4", "port": 9100},
-        unique_id="1.2.3.4:9100",
+        title="TestPrinter",
+        data={CONF_PRINTER_NAME: "TestPrinter"},
+        unique_id="cups_TestPrinter",
     )
     entry.add_to_hass(hass)
-    with patch("escpos.printer.Network"):
+    with patch("escpos.printer.Dummy"):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
     return entry
@@ -29,7 +29,7 @@ async def test_print_image_resizes_large_local_image(hass, tmp_path, caplog):  #
     img.save(img_path)
 
     fake = MagicMock()
-    with patch("escpos.printer.Network", return_value=fake):
+    with patch("escpos.printer.Dummy", return_value=fake):
         await hass.services.async_call(
             DOMAIN,
             "print_image",
@@ -46,7 +46,7 @@ async def test_beep_success_branch(hass, caplog):  # type: ignore[no-untyped-def
     fake = MagicMock()
     # Provide buzzer attribute to go through success path
     fake.buzzer = MagicMock()
-    with patch("escpos.printer.Network", return_value=fake):
+    with patch("escpos.printer.Dummy", return_value=fake):
         await hass.services.async_call(DOMAIN, "beep", {"times": 2, "duration": 3}, blocking=True)
     fake.buzzer.assert_called()
     assert any("beep begin" in rec.message for rec in caplog.records)

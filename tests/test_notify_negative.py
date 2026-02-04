@@ -5,18 +5,18 @@ from homeassistant.helpers import entity_registry as er
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.escpos_printer.const import DOMAIN
+from custom_components.escpos_printer.const import CONF_PRINTER_NAME, DOMAIN
 
 
 async def _setup_notify(hass):  # type: ignore[no-untyped-def]
     entry = MockConfigEntry(
         domain=DOMAIN,
-        title="1.2.3.4:9100",
-        data={"host": "1.2.3.4", "port": 9100},
-        unique_id="1.2.3.4:9100",
+        title="TestPrinter",
+        data={CONF_PRINTER_NAME: "TestPrinter"},
+        unique_id="cups_TestPrinter",
     )
     entry.add_to_hass(hass)
-    with patch("escpos.printer.Network"):
+    with patch("escpos.printer.Dummy"):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
     registry = er.async_get(hass)
@@ -30,7 +30,7 @@ async def test_notify_error_bubbles_as_exception(hass, caplog):  # type: ignore[
 
     fake = MagicMock()
     fake.text.side_effect = RuntimeError("bad printer")
-    with patch("escpos.printer.Network", return_value=fake), pytest.raises(Exception):
+    with patch("escpos.printer.Dummy", return_value=fake), pytest.raises(Exception):
         await hass.services.async_call(
             NOTIFY_DOMAIN,
             "send_message",
@@ -43,7 +43,7 @@ async def test_notify_error_bubbles_as_exception(hass, caplog):  # type: ignore[
 async def test_notify_handles_title_and_message(hass):  # type: ignore[no-untyped-def]
     entity_id = await _setup_notify(hass)
     fake = MagicMock()
-    with patch("escpos.printer.Network", return_value=fake):
+    with patch("escpos.printer.Dummy", return_value=fake):
         await hass.services.async_call(
             NOTIFY_DOMAIN,
             "send_message",

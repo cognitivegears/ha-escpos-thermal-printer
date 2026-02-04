@@ -4,19 +4,19 @@ from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant
 
 from .const import (
     CONF_CODEPAGE,
     CONF_KEEPALIVE,
     CONF_LINE_WIDTH,
+    CONF_PRINTER_NAME,
     CONF_PROFILE,
     CONF_STATUS_INTERVAL,
     DOMAIN,
 )
 
-TO_REDACT = {CONF_HOST}
+TO_REDACT: set[str] = set()
 
 
 async def async_get_config_entry_diagnostics(
@@ -40,8 +40,7 @@ async def async_get_config_entry_diagnostics(
             "profile": config.profile if config else None,
             "codepage": config.codepage if config else None,
             "line_width": config.line_width if config else None,
-            "host": config.host if config else None,
-            "port": config.port if config else None,
+            "printer_name": config.printer_name if config else None,
             "keepalive": getattr(adapter, "_keepalive", None),
             "status_interval": getattr(adapter, "_status_interval", None),
         }
@@ -50,8 +49,7 @@ async def async_get_config_entry_diagnostics(
         "entry": {
             "title": entry.title,
             "data": {
-                CONF_HOST: data.get(CONF_HOST),
-                CONF_PORT: data.get(CONF_PORT),
+                CONF_PRINTER_NAME: data.get(CONF_PRINTER_NAME),
                 CONF_CODEPAGE: data.get(CONF_CODEPAGE),
                 CONF_PROFILE: data.get(CONF_PROFILE),
                 CONF_LINE_WIDTH: data.get(CONF_LINE_WIDTH),
