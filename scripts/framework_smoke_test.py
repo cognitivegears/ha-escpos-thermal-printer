@@ -41,13 +41,13 @@ class FrameworkTester:
     async def test_virtual_printer_emulator(self) -> None:
         """Test virtual printer emulator functionality."""
         try:
-            from tests.integration_tests.emulator.command_parser import EscposCommandParser
-            from tests.integration_tests.emulator.printer_state import PrinterState
-            from tests.integration_tests.emulator.virtual_printer import VirtualPrinter
-            from tests.integration_tests.fixtures.mock_data_generator import MockDataGenerator
+            from tests.integration_tests.emulator.command_parser import EscposCommandParser  # noqa: PLC0415,I001
+            from tests.integration_tests.emulator.printer_state import PrinterState  # noqa: PLC0415
+            from tests.integration_tests.emulator.virtual_printer import VirtualPrinter  # noqa: PLC0415
+            from tests.integration_tests.fixtures.mock_data_generator import MockDataGenerator  # noqa: PLC0415
 
             # Test basic instantiation
-            printer = VirtualPrinter(host='127.0.0.1', port=9100)
+            _ = VirtualPrinter(host='127.0.0.1', port=9100)
             self.log_result("Virtual printer creation", True)
 
             # Test printer state
@@ -76,7 +76,7 @@ class FrameworkTester:
     async def test_printer_server_functionality(self) -> None:
         """Test virtual printer server functionality."""
         try:
-            from tests.integration_tests.emulator.virtual_printer import VirtualPrinterServer
+            from tests.integration_tests.emulator.virtual_printer import VirtualPrinterServer  # noqa: PLC0415,I001
 
             # Create server instance
             server = VirtualPrinterServer(host='127.0.0.1', port=9101)
@@ -95,10 +95,10 @@ class FrameworkTester:
     async def test_test_utilities(self) -> None:
         """Test test utilities and verification tools."""
         try:
-            from datetime import datetime
+            from datetime import datetime  # noqa: PLC0415,I001
 
-            from tests.integration_tests.emulator.printer_state import Command
-            from tests.integration_tests.fixtures.verification_utils import VerificationUtilities
+            from tests.integration_tests.emulator.printer_state import Command  # noqa: PLC0415
+            from tests.integration_tests.fixtures.verification_utils import VerificationUtilities  # noqa: PLC0415
 
             # Test verification utilities
             mock_command = Command(
@@ -159,8 +159,8 @@ class FrameworkTester:
 
             # Test lazy HA environment access
             try:
-                from tests.integration_tests import get_ha_environment
-                ha_func = get_ha_environment()
+                from tests.integration_tests import get_ha_environment  # noqa: PLC0415
+                _ = get_ha_environment()
                 self.log_result("HA environment lazy loading", True)
             except Exception:
                 # HA environment import failure is expected without HA deps

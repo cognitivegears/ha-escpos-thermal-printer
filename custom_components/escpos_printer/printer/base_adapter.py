@@ -65,6 +65,7 @@ class EscposPrinterAdapterBase(
         self._last_error: Any = None
         self._last_latency_ms: int | None = None
         self._last_error_reason: str | None = None
+        self._last_error_errno: int | None = None
 
     @property
     def config(self) -> BasePrinterConfig:
@@ -148,7 +149,26 @@ class EscposPrinterAdapterBase(
             "last_error": _iso(self._last_error),
             "last_latency_ms": self._last_latency_ms,
             "last_error_reason": self._last_error_reason,
+            "last_error_errno": self._last_error_errno,
         }
+
+    async def _acquire_printer(self, hass: HomeAssistant) -> tuple[Any, bool]:
+        """Return a printer instance and whether it should be closed by the caller."""
+        if self._keepalive and self._printer is not None:
+            return self._printer, False
+        printer = await hass.async_add_executor_job(self._connect)
+        return printer, True
+
+    async def _release_printer(self, hass: HomeAssistant, printer: Any, *, owned: bool) -> None:
+        """Close a printer instance if owned by the caller."""
+        if not owned:
+            return
+
+        def _close() -> None:
+            with contextlib.suppress(Exception):
+                printer.close()
+
+        await hass.async_add_executor_job(_close)
 
     def _notify_status_change(self, ok: bool) -> None:
         """Notify all status listeners of a status change."""
@@ -239,6 +259,7 @@ class EscposPrinterAdapterBase(
         self._status = True
         self._last_ok = now
         self._last_check = now
+        self._last_error_errno = None
         for cb in list(self._status_listeners):
             with contextlib.suppress(Exception):
                 cb(True)

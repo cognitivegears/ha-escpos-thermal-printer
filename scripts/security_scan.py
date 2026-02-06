@@ -38,7 +38,7 @@ class SecurityScanner:
                 print(f"\n🔍 Running {description}...")
                 print(f"Command: {' '.join(cmd)}")
 
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: S603
                 cmd,
                 cwd=self.project_root,
                 capture_output=not self.verbose,
@@ -73,7 +73,7 @@ class SecurityScanner:
             try:
                 if self.verbose:
                     print(f"Probing tool command: {' '.join(base)} --version")
-                result = subprocess.run(
+                result = subprocess.run(  # noqa: S603
                     [*base, "--version"], capture_output=True, check=True, text=True
                 )
                 if result.returncode == 0:
@@ -89,7 +89,7 @@ class SecurityScanner:
                 try:
                     if self.verbose:
                         print(f"'--version' failed for {' '.join(base)}; trying --help")
-                    help_res = subprocess.run(
+                    help_res = subprocess.run(  # noqa: S603
                         [*base, "--help"], capture_output=True, check=True, text=True
                     )
                     if help_res.returncode == 0:
@@ -250,9 +250,7 @@ Generated: {Path(__file__).name}
             self.audit_dependencies,
         ]
 
-        results = []
-        for scan in scans:
-            results.append(scan())
+        results = [scan() for scan in scans]
 
         self.generate_report()
 

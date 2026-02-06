@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -30,6 +29,14 @@ class ControlOperationsMixin:
 
     def _connect(self) -> Any:
         """Create and return a printer connection (abstract in base)."""
+        raise NotImplementedError
+
+    async def _acquire_printer(self, hass: Any) -> tuple[Any, bool]:
+        """Return a printer instance and whether it should be closed by the caller."""
+        raise NotImplementedError
+
+    async def _release_printer(self, hass: Any, printer: Any, *, owned: bool) -> None:
+        """Close a printer instance if owned by the caller."""
         raise NotImplementedError
 
     async def feed(self, hass: HomeAssistant, *, lines: int) -> None:
@@ -61,13 +68,11 @@ class ControlOperationsMixin:
                         printer.text("\n")
 
         async with self._lock:
-            printer = self._printer if self._keepalive and self._printer is not None else self._connect()
+            printer, owned = await self._acquire_printer(hass)
             try:
                 await hass.async_add_executor_job(_feed_inner, printer)
             finally:
-                if not self._keepalive:
-                    with contextlib.suppress(Exception):
-                        printer.close()
+                await self._release_printer(hass, printer, owned=owned)
 
     async def cut(self, hass: HomeAssistant, *, mode: str) -> None:
         """Cut the paper."""
@@ -76,13 +81,11 @@ class ControlOperationsMixin:
             _LOGGER.warning("Invalid cut mode '%s', defaulting to full", mode)
             cut_mode = "FULL"
         async with self._lock:
-            printer = self._printer if self._keepalive and self._printer is not None else self._connect()
+            printer, owned = await self._acquire_printer(hass)
             try:
                 await hass.async_add_executor_job(lambda: printer.cut(mode=cut_mode))
             finally:
-                if not self._keepalive:
-                    with contextlib.suppress(Exception):
-                        printer.close()
+                await self._release_printer(hass, printer, owned=owned)
 
     async def beep(self, hass: HomeAssistant, *, times: int = 2, duration: int = 4) -> None:
         """Trigger the printer buzzer."""
@@ -106,10 +109,8 @@ class ControlOperationsMixin:
                 _LOGGER.debug("Beep failed: %s", sanitize_log_message(str(e)))
 
         async with self._lock:
-            printer = self._printer if self._keepalive and self._printer is not None else self._connect()
+            printer, owned = await self._acquire_printer(hass)
             try:
                 await hass.async_add_executor_job(_beep_inner, printer)
             finally:
-                if not self._keepalive:
-                    with contextlib.suppress(Exception):
-                        printer.close()
+                await self._release_printer(hass, printer, owned=owned)

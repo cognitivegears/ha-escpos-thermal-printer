@@ -117,7 +117,7 @@ class UsbFlowMixin:
                 _LOGGER.debug(
                     "Attempting USB connection test to %04X:%04X", vendor_id, product_id
                 )
-                ok, error_code = await self.hass.async_add_executor_job(
+                ok, error_code, errno = await self.hass.async_add_executor_job(
                     _can_connect_usb, vendor_id, product_id, timeout
                 )
                 if ok:
@@ -141,7 +141,13 @@ class UsbFlowMixin:
 
                     return await self.async_step_codepage()  # type: ignore[attr-defined,no-any-return]
 
-                _LOGGER.warning("USB connection test failed for %04X:%04X: %s", vendor_id, product_id, error_code)
+                _LOGGER.warning(
+                    "USB connection test failed for %04X:%04X (errno=%s): %s",
+                    vendor_id,
+                    product_id,
+                    errno,
+                    error_code,
+                )
                 errors["base"] = _usb_error_to_key(error_code)
 
         # Discover USB printers
@@ -232,7 +238,7 @@ class UsbFlowMixin:
                     "Attempting USB connection test to %04X:%04X (in_ep=%02X, out_ep=%02X)",
                     vendor_id, product_id, in_ep, out_ep
                 )
-                ok, error_code = await self.hass.async_add_executor_job(
+                ok, error_code, errno = await self.hass.async_add_executor_job(
                     _can_connect_usb, vendor_id, product_id, timeout, in_ep, out_ep
                 )
                 if ok:
@@ -256,7 +262,13 @@ class UsbFlowMixin:
 
                     return await self.async_step_codepage()  # type: ignore[attr-defined,no-any-return]
 
-                _LOGGER.warning("USB connection test failed for %04X:%04X: %s", vendor_id, product_id, error_code)
+                _LOGGER.warning(
+                    "USB connection test failed for %04X:%04X (errno=%s): %s",
+                    vendor_id,
+                    product_id,
+                    errno,
+                    error_code,
+                )
                 errors["base"] = _usb_error_to_key(error_code)
 
         # Discover all USB devices
@@ -329,7 +341,7 @@ class UsbFlowMixin:
                     "Attempting USB connection test to %04X:%04X (in_ep=%02X, out_ep=%02X)",
                     vendor_id, product_id, in_ep, out_ep
                 )
-                ok, error_code = await self.hass.async_add_executor_job(
+                ok, error_code, errno = await self.hass.async_add_executor_job(
                     _can_connect_usb, vendor_id, product_id, timeout, in_ep, out_ep
                 )
                 if ok:
@@ -353,7 +365,13 @@ class UsbFlowMixin:
 
                     return await self.async_step_codepage()  # type: ignore[attr-defined,no-any-return]
 
-                _LOGGER.warning("USB connection test failed for %04X:%04X: %s", vendor_id, product_id, error_code)
+                _LOGGER.warning(
+                    "USB connection test failed for %04X:%04X (errno=%s): %s",
+                    vendor_id,
+                    product_id,
+                    errno,
+                    error_code,
+                )
                 errors["base"] = _usb_error_to_key(error_code)
 
         # Build profile choices dynamically
