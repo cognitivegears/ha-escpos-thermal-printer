@@ -45,3 +45,18 @@ Print your Mealie shopping list to a receipt printer with AI-powered categorizat
 
 ```yaml
 script: !include examples/mealie_shopping_list_printer.yaml
+```
+
+## Example Dashboard Button
+```yaml
+type: button
+name: Print Shopping List
+icon: mdi:printer-pos
+tap_action:
+  action: call-service
+  service: script.print_mealie_shopping_list
+  data:
+    shopping_list_entity: todo.mealie_shopping_list
+    openai_agent_id: conversation.chatgpt
+    # printer_device_id: optional - omit to use all printers
+```
