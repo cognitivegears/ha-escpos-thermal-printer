@@ -472,3 +472,95 @@ beep:
           max: 10
           step: 1
           mode: slider
+
+print_message:
+  name: Print Formatted Message
+  description: Print a message with full text formatting (bold, underline, size, alignment). Targets an ESC/POS notify entity.
+  target:
+    entity:
+      domain: notify
+      integration: escpos_printer
+  fields:
+    message:
+      name: Message
+      description: The text to print
+      required: true
+      example: "Hello, world!"
+      selector:
+        text:
+          multiline: true
+    title:
+      name: Title
+      description: Optional title printed before the message
+      required: false
+      selector:
+        text: {}
+    align:
+      name: Alignment
+      description: Text alignment
+      selector:
+        select:
+          options:
+            - "left"
+            - "center"
+            - "right"
+    bold:
+      name: Bold
+      description: Enable bold text
+      selector:
+        boolean: {}
+    underline:
+      name: Underline
+      description: Underline style
+      selector:
+        select:
+          options:
+            - "none"
+            - "single"
+            - "double"
+    width:
+      name: Width
+      description: Font width
+      selector:
+        select:
+          options:
+            - "normal"
+            - "double"
+            - "triple"
+    height:
+      name: Height
+      description: Font height
+      selector:
+        select:
+          options:
+            - "normal"
+            - "double"
+            - "triple"
+    utf8:
+      name: UTF-8 Mode
+      description: Enable UTF-8 transcoding (converts special characters to printer-compatible encoding)
+      selector:
+        boolean: {}
+    encoding:
+      name: Encoding
+      description: Character encoding override (ignored when UTF-8 mode is enabled)
+      selector:
+        text: {}
+    cut:
+      name: Cut
+      description: Paper cutting mode after printing
+      selector:
+        select:
+          options:
+            - "none"
+            - "partial"
+            - "full"
+    feed:
+      name: Feed Lines
+      description: Number of lines to feed after printing
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 1
+          mode: slider
