@@ -103,6 +103,7 @@ Omit `target` to broadcast to all configured printers.
 |---------|-------------|
 | `escpos_printer.print_text` | Print formatted text in the device encoding |
 | `escpos_printer.print_text_utf8` | Print UTF-8 text with automatic character conversion |
+| `escpos_printer.print_message` | Print formatted message via notify entity (supports all text formatting + UTF-8) |
 | `escpos_printer.print_qr` | Print QR codes |
 | `escpos_printer.print_barcode` | Print barcodes (EAN13, CODE128, etc.) |
 | `escpos_printer.print_image` | Print images from URL or local path |

@@ -69,8 +69,8 @@ class PrintOperationsMixin:
         align: str | None = None,
         bold: bool | None = None,
         underline: str | None = None,
-        width: str | None = None,
-        height: str | None = None,
+        width: str | int | None = None,
+        height: str | int | None = None,
         encoding: str | None = None,
         cut: str | None = DEFAULT_CUT,
         feed: int | None = 0,
@@ -94,7 +94,16 @@ class PrintOperationsMixin:
 
             # Set style
             if hasattr(printer, "set"):
-                printer.set(align=align_m, bold=bool(bold), underline=ul, width=wmult, height=hmult)
+                use_custom_size = wmult > 1 or hmult > 1
+                printer.set(
+                    align=align_m,
+                    bold=bool(bold),
+                    underline=ul,
+                    width=wmult,
+                    height=hmult,
+                    custom_size=use_custom_size,
+                    normal_textsize=not use_custom_size,
+                )
 
             # Encoding is best-effort; python-escpos handles str internally.
             if encoding:
@@ -159,7 +168,7 @@ class PrintOperationsMixin:
 
         def _do_print(printer: Any) -> None:
             if hasattr(printer, "set"):
-                printer.set(align=align_m)
+                printer.set(align=align_m, normal_textsize=True)
             printer.qr(data, size=qsize, ec=_map_qr_ec(qec))
 
         async with self._lock:
@@ -223,7 +232,7 @@ class PrintOperationsMixin:
 
         def _do_print(printer: Any) -> None:
             if hasattr(printer, "set"):
-                printer.set(align=align_m)
+                printer.set(align=align_m, normal_textsize=True)
             # Some printers need conversion; python-escpos handles PIL.Image
             if hasattr(printer, "image"):
                 printer.image(img_obj, high_density_vertical=high_density, high_density_horizontal=high_density)

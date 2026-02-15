@@ -127,7 +127,7 @@ class SettingsFlowMixin:
             # Handle custom line width
             if line_width == OPTION_CUSTOM:
                 # Store current selections and go to custom line width step
-                self._user_data[CONF_CODEPAGE] = codepage if codepage else ""
+                self._user_data[CONF_CODEPAGE] = codepage or ""
                 self._user_data[CONF_DEFAULT_ALIGN] = user_input.get(
                     CONF_DEFAULT_ALIGN, DEFAULT_ALIGN
                 )
@@ -139,7 +139,7 @@ class SettingsFlowMixin:
             # Merge with data from previous steps and create entry
             data = {
                 **self._user_data,
-                CONF_CODEPAGE: codepage if codepage else "",
+                CONF_CODEPAGE: codepage or "",
                 CONF_LINE_WIDTH: int(line_width) if line_width else DEFAULT_LINE_WIDTH,
                 CONF_DEFAULT_ALIGN: user_input.get(CONF_DEFAULT_ALIGN, DEFAULT_ALIGN),
                 CONF_DEFAULT_CUT: user_input.get(CONF_DEFAULT_CUT, DEFAULT_CUT),

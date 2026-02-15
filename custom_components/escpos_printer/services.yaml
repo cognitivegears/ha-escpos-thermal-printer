@@ -42,22 +42,38 @@ print_text_utf8:
             - "double"
     width:
       name: Width
-      description: Font width
+      description: Font width (`normal`, `double`, `triple`, or `1-8`)
       selector:
         select:
           options:
             - "normal"
             - "double"
             - "triple"
+            - "1"
+            - "2"
+            - "3"
+            - "4"
+            - "5"
+            - "6"
+            - "7"
+            - "8"
     height:
       name: Height
-      description: Font height
+      description: Font height (`normal`, `double`, `triple`, or `1-8`)
       selector:
         select:
           options:
             - "normal"
             - "double"
             - "triple"
+            - "1"
+            - "2"
+            - "3"
+            - "4"
+            - "5"
+            - "6"
+            - "7"
+            - "8"
     cut:
       name: Cut
       description: Paper cutting mode after printing
@@ -121,22 +137,38 @@ print_text:
             - "double"
     width:
       name: Width
-      description: Font width
+      description: Font width (`normal`, `double`, `triple`, or `1-8`)
       selector:
         select:
           options:
             - "normal"
             - "double"
             - "triple"
+            - "1"
+            - "2"
+            - "3"
+            - "4"
+            - "5"
+            - "6"
+            - "7"
+            - "8"
     height:
       name: Height
-      description: Font height
+      description: Font height (`normal`, `double`, `triple`, or `1-8`)
       selector:
         select:
           options:
             - "normal"
             - "double"
             - "triple"
+            - "1"
+            - "2"
+            - "3"
+            - "4"
+            - "5"
+            - "6"
+            - "7"
+            - "8"
     encoding:
       name: Encoding
       description: Character encoding override
@@ -469,6 +501,114 @@ beep:
       selector:
         number:
           min: 1
+          max: 10
+          step: 1
+          mode: slider
+
+print_message:
+  name: Print Formatted Message
+  description: Print a message with full text formatting (bold, underline, size, alignment). Targets an ESC/POS notify entity.
+  target:
+    entity:
+      domain: notify
+      integration: escpos_printer
+  fields:
+    message:
+      name: Message
+      description: The text to print
+      required: true
+      example: "Hello, world!"
+      selector:
+        text:
+          multiline: true
+    title:
+      name: Title
+      description: Optional title printed before the message
+      required: false
+      selector:
+        text: {}
+    align:
+      name: Alignment
+      description: Text alignment
+      selector:
+        select:
+          options:
+            - "left"
+            - "center"
+            - "right"
+    bold:
+      name: Bold
+      description: Enable bold text
+      selector:
+        boolean: {}
+    underline:
+      name: Underline
+      description: Underline style
+      selector:
+        select:
+          options:
+            - "none"
+            - "single"
+            - "double"
+    width:
+      name: Width
+      description: Font width (`normal`, `double`, `triple`, or `1-8`)
+      selector:
+        select:
+          options:
+            - "normal"
+            - "double"
+            - "triple"
+            - "1"
+            - "2"
+            - "3"
+            - "4"
+            - "5"
+            - "6"
+            - "7"
+            - "8"
+    height:
+      name: Height
+      description: Font height (`normal`, `double`, `triple`, or `1-8`)
+      selector:
+        select:
+          options:
+            - "normal"
+            - "double"
+            - "triple"
+            - "1"
+            - "2"
+            - "3"
+            - "4"
+            - "5"
+            - "6"
+            - "7"
+            - "8"
+    utf8:
+      name: UTF-8 Mode
+      description: Enable UTF-8 transcoding (converts special characters to printer-compatible encoding)
+      selector:
+        boolean: {}
+    encoding:
+      name: Encoding
+      description: Character encoding override (ignored when UTF-8 mode is enabled)
+      selector:
+        text: {}
+    cut:
+      name: Cut
+      description: Paper cutting mode after printing
+      selector:
+        select:
+          options:
+            - "none"
+            - "partial"
+            - "full"
+    feed:
+      name: Feed Lines
+      description: Number of lines to feed after printing
+      selector:
+        number:
+          min: 0
           max: 10
           step: 1
           mode: slider
