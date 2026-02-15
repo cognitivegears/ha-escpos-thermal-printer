@@ -42,22 +42,38 @@ print_text_utf8:
             - "double"
     width:
       name: Width
-      description: Font width
+      description: Font width (`normal`, `double`, `triple`, or `1-8`)
       selector:
         select:
           options:
             - "normal"
             - "double"
             - "triple"
+            - 1
+            - 2
+            - 3
+            - 4
+            - 5
+            - 6
+            - 7
+            - 8
     height:
       name: Height
-      description: Font height
+      description: Font height (`normal`, `double`, `triple`, or `1-8`)
       selector:
         select:
           options:
             - "normal"
             - "double"
             - "triple"
+            - 1
+            - 2
+            - 3
+            - 4
+            - 5
+            - 6
+            - 7
+            - 8
     cut:
       name: Cut
       description: Paper cutting mode after printing
@@ -121,22 +137,38 @@ print_text:
             - "double"
     width:
       name: Width
-      description: Font width
+      description: Font width (`normal`, `double`, `triple`, or `1-8`)
       selector:
         select:
           options:
             - "normal"
             - "double"
             - "triple"
+            - 1
+            - 2
+            - 3
+            - 4
+            - 5
+            - 6
+            - 7
+            - 8
     height:
       name: Height
-      description: Font height
+      description: Font height (`normal`, `double`, `triple`, or `1-8`)
       selector:
         select:
           options:
             - "normal"
             - "double"
             - "triple"
+            - 1
+            - 2
+            - 3
+            - 4
+            - 5
+            - 6
+            - 7
+            - 8
     encoding:
       name: Encoding
       description: Character encoding override
@@ -520,22 +552,38 @@ print_message:
             - "double"
     width:
       name: Width
-      description: Font width
+      description: Font width (`normal`, `double`, `triple`, or `1-8`)
       selector:
         select:
           options:
             - "normal"
             - "double"
             - "triple"
+            - 1
+            - 2
+            - 3
+            - 4
+            - 5
+            - 6
+            - 7
+            - 8
     height:
       name: Height
-      description: Font height
+      description: Font height (`normal`, `double`, `triple`, or `1-8`)
       selector:
         select:
           options:
             - "normal"
             - "double"
             - "triple"
+            - 1
+            - 2
+            - 3
+            - 4
+            - 5
+            - 6
+            - 7
+            - 8
     utf8:
       name: UTF-8 Mode
       description: Enable UTF-8 transcoding (converts special characters to printer-compatible encoding)
