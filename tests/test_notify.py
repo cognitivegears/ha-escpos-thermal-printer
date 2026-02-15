@@ -89,6 +89,7 @@ async def test_print_message_entity_service_with_formatting(hass):  # type: igno
     assert kw["width"] == 2
     assert kw["height"] == 2
     assert kw["custom_size"] is True
+    assert kw["normal_textsize"] is False
     assert kw["underline"] == 1
     assert kw["align"] == "center"
 

@@ -92,6 +92,26 @@ async def test_print_text_triple_width_normal_height(hass):  # type: ignore[no-u
     assert kw["width"] == 3
     assert kw["height"] == 1
     assert kw["custom_size"] is True
+    assert kw["normal_textsize"] is False
+
+
+async def test_print_text_numeric_width_height(hass):  # type: ignore[no-untyped-def]
+    """Test numeric width/height values pass through print_text service end-to-end."""
+    await _setup_entry(hass)
+
+    fake = MagicMock()
+    with patch("escpos.printer.Network", return_value=fake):
+        await hass.services.async_call(
+            DOMAIN,
+            "print_text",
+            {"text": "Numeric size", "width": 4, "height": 6},
+            blocking=True,
+        )
+    kw = _get_set_kwargs(fake)
+    assert kw["width"] == 4
+    assert kw["height"] == 6
+    assert kw["custom_size"] is True
+    assert kw["normal_textsize"] is False
 
 
 async def test_print_qr_resets_text_size(hass):  # type: ignore[no-untyped-def]

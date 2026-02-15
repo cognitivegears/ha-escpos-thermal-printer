@@ -449,7 +449,7 @@ class HATestEnvironment:
         except Exception:
             pass
         # Route automation tester service tracking into our list
-        self.automation_tester.set_service_tracker(lambda call: self._service_calls.append(call))
+        self.automation_tester.set_service_tracker(self._service_calls.append)
 
     async def _wait_for_mirror_operations(self, timeout: float = 2.0) -> None:
         """Wait for all pending mirror operations to complete.
