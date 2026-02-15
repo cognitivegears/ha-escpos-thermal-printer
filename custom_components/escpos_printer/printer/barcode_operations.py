@@ -76,7 +76,7 @@ class BarcodeOperationsMixin:
 
         def _do_print(printer: Any) -> None:
             if hasattr(printer, "set"):
-                printer.set(align=align_m)
+                printer.set(align=align_m, normal_textsize=True)
             # Attempt to pass 'force_software' when provided; fall back if unsupported
             kwargs = {
                 "height": height_v,

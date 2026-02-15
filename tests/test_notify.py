@@ -34,3 +34,51 @@ async def test_notify_sends_text(hass):  # type: ignore[no-untyped-def]
             blocking=True,
         )
     assert fake.text.called or fake.cut.called or fake.control.called
+
+
+async def test_notify_passes_text_formatting_from_data(hass):  # type: ignore[no-untyped-def]
+    """Test that notify entity passes bold, width, height, etc. from data dict.
+
+    Note: HA's entity-based notify service schema only accepts message/title,
+    so the data dict is not reachable through the service call. This test calls
+    the entity method directly to verify the code path works.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="1.2.3.4:9100",
+        data={"host": "1.2.3.4", "port": 9100},
+        unique_id="1.2.3.4:9100",
+    )
+    entry.add_to_hass(hass)
+    with patch("escpos.printer.Network"):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    registry = er.async_get(hass)
+    entities = [e for e in registry.entities.values() if e.domain == NOTIFY_DOMAIN]
+    assert entities, "No notify entities registered"
+
+    # Get the actual entity instance to call directly
+    from custom_components.escpos_printer.notify import EscposNotifyEntity
+    notify_entity = EscposNotifyEntity(hass, entry)
+
+    fake = MagicMock()
+    with patch("escpos.printer.Network", return_value=fake):
+        await notify_entity.async_send_message(
+            message="ALERT",
+            data={
+                "bold": True,
+                "width": "double",
+                "height": "double",
+                "underline": "single",
+                "align": "center",
+            },
+        )
+    fake.set.assert_called_once()
+    kw = fake.set.call_args.kwargs
+    assert kw["bold"] is True
+    assert kw["width"] == 2
+    assert kw["height"] == 2
+    assert kw["custom_size"] is True
+    assert kw["underline"] == 1
+    assert kw["align"] == "center"

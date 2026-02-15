@@ -21,12 +21,27 @@ def map_underline(underline: str | None) -> int:
     return mapping.get(underline.lower(), 0)
 
 
-def map_multiplier(val: str | None) -> int:
-    """Map multiplier string to escpos multiplier value."""
-    mapping = {"normal": 1, "double": 2, "triple": 3}
-    if not val:
+def map_multiplier(val: str | int | None) -> int:
+    """Map multiplier string or int to escpos multiplier value (1-8).
+
+    Accepts named sizes ("normal", "double", "triple") or numeric values
+    (int or numeric string). Values are clamped to the 1-8 range supported
+    by python-escpos custom_size.
+    """
+    if val is None:
         return 1
-    return mapping.get(val.lower(), 1)
+    # Accept raw int (e.g. from YAML: width: 4)
+    if isinstance(val, int):
+        return max(1, min(8, val))
+    mapping = {"normal": 1, "double": 2, "triple": 3}
+    named = mapping.get(str(val).lower())
+    if named is not None:
+        return named
+    # Accept numeric strings (e.g. "4")
+    try:
+        return max(1, min(8, int(val)))
+    except (ValueError, TypeError):
+        return 1
 
 
 def map_cut(mode: str | None) -> str | None:
