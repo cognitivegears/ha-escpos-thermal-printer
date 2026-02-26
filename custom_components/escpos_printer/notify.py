@@ -66,12 +66,12 @@ class EscposNotifyEntity(NotifyEntity):
             await adapter.print_text(
                 self._hass,
                 text=text,
-                align=defaults.get("align"),
-                bold=False,
-                underline="none",
-                width="normal",
-                height="normal",
-                encoding=None,
+                align=data.get("align", defaults.get("align")),
+                bold=data.get("bold"),
+                underline=data.get("underline"),
+                width=data.get("width"),
+                height=data.get("height"),
+                encoding=data.get("encoding"),
                 cut=data.get("cut", defaults.get("cut")),
                 feed=data.get("feed", 0),
             )

@@ -388,11 +388,17 @@ class EscposPrinterAdapter:
         return mapping.get(underline.lower(), 0)
 
     @staticmethod
-    def _map_multiplier(val: str | None) -> int:
+    def _map_multiplier(val: str | int | None) -> int:
         mapping = {"normal": 1, "double": 2, "triple": 3}
         if not val:
             return 1
-        return mapping.get(val.lower(), 1)
+        if isinstance(val, int):
+            return max(1, min(8, val))
+        if isinstance(val, str):
+            if val.isdigit():
+                return max(1, min(8, int(val)))
+            return mapping.get(val.lower(), 1)
+        return 1
 
     @staticmethod
     def _map_cut(mode: str | None) -> str | None:
@@ -470,8 +476,15 @@ class EscposPrinterAdapter:
 
             # Set style
             if hasattr(printer, "set"):
-                _LOGGER.debug("Setting printer style: align=%s, bold=%s", align_m, bold)
-                printer.set(align=align_m, bold=bool(bold), underline=ul, width=wmult, height=hmult)
+                _LOGGER.debug("Setting printer style: align=%s, bold=%s, width=%s, height=%s", align_m, bold, wmult, hmult)
+                if wmult > 1 or hmult > 1:
+                    printer.set(
+                        align=align_m, bold=bool(bold), underline=ul,
+                        width=wmult, height=hmult,
+                        custom_size=True, normal_textsize=False,
+                    )
+                else:
+                    printer.set(align=align_m, bold=bool(bold), underline=ul, width=wmult, height=hmult)
 
             # Encoding is best-effort; python-escpos handles str internally.
             if encoding:
