@@ -360,7 +360,7 @@ class EscposPrinterAdapter:
             "last_error_reason": self._last_error_reason,
         }
 
-    def _wrap_text(self, text: str) -> str:
+    def _wrap_text(self, text: str, width_mult: int = 1) -> str:
         """Wrap text to fit within the configured line width.
 
         Preserves all newlines including trailing ones. Python's
@@ -369,6 +369,8 @@ class EscposPrinterAdapter:
 
         Args:
             text: Text to wrap.
+            width_mult: Character width multiplier (1=normal, 2=double, etc.).
+                        The effective wrap column count is line_width // width_mult.
 
         Returns:
             Wrapped text with original newline structure preserved.
@@ -376,6 +378,10 @@ class EscposPrinterAdapter:
         cols = max(0, int(self._config.line_width or 0))
         if cols <= 0:
             return text
+
+        # Reduce effective column count by the width multiplier so that
+        # double-width (or wider) characters don't overflow the paper.
+        effective_cols = max(1, cols // max(1, width_mult))
 
         # splitlines() strips trailing newlines — count them so we can restore
         trailing_newlines = len(text) - len(text.rstrip("\n"))
@@ -386,7 +392,7 @@ class EscposPrinterAdapter:
             if not line:
                 wrapped_lines.append("")
                 continue
-            wrapped_lines.extend(textwrap.wrap(line, width=cols, replace_whitespace=False, drop_whitespace=False))
+            wrapped_lines.extend(textwrap.wrap(line, width=effective_cols, replace_whitespace=False, drop_whitespace=False))
 
         result = "\n".join(wrapped_lines)
 
@@ -486,7 +492,9 @@ class EscposPrinterAdapter:
         ul = self._map_underline(underline)
         wmult = self._map_multiplier(width)
         hmult = self._map_multiplier(height)
-        text_to_print = self._wrap_text(text)
+        # Account for character width when wrapping so doubled/tripled text
+        # doesn't overflow the physical paper width.
+        text_to_print = self._wrap_text(text, width_mult=wmult)
 
         def _do_full_print(printer: Any) -> None:  # noqa: PLR0912
             """Print text using the provided printer instance."""
@@ -512,6 +520,16 @@ class EscposPrinterAdapter:
                     printer.set(align=align_m, bold=bool(bold), underline=ul, width=wmult, height=hmult,
                                 custom_size=False, normal_textsize=True)
 
+            # When height > 1, the default ESC/POS line spacing (~4.2 mm) is
+            # smaller than the character height (~3 mm * hmult), so a bare LF
+            # inside the text doesn't advance the paper far enough and the next
+            # printed line visually overlaps.  Increase line spacing to
+            # 30 * hmult / 180 inches so every LF fully clears the characters.
+            _ESC = 0x1B
+            if hmult > 1 and hasattr(printer, "_raw"):
+                line_spacing = min(255, 30 * hmult)
+                printer._raw(bytes([_ESC, 0x33, line_spacing]))  # ESC 3 n
+
             # Encoding is best-effort; python-escpos handles str internally.
             if encoding:
                 try:
@@ -533,6 +551,11 @@ class EscposPrinterAdapter:
                 _LOGGER.debug("Sending text to printer...")
                 printer.text(text_to_print)
                 _LOGGER.debug("Text sent to buffer")
+
+            # Reset line spacing to default so that subsequent feed lines
+            # (and the next print job) use the standard advance.
+            if hmult > 1 and hasattr(printer, "_raw"):
+                printer._raw(bytes([_ESC, 0x32]))  # ESC 2 = default line spacing
 
         async with self._lock:
             # Use a single printer instance for the entire operation
