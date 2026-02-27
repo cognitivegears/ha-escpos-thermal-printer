@@ -361,9 +361,25 @@ class EscposPrinterAdapter:
         }
 
     def _wrap_text(self, text: str) -> str:
+        """Wrap text to fit within the configured line width.
+
+        Preserves all newlines including trailing ones. Python's
+        str.splitlines() strips trailing newlines, so we detect and
+        restore them after wrapping.
+
+        Args:
+            text: Text to wrap.
+
+        Returns:
+            Wrapped text with original newline structure preserved.
+        """
         cols = max(0, int(self._config.line_width or 0))
         if cols <= 0:
             return text
+
+        # splitlines() strips trailing newlines — count them so we can restore
+        trailing_newlines = len(text) - len(text.rstrip("\n"))
+
         wrapped_lines: list[str] = []
         for line in text.splitlines():
             # Preserve empty lines
@@ -371,7 +387,16 @@ class EscposPrinterAdapter:
                 wrapped_lines.append("")
                 continue
             wrapped_lines.extend(textwrap.wrap(line, width=cols, replace_whitespace=False, drop_whitespace=False))
-        return "\n".join(wrapped_lines)
+
+        result = "\n".join(wrapped_lines)
+
+        # Restore trailing newlines that splitlines() consumed
+        current_trailing = len(result) - len(result.rstrip("\n"))
+        needed = trailing_newlines - current_trailing
+        if needed > 0:
+            result += "\n" * needed
+
+        return result
 
     @staticmethod
     def _map_align(align: str | None) -> str:
