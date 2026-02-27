@@ -245,6 +245,23 @@
         "times": {"name": "Times", "description": "Number of beep cycles."},
         "duration": {"name": "Duration", "description": "Duration of each beep in units supported by the printer."}
       }
+    },
+    "print_message": {
+      "name": "Print Formatted Message",
+      "description": "Print a message with full text formatting to an ESC/POS thermal printer.",
+      "fields": {
+        "message": {"name": "Message", "description": "Text content to print."},
+        "title": {"name": "Title", "description": "Optional title printed before the message."},
+        "align": {"name": "Alignment", "description": "Horizontal alignment for the text."},
+        "bold": {"name": "Bold", "description": "Render text in bold font."},
+        "underline": {"name": "Underline", "description": "Underline mode for text."},
+        "width": {"name": "Width multiplier", "description": "Text width multiplier (normal/double/triple, or 1-8 in YAML)."},
+        "height": {"name": "Height multiplier", "description": "Text height multiplier (normal/double/triple, or 1-8 in YAML)."},
+        "utf8": {"name": "UTF-8 mode", "description": "Enable UTF-8 transcoding to automatically convert special characters to printer-compatible encoding."},
+        "encoding": {"name": "Encoding", "description": "Character encoding/codepage for text (ignored when UTF-8 mode is enabled)."},
+        "cut": {"name": "Cut", "description": "Cut mode after printing."},
+        "feed": {"name": "Feed lines", "description": "Lines to feed after printing."}
+      }
     }
   }
 }
