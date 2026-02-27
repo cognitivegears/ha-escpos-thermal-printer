@@ -56,6 +56,24 @@ from .text_utils import transcode_to_codepage
 _LOGGER = logging.getLogger(__name__)
 
 
+def _normalize_escapes(text: str) -> str:
+    """Normalize literal escape sequences in text to their actual characters.
+
+    YAML unquoted and single-quoted scalars do not interpret escape sequences,
+    so \\n remains as two literal characters (backslash + n) rather than a
+    newline. This function converts common literal escape sequences to their
+    actual character equivalents so that text prints correctly regardless of
+    YAML quoting style.
+
+    Args:
+        text: Text that may contain literal escape sequences.
+
+    Returns:
+        Text with escape sequences converted to actual characters.
+    """
+    return text.replace("\\n", "\n").replace("\\t", "\t")
+
+
 async def _async_get_target_entries(
     call: ServiceCall,
 ) -> list[ConfigEntry]:
@@ -193,9 +211,10 @@ async def async_setup_services(hass: HomeAssistant) -> None:  # noqa: PLR0915
                     entry.entry_id,
                     dict(call.data),
                 )
+                text = _normalize_escapes(cv.string(call.data[ATTR_TEXT]))
                 await adapter.print_text(
                     hass,
-                    text=cv.string(call.data[ATTR_TEXT]),
+                    text=text,
                     align=call.data.get(ATTR_ALIGN, defaults.get("align")),
                     bold=call.data.get(ATTR_BOLD),
                     underline=call.data.get(ATTR_UNDERLINE),
@@ -221,7 +240,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:  # noqa: PLR0915
                     entry.entry_id,
                     dict(call.data),
                 )
-                text = cv.string(call.data[ATTR_TEXT])
+                text = _normalize_escapes(cv.string(call.data[ATTR_TEXT]))
 
                 # Get the configured codepage for transcoding
                 codepage = config.codepage or "CP437"
