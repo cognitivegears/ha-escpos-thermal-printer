@@ -1,4 +1,5 @@
-from unittest.mock import MagicMock, patch
+import sys
+from unittest.mock import patch
 
 from homeassistant.components.notify import DOMAIN as NOTIFY_DOMAIN
 from homeassistant.helpers import entity_registry as er
@@ -28,22 +29,22 @@ async def _setup_notify(hass):  # type: ignore[no-untyped-def]
 async def test_notify_error_bubbles_as_exception(hass, caplog):  # type: ignore[no-untyped-def]
     entity_id = await _setup_notify(hass)
 
-    fake = MagicMock()
-    fake.text.side_effect = RuntimeError("bad printer")
-    with patch("escpos.printer.Dummy", return_value=fake), pytest.raises(Exception):
+    dummy_cls = sys.modules["escpos.printer"].Dummy
+    with patch.object(dummy_cls, "text", side_effect=RuntimeError("bad printer")), pytest.raises(Exception):
         await hass.services.async_call(
             NOTIFY_DOMAIN,
             "send_message",
             {"entity_id": entity_id, "message": "Hello"},
             blocking=True,
         )
-    assert any("print_text failed" in rec.message for rec in caplog.records)
+    assert any("print_message failed" in rec.message for rec in caplog.records)
 
 
 async def test_notify_handles_title_and_message(hass):  # type: ignore[no-untyped-def]
     entity_id = await _setup_notify(hass)
-    fake = MagicMock()
-    with patch("escpos.printer.Dummy", return_value=fake):
+
+    dummy_cls = sys.modules["escpos.printer"].Dummy
+    with patch.object(dummy_cls, "text") as mock_text:
         await hass.services.async_call(
             NOTIFY_DOMAIN,
             "send_message",
@@ -51,4 +52,4 @@ async def test_notify_handles_title_and_message(hass):  # type: ignore[no-untype
             blocking=True,
         )
     # Text should be sent with title and message combined
-    assert fake.text.called
+    assert mock_text.called

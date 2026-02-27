@@ -625,6 +625,39 @@ data:
   title: "System Status"
 ```
 
+### Formatted Notification (print_message)
+
+The `print_message` entity service provides full formatting control through the notify entity. This supports bold, underline, text size, alignment, and UTF-8 transcoding:
+
+```yaml
+service: escpos_printer.print_message
+target:
+  entity_id: notify.esc_pos_printer_192_168_1_100_9100
+data:
+  message: "ALERT: Temperature threshold exceeded!"
+  title: "Warning"
+  bold: true
+  width: double
+  height: double
+  align: center
+  cut: partial
+```
+
+### Formatted Notification with UTF-8
+
+Use `utf8: true` to automatically convert special characters (curly quotes, accented letters, etc.) to printer-compatible encoding:
+
+```yaml
+service: escpos_printer.print_message
+target:
+  entity_id: notify.esc_pos_printer_192_168_1_100_9100
+data:
+  message: "Today's special: Creme brulee & souffle"
+  utf8: true
+  align: center
+  cut: partial
+```
+
 ### Use in Automation
 
 ```yaml
@@ -635,11 +668,14 @@ automation:
         entity_id: sensor.device_battery
         below: 20
     action:
-      - service: notify.send_message
-        data:
+      - service: escpos_printer.print_message
+        target:
           entity_id: notify.esc_pos_printer_192_168_1_100_9100
+        data:
           message: "Battery low: {{ states('sensor.device_battery') }}%"
           title: "Low Battery Warning"
+          bold: true
+          cut: partial
 ```
 
 ---

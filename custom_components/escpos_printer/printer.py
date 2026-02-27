@@ -484,7 +484,8 @@ class EscposPrinterAdapter:
                         custom_size=True, normal_textsize=False,
                     )
                 else:
-                    printer.set(align=align_m, bold=bool(bold), underline=ul, width=wmult, height=hmult)
+                    printer.set(align=align_m, bold=bool(bold), underline=ul, width=wmult, height=hmult,
+                                custom_size=False, normal_textsize=True)
 
             # Encoding is best-effort; python-escpos handles str internally.
             if encoding:

@@ -176,8 +176,8 @@ Select "Custom" to enter a profile name from escpos-printer-db manually. This is
 | align | string | No | `left`, `center`, `right` |
 | bold | boolean | No | Bold text |
 | underline | string | No | `none`, `single`, `double` |
-| width | string | No | `normal`, `double`, `triple` |
-| height | string | No | `normal`, `double`, `triple` |
+| width | string/int | No | `normal`, `double`, `triple`, or 1-8 in YAML |
+| height | string/int | No | `normal`, `double`, `triple`, or 1-8 in YAML |
 | encoding | string | No | Override codepage |
 | cut | string | No | `none`, `partial`, `full` |
 | feed | integer | No | Lines to feed (0-10) |
@@ -185,6 +185,24 @@ Select "Custom" to enter a profile name from escpos-printer-db manually. This is
 ### escpos_printer.print_text_utf8
 
 Same as `print_text` but automatically converts UTF-8 characters to printer-compatible encoding. Does not accept the `encoding` parameter.
+
+### escpos_printer.print_message
+
+Entity service for the notify platform. Targets a notify entity and supports all text formatting options plus optional UTF-8 transcoding.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| message | string | Yes | Text to print |
+| title | string | No | Title printed before the message |
+| align | string | No | `left`, `center`, `right` |
+| bold | boolean | No | Bold text |
+| underline | string | No | `none`, `single`, `double` |
+| width | string/int | No | `normal`, `double`, `triple`, or 1-8 in YAML |
+| height | string/int | No | `normal`, `double`, `triple`, or 1-8 in YAML |
+| utf8 | boolean | No | Enable UTF-8 transcoding |
+| encoding | string | No | Override codepage (ignored when utf8 is true) |
+| cut | string | No | `none`, `partial`, `full` |
+| feed | integer | No | Lines to feed (0-10) |
 
 ### escpos_printer.print_qr
 
