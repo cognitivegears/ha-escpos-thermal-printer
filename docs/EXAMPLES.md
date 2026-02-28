@@ -600,6 +600,69 @@ automation:
           feed: 2
 ```
 
+### AI Shopping List
+```yaml
+alias: Print Shopping List (AI Sorted)
+triggers: []
+actions:
+  - target:
+      entity_id: todo.shopping_list
+    data:
+      status: needs_action
+    response_variable: shopping_list_response
+    action: todo.get_items
+  - variables:
+      shopping_list_items: >
+        {%- set items = shopping_list_response['todo.shopping_list']['items'] |
+        default([], true) -%} {%- for item in items -%} {{ item['summary'] }}
+        {%- if not loop.last %}, {% endif %} {%- endfor -%}
+  - data:
+      agent_id: conversation.ollama_conversation
+      text: >
+        Sort this shopping list by supermarket walking layout.
+
+        Provide sections based on the items provided. For example: Fruit and veg
+        → Bakery → Proteins → Dairy → Frozen → Pantry → Household If you don't
+        know what section an item belongs to, place it in a section called
+        Other.
+
+        Use checkbox format. One line per item, with the section above the list
+        of items.
+
+        For example: Dairy:
+          [ ] Milk
+        Frozen:
+          [ ] Ice cream
+          [ ] Pastry
+
+        Do not provide any output other than the list. Only provide the sections
+        which have items in them.
+
+        If an item has a colon, the text before that item becomes the category
+        for it. for example: "Bunnings: screws" will put screws in a section
+        called Bunnings.
+
+
+        Items: {{ shopping_list_items }}
+    response_variable: ai_reply
+    action: conversation.process
+  - data:
+      text: |
+        ================================
+               SHOPPING LIST
+        ================================
+        {{ now().strftime('%Y-%m-%d') }}
+
+        {{ ai_reply.response.speech.plain.speech }}
+
+        ================================
+      cut: full
+      feed: 0
+    action: escpos_printer.print_text
+mode: single
+
+```
+
 ---
 
 ## Notifications
