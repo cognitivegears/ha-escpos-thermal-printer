@@ -19,7 +19,7 @@ class EscposCommandParser:
 
     def __init__(self) -> None:
         """Initialize the command parser."""
-        self._buffer = bytearray()
+        self._buffer: Any = bytearray()
         self._current_encoding = "cp437"  # Default encoding
 
     def parse_command(self, data: bytes) -> dict[str, Any] | None:
@@ -62,6 +62,14 @@ class EscposCommandParser:
             return self._parse_simple_command("feed", 1)
         elif first_byte == self.CR:
             return self._parse_simple_command("carriage_return", 1)
+        elif first_byte == 0x00:
+            # Ignore NUL byte (often used for padding or status queries)
+            self._buffer = self._buffer[1:]
+            return {
+                'type': 'padding',
+                'raw_data': b'\x00',
+                'parameters': {}
+            }
         else:
             # Regular text data
             return self._parse_text_data()
@@ -99,8 +107,13 @@ class EscposCommandParser:
             return self._parse_codepage_command()
         else:
             # Unknown ESC command, consume ESC and command byte
+            raw_data = bytes(self._buffer[:2])
             self._buffer = self._buffer[2:]
-            return None
+            return {
+                'type': 'unknown',
+                'raw_data': raw_data,
+                'parameters': {}
+            }
 
     def _parse_gs_command(self) -> dict[str, Any] | None:
         """Parse GS-prefixed commands."""
@@ -132,8 +145,13 @@ class EscposCommandParser:
             return self._parse_barcode_height_command()
         else:
             # Unknown GS command, consume GS and command byte
+            raw_data = bytes(self._buffer[:2])
             self._buffer = self._buffer[2:]
-            return None
+            return {
+                'type': 'unknown',
+                'raw_data': raw_data,
+                'parameters': {}
+            }
 
     def _parse_simple_command(self, command_type: str, length: int) -> dict[str, Any] | None:
         """Parse a simple command with fixed length."""

@@ -168,6 +168,9 @@ async def test_service_parameter_variations(printer_with_ha) -> None:  # type: i
     """Test various parameter combinations for services."""
     printer, ha_env, _config = printer_with_ha
 
+    # Wait for any pending mirror operations from fixture setup or previous tests
+    await ha_env.async_block_till_done()
+
     # Clear any commands from fixture setup
     await printer.printer_state.clear_history()
 
@@ -197,7 +200,6 @@ async def test_service_parameter_variations(printer_with_ha) -> None:  # type: i
     # Verify all text commands were processed
     command_log = await printer.get_command_log()
     text_commands = [cmd for cmd in command_log if cmd.command_type == 'text']
-
     assert len(text_commands) == len(formatting_options)
 
 
