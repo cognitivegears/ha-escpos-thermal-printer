@@ -19,7 +19,7 @@ class EscposCommandParser:
 
     def __init__(self) -> None:
         """Initialize the command parser."""
-        self._buffer: Any = bytearray()
+        self._buffer: bytearray = bytearray()
         self._current_encoding = "cp437"  # Default encoding
 
     def parse_command(self, data: bytes) -> dict[str, Any] | None:
