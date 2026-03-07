@@ -49,7 +49,11 @@ class EscposCommandParser:
 
     def _parse_single_command(self) -> dict[str, Any] | None:
         """Parse a single command from the buffer."""
-        if len(self._buffer) < 1:
+        # Ignore NUL byte (often used for padding or status queries)
+        while self._buffer and self._buffer[0] == 0x00:
+            del self._buffer[0]
+
+        if not self._buffer:
             return None
 
         first_byte = self._buffer[0]
@@ -62,14 +66,6 @@ class EscposCommandParser:
             return self._parse_simple_command("feed", 1)
         elif first_byte == self.CR:
             return self._parse_simple_command("carriage_return", 1)
-        elif first_byte == 0x00:
-            # Ignore NUL byte (often used for padding or status queries)
-            self._buffer = self._buffer[1:]
-            return {
-                'type': 'padding',
-                'raw_data': b'\x00',
-                'parameters': {}
-            }
         else:
             # Regular text data
             return self._parse_text_data()
