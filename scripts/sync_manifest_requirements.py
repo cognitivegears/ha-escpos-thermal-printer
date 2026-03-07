@@ -4,6 +4,12 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
+import sys
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
 
 try:
     import tomllib  # Python 3.11+

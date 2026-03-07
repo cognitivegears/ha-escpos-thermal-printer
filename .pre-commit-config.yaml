@@ -3,11 +3,13 @@ repos:
     hooks:
       - id: check-requirements-sync
         name: Check requirements sync (pyproject vs manifest)
-        entry: uv run python scripts/check_requirements_sync.py
-        language: system
+        entry: python scripts/check_requirements_sync.py
+        language: python
+        additional_dependencies: [packaging]
         pass_filenames: false
       - id: check-manifest-sync-from-lock
         name: Check manifest sync from pyproject/uv.lock
-        entry: uv run python scripts/sync_manifest_requirements.py --check
-        language: system
+        entry: python scripts/sync_manifest_requirements.py --check
+        language: python
+        additional_dependencies: [packaging]
         pass_filenames: false
