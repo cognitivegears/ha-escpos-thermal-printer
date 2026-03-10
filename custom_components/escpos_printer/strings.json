@@ -9,7 +9,31 @@
           "connection_type": "Connection type"
         },
         "data_description": {
-          "connection_type": "Choose Network for TCP/IP connected printers or USB for directly connected printers."
+          "connection_type": "Choose Network for TCP/IP connected printers, USB for directly connected printers, or CUPS for printers managed by a CUPS server."
+        }
+      },
+      "cups": {
+        "title": "CUPS Server",
+        "description": "Enter the CUPS server address. Leave empty for the local CUPS daemon.",
+        "data": {
+          "cups_server": "CUPS server address"
+        },
+        "data_description": {
+          "cups_server": "Hostname or hostname:port of the CUPS server. Leave empty for localhost."
+        }
+      },
+      "cups_printer": {
+        "title": "Select CUPS Printer",
+        "description": "Select the CUPS printer queue to use.",
+        "data": {
+          "printer_name": "Printer",
+          "timeout": "Timeout (seconds)",
+          "profile": "Printer profile"
+        },
+        "data_description": {
+          "printer_name": "Select the printer from available CUPS queues.",
+          "timeout": "Connection timeout in seconds.",
+          "profile": "Select your printer model or Auto-detect. Choose 'Custom' to enter a profile name manually."
         }
       },
       "network": {
@@ -139,6 +163,8 @@
     },
     "error": {
       "cannot_connect": "Failed to connect to network printer.",
+      "cups_unavailable": "Could not connect to CUPS server. Ensure CUPS is running and accessible.",
+      "no_printers": "No printers found on the CUPS server.",
       "cannot_connect_usb": "Failed to connect to USB printer. Check that the printer is connected and permissions are configured correctly.",
       "usb_permission_denied": "Permission denied accessing USB device. On Linux, add udev rules or run with appropriate permissions. On Docker/HAOS, ensure the USB device is passed through to the container.",
       "usb_kernel_driver_active": "A kernel driver is active for this USB device. Stop other printing services or detach/blacklist the driver (e.g., usblp on Linux).",

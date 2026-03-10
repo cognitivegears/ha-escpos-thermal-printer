@@ -16,6 +16,11 @@ CONF_LINE_WIDTH = "line_width"
 CONF_CONNECTION_TYPE = "connection_type"
 CONNECTION_TYPE_NETWORK = "network"
 CONNECTION_TYPE_USB = "usb"
+CONNECTION_TYPE_CUPS = "cups"
+
+# CUPS configuration keys
+CONF_PRINTER_NAME = "printer_name"
+CONF_CUPS_SERVER = "cups_server"
 
 # USB configuration keys
 CONF_VENDOR_ID = "vendor_id"

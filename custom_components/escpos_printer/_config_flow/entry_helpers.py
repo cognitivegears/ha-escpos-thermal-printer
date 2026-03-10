@@ -8,8 +8,10 @@ from ..const import (
     CONF_CONNECTION_TYPE,
     CONF_HOST,
     CONF_PORT,
+    CONF_PRINTER_NAME,
     CONF_PRODUCT_ID,
     CONF_VENDOR_ID,
+    CONNECTION_TYPE_CUPS,
     CONNECTION_TYPE_NETWORK,
     CONNECTION_TYPE_USB,
 )
@@ -31,6 +33,8 @@ def generate_entry_title(data: dict[str, Any], user_data: dict[str, Any]) -> str
         if printer_name is not None:
             return str(printer_name)
         return f"USB Printer {data.get(CONF_VENDOR_ID, 0):04X}:{data.get(CONF_PRODUCT_ID, 0):04X}"
+    if connection_type == CONNECTION_TYPE_CUPS:
+        return data.get(CONF_PRINTER_NAME, "CUPS Printer")
     return f"{data[CONF_HOST]}:{data[CONF_PORT]}"
 
 

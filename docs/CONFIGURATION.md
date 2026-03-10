@@ -19,7 +19,7 @@ This guide covers all configuration options for the ESC/POS Thermal Printer inte
 
 1. Go to **Settings** > **Devices & services** > **Add Integration**
 2. Search for "ESC/POS Thermal Printer"
-3. Select your connection type: **Network** or **USB**
+3. Select your connection type: **Network**, **USB**, or **CUPS**
 4. Enter the connection details (see below)
 
 ### Connection Type Selection
@@ -28,6 +28,7 @@ This guide covers all configuration options for the ESC/POS Thermal Printer inte
 |------|----------|
 | Network | Printers with Ethernet/WiFi, shared printers, remote locations |
 | USB | Direct connection, dedicated printers, simpler setup |
+| CUPS | Printers managed by a CUPS server (local or remote), shared queues |
 
 ### Network Connection Settings
 
@@ -49,6 +50,15 @@ This guide covers all configuration options for the ESC/POS Thermal Printer inte
 | Output Endpoint | USB output endpoint address | 0x01 |
 | Timeout | Connection timeout in seconds | 4.0 |
 | Printer Profile | Your printer model | Auto-detect |
+
+### CUPS Connection Settings
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| CUPS Server | Hostname or IP of the CUPS server (leave blank for localhost) | localhost |
+| Printer | Select from discovered CUPS printer queues | Required |
+| Timeout | Connection timeout in seconds | 4.0 |
+| Printer Profile | Your printer model (see [Printer Profiles](#printer-profiles)) | Auto-detect |
 
 ### Common Settings (Step 2)
 
@@ -119,15 +129,15 @@ sudo udevadm control --reload-rules
 sudo udevadm trigger
 ```
 
-### USB vs Network Differences
+### Connection Type Differences
 
-| Aspect | Network | USB |
-|--------|---------|-----|
-| Discovery | Manual IP entry | Auto-discovery by vendor ID |
-| Persistent Connection | Optional (keepalive) | Always reconnects per operation |
-| Status Check | TCP probe | USB device enumeration |
-| Multiple Printers | Yes (different IPs) | Yes (different VID:PID or serial) |
-| Remote Access | Yes | No (local only) |
+| Aspect | Network | USB | CUPS |
+|--------|---------|-----|------|
+| Discovery | Manual IP entry | Auto-discovery by vendor ID | Auto-discovery of CUPS queues |
+| Persistent Connection | Optional (keepalive) | Always reconnects | Always reconnects |
+| Status Check | TCP probe | USB device enumeration | CUPS printer state query |
+| Multiple Printers | Yes (different IPs) | Yes (different VID:PID or serial) | Yes (different queue names) |
+| Remote Access | Yes | No (local only) | Yes (remote CUPS server) |
 
 ---
 
@@ -210,7 +220,7 @@ Maintains a persistent connection to network printers. This can:
 
 Leave disabled unless you have a specific need.
 
-**Note:** This option is not available for USB printers. USB connections always reconnect per operation.
+**Note:** This option is not available for USB or CUPS printers. USB and CUPS connections always reconnect per operation.
 
 ### Status Interval
 

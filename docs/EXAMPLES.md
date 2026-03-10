@@ -2,7 +2,7 @@
 
 This document contains detailed examples for using the ESC/POS Thermal Printer integration.
 
-**Note:** All examples work identically for both network and USB connected printers. The services and parameters are the same regardless of connection type.
+**Note:** All examples work identically for network, USB, and CUPS connected printers. The services and parameters are the same regardless of connection type.
 
 ## Table of Contents
 
@@ -672,6 +672,7 @@ The integration creates a notification entity for each printer.
 **Entity naming:**
 - Network printers: `notify.esc_pos_printer_192_168_1_100_9100`
 - USB printers: `notify.esc_pos_printer_usb_04b8_0e03` (based on VID:PID)
+- CUPS printers: `notify.esc_pos_printer_cups_printername`
 
 ### Send a Notification
 

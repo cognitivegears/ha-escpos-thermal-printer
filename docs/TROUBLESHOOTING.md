@@ -6,6 +6,7 @@ Solutions for common issues with the ESC/POS Thermal Printer integration.
 
 - [Connection Issues](#connection-issues)
 - [USB Connection Issues](#usb-connection-issues)
+- [CUPS Connection Issues](#cups-connection-issues)
 - [Print Quality Problems](#print-quality-problems)
 - [Service Errors](#service-errors)
 - [Image Issues](#image-issues)
@@ -213,6 +214,66 @@ Your printer's vendor ID might not be in the known list.
    ```bash
    echo -1 > /sys/bus/usb/devices/usb*/power/autosuspend
    ```
+
+---
+
+## CUPS Connection Issues
+
+### "CUPS server unavailable"
+
+The CUPS daemon is not reachable.
+
+**Check:**
+
+1. CUPS daemon is running: `systemctl status cups`
+2. For remote servers, verify connectivity: `ping <CUPS_SERVER>`
+3. CUPS is listening on the expected port (default: 631)
+
+**Solutions:**
+
+- Start CUPS: `sudo systemctl start cups`
+- For remote CUPS: ensure the server allows remote connections
+- Check firewall rules for port 631
+
+### "No printers found"
+
+CUPS is reachable but no printer queues are configured.
+
+**Solutions:**
+
+1. Add a printer via the CUPS web interface: `http://localhost:631`
+2. Verify printers are listed: `lpstat -p`
+3. For remote servers, ensure printers are shared
+
+### "Printer not available" after selecting a CUPS printer
+
+The selected printer queue exists but is not accepting jobs.
+
+**Check:**
+
+- Printer state: `lpstat -p PRINTER_NAME`
+- Printer is enabled: `cupsenable PRINTER_NAME`
+- Printer is accepting jobs: `cupsaccept PRINTER_NAME`
+
+### CUPS prints nothing or garbled output
+
+CUPS is receiving the job but the printer output is wrong.
+
+**Solutions:**
+
+1. Verify the printer supports ESC/POS raw mode
+2. Check that the CUPS queue is configured for raw printing (not using a filter/driver)
+3. Try printing a test page from CUPS web interface first
+
+### pycups not installed
+
+The `pycups` Python library is required for CUPS support.
+
+**Solutions:**
+
+- **Home Assistant OS:** pycups should be installed automatically
+- **Docker:** Ensure `cups-dev` is in your container image
+- **Linux:** `sudo apt install libcups2-dev && pip install pycups`
 
 ---
 

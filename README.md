@@ -5,7 +5,7 @@
 [![HACS Validation](https://github.com/cognitivegears/ha-escpos-thermal-printer/actions/workflows/hacs.yml/badge.svg)](https://github.com/cognitivegears/ha-escpos-thermal-printer/actions/workflows/hacs.yml)
 
 Print receipts, labels, QR codes, and more from Home Assistant automations.
-Connect any network or USB thermal printer and start printing in minutes.
+Connect any network, USB, or CUPS thermal printer and start printing in minutes.
 
 ![Printed Receipt Example](docs/assets/receipt.png)
 
@@ -15,7 +15,7 @@ Connect any network or USB thermal printer and start printing in minutes.
 todo lists, daily reports, or shopping lists automatically
 - **Works with cheap hardware** - Any $30+ thermal printer (network or USB) that supports
 ESC/POS will work
-- **Network and USB support** - Connect via TCP/IP or plug directly via USB
+- **Network, USB, and CUPS support** - Connect via TCP/IP, USB, or CUPS print server
 - **Multiple printers** - Set up as many printers as you need and target them individually or broadcast to all
 - **No cloud required** - Direct connection to your printers, everything stays local
 
@@ -37,6 +37,7 @@ ESC/POS will work
 - Thermal printer with ESC/POS support (most receipt printers)
 - **Network printers:** Accessible on your network (typically port 9100)
 - **USB printers:** Connected directly to your Home Assistant host (requires libusb)
+- **CUPS printers:** CUPS print server running locally or on the network (requires pycups)
 
 ### Install via HACS
 
@@ -54,6 +55,7 @@ ESC/POS will work
 3. Select your connection type:
    - **Network:** Enter your printer's IP address and port (default: 9100)
    - **USB:** Select from auto-discovered printers or enter VID:PID manually
+   - **CUPS:** Enter your CUPS server address and select a printer from discovered queues
 4. Select your printer model or use "Auto-detect"
 5. Done! Your printer is ready to use
 
