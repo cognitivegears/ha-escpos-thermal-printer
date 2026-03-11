@@ -12,10 +12,12 @@ import voluptuous as vol
 
 from ..const import (
     CONF_CONNECTION_TYPE,
+    CONNECTION_TYPE_CUPS,
     CONNECTION_TYPE_NETWORK,
     CONNECTION_TYPE_USB,
     DOMAIN,
 )
+from .cups_steps import CupsFlowMixin
 from .import_steps import ImportFlowMixin
 from .network_steps import NetworkFlowMixin
 from .settings_steps import SettingsFlowMixin
@@ -27,6 +29,7 @@ _LOGGER = logging.getLogger(__name__)
 class EscposConfigFlow(
     NetworkFlowMixin,
     UsbFlowMixin,
+    CupsFlowMixin,
     SettingsFlowMixin,
     ImportFlowMixin,
     config_entries.ConfigFlow,
@@ -34,13 +37,14 @@ class EscposConfigFlow(
 ):
     """Config flow for ESC/POS Thermal Printer."""
 
-    VERSION = 3
+    VERSION = 4
 
     def __init__(self) -> None:
         """Initialize config flow."""
         self._user_data: dict[str, Any] = {}
         self._discovered_printers: list[dict[str, Any]] = []
         self._all_usb_devices: list[dict[str, Any]] = []
+        self._cups_server: str | None = None
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -59,6 +63,8 @@ class EscposConfigFlow(
 
             if connection_type == CONNECTION_TYPE_USB:
                 return await self.async_step_usb_select()
+            if connection_type == CONNECTION_TYPE_CUPS:
+                return await self.async_step_cups()
             return await self.async_step_network()
 
         data_schema = vol.Schema(
@@ -67,6 +73,7 @@ class EscposConfigFlow(
                     {
                         CONNECTION_TYPE_NETWORK: "Network (TCP/IP)",
                         CONNECTION_TYPE_USB: "USB (Direct)",
+                        CONNECTION_TYPE_CUPS: "CUPS (Network via CUPS)",
                     }
                 ),
             }

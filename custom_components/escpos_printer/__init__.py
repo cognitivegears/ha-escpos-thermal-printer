@@ -13,17 +13,20 @@ from .capabilities import PROFILE_AUTO, is_valid_profile
 from .const import (
     CONF_CODEPAGE,
     CONF_CONNECTION_TYPE,
+    CONF_CUPS_SERVER,
     CONF_DEFAULT_ALIGN,
     CONF_DEFAULT_CUT,
     CONF_IN_EP,
     CONF_KEEPALIVE,
     CONF_LINE_WIDTH,
     CONF_OUT_EP,
+    CONF_PRINTER_NAME,
     CONF_PRODUCT_ID,
     CONF_PROFILE,
     CONF_STATUS_INTERVAL,
     CONF_TIMEOUT,
     CONF_VENDOR_ID,
+    CONNECTION_TYPE_CUPS,
     CONNECTION_TYPE_NETWORK,
     CONNECTION_TYPE_USB,
     DEFAULT_ALIGN,
@@ -34,6 +37,7 @@ from .const import (
     DOMAIN,
 )
 from .printer import (
+    CupsPrinterConfig,
     NetworkPrinterConfig,
     UsbPrinterConfig,
     create_printer_adapter,
@@ -121,6 +125,26 @@ async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) ->
         )
 
         _LOGGER.info("Migration to v3 complete for entry %s", config_entry.entry_id)
+        # Fall through to v3 -> v4 migration
+
+    if config_entry.version == 3:
+        _LOGGER.info(
+            "Migrating config entry %s from version 3 to 4", config_entry.entry_id
+        )
+
+        new_data = dict(config_entry.data)
+
+        # Ensure connection_type is set (default to network for existing entries)
+        new_data.setdefault(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
+
+        hass.config_entries.async_update_entry(
+            config_entry,
+            data=new_data,
+            version=4,
+            minor_version=0,
+        )
+
+        _LOGGER.info("Migration to v4 complete for entry %s", config_entry.entry_id)
         return True
 
     return True
@@ -142,26 +166,41 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Determine connection type and create appropriate config
     connection_type = entry.data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
 
-    config: UsbPrinterConfig | NetworkPrinterConfig
+    # Common config values shared by all connection types
+    _timeout = float(entry.options.get(CONF_TIMEOUT, entry.data.get(CONF_TIMEOUT, 4.0)))
+    _codepage = entry.options.get(CONF_CODEPAGE) or entry.data.get(CONF_CODEPAGE)
+    _profile = entry.options.get(CONF_PROFILE) or entry.data.get(CONF_PROFILE)
+    _line_width = int(entry.options.get(CONF_LINE_WIDTH, entry.data.get(CONF_LINE_WIDTH, 48)))
+
+    config: UsbPrinterConfig | NetworkPrinterConfig | CupsPrinterConfig
     if connection_type == CONNECTION_TYPE_USB:
         config = UsbPrinterConfig(
             vendor_id=entry.data.get(CONF_VENDOR_ID, 0),
             product_id=entry.data.get(CONF_PRODUCT_ID, 0),
             in_ep=entry.data.get(CONF_IN_EP, DEFAULT_IN_EP),
             out_ep=entry.data.get(CONF_OUT_EP, DEFAULT_OUT_EP),
-            timeout=float(entry.options.get(CONF_TIMEOUT, entry.data.get(CONF_TIMEOUT, 4.0))),
-            codepage=entry.options.get(CONF_CODEPAGE) or entry.data.get(CONF_CODEPAGE),
-            profile=entry.options.get(CONF_PROFILE) or entry.data.get(CONF_PROFILE),
-            line_width=int(entry.options.get(CONF_LINE_WIDTH, entry.data.get(CONF_LINE_WIDTH, 48))),
+            timeout=_timeout,
+            codepage=_codepage,
+            profile=_profile,
+            line_width=_line_width,
+        )
+    elif connection_type == CONNECTION_TYPE_CUPS:
+        config = CupsPrinterConfig(
+            printer_name=entry.data.get(CONF_PRINTER_NAME, ""),
+            cups_server=entry.data.get(CONF_CUPS_SERVER),
+            timeout=_timeout,
+            codepage=_codepage,
+            profile=_profile,
+            line_width=_line_width,
         )
     else:
         config = NetworkPrinterConfig(
             host=entry.data[CONF_HOST],
             port=entry.data.get(CONF_PORT, 9100),
-            timeout=float(entry.options.get(CONF_TIMEOUT, entry.data.get(CONF_TIMEOUT, 4.0))),
-            codepage=entry.options.get(CONF_CODEPAGE) or entry.data.get(CONF_CODEPAGE),
-            profile=entry.options.get(CONF_PROFILE) or entry.data.get(CONF_PROFILE),
-            line_width=int(entry.options.get(CONF_LINE_WIDTH, entry.data.get(CONF_LINE_WIDTH, 48))),
+            timeout=_timeout,
+            codepage=_codepage,
+            profile=_profile,
+            line_width=_line_width,
         )
 
     adapter = create_printer_adapter(config)

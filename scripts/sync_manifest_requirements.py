@@ -20,9 +20,12 @@ UVLOCK = ROOT / "uv.lock"
 # Packages for which we intentionally keep a version range in the HA manifest
 # to avoid conflicts with Home Assistant's own pins.
 MANIFEST_OVERRIDES: dict[str, str] = {
-    # Allow HA to satisfy its own Pillow pin (e.g., 11.3.x) while keeping
+    # Allow HA to satisfy its own Pillow pin (e.g., 12.1.x) while keeping
     # compatibility with our integration.
-    "pillow": ">=11.0.0,<12.0.0",
+    "pillow": ">=11.0.0,<14.0.0",
+    # pycups requires system libcups2-dev and may not be in uv.lock.
+    # Use the same range as pyproject.toml.
+    "pycups": ">=2.0.0",
 }
 
 

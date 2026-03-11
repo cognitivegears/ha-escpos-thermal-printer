@@ -103,12 +103,101 @@ def fake_escpos_module(request: Any) -> Generator[None, None, None]:
         def charcode(self, *_, **__):  # type: ignore[no-untyped-def]
             pass
 
+    class _FakeDummy:
+        def __init__(self, *_, profile: Any = None, **__):  # type: ignore[no-untyped-def]
+            self.profile = profile
+            self._output = b""
+
+        @property
+        def output(self) -> bytes:
+            return self._output
+
+        def set(self, *_: Any, **__: Any) -> None:
+            pass
+
+        def text(self, text: str = "", *_: Any, **__: Any) -> None:
+            self._output += text.encode("utf-8", errors="replace")
+
+        def qr(self, *_: Any, **__: Any) -> None:
+            self._output += b"\x1dQR"
+
+        def image(self, *_: Any, **__: Any) -> None:
+            self._output += b"\x1dIMG"
+
+        def control(self, *_: Any, **__: Any) -> None:
+            pass
+
+        def cut(self, *_: Any, **__: Any) -> None:
+            self._output += b"\x1dV"
+
+        def close(self) -> None:
+            pass
+
+        def _set_codepage(self, *_, **__):  # type: ignore[no-untyped-def]
+            pass
+
+        def _raw(self, data: bytes = b"", *_, **__):  # type: ignore[no-untyped-def]
+            self._output += data
+
+        def barcode(self, *_, **__):  # type: ignore[no-untyped-def]
+            self._output += b"\x1dBC"
+
+        def buzzer(self, *_, **__):  # type: ignore[no-untyped-def]
+            pass
+
+        def beep(self, *_, **__):  # type: ignore[no-untyped-def]
+            pass
+
+        def ln(self, count: int = 1, *_, **__):  # type: ignore[no-untyped-def]
+            self._output += b"\n" * count
+
+        def charcode(self, *_, **__):  # type: ignore[no-untyped-def]
+            pass
+
     printer.Network = _FakeNetwork  # type: ignore[attr-defined]
     printer.Usb = _FakeUsb  # type: ignore[attr-defined]
+    printer.Dummy = _FakeDummy  # type: ignore[attr-defined]
     escpos.printer = printer  # type: ignore[attr-defined]
 
     sys.modules.setdefault("escpos", escpos)
     sys.modules.setdefault("escpos.printer", printer)
+    yield
+
+
+@pytest.fixture(autouse=True)
+def fake_cups_module(request: Any) -> Generator[None, None, None]:
+    """Provide a fake cups module for unit tests."""
+    if request.node.get_closest_marker("integration"):
+        yield
+        return
+
+    cups = types.ModuleType("cups")
+
+    _server: str = ""
+
+    def _set_server(server: str = "") -> None:
+        nonlocal _server
+        _server = server
+
+    class _FakeConnection:
+        def __init__(self) -> None:
+            pass
+
+        def getPrinters(self) -> dict[str, Any]:  # noqa: N802
+            return {
+                "TestPrinter": {
+                    "printer-state": 3,
+                    "printer-state-reasons": ["none"],
+                },
+            }
+
+        def printFile(self, printer: str, filename: str, title: str, options: dict[str, str]) -> int:  # noqa: N802
+            return 1
+
+    cups.setServer = _set_server  # type: ignore[attr-defined]
+    cups.Connection = _FakeConnection  # type: ignore[attr-defined]
+
+    sys.modules.setdefault("cups", cups)
     yield
 
 

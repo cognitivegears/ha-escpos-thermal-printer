@@ -38,8 +38,17 @@ class UsbPrinterConfig(BasePrinterConfig):
     out_ep: int = DEFAULT_OUT_EP
 
 
+@dataclass
+class CupsPrinterConfig(BasePrinterConfig):
+    """Configuration for CUPS printers."""
+
+    connection_type: Literal["cups"] = field(default="cups", repr=False)
+    printer_name: str = ""
+    cups_server: str | None = None
+
+
 # Type alias for config union (use for type hints)
-PrinterConfigTypes = NetworkPrinterConfig | UsbPrinterConfig
+PrinterConfigTypes = NetworkPrinterConfig | UsbPrinterConfig | CupsPrinterConfig
 
 # Backward-compatible alias: PrinterConfig(...) still works and creates NetworkPrinterConfig
 # This maintains API compatibility for existing code that instantiates PrinterConfig directly
