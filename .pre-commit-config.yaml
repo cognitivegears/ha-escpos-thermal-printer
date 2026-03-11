@@ -4,10 +4,12 @@ repos:
       - id: check-requirements-sync
         name: Check requirements sync (pyproject vs manifest)
         entry: python scripts/check_requirements_sync.py
-        language: system
+        language: python
+        additional_dependencies: [packaging]
         pass_filenames: false
       - id: check-manifest-sync-from-lock
         name: Check manifest sync from pyproject/uv.lock
         entry: python scripts/sync_manifest_requirements.py --check
-        language: system
+        language: python
+        additional_dependencies: [packaging]
         pass_filenames: false

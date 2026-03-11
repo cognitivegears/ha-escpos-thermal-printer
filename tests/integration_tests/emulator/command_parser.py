@@ -19,7 +19,7 @@ class EscposCommandParser:
 
     def __init__(self) -> None:
         """Initialize the command parser."""
-        self._buffer = bytearray()
+        self._buffer: bytearray = bytearray()
         self._current_encoding = "cp437"  # Default encoding
 
     def parse_command(self, data: bytes) -> dict[str, Any] | None:
@@ -49,7 +49,11 @@ class EscposCommandParser:
 
     def _parse_single_command(self) -> dict[str, Any] | None:
         """Parse a single command from the buffer."""
-        if len(self._buffer) < 1:
+        # Ignore NUL byte (often used for padding or status queries)
+        while self._buffer and self._buffer[0] == 0x00:
+            del self._buffer[0]
+
+        if not self._buffer:
             return None
 
         first_byte = self._buffer[0]
@@ -99,8 +103,13 @@ class EscposCommandParser:
             return self._parse_codepage_command()
         else:
             # Unknown ESC command, consume ESC and command byte
+            raw_data = bytes(self._buffer[:2])
             self._buffer = self._buffer[2:]
-            return None
+            return {
+                'type': 'unknown',
+                'raw_data': raw_data,
+                'parameters': {}
+            }
 
     def _parse_gs_command(self) -> dict[str, Any] | None:
         """Parse GS-prefixed commands."""
@@ -132,8 +141,13 @@ class EscposCommandParser:
             return self._parse_barcode_height_command()
         else:
             # Unknown GS command, consume GS and command byte
+            raw_data = bytes(self._buffer[:2])
             self._buffer = self._buffer[2:]
-            return None
+            return {
+                'type': 'unknown',
+                'raw_data': raw_data,
+                'parameters': {}
+            }
 
     def _parse_simple_command(self, command_type: str, length: int) -> dict[str, Any] | None:
         """Parse a simple command with fixed length."""
