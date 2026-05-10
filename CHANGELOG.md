@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-05-10
+
+### Compatibility
+
+- **Minimum supported Home Assistant version is now 2026.2.** Earlier
+  HA versions ship `dbus-fast` 2.x and miss the Bluetooth APIs this
+  release relies on. Users on HA 2025.x should stay on 0.4.4.
+
+### Security (lockfile transitives)
+
+- Refreshed `uv.lock` to pull patched versions of dev / security
+  tooling transitives:
+  - `nltk` 3.9.2 → 3.9.4 (zip slip, path traversal, file overwrite,
+    XSS, remote shutdown advisories)
+  - `Authlib` 1.6.8 → 1.7.2 (critical JWS header injection, JWE
+    RSA1_5 padding oracle, OIDC fail-open, CSRF cache)
+  - `Pygments` 2.19.2 → 2.20.0 (ReDoS in GUID matching)
+  - `pip` 25.3 → 26.1.1 (functionality-from-untrusted-source,
+    tar/ZIP confusion)
+  - `bandit` 1.9.3 → 1.9.4
+- The remaining lockfile alerts (Pillow, aiohttp, cryptography,
+  requests, PyOpenSSL, PyJWT, orjson, uv) are pinned by HA core's own
+  manifest in 2026.2 and will resolve automatically when users update
+  to HA versions where core upstreams those bumps.
+
 ### Added
 
 - **Bluetooth Classic / RFCOMM connection type.** Adds support for paired
@@ -66,5 +91,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 Earlier releases — see git history.
 
-[Unreleased]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.4.4...HEAD
+[Unreleased]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/cognitivegears/ha-escpos-thermal-printer/releases/tag/v0.5.0
 [0.4.4]: https://github.com/cognitivegears/ha-escpos-thermal-printer/releases/tag/v0.4.4

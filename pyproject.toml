@@ -1,6 +1,6 @@
 [project]
 name = "ha-escpos-thermal-printer"
-version = "0.4.4"
+version = "0.5.0"
 description = "Network thermal printer integration for Home Assistant using ESC/POS protocol"
 readme = "README.md"
 requires-python = ">=3.13.2"
@@ -34,7 +34,7 @@ dev = [
     "ruff==0.15.1",
     "pre-commit==4.5.1",
     "safety==3.7.0",
-    "bandit==1.9.3",
+    "bandit==1.9.4",
     "pip-audit==2.10.0",
     "typer==0.21.1",
     "marshmallow==4.2.2",
@@ -46,7 +46,7 @@ dev = [
 ]
 security = [
   "safety==3.7.0",
-  "bandit==1.9.3",
+  "bandit==1.9.4",
   "pip-audit==2.10.0",
   "ruff==0.15.1",
   "typer==0.21.1",
@@ -271,7 +271,7 @@ dev = [
     "ruff==0.15.1",
     "pre-commit==4.5.1",
     "safety==3.7.0",
-    "bandit==1.9.3",
+    "bandit==1.9.4",
     "pip-audit==2.10.0",
     "typer==0.21.1",
     "marshmallow==4.2.2",
@@ -283,7 +283,7 @@ dev = [
 ]
 security = [
     "safety==3.7.0",
-    "bandit==1.9.3",
+    "bandit==1.9.4",
     "pip-audit==2.10.0",
     "typer==0.21.1",
     "marshmallow==4.2.2",

@@ -26,9 +26,10 @@ UVLOCK = ROOT / "uv.lock"
 # Packages for which we intentionally keep a version range in the HA manifest
 # to avoid conflicts with Home Assistant's own pins.
 MANIFEST_OVERRIDES: dict[str, str] = {
-    # Allow HA to satisfy its own Pillow pin (e.g., 11.3.x) while keeping
-    # compatibility with our integration.
-    "pillow": ">=11.0.0,<12.0.0",
+    # HA 2026.2 ships Pillow 12.0.0; later HA versions are expected to bump
+    # within the 12.x line. Range matches HA core's expected Pillow range so
+    # pip's resolver doesn't fight with HA's bundled wheel.
+    "pillow": ">=12.0.0,<13.0.0",
 }
 
 

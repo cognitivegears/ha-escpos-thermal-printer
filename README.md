@@ -33,10 +33,14 @@ ESC/POS will work
 
 ### Requirements
 
-- Home Assistant 2024.8 or later
+- **Home Assistant 2026.2 or later** (older HA versions don't ship the
+  `dbus-fast` 4.x APIs the Bluetooth flow needs; 0.4.x of this
+  integration still works on HA 2024.8+ if you're stuck there)
 - Thermal printer with ESC/POS support (most receipt printers)
 - **Network printers:** Accessible on your network (typically port 9100)
 - **USB printers:** Connected directly to your Home Assistant host (requires libusb)
+- **Bluetooth printers:** Linux host with kernel `AF_BLUETOOTH` support;
+  printer paired on the host before adding to HA. See [Bluetooth (RFCOMM) printers](#bluetooth-rfcomm-printers).
 
 ### Install via HACS
 
