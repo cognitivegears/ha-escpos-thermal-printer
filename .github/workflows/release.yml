@@ -1,0 +1,72 @@
+name: Release
+
+# Tag-driven release workflow for HACS distribution.
+# Creates a GitHub Release whose title/body are derived from the tag name
+# and the matching CHANGELOG.md section. HACS picks up the release and
+# surfaces the integration's new version to users automatically.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Verify tag matches manifest.json + pyproject.toml
+        run: |
+          TAG="${GITHUB_REF##refs/tags/}"
+          TAG_VERSION="${TAG#v}"
+          MANIFEST_VERSION="$(python -c 'import json; print(json.load(open("custom_components/escpos_printer/manifest.json"))["version"])')"
+          PYPROJECT_VERSION="$(python -c 'import tomllib; print(tomllib.loads(open("pyproject.toml","rb").read().decode())["project"]["version"])')"
+          echo "tag=$TAG_VERSION manifest=$MANIFEST_VERSION pyproject=$PYPROJECT_VERSION"
+          if [ "$TAG_VERSION" != "$MANIFEST_VERSION" ] || [ "$TAG_VERSION" != "$PYPROJECT_VERSION" ]; then
+            echo "::error::Tag '$TAG_VERSION' does not match manifest ($MANIFEST_VERSION) or pyproject ($PYPROJECT_VERSION)."
+            exit 1
+          fi
+
+  release:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Extract release notes from CHANGELOG.md (if present)
+        id: notes
+        run: |
+          TAG="${GITHUB_REF##refs/tags/}"
+          if [ -f CHANGELOG.md ]; then
+            # Pull the section between "## [TAG]" and the next "## [..." heading.
+            awk -v tag="$TAG" '
+              $0 ~ "^## \\[" tag "\\]" { in_section=1; next }
+              in_section && $0 ~ "^## \\[" { in_section=0 }
+              in_section { print }
+            ' CHANGELOG.md > release-body.md
+            if [ ! -s release-body.md ]; then
+              echo "Release $TAG" > release-body.md
+            fi
+          else
+            echo "Release $TAG" > release-body.md
+          fi
+          echo "body_path=release-body.md" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body_path: ${{ steps.notes.outputs.body_path }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}

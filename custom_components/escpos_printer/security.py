@@ -253,6 +253,23 @@ def validate_numeric_input(value: Any, min_val: int, max_val: int, field_name: s
     return num_value
 
 
+# Bluetooth MACs are hardware identifiers (treated as personal data under
+# GDPR). Redact while preserving the OUI (first 3 octets) so support logs
+# remain useful for vendor lookups without exposing the full address.
+_MAC_RE = re.compile(r'\b([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b')
+
+# Default sensitive-field names compiled into a single alternation so the
+# common path costs one regex pass instead of one per field name.
+_DEFAULT_SENSITIVE_FIELDS = (
+    "password", "token", "key", "secret", "data", "text",
+    "address", "mac", "alias",
+)
+_DEFAULT_FIELD_RE = re.compile(
+    rf'({"|".join(_DEFAULT_SENSITIVE_FIELDS)})=([^\s,)]+)',
+    re.IGNORECASE,
+)
+
+
 def sanitize_log_message(message: str, sensitive_fields: list[str] | None = None) -> str:
     """Sanitize log messages to prevent information disclosure.
 
@@ -263,16 +280,25 @@ def sanitize_log_message(message: str, sensitive_fields: list[str] | None = None
     Returns:
         Sanitized log message
     """
-    if sensitive_fields is None:
-        sensitive_fields = ["password", "token", "key", "secret", "data", "text"]
-
     sanitized = message
+    if "=" in sanitized:
+        if sensitive_fields is None:
+            sanitized = _DEFAULT_FIELD_RE.sub(r'\1=[REDACTED]', sanitized)
+        else:
+            for field in sensitive_fields:
+                pattern = rf'({field})=([^\s,)]+)'
+                sanitized = re.sub(
+                    pattern, r'\1=[REDACTED]', sanitized, flags=re.IGNORECASE
+                )
 
-    # Redact sensitive field values in log-like formats
-    for field in sensitive_fields:
-        # Pattern to match field=value in logs
-        pattern = rf'({field})=([^\s,)]+)'
-        sanitized = re.sub(pattern, r'\1=[REDACTED]', sanitized, flags=re.IGNORECASE)
+    # Redact Bluetooth MAC addresses in any format (XX:XX:XX:XX:XX:XX or
+    # XX-XX-XX-XX-XX-XX) wherever they appear. Keep the OUI (first 3
+    # octets) for vendor lookups; redact the last 3 octets which uniquely
+    # identify the device.
+    if ":" in sanitized or "-" in sanitized:
+        sanitized = _MAC_RE.sub(
+            lambda m: m.group(0)[:8] + ":XX:XX:XX", sanitized
+        )
 
     return sanitized
 
@@ -296,6 +322,43 @@ def validate_timeout(timeout: float) -> float:
         raise HomeAssistantError("Timeout cannot exceed 300 seconds")
 
     return float(timeout)
+
+
+_BT_MAC_RE = re.compile(r"^([0-9A-F]{2}:){5}[0-9A-F]{2}$")
+
+
+def validate_bluetooth_mac(mac: str) -> str:
+    """Validate and normalize a Bluetooth MAC address.
+
+    Accepts MACs separated by ``:`` or ``-`` and returns the canonical
+    upper-case ``XX:XX:XX:XX:XX:XX`` form.
+
+    Raises:
+        HomeAssistantError: If the value isn't a well-formed MAC.
+    """
+    if not isinstance(mac, str):
+        raise HomeAssistantError("Bluetooth MAC must be a string")
+    candidate = mac.strip().upper().replace("-", ":")
+    if not _BT_MAC_RE.match(candidate):
+        raise HomeAssistantError(
+            "Invalid Bluetooth MAC address; expected format AA:BB:CC:DD:EE:FF"
+        )
+    return candidate
+
+
+def validate_rfcomm_channel(channel: int) -> int:
+    """Validate an RFCOMM channel number.
+
+    RFCOMM channels are 1-30 (per the Bluetooth Core spec). Most ESC/POS
+    printers advertise the SPP service on channel 1.
+    """
+    try:
+        value = int(channel)
+    except (ValueError, TypeError) as exc:
+        raise HomeAssistantError("RFCOMM channel must be an integer") from exc
+    if not 1 <= value <= 30:
+        raise HomeAssistantError("RFCOMM channel must be between 1 and 30")
+    return value
 
 
 # Security-focused validation decorators

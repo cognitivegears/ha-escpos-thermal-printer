@@ -28,6 +28,7 @@ This guide covers all configuration options for the ESC/POS Thermal Printer inte
 |------|----------|
 | Network | Printers with Ethernet/WiFi, shared printers, remote locations |
 | USB | Direct connection, dedicated printers, simpler setup |
+| Bluetooth (RFCOMM) | Cheap battery-powered thermal printers (Netum, MUNBYN, POS-58 generics, Phomemo Classic line). **Pair on the host first**, then add in HA. See [Bluetooth Printers](#bluetooth-printers) below and the README's [Security considerations](../README.md#security-considerations). |
 
 ### Network Connection Settings
 
@@ -49,6 +50,21 @@ This guide covers all configuration options for the ESC/POS Thermal Printer inte
 | Output Endpoint | USB output endpoint address | 0x01 |
 | Timeout | Connection timeout in seconds | 4.0 |
 | Printer Profile | Your printer model | Auto-detect |
+
+### Bluetooth Connection Settings
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Bluetooth device | Pick from paired devices (or **Manual MAC entry**) | Required |
+| MAC address | `AA:BB:CC:DD:EE:FF` format (manual entry only) | Required |
+| RFCOMM channel | Service channel — 1 for almost every ESC/POS printer | 1 |
+| Timeout | Connection timeout in seconds | 4.0 |
+| Printer Profile | Your printer model | Auto-detect |
+
+**Pair the printer on the host BEFORE adding it in HA.** The integration
+never pairs devices itself; see the README's [Bluetooth (RFCOMM)
+printers](../README.md#bluetooth-rfcomm-printers) section for the full
+pairing walkthrough.
 
 ### Common Settings (Step 2)
 
@@ -119,15 +135,84 @@ sudo udevadm control --reload-rules
 sudo udevadm trigger
 ```
 
-### USB vs Network Differences
+### USB vs Network vs Bluetooth Differences
 
-| Aspect | Network | USB |
-|--------|---------|-----|
-| Discovery | Manual IP entry | Auto-discovery by vendor ID |
-| Persistent Connection | Optional (keepalive) | Always reconnects per operation |
-| Status Check | TCP probe | USB device enumeration |
-| Multiple Printers | Yes (different IPs) | Yes (different VID:PID or serial) |
-| Remote Access | Yes | No (local only) |
+| Aspect | Network | USB | Bluetooth (RFCOMM) |
+|--------|---------|-----|---------------------|
+| Discovery | Manual IP entry | Auto-discovery by vendor ID | Paired-list via bluez D-Bus + manual MAC fallback |
+| Pairing | N/A | N/A | **On host**, before adding in HA |
+| Persistent Connection | Optional (keepalive) | Always reconnects per operation | Always reconnects per operation |
+| Status Check | TCP probe | USB device enumeration | RFCOMM probe (set `status_interval` ≥60s; see Security note) |
+| Multiple Printers | Yes (different IPs) | Yes (different VID:PID or serial) | Yes (different MACs) |
+| Remote Access | Yes | No (local only) | No (radio range, ~10m) |
+| Required deps | `python-escpos` | `pyusb` + libusb | `dbus-fast` (optional in code, declared in manifest); kernel `AF_BLUETOOTH` |
+| Container support | Default Docker | USB device pass-through | `--net=host` + `NET_ADMIN` + `NET_RAW` + `/run/dbus` mount, OR `socat` host bridge |
+
+---
+
+## Bluetooth Printers
+
+### Requirements
+
+- A Linux host with the kernel `AF_BLUETOOTH` socket family available
+  (any HA OS, Supervised, Core, or Container with `--net=host`).
+- The printer must be **paired on the host before** adding it to HA.
+  See the README's [One-time pairing](../README.md#one-time-pairing)
+  walkthrough.
+- For the paired-device picker in the config flow, the integration also
+  needs read access to the system D-Bus (`/run/dbus`). When unavailable,
+  the flow falls through to manual MAC entry.
+
+### Discovery
+
+The config flow lists already-paired Classic Bluetooth devices via bluez.
+If your printer isn't listed, either:
+
+- Pair it on the host first, then re-open the flow, OR
+- Choose **Manual MAC entry** and type the MAC.
+
+The integration never initiates pairing itself.
+
+### Manual Bluetooth Configuration
+
+If your printer isn't in the paired-devices dropdown:
+
+1. Pair the printer on the host:
+   ```bash
+   bluetoothctl
+   [bluetooth]# scan on
+   [bluetooth]# pair AA:BB:CC:DD:EE:FF
+   [bluetooth]# trust AA:BB:CC:DD:EE:FF
+   ```
+2. In HA, choose **Bluetooth (RFCOMM)** → **Manual MAC entry**, paste
+   the MAC, leave channel at `1`.
+
+### Confirming the RFCOMM channel
+
+Almost every ESC/POS printer exposes SPP on **channel 1**. If you get
+`bt_channel_refused`, look up the printer's SDP records:
+
+```bash
+bluetoothctl info AA:BB:CC:DD:EE:FF
+# Look for the SerialPort service-record entry — its "Channel:" line is
+# the value to use.
+```
+
+### Bluetooth security trade-offs
+
+Bluetooth Classic SPP / RFCOMM is **plaintext by default** with no-PIN
+or `0000` pairings. See the README's
+[Security considerations](../README.md#security-considerations) for the
+threat model and the recommended `status_interval` floor (≥60 seconds for
+BT entries).
+
+### Container deployments
+
+HA Container needs `network_mode: host`, `cap_add: [NET_ADMIN, NET_RAW]`,
+and a `/run/dbus` bind-mount to use BT printers. If you want to keep
+Docker isolation, prefer the **`socat` host bridge fallback** documented
+in the README — it routes BT prints through the existing Network adapter
+and needs no special container privileges.
 
 ---
 
@@ -217,6 +302,20 @@ Leave disabled unless you have a specific need.
 How often to check if the printer is online (in seconds). Set to 0 to disable.
 
 When enabled, the integration creates a binary sensor showing printer status.
+
+**For Bluetooth printers, set this to 60 seconds or longer (or leave at
+0).** RFCOMM accepts only one client at a time, so each status check is
+a real connection attempt — many cheap BT printers audibly beep on every
+connect and aggressive polling competes with in-flight print jobs. The
+integration also automatically skips probes while a print is in flight,
+so the next idle tick will refresh status; there's no benefit to fast
+polling on Bluetooth links.
+
+**Note:** Bluetooth `keepalive` is not available — the integration
+always reconnects per operation, like USB.
+
+Also, **Keep Alive** is not available for USB or Bluetooth — both
+connection types reconnect per operation by design.
 
 ---
 

@@ -6,6 +6,7 @@ Solutions for common issues with the ESC/POS Thermal Printer integration.
 
 - [Connection Issues](#connection-issues)
 - [USB Connection Issues](#usb-connection-issues)
+- [Bluetooth Connection Issues](#bluetooth-connection-issues)
 - [Print Quality Problems](#print-quality-problems)
 - [Service Errors](#service-errors)
 - [Image Issues](#image-issues)
@@ -213,6 +214,165 @@ Your printer's vendor ID might not be in the known list.
    ```bash
    echo -1 > /sys/bus/usb/devices/usb*/power/autosuspend
    ```
+
+---
+
+## Bluetooth Connection Issues
+
+The Bluetooth (RFCOMM) flow is **pair-on-host**: the integration never
+pairs devices itself, it only opens RFCOMM sockets to already-paired
+printers. Most Bluetooth issues are pairing problems on the host or
+permission/exposure problems with the bluez stack.
+
+### Error key reference
+
+When a Bluetooth print or status check fails, the integration shows one
+of these error keys (visible in HA logs and on the config-flow form):
+
+| Error key                  | Likely cause                                           | Action |
+|----------------------------|--------------------------------------------------------|--------|
+| `bt_unavailable`           | Kernel doesn't support `AF_BLUETOOTH` (or HA Container without `--net=host`) | See ["Bluetooth not available"](#bluetooth-not-available) below |
+| `bt_permission_denied`     | HA process can't open the Bluetooth socket             | Add HA user to the `bluetooth` group on bare Linux; on HA OS this is preconfigured |
+| `bt_device_not_found`      | Printer never paired, or paired entry was removed      | Pair the printer on the host (see README) |
+| `bt_host_down`             | Printer powered off, out of range, or already connected to another host | Power on, bring closer, disconnect any other paired host |
+| `bt_timeout`               | Printer asleep — first probe missed it                 | Print once to wake it, or increase the timeout |
+| `bt_channel_refused`       | Printer reachable but RFCOMM channel wrong             | Try channel 1 (default for ESC/POS); confirm with `bluetoothctl info <MAC>` |
+| `cannot_connect_bt`        | Generic catchall (errno not recognized)                | Check HA debug logs for the underlying errno |
+| `invalid_bt_mac`           | MAC address format invalid                             | Use `AA:BB:CC:DD:EE:FF` (uppercase, colons) |
+| `invalid_rfcomm_channel`   | Channel out of range                                   | Must be 1–30 (almost always 1) |
+
+### Bluetooth not available
+
+> "Bluetooth Classic (AF_BLUETOOTH/RFCOMM) is not available in this
+> environment."
+
+**Cause:** the kernel `AF_BLUETOOTH` socket family isn't reachable from
+the HA process. Most common causes:
+
+1. **HA Container without `--net=host`** — the default Docker network
+   namespace doesn't expose `AF_BLUETOOTH`. See the docker-compose
+   snippet in the README's [Home Assistant Container caveats] section.
+2. **Rootless Docker / Podman** — the bluez D-Bus EXTERNAL auth doesn't
+   work across UID namespaces. **Use the [`socat` host-bridge fallback]**
+   from the README instead.
+3. **Non-Linux host** — `AF_BLUETOOTH` is Linux-only. macOS / Windows
+   HA installs cannot use this connection type natively; use the
+   `socat` host-bridge or a network printer.
+
+[Home Assistant Container caveats]: ../README.md#home-assistant-container-caveats
+[`socat` host-bridge fallback]: ../README.md#host-bridge-fallback-socat
+
+### "Bluetooth printer not reachable" (intermittent)
+
+The status sensor flaps between online and offline. Most BT thermal
+printers sleep aggressively to save battery, then wake on the next
+RFCOMM connect — but the connect itself takes 1–3 seconds.
+
+**Solutions:**
+
+- **Set Status check interval to 60 seconds or longer** (or `0` to
+  disable). Aggressive polling makes cheap printers beep on every probe
+  and competes for the printer's only RFCOMM slot. See the README's
+  [Security considerations] for the recommended floor.
+- Run `bluetoothctl info <MAC>` on the host to confirm the printer is
+  still paired and the link key is intact:
+  ```bash
+  bluetoothctl info AA:BB:CC:DD:EE:FF
+  # Look for "Paired: yes" and "Trusted: yes"
+  ```
+- If the printer was factory-reset (or its battery fully drained), the
+  link key may be invalidated. Re-pair:
+  ```bash
+  bluetoothctl
+  [bluetooth]# remove AA:BB:CC:DD:EE:FF
+  [bluetooth]# scan on
+  [bluetooth]# pair AA:BB:CC:DD:EE:FF
+  [bluetooth]# trust AA:BB:CC:DD:EE:FF
+  ```
+
+[Security considerations]: ../README.md#security-considerations
+
+### "Connection refused" / `bt_channel_refused`
+
+The printer is reachable but rejects the RFCOMM channel. Almost always
+means the channel number is wrong.
+
+**Solutions:**
+
+- Default to **channel 1**. The vast majority of ESC/POS thermal
+  printers expose SPP on channel 1.
+- Confirm via SDP service-record lookup:
+  ```bash
+  bluetoothctl info AA:BB:CC:DD:EE:FF
+  # Look for the SerialPort service-record entry — its "Channel:" line
+  # is the value to use.
+  ```
+- If the printer presents multiple SPP records, try each channel in turn.
+
+### Paired-device list is empty in the config flow
+
+The bluez D-Bus enumeration succeeded but returned no devices, **or**
+D-Bus wasn't reachable and the flow fell through to manual MAC entry.
+
+**Verify:**
+
+```bash
+# On the host (HA OS: drop into the host shell first via `login`)
+bluetoothctl paired-devices
+```
+
+- If `bluetoothctl paired-devices` shows your printer but the integration
+  doesn't, the HA process can't reach the system D-Bus. On HA Container,
+  add `/run/dbus:/run/dbus:ro` to your volume mounts (see README).
+- If `bluetoothctl paired-devices` is also empty, the printer simply
+  isn't paired — pair it first per the README instructions.
+
+### Status sensor stale (timestamp not updating)
+
+Status checks are deliberately **skipped while a print is in flight**
+(RFCOMM accepts only one client at a time, so a probe during a print
+would either fail or kick the print). If you see a stale `last_check`
+timestamp, the integration is correctly deferring to the active print —
+the next idle tick will refresh.
+
+### Container can pair but can't print
+
+You paired the printer from inside the HA container (using `bluetoothctl`
+with `/run/dbus` mounted), but prints fail with `bt_unavailable`.
+
+**Cause:** pairing went through D-Bus (which `/run/dbus` exposes), but
+the actual data-plane RFCOMM open uses `AF_BLUETOOTH` directly, which
+needs `network_mode: host` and `NET_ADMIN` / `NET_RAW` capabilities.
+
+**Solution:** add the missing docker-compose settings (see README), or
+use the `socat` host-bridge fallback to avoid the privilege grant entirely.
+
+### Notifications routed to BT printer were intercepted
+
+If you're concerned about over-the-air eavesdropping, see the README's
+[Security considerations]. Bluetooth Classic SPP with no PIN or PIN
+`0000` is unencrypted. **Don't route OTPs, 2FA codes, or other sensitive
+content to a Bluetooth printer.**
+
+### Useful host-side diagnostic commands
+
+```bash
+# Confirm the kernel sees the printer
+bluetoothctl paired-devices
+
+# Show pairing details + service records
+bluetoothctl info AA:BB:CC:DD:EE:FF
+
+# Live-watch BT events while reproducing the issue
+sudo dmesg -w | grep -i bluetooth
+
+# Show RFCOMM channels exposed by the printer
+sudo rfcomm -a   # only useful if you've used `rfcomm bind`
+
+# Test a manual RFCOMM connection without HA
+sudo rfcomm connect 0 AA:BB:CC:DD:EE:FF 1
+# (Ctrl-C to exit; if this connects, HA's adapter will too)
+```
 
 ---
 

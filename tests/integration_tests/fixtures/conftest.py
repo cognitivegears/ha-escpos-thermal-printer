@@ -37,7 +37,7 @@ def _get_ha_environment() -> Any:
 
 
 @pytest.fixture
-async def virtual_printer() -> AsyncGenerator[VirtualPrinterServer, None]:
+async def virtual_printer() -> AsyncGenerator[VirtualPrinterServer]:
     """Fixture that provides a virtual printer server."""
     async with VirtualPrinter(host='127.0.0.1', port=9100) as server:
         # Expose as active server for other helpers
@@ -49,7 +49,7 @@ async def virtual_printer() -> AsyncGenerator[VirtualPrinterServer, None]:
 
 
 @pytest.fixture
-async def ha_test_environment(hass: Any) -> AsyncGenerator[Any, None]:
+async def ha_test_environment(hass: Any) -> AsyncGenerator[Any]:
     """Fixture that provides a Home Assistant test environment."""
     HATestEnvironment = _get_ha_environment()
     if not HATestEnvironment:
@@ -65,7 +65,7 @@ async def ha_test_environment(hass: Any) -> AsyncGenerator[Any, None]:
 
 
 @pytest.fixture
-async def printer_with_ha(hass: Any, virtual_printer: Any) -> AsyncGenerator[tuple[Any, Any, dict[str, Any]], None]:
+async def printer_with_ha(hass: Any, virtual_printer: Any) -> AsyncGenerator[tuple[Any, Any, dict[str, Any]]]:
     """Fixture that provides both virtual printer and HA environment."""
     HATestEnvironment = _get_ha_environment()
     if not HATestEnvironment:
@@ -92,7 +92,7 @@ async def printer_with_ha(hass: Any, virtual_printer: Any) -> AsyncGenerator[tup
 
 
 @pytest.fixture
-def temp_image_file() -> Generator[str, None, None]:
+def temp_image_file() -> Generator[str]:
     """Fixture that creates a temporary image file for testing."""
     from PIL import Image
 
@@ -144,7 +144,7 @@ def automation_config() -> dict[str, Any]:
 
 
 @pytest.fixture
-async def mock_printer_server() -> AsyncGenerator[VirtualPrinterServer, None]:
+async def mock_printer_server() -> AsyncGenerator[VirtualPrinterServer]:
     """Fixture that provides a mock printer server for testing."""
     server = VirtualPrinterServer(host='127.0.0.1', port=9101)
 
@@ -190,7 +190,7 @@ def sample_print_data() -> dict[str, Any]:
 
 
 @pytest.fixture
-async def error_printer_server() -> AsyncGenerator[VirtualPrinterServer, None]:
+async def error_printer_server() -> AsyncGenerator[VirtualPrinterServer]:
     """Fixture that provides a printer server configured for error testing."""
     from tests.integration_tests.emulator import create_offline_error
 

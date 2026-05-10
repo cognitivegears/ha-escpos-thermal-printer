@@ -236,6 +236,26 @@ class TestLogSanitization:
         assert "[REDACTED]" in result
         assert "secret" not in result
 
+    def test_sanitize_redacts_bare_mac_address(self):  # type: ignore[no-untyped-def]
+        """Bluetooth MACs are personal data; redact device portion, keep OUI."""
+        message = "Bluetooth open failed for AA:BB:CC:DD:EE:FF ch=1"
+        result = sanitize_log_message(message)
+        assert "AA:BB:CC:" in result  # OUI preserved
+        assert "DD:EE:FF" not in result  # device portion redacted
+        assert "XX:XX:XX" in result
+
+    def test_sanitize_redacts_mac_with_dashes(self):  # type: ignore[no-untyped-def]
+        message = "Device 00-1A-7D-DA-71-13 unreachable"
+        result = sanitize_log_message(message)
+        assert "00-1A-7D" in result
+        assert "DA-71-13" not in result
+
+    def test_sanitize_default_field_list_includes_address_mac_alias(self):  # type: ignore[no-untyped-def]
+        message = "address=AA:BB:CC:DD:EE:FF mac=11:22:33:44:55:66 alias=Phone"
+        result = sanitize_log_message(message)
+        assert "[REDACTED]" in result
+        assert "Phone" not in result
+
 
 class TestTimeoutValidation:
     """Test timeout validation."""

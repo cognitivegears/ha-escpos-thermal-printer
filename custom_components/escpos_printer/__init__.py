@@ -11,6 +11,7 @@ from homeassistant.helpers import config_validation as cv
 
 from .capabilities import PROFILE_AUTO, is_valid_profile
 from .const import (
+    CONF_BT_MAC,
     CONF_CODEPAGE,
     CONF_CONNECTION_TYPE,
     CONF_DEFAULT_ALIGN,
@@ -21,9 +22,11 @@ from .const import (
     CONF_OUT_EP,
     CONF_PRODUCT_ID,
     CONF_PROFILE,
+    CONF_RFCOMM_CHANNEL,
     CONF_STATUS_INTERVAL,
     CONF_TIMEOUT,
     CONF_VENDOR_ID,
+    CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
     CONNECTION_TYPE_USB,
     DEFAULT_ALIGN,
@@ -31,9 +34,11 @@ from .const import (
     DEFAULT_IN_EP,
     DEFAULT_LINE_WIDTH,
     DEFAULT_OUT_EP,
+    DEFAULT_RFCOMM_CHANNEL,
     DOMAIN,
 )
 from .printer import (
+    BluetoothPrinterConfig,
     NetworkPrinterConfig,
     UsbPrinterConfig,
     create_printer_adapter,
@@ -44,7 +49,7 @@ _LOGGER = logging.getLogger(__name__)
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
-PLATFORMS: list[str] = ["notify", "binary_sensor"]
+PLATFORMS: list[str] = ["notify", "binary_sensor", "sensor"]
 
 # Track if services have been registered
 DATA_SERVICES_REGISTERED = "services_registered"
@@ -142,13 +147,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Determine connection type and create appropriate config
     connection_type = entry.data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
 
-    config: UsbPrinterConfig | NetworkPrinterConfig
+    config: UsbPrinterConfig | NetworkPrinterConfig | BluetoothPrinterConfig
     if connection_type == CONNECTION_TYPE_USB:
         config = UsbPrinterConfig(
             vendor_id=entry.data.get(CONF_VENDOR_ID, 0),
             product_id=entry.data.get(CONF_PRODUCT_ID, 0),
             in_ep=entry.data.get(CONF_IN_EP, DEFAULT_IN_EP),
             out_ep=entry.data.get(CONF_OUT_EP, DEFAULT_OUT_EP),
+            timeout=float(entry.options.get(CONF_TIMEOUT, entry.data.get(CONF_TIMEOUT, 4.0))),
+            codepage=entry.options.get(CONF_CODEPAGE) or entry.data.get(CONF_CODEPAGE),
+            profile=entry.options.get(CONF_PROFILE) or entry.data.get(CONF_PROFILE),
+            line_width=int(entry.options.get(CONF_LINE_WIDTH, entry.data.get(CONF_LINE_WIDTH, 48))),
+        )
+    elif connection_type == CONNECTION_TYPE_BLUETOOTH:
+        config = BluetoothPrinterConfig(
+            mac=str(entry.data.get(CONF_BT_MAC, "")),
+            rfcomm_channel=int(entry.data.get(CONF_RFCOMM_CHANNEL, DEFAULT_RFCOMM_CHANNEL)),
             timeout=float(entry.options.get(CONF_TIMEOUT, entry.data.get(CONF_TIMEOUT, 4.0))),
             codepage=entry.options.get(CONF_CODEPAGE) or entry.data.get(CONF_CODEPAGE),
             profile=entry.options.get(CONF_PROFILE) or entry.data.get(CONF_PROFILE),
