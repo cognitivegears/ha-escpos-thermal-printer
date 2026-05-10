@@ -11,3 +11,12 @@ wheels/
 
 # Coverage files
 .coverage
+
+# macOS Finder metadata
+.DS_Store
+
+# Local Claude Code review artifacts
+.full-review/
+
+# Local Claude Code project instructions (not source-controlled)
+CLAUDE.md
