@@ -104,6 +104,7 @@ class UsbPrinterAdapter(EscposPrinterAdapterBase):
                     )
                     raise
                 time.sleep(self._CONNECT_RETRY_DELAY_S)
+        assert last_exc is not None  # pragma: no cover
         raise last_exc  # pragma: no cover
 
     async def _status_check(self, hass: HomeAssistant) -> None:

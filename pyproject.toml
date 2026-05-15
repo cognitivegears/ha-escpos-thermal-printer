@@ -1,6 +1,6 @@
 [project]
 name = "ha-escpos-thermal-printer"
-version = "0.4.4"
+version = "0.5.0"
 description = "Network thermal printer integration for Home Assistant using ESC/POS protocol"
 readme = "README.md"
 requires-python = ">=3.13.2"
@@ -10,6 +10,7 @@ dependencies = [
   "qrcode==8.2",
   "python-barcode==0.16.1",
   "pyusb==1.3.1",
+  "dbus-fast==4.0.4",
 ]
 
 [build-system]
@@ -24,37 +25,23 @@ where = ["."]
 include = ["custom_components*", "scripts*"]
 
 [project.optional-dependencies]
-# Define pip extras so CI can install tooling via
-# `pip install -e .[dev,security]`
+# Source of truth for dev / security tooling. Both CI (`pip install -e .[dev]`)
+# and local uv workflows (`uv sync --all-extras`) read these. PEP 735
+# `[dependency-groups]` is intentionally NOT used to avoid drift.
 dev = [
     "pytest==9.0.0",
     "pytest-homeassistant-custom-component==0.13.314",
     "mypy==1.19.1",
     "ruff==0.15.1",
     "pre-commit==4.5.1",
-    "safety==3.7.0",
-    "bandit==1.9.3",
+    "bandit==1.9.4",
+    "bandit-sarif-formatter==1.1.1",
     "pip-audit==2.10.0",
-    "typer==0.21.1",
-    "marshmallow==4.2.2",
-    "aiohttp==3.13.3",
-    "cryptography==46.0.2",
-    "jinja2==3.1.6",
-    "requests==2.32.5",
-    "urllib3==2.6.3",
 ]
 security = [
-  "safety==3.7.0",
-  "bandit==1.9.3",
+  "bandit==1.9.4",
+  "bandit-sarif-formatter==1.1.1",
   "pip-audit==2.10.0",
-  "ruff==0.15.1",
-  "typer==0.21.1",
-  "marshmallow==4.2.2",
-  "aiohttp==3.13.3",
-  "cryptography==46.0.2",
-  "jinja2==3.1.6",
-  "requests==2.32.5",
-  "urllib3==2.6.3",
 ]
 
 [tool.pytest.ini_options]
@@ -67,7 +54,7 @@ markers = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = [
@@ -163,8 +150,6 @@ ignore = [
     "B904",    # raise from in tests
 ]
 "custom_components/escpos_printer/__init__.py" = ["BLE001"]
-"custom_components/escpos_printer/printer.py" = ["BLE001", "C901"]
-"custom_components/escpos_printer/config_flow.py" = ["PLR0912"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["custom_components.escpos_printer"]
@@ -191,12 +176,6 @@ strict_equality = true
 show_error_codes = true
 pretty = true
 namespace_packages = false
-exclude = [
-    "^fix_mypy_errors\\.py$",
-    "^fix_remaining_errors\\.py$",
-    "^fix_final_14_errors\\.py$",
-    "^fix_final_mypy_errors\\.py$",
-]
 
 [[tool.mypy.overrides]]
 module = [
@@ -247,7 +226,9 @@ show_missing = true
 skip_covered = false
 skip_empty = false
 precision = 2
-fail_under = 85.0
+# Matches sibling ha-pixelblaze project. Ratchet upward (target: silver-tier
+# 95%) as more error paths and config-flow steps gain coverage.
+fail_under = 80.0
 
 [tool.coverage.html]
 directory = "htmlcov"
@@ -258,34 +239,3 @@ output = "coverage.xml"
 
 [tool.coverage.json]
 output = "coverage.json"
-
-[dependency-groups]
-dev = [
-    "pytest==9.0.0",
-    "pytest-homeassistant-custom-component==0.13.314",
-    "mypy==1.19.1",
-    "ruff==0.15.1",
-    "pre-commit==4.5.1",
-    "safety==3.7.0",
-    "bandit==1.9.3",
-    "pip-audit==2.10.0",
-    "typer==0.21.1",
-    "marshmallow==4.2.2",
-    "aiohttp==3.13.3",
-    "cryptography==46.0.2",
-    "jinja2==3.1.6",
-    "requests==2.32.5",
-    "urllib3==2.6.3",
-]
-security = [
-    "safety==3.7.0",
-    "bandit==1.9.3",
-    "pip-audit==2.10.0",
-    "typer==0.21.1",
-    "marshmallow==4.2.2",
-    "aiohttp==3.13.3",
-    "cryptography==46.0.2",
-    "jinja2==3.1.6",
-    "requests==2.32.5",
-    "urllib3==2.6.3",
-]

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
-from ..const import DEFAULT_IN_EP, DEFAULT_OUT_EP
+from ..const import DEFAULT_IN_EP, DEFAULT_OUT_EP, DEFAULT_RFCOMM_CHANNEL
 
 
 @dataclass
@@ -38,8 +38,17 @@ class UsbPrinterConfig(BasePrinterConfig):
     out_ep: int = DEFAULT_OUT_EP
 
 
+@dataclass
+class BluetoothPrinterConfig(BasePrinterConfig):
+    """Configuration for Bluetooth Classic / RFCOMM printers."""
+
+    connection_type: Literal["bluetooth"] = field(default="bluetooth", repr=False)
+    mac: str = ""
+    rfcomm_channel: int = DEFAULT_RFCOMM_CHANNEL
+
+
 # Type alias for config union (use for type hints)
-PrinterConfigTypes = NetworkPrinterConfig | UsbPrinterConfig
+PrinterConfigTypes = NetworkPrinterConfig | UsbPrinterConfig | BluetoothPrinterConfig
 
 # Backward-compatible alias: PrinterConfig(...) still works and creates NetworkPrinterConfig
 # This maintains API compatibility for existing code that instantiates PrinterConfig directly

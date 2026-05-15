@@ -90,6 +90,54 @@
           "profile": "Select your printer model or Auto-detect."
         }
       },
+      "bluetooth_select": {
+        "title": "Configure Bluetooth printer",
+        "description": "Select a paired Bluetooth printer. If your printer isn't listed, pair it on the host first (HA OS: Settings → System → Hardware; otherwise run 'bluetoothctl pair AA:BB:CC:DD:EE:FF' on the host) and try again, or choose Manual MAC entry.",
+        "data": {
+          "bt_device": "Bluetooth device",
+          "rfcomm_channel": "RFCOMM channel",
+          "timeout": "Timeout (seconds)",
+          "profile": "Printer profile"
+        },
+        "data_description": {
+          "bt_device": "Select your printer from the list of paired Bluetooth devices.",
+          "rfcomm_channel": "RFCOMM channel (almost always 1 for ESC/POS printers; run 'bluetoothctl info [MAC]' on the host and look for the SerialPort service-record 'Channel:' line to confirm).",
+          "timeout": "Connection timeout in seconds.",
+          "profile": "Select your printer model or Auto-detect."
+        }
+      },
+      "bluetooth_manual": {
+        "title": "Manual Bluetooth configuration",
+        "description": "Enter the Bluetooth MAC address of a printer you have already paired on the host (HA OS: Settings → System → Hardware; otherwise 'bluetoothctl pair [MAC]'). The integration only opens an RFCOMM socket — pairing must be done outside the integration.",
+        "data": {
+          "bt_mac": "MAC address",
+          "rfcomm_channel": "RFCOMM channel",
+          "timeout": "Timeout (seconds)",
+          "profile": "Printer profile"
+        },
+        "data_description": {
+          "bt_mac": "Bluetooth MAC address in AA:BB:CC:DD:EE:FF format.",
+          "rfcomm_channel": "RFCOMM channel (almost always 1 for ESC/POS printers).",
+          "timeout": "Connection timeout in seconds.",
+          "profile": "Select your printer model or Auto-detect."
+        }
+      },
+      "bluetooth_no_devices": {
+        "title": "No paired Bluetooth printers found",
+        "description": "Your Home Assistant host can't see any paired Bluetooth printers. Pair the printer first, then come back to this screen.\n\n**On Home Assistant OS / Supervised**: open Settings → Devices & services → Bluetooth, put your printer into pairing mode, and accept the pairing.\n\n**On Home Assistant Core or Container**: pair from the host shell:\n\n```\nbluetoothctl\n[bluetooth]# scan on\n[bluetooth]# pair AA:BB:CC:DD:EE:FF\n[bluetooth]# trust AA:BB:CC:DD:EE:FF\n```\n\nIf bluez D-Bus isn't reachable from this container (rootless Docker, no `/run/dbus` mount), use the **socat host bridge** described in the [setup guide]({docs_url}). Or if you already know the printer's MAC address, **submit this form** to enter it manually.",
+        "data": {},
+        "data_description": {}
+      },
+      "bluetooth_channel_retry": {
+        "title": "Try a different RFCOMM channel",
+        "description": "The printer at {mac} refused the default RFCOMM channel (1). Most ESC/POS printers use channel 1 — your printer may use a different one. Run `bluetoothctl info [MAC]` on the host and look for the SerialPort service-record 'Channel:' line. If you don't have shell access, try 2 or 3.",
+        "data": {
+          "rfcomm_channel": "RFCOMM channel"
+        },
+        "data_description": {
+          "rfcomm_channel": "Channel number (1-30); see the printer's SDP service record."
+        }
+      },
       "codepage": {
         "title": "Printer settings",
         "description": "Configure encoding and printing defaults for your printer.",
@@ -152,7 +200,16 @@
       "invalid_line_width": "Invalid line width. Must be a positive number.",
       "invalid_usb_device": "Invalid USB device selection.",
       "invalid_discovery_info": "Invalid USB discovery information.",
-      "invalid_endpoint": "Invalid USB endpoint address. Must be between 0x00 and 0xFF (0-255)."
+      "invalid_endpoint": "Invalid USB endpoint address. Must be between 0x00 and 0xFF (0-255).",
+      "cannot_connect_bt": "Failed to connect to Bluetooth printer. Verify the device is paired, powered on, and within range.",
+      "bt_unavailable": "Bluetooth Classic (AF_BLUETOOTH/RFCOMM) is not available in this environment. On Home Assistant Container this typically means the container needs '--net=host' and the NET_ADMIN/NET_RAW capabilities. See the README for setup instructions.",
+      "bt_permission_denied": "Permission denied opening the Bluetooth socket. Ensure the Home Assistant process can access bluez (typically requires the 'bluetooth' group on bare Linux).",
+      "bt_device_not_found": "Bluetooth device not found. Pair the printer first using 'bluetoothctl' on the host or HA OS Settings → System → Hardware.",
+      "bt_host_down": "Bluetooth printer is not reachable. Make sure it's powered on, within range, and not currently connected to another host (most BT printers accept only one connection at a time).",
+      "bt_timeout": "Timed out connecting to Bluetooth printer. The printer may be asleep — try printing once to wake it, or increase the timeout.",
+      "bt_channel_refused": "The printer is reachable but refused the RFCOMM channel. Most ESC/POS printers use channel 1 — try a different channel, or run 'bluetoothctl info [MAC]' on the host to confirm the SerialPort service-record channel.",
+      "invalid_bt_mac": "Invalid Bluetooth MAC address. Expected format AA:BB:CC:DD:EE:FF.",
+      "invalid_rfcomm_channel": "Invalid RFCOMM channel. Must be between 1 and 30."
     },
     "abort": {
       "already_configured": "This printer is already configured.",

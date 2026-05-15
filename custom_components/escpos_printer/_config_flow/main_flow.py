@@ -12,10 +12,12 @@ import voluptuous as vol
 
 from ..const import (
     CONF_CONNECTION_TYPE,
+    CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
     CONNECTION_TYPE_USB,
     DOMAIN,
 )
+from .bluetooth_steps import BluetoothFlowMixin
 from .import_steps import ImportFlowMixin
 from .network_steps import NetworkFlowMixin
 from .settings_steps import SettingsFlowMixin
@@ -27,6 +29,7 @@ _LOGGER = logging.getLogger(__name__)
 class EscposConfigFlow(
     NetworkFlowMixin,
     UsbFlowMixin,
+    BluetoothFlowMixin,
     SettingsFlowMixin,
     ImportFlowMixin,
     config_entries.ConfigFlow,
@@ -41,6 +44,9 @@ class EscposConfigFlow(
         self._user_data: dict[str, Any] = {}
         self._discovered_printers: list[dict[str, Any]] = []
         self._all_usb_devices: list[dict[str, Any]] = []
+        self._paired_bt_devices: list[dict[str, Any]] = []
+        self._show_all_bt_devices: bool = False
+        self._pending_bt: dict[str, Any] = {}
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -59,6 +65,8 @@ class EscposConfigFlow(
 
             if connection_type == CONNECTION_TYPE_USB:
                 return await self.async_step_usb_select()
+            if connection_type == CONNECTION_TYPE_BLUETOOTH:
+                return await self.async_step_bluetooth_select()
             return await self.async_step_network()
 
         data_schema = vol.Schema(
@@ -67,6 +75,7 @@ class EscposConfigFlow(
                     {
                         CONNECTION_TYPE_NETWORK: "Network (TCP/IP)",
                         CONNECTION_TYPE_USB: "USB (Direct)",
+                        CONNECTION_TYPE_BLUETOOTH: "Bluetooth (RFCOMM)",
                     }
                 ),
             }

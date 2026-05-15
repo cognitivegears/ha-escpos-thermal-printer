@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.notify import (
     ATTR_MESSAGE,
@@ -9,16 +9,22 @@ from homeassistant.components.notify import (
     NotifyEntity,
     NotifyEntityFeature,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_platform
 import voluptuous as vol
 
-from .const import DOMAIN
 from .text_utils import transcode_to_codepage
 
+if TYPE_CHECKING:
+    from . import EscposConfigEntry
+
 _LOGGER = logging.getLogger(__name__)
+
+# Notify entities don't poll; this constant only governs entity update
+# concurrency. Printer I/O serialization is enforced by the adapter's
+# asyncio.Lock — not here.
+PARALLEL_UPDATES = 0
 
 SERVICE_PRINT_MESSAGE = "print_message"
 
@@ -46,7 +52,7 @@ SERVICE_PRINT_MESSAGE_SCHEMA = cv.make_entity_service_schema(
 )
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> None:  # type: ignore[no-untyped-def]
+async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry, async_add_entities) -> None:  # type: ignore[no-untyped-def]
     _LOGGER.debug("Setting up notify entity for entry %s", entry.entry_id)
     async_add_entities([EscposNotifyEntity(hass, entry)])
 
@@ -72,7 +78,7 @@ class EscposNotifyEntity(NotifyEntity):
     _attr_has_entity_name = True
     _attr_supported_features = NotifyEntityFeature.TITLE
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+    def __init__(self, hass: HomeAssistant, entry: EscposConfigEntry) -> None:
         """Initialize the notification entity."""
         self._hass = hass
         self._entry = entry
@@ -102,8 +108,8 @@ class EscposNotifyEntity(NotifyEntity):
             len(message or ""),
             list(kwargs.keys()),
         )
-        defaults = self._hass.data[DOMAIN][self._entry.entry_id]["defaults"]
-        adapter = self._hass.data[DOMAIN][self._entry.entry_id]["adapter"]
+        defaults = self._entry.runtime_data.defaults
+        adapter = self._entry.runtime_data.adapter
 
         text = f"{title}\n{message}" if title else message
 

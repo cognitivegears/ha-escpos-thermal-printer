@@ -13,47 +13,44 @@ def auto_enable_custom_integrations(enable_custom_integrations: Any) -> None:
 
 
 @pytest.fixture(autouse=True)
-def fake_escpos_module(request: Any) -> Generator[None, None, None]:
+def fake_escpos_module(
+    request: Any, monkeypatch: pytest.MonkeyPatch
+) -> Generator[None]:
     # Do not stub escpos for integration tests; use real network path
     if request.node.get_closest_marker("integration"):
         yield
         return
     escpos = types.ModuleType("escpos")
     printer = types.ModuleType("escpos.printer")
+    escpos_pkg = types.ModuleType("escpos.escpos")
 
-    class _FakeNetwork:
-        def __init__(self, *_, **__):  # type: ignore[no-untyped-def]
-            pass
+    # Single no-op surface shared by every fake. Adding a method here is one
+    # change instead of three — and no risk of one fake silently lacking a
+    # method that another exposes.
+    class _FakeEscposCommon:
+        def set(self, *_: Any, **__: Any) -> None: pass
+        def text(self, *_: Any, **__: Any) -> None: pass
+        def qr(self, *_: Any, **__: Any) -> None: pass
+        def image(self, *_: Any, **__: Any) -> None: pass
+        def control(self, *_: Any, **__: Any) -> None: pass
+        def cut(self, *_: Any, **__: Any) -> None: pass
+        def close(self) -> None: pass
+        def _set_codepage(self, *_: Any, **__: Any) -> None: pass
+        def _raw(self, *_: Any, **__: Any) -> None: pass
+        def barcode(self, *_: Any, **__: Any) -> None: pass
+        def buzzer(self, *_: Any, **__: Any) -> None: pass
+        def beep(self, *_: Any, **__: Any) -> None: pass
+        def ln(self, *_: Any, **__: Any) -> None: pass
+        def charcode(self, *_: Any, **__: Any) -> None: pass
 
-        def set(self, *_: Any, **__: Any) -> None:
-            pass
+    class _FakeNetwork(_FakeEscposCommon):
+        def __init__(self, *_: Any, **__: Any) -> None: pass
 
-        def text(self, *_: Any, **__: Any) -> None:
-            pass
-
-        def qr(self, *_: Any, **__: Any) -> None:
-            pass
-
-        def image(self, *_: Any, **__: Any) -> None:
-            pass
-
-        def control(self, *_: Any, **__: Any) -> None:
-            pass
-
-        def cut(self, *_: Any, **__: Any) -> None:
-            pass
-
-        def close(self) -> None:
-            pass
-
-        def _set_codepage(self, *_, **__):  # type: ignore[no-untyped-def]
-            pass
-
-        def _raw(self, *_, **__):  # type: ignore[no-untyped-def]
-            pass
-
-    class _FakeUsb:
-        def __init__(self, id_vendor: int = 0, id_product: int = 0, timeout: int = 0, in_ep: int = 0x82, out_ep: int = 0x01, profile: Any = None, **__: Any):  # type: ignore[no-untyped-def]
+    class _FakeUsb(_FakeEscposCommon):
+        def __init__(
+            self, id_vendor: int = 0, id_product: int = 0, timeout: int = 0,
+            in_ep: int = 0x82, out_ep: int = 0x01, profile: Any = None, **__: Any,
+        ) -> None:
             self.idVendor = id_vendor  # Match real USB API
             self.idProduct = id_product  # Match real USB API
             self.timeout = timeout
@@ -61,59 +58,41 @@ def fake_escpos_module(request: Any) -> Generator[None, None, None]:
             self.out_ep = out_ep
             self.profile = profile
 
-        def set(self, *_: Any, **__: Any) -> None:
-            pass
-
-        def text(self, *_: Any, **__: Any) -> None:
-            pass
-
-        def qr(self, *_: Any, **__: Any) -> None:
-            pass
-
-        def image(self, *_: Any, **__: Any) -> None:
-            pass
-
-        def control(self, *_: Any, **__: Any) -> None:
-            pass
-
-        def cut(self, *_: Any, **__: Any) -> None:
-            pass
-
-        def close(self) -> None:
-            pass
-
-        def _set_codepage(self, *_, **__):  # type: ignore[no-untyped-def]
-            pass
-
-        def _raw(self, *_, **__):  # type: ignore[no-untyped-def]
-            pass
-
-        def barcode(self, *_, **__):  # type: ignore[no-untyped-def]
-            pass
-
-        def buzzer(self, *_, **__):  # type: ignore[no-untyped-def]
-            pass
-
-        def beep(self, *_, **__):  # type: ignore[no-untyped-def]
-            pass
-
-        def ln(self, *_, **__):  # type: ignore[no-untyped-def]
-            pass
-
-        def charcode(self, *_, **__):  # type: ignore[no-untyped-def]
-            pass
+    class _FakeEscposBase(_FakeEscposCommon):
+        def __init__(self, profile: Any = None, **__: Any) -> None:
+            self.profile = profile
 
     printer.Network = _FakeNetwork  # type: ignore[attr-defined]
     printer.Usb = _FakeUsb  # type: ignore[attr-defined]
     escpos.printer = printer  # type: ignore[attr-defined]
+    escpos_pkg.Escpos = _FakeEscposBase  # type: ignore[attr-defined]
+    escpos.escpos = escpos_pkg  # type: ignore[attr-defined]
 
-    sys.modules.setdefault("escpos", escpos)
-    sys.modules.setdefault("escpos.printer", printer)
-    yield
+    # Use monkeypatch.setitem so each test's stub is automatically reverted at
+    # teardown. Previously this used sys.modules.setdefault which never cleaned
+    # up — that leaked the fakes into integration tests run in the same session
+    # and forced an _ensure_real_escpos hack on the integration-test side.
+    monkeypatch.setitem(sys.modules, "escpos", escpos)
+    monkeypatch.setitem(sys.modules, "escpos.printer", printer)
+    monkeypatch.setitem(sys.modules, "escpos.escpos", escpos_pkg)
+
+    # The Bluetooth subclass is cached at module scope; invalidate it so the
+    # next make_bluetooth_escpos call resolves the (just-installed) fake base.
+    # Drop again on teardown so a later integration test resolves the real
+    # Escpos module.
+    from custom_components.escpos_printer.printer import _escpos_bluetooth
+
+    _escpos_bluetooth._get_bluetooth_escpos_cls.cache_clear()
+    try:
+        yield
+    finally:
+        _escpos_bluetooth._get_bluetooth_escpos_cls.cache_clear()
 
 
 @pytest.fixture(autouse=True)
-def fake_usb_module(request: Any) -> Generator[None, None, None]:
+def fake_usb_module(
+    request: Any, monkeypatch: pytest.MonkeyPatch
+) -> Generator[None]:
     """Provide a fake usb module for unit tests."""
     if request.node.get_closest_marker("integration"):
         yield
@@ -140,10 +119,51 @@ def fake_usb_module(request: Any) -> Generator[None, None, None]:
     usb.core = usb_core  # type: ignore[attr-defined]
     usb.util = usb_util  # type: ignore[attr-defined]
 
-    sys.modules.setdefault("usb", usb)
-    sys.modules.setdefault("usb.core", usb_core)
-    sys.modules.setdefault("usb.util", usb_util)
+    monkeypatch.setitem(sys.modules, "usb", usb)
+    monkeypatch.setitem(sys.modules, "usb.core", usb_core)
+    monkeypatch.setitem(sys.modules, "usb.util", usb_util)
     yield
+
+
+@pytest.fixture(autouse=True)
+def fake_bluetooth_module(request: Any) -> Generator[None]:
+    """Stub out dbus-fast and AF_BLUETOOTH for unit tests.
+
+    Unit tests must not touch a real D-Bus or kernel Bluetooth stack. The
+    bluetooth helpers gracefully degrade when ``dbus_fast`` import fails
+    or D-Bus isn't reachable, so by default we just remove dbus_fast from
+    sys.modules and let the helpers return an empty paired list. Tests
+    that need to drive specific D-Bus replies can install their own fake
+    via ``sys.modules["dbus_fast"]``.
+    """
+    if request.node.get_closest_marker("integration"):
+        yield
+        return
+
+    # Patch the RFCOMM transport seam so we never touch a real socket.
+    # Tests that want to assert on behavior can monkeypatch this further.
+    from custom_components.escpos_printer.printer import bluetooth_transport as bt_mod
+
+    class _StubTransport:
+        def __init__(self) -> None:
+            self.written: list[bytes] = []
+            self.closed = False
+
+        def write(self, data: bytes) -> None:
+            self.written.append(data)
+
+        def close(self) -> None:
+            self.closed = True
+
+    def _stub_open(_mac: str, _channel: int, _timeout: float) -> _StubTransport:
+        return _StubTransport()
+
+    original = bt_mod.open_rfcomm_transport
+    bt_mod.open_rfcomm_transport = _stub_open  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        bt_mod.open_rfcomm_transport = original  # type: ignore[assignment]
 
 
 @pytest.fixture(autouse=True)

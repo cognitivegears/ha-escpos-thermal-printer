@@ -18,6 +18,7 @@ from ..capabilities import (
     is_valid_profile,
 )
 from ..const import (
+    CONF_BT_MAC,
     CONF_CODEPAGE,
     CONF_CONNECTION_TYPE,
     CONF_DEFAULT_ALIGN,
@@ -28,6 +29,7 @@ from ..const import (
     CONF_PRODUCT_ID,
     CONF_PROFILE,
     CONF_VENDOR_ID,
+    CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
     CONNECTION_TYPE_USB,
     DEFAULT_ALIGN,
@@ -36,6 +38,22 @@ from ..const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _make_entry_title(data: dict[str, Any], user_data: dict[str, Any]) -> str:
+    """Build a config entry title from the merged data, by connection type."""
+    connection_type = data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
+    if connection_type == CONNECTION_TYPE_USB:
+        return str(user_data.get(
+            "_printer_name",
+            f"USB Printer {data.get(CONF_VENDOR_ID, 0):04X}:{data.get(CONF_PRODUCT_ID, 0):04X}",
+        ))
+    if connection_type == CONNECTION_TYPE_BLUETOOTH:
+        return str(user_data.get(
+            "_printer_name",
+            f"Bluetooth Printer {data.get(CONF_BT_MAC, '')}",
+        ))
+    return f"{data[CONF_HOST]}:{data[CONF_PORT]}"
 
 
 class SettingsFlowMixin:
@@ -148,17 +166,7 @@ class SettingsFlowMixin:
             # Remove internal keys
             data.pop("_printer_name", None)
 
-            # Generate title based on connection type
-            connection_type = data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
-            if connection_type == CONNECTION_TYPE_USB:
-                title = self._user_data.get(
-                    "_printer_name",
-                    f"USB Printer {data.get(CONF_VENDOR_ID, 0):04X}:{data.get(CONF_PRODUCT_ID, 0):04X}"
-                )
-            else:
-                host = data[CONF_HOST]
-                port = data[CONF_PORT]
-                title = f"{host}:{port}"
+            title = _make_entry_title(data, self._user_data)
 
             _LOGGER.debug(
                 "Creating config entry for %s with profile=%s codepage=%s",
@@ -249,17 +257,7 @@ class SettingsFlowMixin:
                 # Remove internal keys
                 data.pop("_printer_name", None)
 
-                # Generate title based on connection type
-                connection_type = data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
-                if connection_type == CONNECTION_TYPE_USB:
-                    title = self._user_data.get(
-                        "_printer_name",
-                        f"USB Printer {data.get(CONF_VENDOR_ID, 0):04X}:{data.get(CONF_PRODUCT_ID, 0):04X}"
-                    )
-                else:
-                    host = data[CONF_HOST]
-                    port = data[CONF_PORT]
-                    title = f"{host}:{port}"
+                title = _make_entry_title(data, self._user_data)
 
                 return self.async_create_entry(title=title, data=data)  # type: ignore[attr-defined,no-any-return]
 
@@ -312,17 +310,7 @@ class SettingsFlowMixin:
                 # Remove internal keys
                 data.pop("_printer_name", None)
 
-                # Generate title based on connection type
-                connection_type = data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
-                if connection_type == CONNECTION_TYPE_USB:
-                    title = self._user_data.get(
-                        "_printer_name",
-                        f"USB Printer {data.get(CONF_VENDOR_ID, 0):04X}:{data.get(CONF_PRODUCT_ID, 0):04X}"
-                    )
-                else:
-                    host = data[CONF_HOST]
-                    port = data[CONF_PORT]
-                    title = f"{host}:{port}"
+                title = _make_entry_title(data, self._user_data)
 
                 return self.async_create_entry(title=title, data=data)  # type: ignore[attr-defined,no-any-return]
 

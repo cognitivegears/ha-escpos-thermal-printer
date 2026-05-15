@@ -3,12 +3,12 @@ from __future__ import annotations
 from collections.abc import Callable
 import contextlib
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass, BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 
 from .const import (
     CONF_CONNECTION_TYPE,
@@ -17,11 +17,17 @@ from .const import (
     DOMAIN,
 )
 
+if TYPE_CHECKING:
+    from . import EscposConfigEntry
+
 _LOGGER = logging.getLogger(__name__)
 
+# Status updates are pushed by the adapter's status listener; no polling here.
+PARALLEL_UPDATES = 0
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> None:  # type: ignore[no-untyped-def]
-    adapter = hass.data[DOMAIN][entry.entry_id]["adapter"]
+
+async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry, async_add_entities) -> None:  # type: ignore[no-untyped-def]
+    adapter = entry.runtime_data.adapter
     entity = EscposOnlineSensor(hass, entry, adapter)
     async_add_entities([entity])
 
@@ -30,6 +36,7 @@ class EscposOnlineSensor(BinarySensorEntity):
     _attr_has_entity_name = True
     _attr_name = "Online"
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, adapter: Any) -> None:
         self._hass = hass

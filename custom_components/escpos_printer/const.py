@@ -16,12 +16,24 @@ CONF_LINE_WIDTH = "line_width"
 CONF_CONNECTION_TYPE = "connection_type"
 CONNECTION_TYPE_NETWORK = "network"
 CONNECTION_TYPE_USB = "usb"
+CONNECTION_TYPE_BLUETOOTH = "bluetooth"
 
 # USB configuration keys
 CONF_VENDOR_ID = "vendor_id"
 CONF_PRODUCT_ID = "product_id"
 CONF_IN_EP = "in_ep"
 CONF_OUT_EP = "out_ep"
+
+# Bluetooth configuration keys
+CONF_BT_MAC = "bt_mac"
+CONF_BT_DEVICE = "bt_device"
+CONF_RFCOMM_CHANNEL = "rfcomm_channel"
+
+# Sentinel value for the manual-MAC-entry choice in the BT picker dropdown.
+BT_MANUAL_ENTRY_KEY = "__manual__"
+
+# Sentinel for "show all paired devices, not just imaging-class" in the picker.
+BT_SHOW_ALL_KEY = "__show_all__"
 
 # Default values
 DEFAULT_PORT = 9100
@@ -34,6 +46,9 @@ DEFAULT_CODEPAGE = "CP437"
 # USB defaults
 DEFAULT_IN_EP = 0x82
 DEFAULT_OUT_EP = 0x01
+
+# Bluetooth defaults
+DEFAULT_RFCOMM_CHANNEL = 1
 
 # Known thermal printer vendor IDs for auto-discovery
 # Source: http://www.linux-usb.org/usb.ids

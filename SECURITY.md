@@ -19,10 +19,9 @@ The integration implements comprehensive input validation to prevent injection a
 
 The project includes automated security scanning as part of the development and CI/CD process:
 
-- **Safety**: Scans Python dependencies for known security vulnerabilities
 - **Bandit**: Performs static analysis to detect common security issues in Python code
 - **pip-audit**: Audits installed packages for known vulnerabilities
-- **Ruff Security Rules**: Includes security-focused linting rules
+- **Ruff Security Rules** (`S` category): Security-focused linting rules run as part of the main lint job
 
 ### 3. Secure Coding Practices
 
@@ -57,21 +56,25 @@ _LOGGER.debug(log_msg)
 
 ## Security Configuration
 
-### Bandit Configuration (.bandit)
-```ini
-[bandit]
-exclude_dirs = ["tests", ".git", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"]
-skips = ["B101", "B601", "B603", "B607"]
-```
+### Bandit
+
+Bandit runs in CI as `bandit -r custom_components/escpos_printer -lll`. The
+`-lll` flag fails the build only on HIGH-severity findings; LOW/MEDIUM
+findings appear in the JSON report uploaded as SARIF. Project-specific
+ignores live in `pyproject.toml` under `[tool.ruff.lint] ignore` for the
+flake8-bandit (`S`) rule family.
 
 ### Ruff Security Rules (pyproject.toml)
 ```toml
-[tool.ruff]
+[tool.ruff.lint]
 select = [
     "S",      # flake8-bandit (security)
     # ... other rules
 ]
 ```
+
+The `S` ruleset runs as part of the main `ruff check .` invocation in
+`validate.yml`; there is no separate security-only ruff pass.
 
 ## CI/CD Security Integration
 
@@ -85,18 +88,9 @@ The project includes automated security scanning in CI/CD:
 
 ### Running Security Scans Locally
 
-#### Quick Security Scan
 ```bash
-python scripts/security_scan.py
-```
-
-#### Individual Security Tools
-```bash
-# Dependency vulnerability scan
-safety check --full-report
-
-# Python security linting
-bandit -r custom_components/escpos_printer
+# Python security linting (HIGH-severity gate)
+bandit -r custom_components/escpos_printer -lll
 
 # Dependency audit
 pip-audit
@@ -123,10 +117,10 @@ pip-audit
 
 If you discover a security vulnerability in this integration:
 
-1. **Do not** create a public GitHub issue
-2. Email security concerns to: [security contact information]
-3. Include detailed information about the vulnerability
-4. Allow reasonable time for response and fixes
+1. **Do not** create a public GitHub issue.
+2. Report it privately via [GitHub Security Advisories](https://github.com/cognitivegears/ha-escpos-thermal-printer/security/advisories/new).
+3. Include detailed information about the vulnerability and a reproduction case.
+4. Allow reasonable time for response and a fix before public disclosure.
 
 ## Security Best Practices for Users
 
@@ -192,4 +186,3 @@ This integration follows security best practices aligned with:
 - [Python Security Best Practices](https://bestpractices.coreinfrastructure.org/en/projects/221)
 - [Home Assistant Security Guidelines](https://developers.home-assistant.io/docs/development_security)
 - [Bandit Documentation](https://bandit.readthedocs.io/)
-- [Safety Documentation](https://pyup.io/safety/)

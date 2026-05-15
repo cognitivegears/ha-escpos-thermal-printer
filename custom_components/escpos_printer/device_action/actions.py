@@ -77,20 +77,17 @@ async def async_call_action_from_config(
     if entry_id is None:
         raise ValueError(f"Device {device_id} not found")
 
-    domain_data = hass.data.get(DOMAIN, {})
-    entry_data = domain_data.get(entry_id)
-    if entry_data is None:
+    entry = hass.config_entries.async_get_entry(entry_id)
+    if entry is None or not hasattr(entry, "runtime_data"):
         raise ValueError(f"No data found for entry {entry_id}")
 
-    adapter = entry_data.get("adapter")
-    if adapter is None:
-        raise ValueError(f"No adapter found for entry {entry_id}")
-
-    defaults = entry_data.get("defaults", {})
+    runtime_data = entry.runtime_data
+    adapter = runtime_data.adapter
+    defaults = runtime_data.defaults
 
     # Execute the appropriate action
     if action_type == ACTION_PRINT_TEXT_UTF8:
-        await _call_print_text_utf8(hass, adapter, defaults, config, entry_data)
+        await _call_print_text_utf8(hass, adapter, defaults, config)
     elif action_type == ACTION_PRINT_TEXT:
         await _call_print_text(hass, adapter, defaults, config)
     elif action_type == ACTION_PRINT_QR:
@@ -116,7 +113,6 @@ async def _call_print_text_utf8(
     adapter: Any,
     defaults: dict[str, Any],
     config: ConfigType,
-    entry_data: dict[str, Any],
 ) -> None:
     """Execute print_text_utf8 action."""
     text = config[ATTR_TEXT]
