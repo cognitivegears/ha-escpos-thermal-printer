@@ -95,6 +95,19 @@ The printer should be in this list. You can also check `bluetoothctl devices Tru
 
 > If HA shows "No paired Bluetooth printers found" right after pairing, restart Home Assistant (**Settings → System → Restart**) and try again.
 
+The dropdown filters to imaging-class Bluetooth devices by default so your phone and headset don't clutter the list. If your printer doesn't advertise the Class-of-Device correctly (some cheap models don't), pick **Show all paired Bluetooth devices** from the dropdown. Or use **Manual MAC entry** if you already know the address.
+
+The **RFCOMM channel** is hidden by default — almost every ESC/POS printer uses channel 1. If the connection test fails with `bt_channel_refused` you'll be prompted for a different one. Power users can also enable HA's *Advanced Mode* in their profile to surface the field up-front.
+
+### No paired devices found
+
+If the picker shows **No paired Bluetooth printers found**:
+
+- The host can't see any paired BT devices, *or*
+- bluez D-Bus isn't reachable from the HA process (most likely on HA Container without `/run/dbus` mounted, or rootless Docker).
+
+Pair the printer first using the steps above, or — if you already know the MAC — submit the form to enter it manually. The data plane works without bluez D-Bus as long as `AF_BLUETOOTH` is reachable.
+
 ## Connection settings
 
 | Setting | Description | Default |
@@ -117,7 +130,37 @@ bluetoothctl info AA:BB:CC:DD:EE:FF
 
 ## Container deployments
 
-HA Container needs `network_mode: host`, `cap_add: [NET_ADMIN, NET_RAW]`, and a `/run/dbus` bind-mount to use BT printers. If you want to keep Docker isolation, prefer the `socat` host-bridge fallback documented in the [README](../README.md) — it routes BT prints through the existing Network adapter and needs no special container privileges.
+HA Container needs the host's Bluetooth stack exposed for the BT printer flow:
+
+```yaml
+# docker-compose.yml
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    network_mode: host          # required for AF_BLUETOOTH
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - /run/dbus:/run/dbus:ro  # only needed for paired-device discovery
+      - ./config:/config
+    restart: unless-stopped
+```
+
+These settings substantially weaken Docker's isolation — see [Security considerations](#security-considerations) before adopting them. **If you care about container isolation, use the [`socat` host bridge](#host-bridge-fallback-socat) instead.**
+
+**Rootless Docker / Podman** is not supported because of a known D-Bus EXTERNAL-auth limitation; use the host bridge.
+
+## Host bridge fallback (`socat`)
+
+If exposing bluez D-Bus to your container isn't workable, run `socat` on the host as a one-line bridge and use the integration's existing **Network (TCP/IP)** flow instead — zero new code path, no privilege grants:
+
+```bash
+# Install socat once: apt install socat
+socat TCP-LISTEN:9100,reuseaddr,fork BLUETOOTH-RFCOMM:AA:BB:CC:DD:EE:FF:1 &
+```
+
+Add the printer in HA as a network printer at `127.0.0.1:9100`.
 
 ## Battery sensor
 
@@ -125,9 +168,12 @@ For BT printers that expose `org.bluez.Battery1`, a `sensor.<printer>_battery` e
 
 ## Security considerations
 
-Bluetooth Classic SPP / RFCOMM is **plaintext by default** with no-PIN or `0000` pairings. **Don't route OTPs, 2FA codes, or other sensitive content to a Bluetooth printer**. See the [README's security section](../README.md#security-considerations) for the threat model.
+Bluetooth Classic / RFCOMM has security properties you should understand before routing sensitive notifications to a paired printer:
 
-The integration enforces a recommended `status_interval` floor of 60 seconds for BT entries — aggressive polling makes cheap printers beep on every probe and competes with in-flight prints.
+- **The radio link is not encrypted by default.** Most ESC/POS thermal printers pair with no PIN or with `0000`, both of which negotiate a "Just Works" link key. ESC/POS bytes are recoverable over the air with consumer-grade SDR / Ubertooth equipment within ~10 metres. **Avoid routing OTPs, 2FA codes, door-access logs, alarm-disarm codes, or other sensitive content to a Bluetooth printer.**
+- **Pairing is not authentication.** An attacker who can spoof your printer's MAC (`bdaddr -i hci0 AA:BB:CC:DD:EE:FF`) and listen on RFCOMM channel 1 will receive every print HA sends while the real printer is off or out of range. If integrity matters, prefer wired (USB) or a network printer on a trusted VLAN. Re-pair after any factory reset, theft, or extended absence.
+- **Container exposure trade-off.** The docker-compose settings in [Container deployments](#container-deployments) remove Docker's network-namespace isolation, grant raw-socket / iptables / route-table powers, and expose the system D-Bus protocol (`:ro` only protects the socket *file*, not bus messages). A vulnerability in any HA integration becomes more impactful in this configuration. Prefer the [`socat` host bridge](#host-bridge-fallback-socat) when isolation matters.
+- **Status polling competes with prints.** Bluetooth Classic accepts one client at a time, so each status check is a real RFCOMM open and many cheap printers audibly beep on every connect. Set **Status check interval** to **60 seconds or longer** (or leave at `0` and rely on print success/failure for liveness). Aggressive polling beeps the printer, drains battery on portable models, and contends with in-flight print jobs. The integration enforces a recommended floor of 60 seconds for BT entries.
 
 ## Troubleshooting
 
