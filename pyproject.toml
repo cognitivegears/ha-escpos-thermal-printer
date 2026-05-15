@@ -29,7 +29,7 @@ include = ["custom_components*", "scripts*"]
 # and local uv workflows (`uv sync --all-extras`) read these. PEP 735
 # `[dependency-groups]` is intentionally NOT used to avoid drift.
 dev = [
-    "pytest==9.0.0",
+    "pytest==9.0.3",
     "pytest-homeassistant-custom-component==0.13.314",
     "mypy==1.19.1",
     "ruff==0.15.1",
