@@ -36,7 +36,7 @@ from .usb_helpers import (
 )
 
 if TYPE_CHECKING:
-    from homeassistant.components.usb import UsbServiceInfo
+    from homeassistant.helpers.service_info.usb import UsbServiceInfo
 
 _LOGGER = logging.getLogger(__name__)
 

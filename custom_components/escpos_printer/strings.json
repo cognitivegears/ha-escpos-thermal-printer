@@ -101,14 +101,14 @@
         },
         "data_description": {
           "bt_device": "Select your printer from the list of paired Bluetooth devices.",
-          "rfcomm_channel": "RFCOMM channel (almost always 1 for ESC/POS printers; run 'bluetoothctl info <MAC>' on the host and look for the SerialPort service-record 'Channel:' line to confirm).",
+          "rfcomm_channel": "RFCOMM channel (almost always 1 for ESC/POS printers; run 'bluetoothctl info [MAC]' on the host and look for the SerialPort service-record 'Channel:' line to confirm).",
           "timeout": "Connection timeout in seconds.",
           "profile": "Select your printer model or Auto-detect."
         }
       },
       "bluetooth_manual": {
         "title": "Manual Bluetooth configuration",
-        "description": "Enter the Bluetooth MAC address of a printer you have already paired on the host (HA OS: Settings → System → Hardware; otherwise 'bluetoothctl pair <MAC>'). The integration only opens an RFCOMM socket — pairing must be done outside the integration.",
+        "description": "Enter the Bluetooth MAC address of a printer you have already paired on the host (HA OS: Settings → System → Hardware; otherwise 'bluetoothctl pair [MAC]'). The integration only opens an RFCOMM socket — pairing must be done outside the integration.",
         "data": {
           "bt_mac": "MAC address",
           "rfcomm_channel": "RFCOMM channel",
@@ -130,7 +130,7 @@
       },
       "bluetooth_channel_retry": {
         "title": "Try a different RFCOMM channel",
-        "description": "The printer at {mac} refused the default RFCOMM channel (1). Most ESC/POS printers use channel 1 — your printer may use a different one. Run `bluetoothctl info <MAC>` on the host and look for the SerialPort service-record 'Channel:' line. If you don't have shell access, try 2 or 3.",
+        "description": "The printer at {mac} refused the default RFCOMM channel (1). Most ESC/POS printers use channel 1 — your printer may use a different one. Run `bluetoothctl info [MAC]` on the host and look for the SerialPort service-record 'Channel:' line. If you don't have shell access, try 2 or 3.",
         "data": {
           "rfcomm_channel": "RFCOMM channel"
         },
@@ -207,7 +207,7 @@
       "bt_device_not_found": "Bluetooth device not found. Pair the printer first using 'bluetoothctl' on the host or HA OS Settings → System → Hardware.",
       "bt_host_down": "Bluetooth printer is not reachable. Make sure it's powered on, within range, and not currently connected to another host (most BT printers accept only one connection at a time).",
       "bt_timeout": "Timed out connecting to Bluetooth printer. The printer may be asleep — try printing once to wake it, or increase the timeout.",
-      "bt_channel_refused": "The printer is reachable but refused the RFCOMM channel. Most ESC/POS printers use channel 1 — try a different channel, or run 'bluetoothctl info <MAC>' on the host to confirm the SerialPort service-record channel.",
+      "bt_channel_refused": "The printer is reachable but refused the RFCOMM channel. Most ESC/POS printers use channel 1 — try a different channel, or run 'bluetoothctl info [MAC]' on the host to confirm the SerialPort service-record channel.",
       "invalid_bt_mac": "Invalid Bluetooth MAC address. Expected format AA:BB:CC:DD:EE:FF.",
       "invalid_rfcomm_channel": "Invalid RFCOMM channel. Must be between 1 and 30."
     },

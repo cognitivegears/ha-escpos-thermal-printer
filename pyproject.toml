@@ -35,10 +35,12 @@ dev = [
     "ruff==0.15.1",
     "pre-commit==4.5.1",
     "bandit==1.9.4",
+    "bandit-sarif-formatter==1.1.1",
     "pip-audit==2.10.0",
 ]
 security = [
   "bandit==1.9.4",
+  "bandit-sarif-formatter==1.1.1",
   "pip-audit==2.10.0",
 ]
 
