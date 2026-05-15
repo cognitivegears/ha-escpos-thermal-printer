@@ -5,7 +5,8 @@
 [![HACS Validation](https://github.com/cognitivegears/ha-escpos-thermal-printer/actions/workflows/hacs.yml/badge.svg)](https://github.com/cognitivegears/ha-escpos-thermal-printer/actions/workflows/hacs.yml)
 
 Print receipts, labels, QR codes, and more from Home Assistant automations.
-Connect any network or USB thermal printer and start printing in minutes.
+Connect any ESC/POS capable network, USB, or bluetooth thermal printer and
+start printing in minutes.
 
 ![Printed Receipt Example](docs/assets/receipt.png)
 
@@ -13,10 +14,12 @@ Connect any network or USB thermal printer and start printing in minutes.
 
 - **Automate physical output** - Print door access logs, temperature alerts,
 todo lists, daily reports, or shopping lists automatically
-- **Works with cheap hardware** - Any $30+ thermal printer (network or USB) that supports
-ESC/POS will work
-- **Network and USB support** - Connect via TCP/IP or plug directly via USB
-- **Multiple printers** - Set up as many printers as you need and target them individually or broadcast to all
+- **Works with cheap hardware** - Any $30+ thermal printer (network, USB, or bluetooth)
+that supports ESC/POS will work
+- **Network, USB, and bluetooth support** - Connect via TCP/IP, plug directly via
+USB, or print wirelessly
+- **Multiple printers** - Set up as many printers as you need and target them
+individually or broadcast to all
 - **No cloud required** - Direct connection to your printers, everything stays local
 
 ## Features
@@ -61,7 +64,8 @@ ESC/POS will work
 4. Select your printer model or use "Auto-detect"
 5. Done! Your printer is ready to use
 
-**Note:** USB printers may be auto-discovered when connected. Check your Home Assistant notifications.
+**Note:** USB printers may be auto-discovered when connected. Check your Home
+Assistant notifications.
 
 ## Basic Examples
 
