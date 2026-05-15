@@ -4,7 +4,7 @@ This guide covers how to set up a development environment, run tests, and contri
 
 ## Prerequisites
 
-- Python 3.11 or later
+- Python 3.13.2 or later
 - [uv](https://github.com/astral-sh/uv) package manager (recommended) or pip
 - Git
 - Docker (optional, for local Home Assistant testing)
@@ -23,7 +23,7 @@ cd ha-escpos-thermal-printer
 Using uv (recommended):
 
 ```bash
-uv sync --all-extras --group dev
+uv sync --all-extras
 ```
 
 Or using pip:
@@ -125,49 +125,39 @@ Once running:
 3. Go to **Settings** > **Devices & services** > **Add Integration**
 4. Search for "ESC/POS Thermal Printer"
 
-### Framework Smoke Test
-
-Test basic framework functionality without a full Home Assistant instance:
-
-```bash
-uv run python scripts/framework_smoke_test.py
-```
-
 ## Project Structure
 
+The integration lives under `custom_components/escpos_printer/`. Major subpackages:
+
+| Path | Purpose |
+|------|---------|
+| `__init__.py` | Integration setup, `EscposRuntimeData`, `async_setup_entry`/`async_unload_entry` |
+| `_config_flow/` | Multi-step config flow (network, USB, Bluetooth, settings, options, import) |
+| `printer/` | Adapter implementations: base, network, USB, Bluetooth (RFCOMM), shared print/barcode/control operations, factory, configs |
+| `services/` | Service registration + handlers (print, control, target resolution) |
+| `device_action/` | Device-action triggers exposed to automations |
+| `capabilities/` | Printer profile / codepage / line-width capability data |
+| `text_utils/` | UTF-8 transcoding + lookalike/accent fallback tables |
+| `binary_sensor.py` | Printer-online connectivity entity |
+| `sensor.py` | Bluetooth battery sensor |
+| `notify.py` | HA notify entity + `print_message` entity service |
+| `diagnostics.py` | Diagnostics dump for support tickets |
+| `security.py` | Input validation (text, URLs, paths, numerics) |
+| `bluez.py` | Bluez D-Bus helpers (paired-device enumeration, battery query) |
+| `const.py` | Domain, config keys, defaults, vendor IDs |
+| `manifest.json` | Integration metadata + `quality_scale` declaration |
+| `services.yaml` | Service definitions surfaced to HA |
+| `icons.json` | Service + entity icon registry |
+| `quality_scale.yaml` | HA quality-scale rule audit |
+| `strings.json` / `translations/` | UI strings + translations |
+
+For the live tree, run:
+
+```bash
+tree custom_components/escpos_printer -L 2 -I "__pycache__"
 ```
-ha-escpos-thermal-printer/
-├── custom_components/
-│   └── escpos_printer/
-│       ├── __init__.py          # Integration setup, entry points
-│       ├── binary_sensor.py     # Printer status sensor
-│       ├── capabilities.py      # Printer profile detection
-│       ├── const.py             # Constants and defaults
-│       ├── diagnostics.py       # Debug info collection
-│       ├── manifest.json        # Integration metadata
-│       ├── notify.py            # Notification platform
-│       ├── security.py          # Input validation
-│       ├── services.py          # Service handlers
-│       ├── services.yaml        # Service definitions
-│       ├── strings.json         # UI strings
-│       ├── text_utils.py        # UTF-8 transcoding
-│       ├── _config_flow/        # Configuration flow subpackage
-│       │   ├── flow.py          # Main ConfigFlow class
-│       │   ├── usb_helpers.py   # USB discovery and validation
-│       │   └── network_helpers.py # Network validation
-│       └── printer/             # Printer adapter subpackage
-│           ├── base.py          # Abstract adapter base class
-│           ├── network_adapter.py # Network (TCP/IP) adapter
-│           ├── usb_adapter.py   # USB adapter
-│           ├── config.py        # Config dataclasses
-│           └── factory.py       # Adapter factory
-├── tests/
-│   ├── integration_tests/       # Full integration tests
-│   └── test_*.py                # Unit tests
-├── scripts/                     # Utility scripts
-├── docs/                        # Documentation
-└── pyproject.toml               # Project configuration
-```
+
+Tests live under `tests/` (unit) and `tests/integration_tests/` (HA-runtime). Utility scripts in `scripts/` (manifest sync, version check). User documentation in `docs/`.
 
 ## Key Patterns
 
@@ -263,7 +253,7 @@ For manual testing, you can:
 If you see import errors, make sure you've installed in development mode:
 
 ```bash
-uv sync --all-extras --group dev
+uv sync --all-extras
 ```
 
 ### Test Failures

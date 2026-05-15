@@ -11,12 +11,19 @@ wheels/
 
 # Coverage files
 .coverage
+htmlcov/
+coverage.xml
+coverage.json
+.pytest_cache/
 
-# macOS Finder metadata
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
 .DS_Store
 
 # Local Claude Code review artifacts
 .full-review/
-
-# Local Claude Code project instructions (not source-controlled)
-CLAUDE.md

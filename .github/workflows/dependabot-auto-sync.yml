@@ -7,15 +7,23 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   sync-manifest:
-    if: github.actor == 'dependabot[bot]'
+    # Only run for dependabot PRs from the SAME repo (defense-in-depth against
+    # the pull_request_target + PR-head-checkout "pwn-request" pattern). Forks
+    # cannot reach this job because dependabot doesn't open cross-repo PRs.
+    if: >-
+      github.actor == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v6
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
 

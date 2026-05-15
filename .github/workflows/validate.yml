@@ -4,6 +4,13 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
@@ -33,14 +40,13 @@ jobs:
         run: mypy custom_components/
 
       - name: Run unit tests with coverage gate
-        # Coverage floor: current baseline 70 (matches pyproject.toml
-        # [tool.coverage.report] fail_under). Long-term target 85; ratchet
-        # up as services / target_resolution gain test coverage.
+        # Coverage floor: matches pyproject.toml [tool.coverage.report]
+        # fail_under (80). Long-term target is silver-tier 95%.
         run: |
           pytest --cov=custom_components/escpos_printer \
                  --cov-report=term \
                  --cov-report=xml \
-                 --cov-fail-under=70
+                 --cov-fail-under=80
 
       - name: Upload coverage XML (artifact)
         if: always()

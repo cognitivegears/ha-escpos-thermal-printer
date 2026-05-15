@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import logging
 import os
 from typing import Any
@@ -39,6 +40,7 @@ from .const import (
 )
 from .printer import (
     BluetoothPrinterConfig,
+    EscposPrinterAdapterBase,
     NetworkPrinterConfig,
     UsbPrinterConfig,
     create_printer_adapter,
@@ -51,8 +53,20 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 PLATFORMS: list[str] = ["notify", "binary_sensor", "sensor"]
 
-# Track if services have been registered
+# Domain-level singleton flag for one-time service registration.
+# Per-entry state lives on entry.runtime_data (see EscposRuntimeData).
 DATA_SERVICES_REGISTERED = "services_registered"
+
+
+@dataclass
+class EscposRuntimeData:
+    """Per-entry runtime data."""
+
+    adapter: EscposPrinterAdapterBase
+    defaults: dict[str, Any] = field(default_factory=dict)
+
+
+type EscposConfigEntry = ConfigEntry[EscposRuntimeData]
 
 
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
@@ -131,11 +145,12 @@ async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) ->
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bool:
     """Set up ESC/POS Printer from a config entry."""
     _LOGGER.debug("Setting up escpos_printer entry: %s", entry.entry_id)
 
-    # Initialize domain data if needed
+    # Domain-level singleton state (services-registered flag) lives in
+    # hass.data[DOMAIN]; per-entry state lives on entry.runtime_data.
     hass.data.setdefault(DOMAIN, {})
 
     # Register services once when the first config entry is set up
@@ -180,13 +195,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     adapter = create_printer_adapter(config)
 
-    hass.data[DOMAIN][entry.entry_id] = {
-        "adapter": adapter,
-        "defaults": {
+    entry.runtime_data = EscposRuntimeData(
+        adapter=adapter,
+        defaults={
             "align": entry.options.get(CONF_DEFAULT_ALIGN, entry.data.get(CONF_DEFAULT_ALIGN)),
             "cut": entry.options.get(CONF_DEFAULT_CUT, entry.data.get(CONF_DEFAULT_CUT)),
         },
-    }
+    )
 
     # Start adapter background tasks (keepalive/status)
     # Note: USB printers don't support keepalive, but the adapter handles this
@@ -204,28 +219,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bool:
     """Unload a config entry."""
     _LOGGER.debug("Unloading escpos_printer entry: %s", entry.entry_id)
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         # Stop adapter background tasks
         try:
-            adapter = hass.data.get(DOMAIN, {}).get(entry.entry_id, {}).get("adapter")
-            if adapter is not None:
-                await adapter.stop()
+            adapter = entry.runtime_data.adapter
+            await adapter.stop()
         except Exception:  # best effort on unload
             pass
-        hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
         _LOGGER.debug("Unloaded entry %s", entry.entry_id)
 
-        # Check if this was the last config entry (excluding our metadata keys)
-        domain_data = hass.data.get(DOMAIN, {})
-        remaining_entries = [
-            key for key in domain_data
-            if key != DATA_SERVICES_REGISTERED
+        # If this was the last loaded config entry, tear down global services.
+        other_loaded = [
+            e
+            for e in hass.config_entries.async_loaded_entries(DOMAIN)
+            if e.entry_id != entry.entry_id
         ]
-        if not remaining_entries and domain_data.get(DATA_SERVICES_REGISTERED):
+        domain_data = hass.data.get(DOMAIN)
+        if not other_loaded and domain_data and domain_data.get(DATA_SERVICES_REGISTERED):
             await async_unload_services(hass)
             domain_data[DATA_SERVICES_REGISTERED] = False
             _LOGGER.debug("Unloaded global services for %s", DOMAIN)

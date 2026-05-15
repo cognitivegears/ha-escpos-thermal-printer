@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.diagnostics import async_redact_data
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant
 
@@ -20,9 +19,11 @@ from .const import (
     CONF_VENDOR_ID,
     CONNECTION_TYPE_NETWORK,
     CONNECTION_TYPE_USB,
-    DOMAIN,
 )
 from .printer import NetworkPrinterConfig, UsbPrinterConfig
+
+if TYPE_CHECKING:
+    from . import EscposConfigEntry
 
 # Fields to redact in diagnostics output
 # - CONF_HOST: network printer hostname/IP
@@ -32,30 +33,30 @@ TO_REDACT = {CONF_HOST, "host", "connection_info"}
 
 
 async def async_get_config_entry_diagnostics(
-    hass: HomeAssistant, entry: ConfigEntry
+    hass: HomeAssistant, entry: EscposConfigEntry
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
     data = dict(entry.data)
     options = dict(entry.options)
 
-    store = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
-    adapter = store.get("adapter")
+    # runtime_data may be missing if setup failed before reaching async_setup_entry.
+    runtime_data = getattr(entry, "runtime_data", None)
+    adapter = runtime_data.adapter if runtime_data is not None else None
 
     connection_type = data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
 
     runtime: dict[str, Any] = {}
     if adapter is not None:
-        # Get config once to avoid repeated nested getattr calls
-        config = getattr(adapter, "_config", None)
+        config = adapter.config
 
         # Common diagnostics
         runtime = {
             "status": adapter.get_status(),
             "diagnostics": adapter.get_diagnostics(),
             "connection_type": connection_type,
-            "profile": config.profile if config else None,
-            "codepage": config.codepage if config else None,
-            "line_width": config.line_width if config else None,
+            "profile": config.profile,
+            "codepage": config.codepage,
+            "line_width": config.line_width,
             "keepalive": getattr(adapter, "_keepalive", None),
             "status_interval": getattr(adapter, "_status_interval", None),
         }
@@ -67,8 +68,8 @@ async def async_get_config_entry_diagnostics(
             runtime["in_ep"] = f"0x{config.in_ep:02X}" if config.in_ep else None
             runtime["out_ep"] = f"0x{config.out_ep:02X}" if config.out_ep else None
         elif isinstance(config, NetworkPrinterConfig):
-            runtime["host"] = config.host if config else None
-            runtime["port"] = config.port if config else None
+            runtime["host"] = config.host
+            runtime["port"] = config.port
 
         # Add connection info if available
         if hasattr(adapter, "get_connection_info"):

@@ -2,19 +2,75 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.escpos_printer.sensor import BluetoothPrinterBatterySensor
+from custom_components.escpos_printer.const import (
+    CONF_BT_MAC,
+    CONF_CONNECTION_TYPE,
+    CONNECTION_TYPE_BLUETOOTH,
+    CONNECTION_TYPE_NETWORK,
+)
+from custom_components.escpos_printer.sensor import (
+    BluetoothPrinterBatterySensor,
+    async_setup_entry,
+)
 
 
 class _FakeEntry:
     """Lightweight stand-in for ConfigEntry — only the attrs the sensor reads."""
 
-    def __init__(self, entry_id: str = "abc", title: str = "Netum") -> None:
+    def __init__(
+        self,
+        entry_id: str = "abc",
+        title: str = "Netum",
+        data: dict[str, Any] | None = None,
+    ) -> None:
         self.entry_id = entry_id
         self.title = title
+        self.data = data or {}
+
+
+async def test_sensor_async_setup_entry_skips_non_bluetooth():
+    """Non-Bluetooth entries should not register the battery sensor."""
+    entry = _FakeEntry(data={CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK})
+    add = MagicMock()
+    await async_setup_entry(MagicMock(), entry, add)  # type: ignore[arg-type]
+    add.assert_not_called()
+
+
+async def test_sensor_async_setup_entry_skips_bluetooth_without_mac():
+    """A Bluetooth entry missing the MAC should not register the sensor."""
+    entry = _FakeEntry(
+        data={CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH, CONF_BT_MAC: ""}
+    )
+    add = MagicMock()
+    await async_setup_entry(MagicMock(), entry, add)  # type: ignore[arg-type]
+    add.assert_not_called()
+
+
+async def test_sensor_async_setup_entry_creates_for_bluetooth_with_mac():
+    """A Bluetooth entry with a MAC should create the battery sensor."""
+    entry = _FakeEntry(
+        data={
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH,
+            CONF_BT_MAC: "AA:BB:CC:DD:EE:FF",
+        }
+    )
+    add = MagicMock()
+    await async_setup_entry(MagicMock(), entry, add)  # type: ignore[arg-type]
+    add.assert_called_once()
+    sensors = list(add.call_args.args[0])
+    assert len(sensors) == 1
+    assert isinstance(sensors[0], BluetoothPrinterBatterySensor)
+
+
+def test_battery_sensor_device_info_includes_title():
+    sensor = BluetoothPrinterBatterySensor(_FakeEntry(title="Phomemo M02"), "AA:BB:CC:DD:EE:FF")
+    info = sensor.device_info
+    assert "Phomemo M02" in info["name"]
 
 
 @pytest.mark.asyncio

@@ -1,4 +1,0 @@
-[bandit]
-exclude_dirs = ["tests", ".git", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"]
-# B110: try/except/pass; intentionally allowed for best-effort cleanup and callbacks
-skips = ["B101", "B110", "B601", "B603", "B607"]

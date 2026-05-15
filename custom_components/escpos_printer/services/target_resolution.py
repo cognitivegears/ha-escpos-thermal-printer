@@ -107,15 +107,11 @@ def _get_adapter_and_defaults(
     Raises:
         HomeAssistantError: If entry data is not found
     """
-    domain_data = hass.data.get(DOMAIN, {})
-    entry_data = domain_data.get(entry_id)
-
-    if entry_data is None:
+    entry = hass.config_entries.async_get_entry(entry_id)
+    if entry is None or not hasattr(entry, "runtime_data"):
         raise HomeAssistantError(f"Printer configuration not found for entry {entry_id}")
 
-    adapter = entry_data.get("adapter")
-    if adapter is None:
-        raise HomeAssistantError(f"Printer adapter not found for entry {entry_id}")
-
-    defaults = entry_data.get("defaults", {})
+    runtime_data = entry.runtime_data
+    adapter = runtime_data.adapter
+    defaults = runtime_data.defaults
     return adapter, defaults, adapter.config

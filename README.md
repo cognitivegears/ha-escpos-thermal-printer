@@ -171,7 +171,7 @@ for the docker-compose changes you need.
 - [Home Assistant Container](#home-assistant-container)
 - [Host bridge fallback (`socat`)](#host-bridge-fallback-socat)
 - [Security considerations](#security-considerations)
-- [Troubleshooting](docs/TROUBLESHOOTING.md#bluetooth-connection-issues)
+- [Bluetooth troubleshooting](docs/troubleshooting.md#bluetooth-issues)
 
 ### How pairing works
 
@@ -314,9 +314,17 @@ understand before routing sensitive notifications to a paired printer:
 
 | Document | Description |
 |----------|-------------|
-| [Configuration Guide](docs/CONFIGURATION.md) | Detailed setup options, printer profiles, and settings |
-| [Examples](docs/EXAMPLES.md) | Complete examples for receipts, automations, and multi-printer setups |
-| [Troubleshooting](docs/TROUBLESHOOTING.md) | Common issues and solutions |
+| [Installation](docs/installation.md) | HACS / manual install, removal |
+| [Configuration](docs/configuration.md) | Common settings reference (codepage, line width, defaults) |
+| [Network printers](docs/network.md) | TCP/IP setup |
+| [USB printers](docs/usb.md) | USB setup, permissions, container pass-through |
+| [Bluetooth printers](docs/bluetooth.md) | Pairing, RFCOMM, container caveats |
+| [Services](docs/services.md) | Service parameter reference |
+| [Automations](docs/automations.md) | Automation examples |
+| [Notifications](docs/notifications.md) | Notify entity and `print_message` service |
+| [Multi-printer targeting](docs/multi-printer.md) | `target:` blocks, area / entity / device targeting |
+| [Limitations](docs/limitations.md) | Known limitations |
+| [Troubleshooting](docs/troubleshooting.md) | Common issues and solutions |
 | [Contributing](CONTRIBUTING.md) | Contributing, testing, and local development |
 
 ## Getting Help

@@ -6,16 +6,20 @@ on:
   pull_request:
     branches: [ main, develop ]
   schedule:
-    # Run security scans weekly on Sundays at 3 AM UTC
+    # Weekly on Sundays at 3 AM UTC
     - cron: '0 3 * * 0'
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   security-scan:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write
-      pull-requests: write
 
     steps:
       - name: Checkout code
@@ -35,104 +39,37 @@ jobs:
             ${{ runner.os }}-pip-
 
       - name: Install dependencies
+        # Pinned via pyproject.toml's [security] extra so bandit and pip-audit
+        # versions match local dev and don't drift unexpectedly.
         run: |
           python -m pip install --upgrade pip
-          # Install only the minimal security toolchain to avoid heavy resolver backtracking
-          pip install -e .[security]
-
-      - name: Run security scan script
-        run: |
-          python scripts/security_scan.py --verbose
-
-      - name: Upload security scan results
-        uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: security-scan-results
-          path: security_report.md
-
-      - name: Safety - Dependency vulnerability scan
-        env:
-          SAFETY_API_KEY: ${{ secrets.SAFETY_API_KEY }}
-        run: |
-          # Use new 'scan' with API key if available; otherwise use legacy 'check' to avoid interactive auth
-          if [ -n "$SAFETY_API_KEY" ]; then
-            safety scan --key "$SAFETY_API_KEY" --json -o safety-report.json || true
-          else
-            echo "No SAFETY_API_KEY provided; using legacy 'check' (deprecated)"
-            safety check --full-report --output safety-report.json || true
-          fi
+          pip install -e ".[security]"
 
       - name: Bandit - Python security linting
         run: |
-          bandit -r custom_components/escpos_printer -f json -o bandit-report.json || true
+          # Two passes: SARIF for the Security tab, exit-code gate for CI.
+          # `-lll` fails the build on HIGH severity only; MEDIUM/LOW findings
+          # appear in the SARIF report uploaded below but do not block.
+          bandit -r custom_components/escpos_printer -f sarif -o bandit.sarif || true
+          bandit -r custom_components/escpos_printer -lll
 
       - name: pip-audit - Dependency audit
+        # pip-audit doesn't emit SARIF natively; the JSON report is kept as a
+        # build artifact only. The text run below is the actual gate.
         run: |
           pip-audit --format json --output pip-audit-report.json || true
+          pip-audit
 
-      - name: Upload SARIF reports
-        uses: github/codeql-action/upload-sarif@v4
+      - name: Upload Bandit SARIF to Security tab
         if: always()
+        uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: |
-            safety-report.json
-            bandit-report.json
-            pip-audit-report.json
-        continue-on-error: true
+          sarif_file: bandit.sarif
 
-      - name: Comment PR with security findings
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v8
+      - name: Upload pip-audit JSON artifact
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          script: |
-            const fs = require('fs');
-            const path = require('path');
-
-            // Read security report if it exists
-            const reportPath = 'security_report.md';
-            let reportContent = '## 🔒 Security Scan Results\n\n';
-
-            if (fs.existsSync(reportPath)) {
-              const content = fs.readFileSync(reportPath, 'utf8');
-              reportContent += content;
-            } else {
-              reportContent += 'Security scan completed. Check the "Security Scan Results" artifact for detailed findings.\n';
-            }
-
-            reportContent += '\n### 📊 Scan Summary\n';
-            reportContent += '- ✅ Dependencies scanned for vulnerabilities\n';
-            reportContent += '- ✅ Python code scanned for security issues\n';
-            reportContent += '- ✅ Static analysis completed\n\n';
-
-            reportContent += '### 🔍 Next Steps\n';
-            reportContent += '1. Review any security findings in the uploaded artifacts\n';
-            reportContent += '2. Address high and medium priority issues\n';
-            reportContent += '3. Ensure dependencies are kept up to date\n';
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: reportContent
-            });
-
-      - name: Fail on high severity vulnerabilities
-        run: |
-          # Check for critical/high severity issues and fail if found
-          if [ -f safety-report.json ]; then
-            if grep -q '"severity":\s*"critical\|high"' safety-report.json; then
-              echo "❌ Critical or high severity vulnerabilities found!"
-              exit 1
-            fi
-          fi
-
-          if [ -f bandit-report.json ]; then
-            # Bandit uses severity levels: HIGH, MEDIUM, LOW
-            if grep -q '"issue_severity":\s*"HIGH"' bandit-report.json; then
-              echo "❌ High severity security issues found in code!"
-              exit 1
-            fi
-          fi
-
-          echo "✅ No critical/high severity security issues found"
+          name: pip-audit-report
+          path: pip-audit-report.json
+          if-no-files-found: ignore

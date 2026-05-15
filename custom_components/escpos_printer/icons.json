@@ -1,0 +1,21 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "status": {"default": "mdi:printer"}
+    },
+    "sensor": {
+      "battery": {"default": "mdi:battery"}
+    }
+  },
+  "services": {
+    "print_text_utf8": "mdi:format-text",
+    "print_text": "mdi:format-text",
+    "print_qr": "mdi:qrcode",
+    "print_image": "mdi:image",
+    "print_barcode": "mdi:barcode",
+    "print_message": "mdi:message-text",
+    "feed": "mdi:arrow-down-thick",
+    "cut": "mdi:content-cut",
+    "beep": "mdi:bell-ring"
+  }
+}

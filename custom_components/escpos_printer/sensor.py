@@ -31,6 +31,9 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+# Battery polling cadence is set by _attr_should_poll on the entity.
+PARALLEL_UPDATES = 0
+
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: Any

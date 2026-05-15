@@ -25,37 +25,21 @@ where = ["."]
 include = ["custom_components*", "scripts*"]
 
 [project.optional-dependencies]
-# Define pip extras so CI can install tooling via
-# `pip install -e .[dev,security]`
+# Source of truth for dev / security tooling. Both CI (`pip install -e .[dev]`)
+# and local uv workflows (`uv sync --all-extras`) read these. PEP 735
+# `[dependency-groups]` is intentionally NOT used to avoid drift.
 dev = [
     "pytest==9.0.0",
     "pytest-homeassistant-custom-component==0.13.314",
     "mypy==1.19.1",
     "ruff==0.15.1",
     "pre-commit==4.5.1",
-    "safety==3.7.0",
     "bandit==1.9.4",
     "pip-audit==2.10.0",
-    "typer==0.21.1",
-    "marshmallow==4.2.2",
-    "aiohttp==3.13.3",
-    "cryptography==46.0.2",
-    "jinja2==3.1.6",
-    "requests==2.32.5",
-    "urllib3==2.6.3",
 ]
 security = [
-  "safety==3.7.0",
   "bandit==1.9.4",
   "pip-audit==2.10.0",
-  "ruff==0.15.1",
-  "typer==0.21.1",
-  "marshmallow==4.2.2",
-  "aiohttp==3.13.3",
-  "cryptography==46.0.2",
-  "jinja2==3.1.6",
-  "requests==2.32.5",
-  "urllib3==2.6.3",
 ]
 
 [tool.pytest.ini_options]
@@ -164,8 +148,6 @@ ignore = [
     "B904",    # raise from in tests
 ]
 "custom_components/escpos_printer/__init__.py" = ["BLE001"]
-"custom_components/escpos_printer/printer.py" = ["BLE001", "C901"]
-"custom_components/escpos_printer/config_flow.py" = ["PLR0912"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["custom_components.escpos_printer"]
@@ -192,12 +174,6 @@ strict_equality = true
 show_error_codes = true
 pretty = true
 namespace_packages = false
-exclude = [
-    "^fix_mypy_errors\\.py$",
-    "^fix_remaining_errors\\.py$",
-    "^fix_final_14_errors\\.py$",
-    "^fix_final_mypy_errors\\.py$",
-]
 
 [[tool.mypy.overrides]]
 module = [
@@ -248,10 +224,9 @@ show_missing = true
 skip_covered = false
 skip_empty = false
 precision = 2
-# Long-term target is 85.0; current floor reflects baseline coverage at the
-# time of the Bluetooth feature add (Phase-4 review). Ratchet up as services
-# and target_resolution paths gain test coverage.
-fail_under = 70.0
+# Matches sibling ha-pixelblaze project. Ratchet upward (target: silver-tier
+# 95%) as more error paths and config-flow steps gain coverage.
+fail_under = 80.0
 
 [tool.coverage.html]
 directory = "htmlcov"
@@ -262,34 +237,3 @@ output = "coverage.xml"
 
 [tool.coverage.json]
 output = "coverage.json"
-
-[dependency-groups]
-dev = [
-    "pytest==9.0.0",
-    "pytest-homeassistant-custom-component==0.13.314",
-    "mypy==1.19.1",
-    "ruff==0.15.1",
-    "pre-commit==4.5.1",
-    "safety==3.7.0",
-    "bandit==1.9.4",
-    "pip-audit==2.10.0",
-    "typer==0.21.1",
-    "marshmallow==4.2.2",
-    "aiohttp==3.13.3",
-    "cryptography==46.0.2",
-    "jinja2==3.1.6",
-    "requests==2.32.5",
-    "urllib3==2.6.3",
-]
-security = [
-    "safety==3.7.0",
-    "bandit==1.9.4",
-    "pip-audit==2.10.0",
-    "typer==0.21.1",
-    "marshmallow==4.2.2",
-    "aiohttp==3.13.3",
-    "cryptography==46.0.2",
-    "jinja2==3.1.6",
-    "requests==2.32.5",
-    "urllib3==2.6.3",
-]

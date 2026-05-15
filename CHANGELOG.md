@@ -7,6 +7,98 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Migrated to typed `runtime_data` config-entry pattern.** `__init__.py`
+  now exposes an `EscposRuntimeData` dataclass and `EscposConfigEntry`
+  type alias; per-entry adapter and defaults live on `entry.runtime_data`
+  rather than `hass.data[DOMAIN][entry_id]`. Domain-level
+  service-registration flag stays in `hass.data[DOMAIN]`. Aligns with the
+  HA quality-scale `runtime-data` rule. No user-facing change; all
+  existing tests pass.
+- **Split `docs/` into task-oriented pages** (installation, configuration,
+  network, usb, bluetooth, services, automations, notifications,
+  multi-printer, limitations, troubleshooting). Replaces the three
+  monolithic `CONFIGURATION.md` / `EXAMPLES.md` / `TROUBLESHOOTING.md`
+  files. Maps onto HA quality-scale `docs-*` rules.
+- **Replaced homegrown security-scan orchestrator** in CI with native
+  `bandit -lll` + `pip-audit` exit-code gates. Drops the brittle JSON
+  text-grep severity matching. Workflow shrinks from 139 lines to ~70.
+- Slimmed `[security]` and `[dev]` extras in `pyproject.toml` to actual
+  tooling (bandit, pip-audit, pytest, mypy, ruff, pre-commit). Dropped
+  `safety` entirely (never invoked by CI; `pip-audit` covers the same
+  use-case).
+- Dropped `[dependency-groups]` table; `[project.optional-dependencies]`
+  is now the single source of truth. `uv sync --all-extras` replaces
+  `uv sync --all-extras --group dev`.
+- Bumped `actions/github-script@v8` → `@v9`.
+- **`PARALLEL_UPDATES = 0`** declared on `notify.py`, `binary_sensor.py`,
+  and `sensor.py`. Satisfies HA quality-scale `parallel-updates` rule
+  (printer I/O serialization is enforced separately by adapter locks).
+- **`EscposOnlineSensor`** now sets `_attr_entity_category = DIAGNOSTIC`,
+  matching the battery sensor and satisfying `entity-category`.
+- **`security.yml` SARIF upload fixed** — emits `bandit -f sarif` instead
+  of uploading non-SARIF JSON. Previously the Security tab silently
+  received nothing.
+- **`dependabot-auto-sync.yml` hardened** with a same-repo guard
+  (`head.repo.full_name == github.repository`) and dropped the explicit
+  cross-repo checkout (defense-in-depth against the
+  `pull_request_target` "pwn-request" pattern).
+- **Coverage floor raised** from 70% to 80% (matches sibling
+  `ha-pixelblaze`). Long-term target is silver-tier 95%.
+
+### Tests
+
+- New `tests/test_init.py` covers the entry-lifecycle (runtime_data
+  assignment, single-entry unload tearing down services, multi-entry
+  unload preserving services, adapter.stop() invocation).
+- New `tests/test_diagnostics.py` covers diagnostics for network and USB
+  entries, plus the defensive missing-`runtime_data` path.
+- New `tests/test_device_actions.py` covers all 8 device-action types
+  exercised through `async_call_action_from_config`.
+- New `tests/test_services_targeting.py` covers `device_id` targeting
+  (single + list), the no-target / unknown-target error paths, and the
+  HomeAssistantError wrapping in print- and control-handler error paths.
+- New `tests/test_adapter_lifecycle.py` covers the network-adapter
+  status-check success/failure paths, listener (un)subscribe, and
+  `_wrap_text` line-width handling.
+- New `tests/test_options_flow_custom.py` covers the
+  custom-profile / custom-codepage / custom-line-width options-flow
+  branches.
+- Existing `tests/test_bluetooth_battery_sensor.py` extended to cover
+  `async_setup_entry` skip / create paths and `device_info`.
+
+### Added
+
+- **`quality_scale.yaml` and `manifest.json` `quality_scale: bronze`.**
+  Each Bronze/Silver/Gold/Platinum rule audited and tagged
+  `done`/`todo`/`exempt`. Concrete maturity signal for HACS / HA-core
+  submission.
+- **`info.md`** at repo root for the HACS install-dialog card.
+- **`icons.json`** mapping service and entity icons centrally
+  (HA quality-scale `icon-translations` rule).
+- Top-level `permissions: contents: read` and `concurrency:` blocks on
+  every GitHub Actions workflow. Faster CI, least-privilege tokens.
+
+### Removed
+
+- `tox.ini`, `.bandit`, `scripts/security_scan.py`,
+  `scripts/framework_smoke_test.py`, `scripts/test_network_printer.py` —
+  vestigial relative to the canonical `uv run pytest` / `bandit -lll`
+  invocations.
+- Stale `[tool.mypy] exclude` entries for nonexistent
+  `fix_*_errors.py` scratch files.
+- Stale ruff per-file-ignore for `printer.py` (now the `printer/`
+  subpackage).
+
+### Fixed
+
+- `.gitignore` now covers `htmlcov/`, `coverage.xml`, `coverage.json`,
+  `.pytest_cache/`. Removed the `CLAUDE.md` ignore (committed elsewhere
+  as a personal scratch file; previously dead).
+- `CONTRIBUTING.md` Python version was stale at "3.11 or later"; now
+  matches the `>=3.13.2` requirement in `pyproject.toml`.
+
 ## [0.5.0] - 2026-05-10
 
 ### Compatibility
