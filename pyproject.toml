@@ -52,6 +52,13 @@ markers = [
   "integration: tests requiring HA runtime and network sockets",
 ]
 
+[tool.bandit]
+# Mirrors the ruff S101/S110 ignores above. Asserts are used for type
+# narrowing after explicit error checks; try/except/pass is used for
+# best-effort cleanup and fallback paths.
+skips = ["B101", "B110"]
+exclude_dirs = ["tests", "scripts"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py313"
