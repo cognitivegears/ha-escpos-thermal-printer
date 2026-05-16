@@ -13,4 +13,15 @@ updates:
     # Dependabot will update pins in pyproject.toml. A companion workflow
     # auto-syncs Home Assistant manifest requirements on Dependabot PRs.
     open-pull-requests-limit: 10
+    ignore:
+      # pytest-homeassistant-custom-component hard-pins pytest==9.0.0 (and
+      # any future pin set by that package), so bumping pytest independently
+      # creates an unresolvable conflict. Let the HA test harness drive the
+      # pytest version; revisit if upstream loosens the pin.
+      - dependency-name: "pytest"
+      # dbus-fast is pinned by Home Assistant core (package_constraints.txt)
+      # and the HA bluetooth integration manifest. Bumping it independently
+      # breaks HA installs. Let HA core drive the version; revisit when HA
+      # bumps it.
+      - dependency-name: "dbus-fast"
 
