@@ -32,7 +32,7 @@ dev = [
     "pytest==9.0.0",
     "pytest-homeassistant-custom-component==0.13.314",
     "mypy==1.19.1",
-    "ruff==0.15.1",
+    "ruff==0.15.13",
     "pre-commit==4.5.1",
     "bandit==1.9.4",
     "bandit-sarif-formatter==1.1.1",
