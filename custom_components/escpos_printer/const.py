@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Any
+
 DOMAIN = "escpos_printer"
 
 # Configuration keys
@@ -50,9 +54,11 @@ DEFAULT_OUT_EP = 0x01
 # Bluetooth defaults
 DEFAULT_RFCOMM_CHANNEL = 1
 
-# Known thermal printer vendor IDs for auto-discovery
+# Known thermal printer vendor IDs for auto-discovery.
 # Source: http://www.linux-usb.org/usb.ids
-THERMAL_PRINTER_VIDS: set[int] = {
+# `manifest.json`'s `usb` block is generated from this set by
+# `scripts/sync_manifest_requirements.py` — keep this list authoritative.
+THERMAL_PRINTER_VIDS: frozenset[int] = frozenset({
     0x0404,  # NCR Corp (7167/7197 Receipt Printers)
     0x04B8,  # Seiko Epson Corp (TM-T88, TM-T20, TM-T70, TM-L100)
     0x04C5,  # Fujitsu, Ltd (KD02906 Line Thermal Printer)
@@ -73,7 +79,7 @@ THERMAL_PRINTER_VIDS: set[int] = {
     0x2730,  # Citizen (CT-S2000/4000/310, CLP-521/621/631, CL-S700)
     0x2D84,  # Zhuhai Poskey Technology (DT-108B Thermal Label Printer)
     0x0416,  # Winbond Electronics (some generic Chinese POS-58/80 printers)
-}
+})
 
 # Profile selection constants (also defined in capabilities.py, imported here for convenience)
 PROFILE_AUTO = ""  # Auto-detect (default) profile
@@ -103,6 +109,11 @@ SERVICE_PRINT_TEXT = "print_text"
 SERVICE_PRINT_TEXT_UTF8 = "print_text_utf8"
 SERVICE_PRINT_QR = "print_qr"
 SERVICE_PRINT_IMAGE = "print_image"
+SERVICE_PRINT_CAMERA_SNAPSHOT = "print_camera_snapshot"
+SERVICE_PRINT_IMAGE_ENTITY = "print_image_entity"
+SERVICE_PRINT_IMAGE_URL = "print_image_url"
+SERVICE_PREVIEW_IMAGE = "preview_image"
+SERVICE_CALIBRATION_PRINT = "calibration_print"
 SERVICE_FEED = "feed"
 SERVICE_CUT = "cut"
 SERVICE_PRINT_BARCODE = "print_barcode"
@@ -139,3 +150,83 @@ ATTR_FORCE_SOFTWARE = "force_software"
 # Beep-related
 ATTR_TIMES = "times"
 ATTR_DURATION = "duration"
+
+# Image-related (v2)
+ATTR_IMAGE_WIDTH = "image_width"
+ATTR_ROTATION = "rotation"
+ATTR_DITHER = "dither"
+ATTR_THRESHOLD = "threshold"
+ATTR_IMPL = "impl"
+ATTR_CENTER = "center"
+ATTR_AUTOCONTRAST = "autocontrast"
+ATTR_FRAGMENT_HEIGHT = "fragment_height"
+ATTR_CHUNK_DELAY_MS = "chunk_delay_ms"
+ATTR_INVERT = "invert"
+ATTR_MIRROR = "mirror"
+ATTR_AUTO_RESIZE = "auto_resize"
+ATTR_FALLBACK_IMAGE = "fallback_image"
+
+# Image v2 defaults.
+#
+# - ``DEFAULT_FRAGMENT_HEIGHT = 256`` is a tuning constant carried over from
+#   issue #45 (python-escpos buffer overruns on very tall images). 256-px
+#   slices keep the per-write payload under most printers' buffer.
+# - ``DEFAULT_CHUNK_DELAY_MS_BLUETOOTH = 50`` is the per-slice wait from
+#   issue #43 (slow Bluetooth-SPP printers needed time to drain the buffer
+#   between writes). The schema leaves the field unset by default so the
+#   adapter substitutes its per-transport default (Network/USB: ``0``;
+#   Bluetooth: ``50``).
+# - ``DEFAULT_DITHER = "floyd-steinberg"`` is dithered *in this integration*
+#   (see ``image_processor.process_image``) — not delegated to
+#   ``python-escpos``.
+# - Bounds (``IMAGE_WIDTH_MIN``/``IMAGE_THRESHOLD_MIN``/...) live in
+#   ``security.py`` so the schema and the validators share one source of
+#   truth. ``services.yaml`` selectors must mirror those bounds.
+DEFAULT_FRAGMENT_HEIGHT = 256
+# ``DEFAULT_CHUNK_DELAY_MS = None`` is the schema-level "no explicit value"
+# sentinel; the adapter substitutes its per-transport default (Network/USB:
+# ``0``; Bluetooth: ``50``). Pre-existing code that imports the int default
+# can still rely on ``DEFAULT_CHUNK_DELAY_MS_BLUETOOTH`` below.
+DEFAULT_CHUNK_DELAY_MS_NETWORK = 0
+DEFAULT_CHUNK_DELAY_MS_BLUETOOTH = 50
+DEFAULT_DITHER = "floyd-steinberg"
+DEFAULT_IMPL = "bitImageRaster"
+DEFAULT_THRESHOLD = 128
+
+DITHER_MODES: frozenset[str] = frozenset({"floyd-steinberg", "none", "threshold"})
+IMPL_MODES: frozenset[str] = frozenset({"bitImageRaster", "graphics", "bitImageColumn"})
+ROTATION_VALUES: frozenset[int] = frozenset({0, 90, 180, 270})
+
+# Reliability profile presets used by the options flow.
+# A profile picks fragment_height + chunk_delay_ms + impl; the user can
+# still override any of these per service call.
+RELIABILITY_PROFILE_AUTO = "auto"
+RELIABILITY_PROFILE_FAST_LAN = "fast_lan"
+RELIABILITY_PROFILE_BALANCED = "balanced"
+RELIABILITY_PROFILE_CONSERVATIVE = "conservative"
+RELIABILITY_PROFILE_BLUETOOTH = "bluetooth_safe"
+CONF_RELIABILITY_PROFILE = "reliability_profile"
+
+RELIABILITY_PROFILE_PRESETS: dict[str, dict[str, Any]] = {
+    RELIABILITY_PROFILE_AUTO: {},
+    RELIABILITY_PROFILE_FAST_LAN: {
+        "fragment_height": 512,
+        "chunk_delay_ms": 0,
+        "impl": "bitImageRaster",
+    },
+    RELIABILITY_PROFILE_BALANCED: {
+        "fragment_height": 256,
+        "chunk_delay_ms": 20,
+        "impl": "bitImageRaster",
+    },
+    RELIABILITY_PROFILE_CONSERVATIVE: {
+        "fragment_height": 128,
+        "chunk_delay_ms": 100,
+        "impl": "bitImageRaster",
+    },
+    RELIABILITY_PROFILE_BLUETOOTH: {
+        "fragment_height": 128,
+        "chunk_delay_ms": 150,
+        "impl": "bitImageRaster",
+    },
+}

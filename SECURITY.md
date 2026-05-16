@@ -8,12 +8,42 @@ This document outlines the security measures and best practices implemented in t
 
 ### 1. Input Validation and Sanitization
 
-The integration implements comprehensive input validation to prevent injection attacks and resource exhaustion:
+The integration implements input validation to prevent injection attacks and
+resource exhaustion. Validation is centralized in
+`custom_components/escpos_printer/security.py` and reused by every service
+schema (Bronze quality-scale `action-setup` rule):
 
-- **Text Input Validation**: All text inputs are validated for length limits and sanitized to remove control characters
-- **URL Validation**: Image URLs are validated against allowed schemes and patterns
-- **File Path Validation**: Local image paths are checked for path traversal attempts
-- **Numeric Input Validation**: All numeric parameters are validated within safe bounds
+- **Service-level schemas** (voluptuous) — every action registered via
+  `hass.services.async_register(..., schema=...)`. REST / WebSocket /
+  Python-script callers go through the same validation as the UI selectors.
+- **Text input** — length cap (`MAX_TEXT_LENGTH = 10000`), control characters
+  stripped.
+- **Image URLs** — `validate_image_url` rejects non-`http(s)` schemes,
+  embedded credentials (`https://user:pass@host/`), IDN/punycode hostnames,
+  and non-default ports. `validate_image_url_and_resolve` additionally
+  resolves the hostname and **rejects private, loopback, link-local,
+  reserved, multicast, and unspecified IPs** (defends against SSRF to
+  RFC1918 networks, `127.0.0.1`, `::1`, and cloud-metadata endpoints like
+  `169.254.169.254`). HTTP redirects are followed manually and each
+  redirect target is re-validated.
+- **Local image paths** — `Path.resolve(strict=True)` dereferences
+  symlinks before the extension / size / allowlist checks; the final
+  `open()` uses `O_NOFOLLOW` to defeat TOCTOU swaps. Paths outside
+  `allowlist_external_dirs` are **rejected** (no warn-but-read).
+- **Camera / image entity sources** — the calling user's permissions are
+  checked via `user.permissions.check_entity(entity_id, POLICY_READ)`;
+  denied users receive `Unauthorized` (HTTP 403 from the WebSocket / REST
+  API). Internal calls without a `user_id` and admins bypass.
+- **Base64 data URIs** — input length capped *before* regex/decoding
+  (no OOM on a 200 MB base64 string); subtype pinned to
+  `png|jpe?g|gif|bmp|tiff|webp` (no SVG / XML decoder reach).
+- **Pillow** — `Image.MAX_IMAGE_PIXELS` set process-globally so
+  decompression bombs raise deterministically; `Image.open` is invoked
+  with a pinned `formats=` allow-list.
+- **Numeric input** — every numeric parameter validated within safe
+  bounds (`MAX_FEED_LINES`, `IMAGE_FRAGMENT_MIN/MAX`, etc.) declared in
+  `security.py` and reused by the voluptuous schemas in
+  `services/schemas.py`.
 
 ### 2. Security Scanning Tools
 
@@ -46,13 +76,53 @@ log_msg = sanitize_log_message(
 _LOGGER.debug(log_msg)
 ```
 
+`sanitize_log_message` redacts:
+
+- `field=value` pairs whose field name appears in the default sensitive
+  list (`password`, `token`, `key`, `secret`, `data`, `text`, `address`,
+  `mac`, `alias`, `url`, `path`, `host`, `image`, `source`).
+- URL userinfo (`scheme://user:pass@host/...` → `scheme://[REDACTED]@host/...`).
+- Filesystem paths under HA's standard mount points (`/config/`,
+  `/media/`, `/share/`, `/ssl/`, `/addon_configs/`, `/data/`) — preserves
+  the prefix, redacts the rest.
+- Bluetooth MAC addresses (preserves the 3-octet OUI for vendor lookups,
+  redacts the device-specific portion as personal data under GDPR).
+
 #### Resource Limits
 - Maximum text length: 10,000 characters
 - Maximum QR data length: 2,000 characters
 - Maximum barcode data length: 100 characters
-- Maximum image download size: 10MB
+- Maximum image download size: 10 MB (also the **decoded** cap for base64
+  data URIs)
+- Maximum decoded pixel count: 20 million (`Image.MAX_IMAGE_PIXELS`)
+- Maximum processed image height: 8192 px
+- Maximum image slices per print: 64 (avoids paper-DoS via tall ribbons)
 - Maximum feed lines: 50
 - Maximum beep repetitions: 10
+
+## Known Limitations
+
+These deserve explicit mention so deployers understand the threat model:
+
+- **Trust boundary** — any HA user who can call `escpos_printer.print_image`
+  or `notify.<printer>` can print to your physical paper roll. Restrict
+  service exposure via HA's standard scripts / scenes / Lovelace card
+  permissions for shared installations.
+- **SSRF on out-of-process resolvers** — between our `getaddrinfo`-based
+  IP check and the actual fetch by `httpx` / `aiohttp`, there is a
+  small TOCTOU window. Sophisticated DNS-rebinding attacks against this
+  window are not fully mitigated; pinning to the resolved IP would
+  require a custom transport and break SNI. The validation rejects
+  the common case (a URL whose hostname directly resolves to a private
+  address).
+- **ESC/POS protocol bytes in printed content** — `validate_text_input`
+  strips C0 control characters but not all printable ESC/POS escape
+  sequences. If a downstream POS scanner consumes the receipt as data
+  (rather than a human reading paper), additional sanitization may be
+  warranted.
+- **Camera / image authorization** — see `image_sources.py` for the
+  permission check pattern. Bear in mind HA admins bypass entity
+  permissions by design; admin users can print any camera regardless.
 
 ## Security Configuration
 

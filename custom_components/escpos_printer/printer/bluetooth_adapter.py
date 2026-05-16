@@ -38,6 +38,10 @@ class BluetoothPrinterAdapter(EscposPrinterAdapterBase):
     _CONNECT_RETRIES = 2
     _CONNECT_RETRY_DELAY_S = 0.3
 
+    # Slow serial-over-RFCOMM links need a small inter-slice delay to
+    # avoid buffer overruns (issue #43). Network/USB don't.
+    default_chunk_delay_ms = 50
+
     def __init__(self, config: BluetoothPrinterConfig) -> None:
         super().__init__(config)
         self._bt_config = config
