@@ -13,4 +13,10 @@ updates:
     # Dependabot will update pins in pyproject.toml. A companion workflow
     # auto-syncs Home Assistant manifest requirements on Dependabot PRs.
     open-pull-requests-limit: 10
+    ignore:
+      # pytest-homeassistant-custom-component hard-pins pytest==9.0.0 (and
+      # any future pin set by that package), so bumping pytest independently
+      # creates an unresolvable conflict. Let the HA test harness drive the
+      # pytest version; revisit if upstream loosens the pin.
+      - dependency-name: "pytest"
 
