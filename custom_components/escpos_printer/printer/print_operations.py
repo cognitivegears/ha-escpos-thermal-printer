@@ -1,20 +1,14 @@
-"""Print operation mixins for ESC/POS printer adapters."""
+"""Print operation mixins for ESC/POS printer adapters (text + QR)."""
 
 from __future__ import annotations
 
-import contextlib
-import io
+import asyncio
 import logging
-from typing import TYPE_CHECKING, Any
-
-import aiohttp
-from PIL import Image
+from typing import TYPE_CHECKING, Any, Protocol
 
 from ..const import DEFAULT_CUT
 from ..security import (
     sanitize_log_message,
-    validate_image_url,
-    validate_local_image_path,
     validate_qr_data,
     validate_text_input,
 )
@@ -23,46 +17,50 @@ from .mapping_utils import map_align, map_multiplier, map_underline
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
+    from .config import BasePrinterConfig
+
 _LOGGER = logging.getLogger(__name__)
 
 
-class PrintOperationsMixin:
-    """Mixin providing print_text, print_qr, and print_image methods."""
+class _PrinterHost(Protocol):
+    """The surface a print operation mixin requires from ``self``.
 
-    # These attributes are expected from the base class
-    _config: Any
-    _keepalive: bool
+    Methods are implemented by :class:`EscposPrinterAdapterBase`. The
+    Protocol lets mypy verify the mixin contract without a runtime
+    inheritance dependency.
+    """
+
+    _config: BasePrinterConfig
     _printer: Any
-    _lock: Any
+    _lock: asyncio.Lock
 
-    def _connect(self) -> Any:
-        """Create and return a printer connection (abstract in base)."""
-        raise NotImplementedError
+    def _connect(self) -> Any: ...
+    def _wrap_text(self, text: str) -> str: ...
+    def _get_profile_pixel_width(
+        self, hass: HomeAssistant | None = None
+    ) -> int | None: ...
 
-    def _wrap_text(self, text: str) -> str:
-        """Wrap text to configured line width (implemented in base)."""
-        raise NotImplementedError
-
+    async def _acquire_printer(
+        self, hass: HomeAssistant
+    ) -> tuple[Any, bool]: ...
+    async def _release_printer(
+        self, hass: HomeAssistant, printer: Any, *, owned: bool
+    ) -> None: ...
     async def _apply_cut_and_feed(
-        self, hass: Any, printer: Any, cut: str | None, feed: int | None
-    ) -> None:
-        """Apply feed and cut operations (implemented in base)."""
-        raise NotImplementedError
+        self,
+        hass: HomeAssistant,
+        printer: Any,
+        cut: str | None,
+        feed: int | None,
+    ) -> None: ...
+    async def _mark_success(self) -> None: ...
 
-    async def _mark_success(self) -> None:
-        """Mark a successful operation (implemented in base)."""
-        raise NotImplementedError
 
-    async def _acquire_printer(self, hass: Any) -> tuple[Any, bool]:
-        """Return a printer instance and whether it should be closed by the caller."""
-        raise NotImplementedError
-
-    async def _release_printer(self, hass: Any, printer: Any, *, owned: bool) -> None:
-        """Close a printer instance if owned by the caller."""
-        raise NotImplementedError
+class PrintOperationsMixin:
+    """Mixin providing :meth:`print_text` and :meth:`print_qr`."""
 
     async def print_text(
-        self,
+        self: _PrinterHost,
         hass: HomeAssistant,
         *,
         text: str,
@@ -76,66 +74,28 @@ class PrintOperationsMixin:
         feed: int | None = 0,
     ) -> None:
         """Print text to the printer."""
-        text = validate_text_input(text)
-        align_m = map_align(align)
-        ul = map_underline(underline)
-        wmult = map_multiplier(width)
-        hmult = map_multiplier(height)
-        text_to_print = self._wrap_text(text)
-
-        def _do_print(printer: Any) -> None:
-            # Optional codepage
-            if self._config.codepage:
-                try:
-                    if hasattr(printer, "charcode"):
-                        printer.charcode(self._config.codepage)
-                except Exception as e:
-                    _LOGGER.debug("Codepage set failed: %s", sanitize_log_message(str(e)))
-
-            # Set style
-            if hasattr(printer, "set"):
-                use_custom_size = wmult > 1 or hmult > 1
-                printer.set(
-                    align=align_m,
-                    bold=bool(bold),
-                    underline=ul,
-                    width=wmult,
-                    height=hmult,
-                    custom_size=use_custom_size,
-                    normal_textsize=not use_custom_size,
-                )
-
-            # Encoding is best-effort; python-escpos handles str internally.
-            if encoding:
-                try:
-                    # Try to set codepage if printer exposes helper
-                    if hasattr(printer, "_set_codepage"):
-                        try:
-                            printer._set_codepage(encoding)
-                        except Exception:
-                            _LOGGER.warning("Unsupported encoding/codepage: %s", encoding)
-                    text_bytes = text_to_print.encode(encoding, errors="replace")
-                    if hasattr(printer, "_raw"):
-                        printer._raw(text_bytes)
-                    else:
-                        printer.text(text_to_print)
-                except Exception:
-                    printer.text(text_to_print)
-            else:
-                printer.text(text_to_print)
-
         async with self._lock:
             printer, owned = await self._acquire_printer(hass)
             try:
-                await hass.async_add_executor_job(_do_print, printer)
+                await _print_text_under_lock(
+                    self,
+                    hass,
+                    printer,
+                    text=text,
+                    align=align,
+                    bold=bold,
+                    underline=underline,
+                    width=width,
+                    height=height,
+                    encoding=encoding,
+                )
                 await self._apply_cut_and_feed(hass, printer, cut, feed)
             finally:
                 await self._release_printer(hass, printer, owned=owned)
-        # Successful operation implies reachable
         await self._mark_success()
 
     async def print_qr(
-        self,
+        self: _PrinterHost,
         hass: HomeAssistant,
         *,
         data: str,
@@ -178,72 +138,78 @@ class PrintOperationsMixin:
                 await self._apply_cut_and_feed(hass, printer, cut, feed)
             finally:
                 await self._release_printer(hass, printer, owned=owned)
+        await self._mark_success()
 
-    async def print_image(
-        self,
-        hass: HomeAssistant,
-        *,
-        image: str,
-        high_density: bool = True,
-        align: str | None = None,
-        cut: str | None = DEFAULT_CUT,
-        feed: int | None = 0,
-    ) -> None:
-        """Print an image to the printer."""
-        # Resolve image source
-        img_obj: Image.Image
 
-        if image.lower().startswith(("http://", "https://")):
-            _LOGGER.debug("Downloading image from URL: %s", sanitize_log_message(image, ["text", "data"]))
-            url = validate_image_url(image)
-            # Use a local ClientSession to avoid depending on HA http component in unit tests
-            session = aiohttp.ClientSession()
+# ---------------------------------------------------------------------------
+# Module-level helper: runs the text-print body assuming the lock is held
+# and ``printer`` is already acquired. Used by both ``print_text`` and the
+# ``print_text_with_image`` adapter method (which needs to keep the lock
+# across two operations for atomicity).
+# ---------------------------------------------------------------------------
+
+
+async def _print_text_under_lock(
+    host: _PrinterHost,
+    hass: HomeAssistant,
+    printer: Any,
+    *,
+    text: str,
+    align: str | None,
+    bold: bool | None,
+    underline: str | None,
+    width: str | int | None,
+    height: str | int | None,
+    encoding: str | None,
+) -> None:
+    """Execute the text-print body. ``host._lock`` must already be held."""
+    text = validate_text_input(text)
+    align_m = map_align(align)
+    ul = map_underline(underline)
+    wmult = map_multiplier(width)
+    hmult = map_multiplier(height)
+    text_to_print = host._wrap_text(text)
+    codepage = host._config.codepage
+
+    def _do_print(p: Any) -> None:
+        if codepage:
             try:
-                resp = await session.get(url)
-                try:
-                    resp.raise_for_status()
-                    content = await resp.read()
-                finally:
-                    with contextlib.suppress(Exception):
-                        resp.close()
-            finally:
-                with contextlib.suppress(Exception):
-                    await session.close()
-            img_obj = Image.open(io.BytesIO(content))
+                if hasattr(p, "charcode"):
+                    p.charcode(codepage)
+            except Exception as e:
+                _LOGGER.debug(
+                    "Codepage set failed: %s", sanitize_log_message(str(e))
+                )
+
+        if hasattr(p, "set"):
+            use_custom_size = wmult > 1 or hmult > 1
+            p.set(
+                align=align_m,
+                bold=bool(bold),
+                underline=ul,
+                width=wmult,
+                height=hmult,
+                custom_size=use_custom_size,
+                normal_textsize=not use_custom_size,
+            )
+
+        if encoding:
+            try:
+                if hasattr(p, "_set_codepage"):
+                    try:
+                        p._set_codepage(encoding)
+                    except Exception:
+                        _LOGGER.warning(
+                            "Unsupported encoding/codepage: %s", encoding
+                        )
+                text_bytes = text_to_print.encode(encoding, errors="replace")
+                if hasattr(p, "_raw"):
+                    p._raw(text_bytes)
+                else:
+                    p.text(text_to_print)
+            except Exception:
+                p.text(text_to_print)
         else:
-            _LOGGER.debug("Opening local image: %s", image)
-            path = validate_local_image_path(image)
-            img_obj = Image.open(path)
+            p.text(text_to_print)
 
-        align_m = map_align(align)
-
-        # Resize overly wide images to a sane default (e.g., 512px)
-        try:
-            max_width = 512
-            orig_w, orig_h = img_obj.width, img_obj.height
-            if orig_w > max_width:
-                ratio = max_width / float(orig_w)
-                new_size = (max_width, int(orig_h * ratio))
-                img_obj = img_obj.resize(new_size)
-                _LOGGER.debug("Resized image from %sx%s to %sx%s", orig_w, orig_h, new_size[0], new_size[1])
-        except Exception:
-            # If resizing fails for any reason, continue with the original image
-            pass
-
-        def _do_print(printer: Any) -> None:
-            if hasattr(printer, "set"):
-                printer.set(align=align_m, normal_textsize=True)
-            # Some printers need conversion; python-escpos handles PIL.Image
-            if hasattr(printer, "image"):
-                printer.image(img_obj, high_density_vertical=high_density, high_density_horizontal=high_density)
-            else:
-                # Fallback: convert to bytes via ESC/POS raster if possible
-                printer.text("[image printing not supported by this printer]\n")
-
-        async with self._lock:
-            printer, owned = await self._acquire_printer(hass)
-            try:
-                await hass.async_add_executor_job(_do_print, printer)
-                await self._apply_cut_and_feed(hass, printer, cut, feed)
-            finally:
-                await self._release_printer(hass, printer, owned=owned)
+    await hass.async_add_executor_job(_do_print, printer)

@@ -1,0 +1,80 @@
+# Project-specific Semgrep rules for ha-escpos-thermal-printer.
+#
+# These catch regressions of the Phase 2 / Phase 4 findings in
+# `.full-review/05-final-report.md` that off-the-shelf scanners
+# (Bandit, ruff `S`) miss because they require domain knowledge:
+#
+# - Direct `aiohttp.ClientSession()` construction bypasses HA's
+#   pooled session (defeats SSRF middleware + connection pooling).
+# - `os.path.normpath` in a validator name suggests the deny-list
+#   path-traversal pattern that S-C2 documents as insecure.
+# - `Image.open(` without an accompanying `formats=` arg or a
+#   module-level `MAX_IMAGE_PIXELS` cap reaches every registered
+#   Pillow decoder on attacker-controlled bytes.
+# - `_LOGGER.error(..., err)` in the image / notify paths without
+#   `sanitize_log_message` leaks URLs, paths, and Pillow byte
+#   fragments (S-H5).
+rules:
+  - id: no-raw-aiohttp-clientsession
+    pattern: aiohttp.ClientSession(...)
+    message: >
+      Use `homeassistant.helpers.aiohttp_client.async_get_clientsession(hass)`
+      instead of constructing a new `aiohttp.ClientSession()`. Per-request
+      sessions defeat HA's connection pooling and skip its SSRF middleware.
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - "custom_components/escpos_printer/"
+      exclude:
+        - "custom_components/escpos_printer/printer/_escpos_bluetooth.py"
+
+  - id: no-normpath-in-validator
+    pattern: |
+      def $F(...):
+        ...
+        os.path.normpath(...)
+        ...
+    message: >
+      Validators must use `pathlib.Path.resolve(strict=True)`, not
+      `os.path.normpath`. `normpath` doesn't dereference symlinks, so
+      a `.png` symlink to `/etc/shadow` slips through a deny-list path
+      check. See S-C2 in `.full-review/02a-security.md`.
+    severity: WARNING
+    languages: [python]
+    paths:
+      include:
+        - "custom_components/escpos_printer/security.py"
+
+  - id: pillow-image-open-without-formats
+    pattern: Image.open($BIO)
+    message: >
+      `Image.open(...)` without `formats=` reaches every registered
+      Pillow decoder on attacker-controlled bytes. Pass an explicit
+      `formats=("PNG", "JPEG", "GIF", "BMP", "TIFF", "WEBP")` allow-list.
+    severity: WARNING
+    languages: [python]
+    paths:
+      include:
+        - "custom_components/escpos_printer/"
+
+  - id: unsanitized-logger-with-exception
+    pattern-either:
+      - pattern: _LOGGER.error($MSG, $ERR)
+      - pattern: _LOGGER.warning($MSG, $ERR)
+    pattern-not: _LOGGER.error($MSG, sanitize_log_message(...))
+    pattern-not: _LOGGER.warning($MSG, sanitize_log_message(...))
+    message: >
+      `_LOGGER.error(...)` with an exception in `notify.py` or
+      `image_sources.py` may leak URL credentials, file paths, or
+      Pillow byte fragments. Wrap the exception value in
+      `sanitize_log_message(str(err))` or use `_LOGGER.exception(...)`
+      (which doesn't interpolate the exception text into the format
+      string).
+    severity: WARNING
+    languages: [python]
+    paths:
+      include:
+        - "custom_components/escpos_printer/notify.py"
+        - "custom_components/escpos_printer/image_sources.py"
+        - "custom_components/escpos_printer/services/print_handlers.py"

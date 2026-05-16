@@ -37,44 +37,56 @@ async def test_print_text_service_raises_homeassistanterror(hass, caplog):  # ty
     assert any("print_text failed" in rec.message for rec in caplog.records)
 
 
-async def test_print_image_service_bad_path(hass, caplog):  # type: ignore[no-untyped-def]
+async def test_print_image_service_bad_path(hass):  # type: ignore[no-untyped-def]
     await _setup_entry(hass)
     fake = MagicMock()
-    with patch("escpos.printer.Network", return_value=fake), pytest.raises(Exception):
+    with patch("escpos.printer.Network", return_value=fake), pytest.raises(Exception) as excinfo:
         await hass.services.async_call(
             DOMAIN,
             "print_image",
             {"image": "/non/existent.png"},
             blocking=True,
         )
-    assert any("Opening local image" in rec.message for rec in caplog.records)
+    # `Path.resolve(strict=True)` raises FileNotFoundError → wrapped as
+    # "Image file does not exist or is not a regular file".
+    assert "does not exist" in str(excinfo.value) or "print_image failed" in str(excinfo.value)
 
 
-async def test_cut_invalid_mode_logs_warning(hass, caplog):  # type: ignore[no-untyped-def]
+async def test_cut_invalid_mode_rejected_by_schema(hass):  # type: ignore[no-untyped-def]
+    """`mode: invalid` is now rejected by the cut-service schema (BP-C1).
+
+    Previously the handler accepted anything and warned at runtime; the
+    schema is the right enforcement point.
+    """
+    import voluptuous as vol
+
     await _setup_entry(hass)
     fake = MagicMock()
-    with patch("escpos.printer.Network", return_value=fake):
+    with patch("escpos.printer.Network", return_value=fake), pytest.raises(vol.Invalid):
         await hass.services.async_call(
             DOMAIN,
             "cut",
             {"mode": "invalid"},
             blocking=True,
         )
-    # Should warn and default to full
-    assert any("Invalid cut mode" in rec.message for rec in caplog.records)
-    fake.cut.assert_called()  # still called
+    fake.cut.assert_not_called()
 
 
-async def test_feed_clamps_and_executes(hass, caplog):  # type: ignore[no-untyped-def]
+async def test_feed_zero_rejected_by_schema(hass):  # type: ignore[no-untyped-def]
+    """`lines: 0` is now rejected by the feed-service schema (min=1).
+
+    Previously the handler clamped silently; the schema is the right
+    enforcement point.
+    """
+    import voluptuous as vol
+
     await _setup_entry(hass)
     fake = MagicMock()
-    with patch("escpos.printer.Network", return_value=fake):
+    with patch("escpos.printer.Network", return_value=fake), pytest.raises(vol.Invalid):
         await hass.services.async_call(
             DOMAIN,
             "feed",
             {"lines": 0},
             blocking=True,
         )
-    # Should clamp to at least 1
-    assert any("Feeding" in rec.message for rec in caplog.records)
-    assert fake.control.called
+    fake.control.assert_not_called()

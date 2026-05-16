@@ -6,7 +6,13 @@ readme = "README.md"
 requires-python = ">=3.13.2"
 dependencies = [
   "python-escpos==3.1",
-  "Pillow>=12.0.0,<13",
+  # Pillow is pinned in pyproject for dev/CI reproducibility (decoder,
+  # MAX_IMAGE_PIXELS, exif_transpose, and dither semantics are all
+  # Pillow-version-sensitive — see image_processor.py). At runtime HA
+  # core ships its own Pillow; the manifest carries a range so we don't
+  # fight HA's pin. See `scripts/sync_manifest_requirements.py`
+  # MANIFEST_OVERRIDES and CLAUDE.md for the rationale.
+  "Pillow==12.0.0",
   "qrcode==8.2",
   "python-barcode==0.16.1",
   "pyusb==1.3.1",
@@ -37,6 +43,17 @@ dev = [
     "bandit==1.9.4",
     "bandit-sarif-formatter==1.1.1",
     "pip-audit==2.10.0",
+    # HTTP mocking for the SSRF / slow-loris / fallback-bug regression
+    # tests in tests/test_image_sources.py. Used by tests/conftest.py
+    # fixtures `mock_pooled_aiohttp` and `slow_aiter`. Pinned to the
+    # version that `pytest-homeassistant-custom-component` also requires
+    # so the resolver doesn't fight itself.
+    "respx==0.22.0",
+    # Per-patch coverage gate (validate.yml runs `diff-cover` against
+    # main to enforce >=90% on changed lines, on top of the global
+    # `fail_under=80`). Catches regressions in large PRs where the
+    # global average masks new untested code.
+    "diff-cover==9.5.0",
 ]
 security = [
   "bandit==1.9.4",
@@ -45,7 +62,10 @@ security = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "-q -m 'not integration'"
+# `-q` removed so CI surfaces per-test progress and hanging tests don't
+# silently consume the whole job budget. Local developers can opt back
+# in with `uv run pytest -q`.
+addopts = "-m 'not integration'"
 testpaths = ["tests"]
 asyncio_mode = "auto"
 markers = [
@@ -57,7 +77,11 @@ markers = [
 # narrowing after explicit error checks; try/except/pass is used for
 # best-effort cleanup and fallback paths.
 skips = ["B101", "B110"]
-exclude_dirs = ["tests", "scripts"]
+# `scripts/` runs with elevated CI privileges in dependabot-auto-sync.yml
+# (`contents: write`). Excluding it from Bandit inverts the priority;
+# the scripts directory is precisely where elevated-privilege analysis
+# belongs. Only `tests/` is excluded (assertion-heavy noise).
+exclude_dirs = ["tests"]
 
 [tool.ruff]
 line-length = 100
@@ -126,6 +150,12 @@ ignore = [
     "TD002",   # missing author in TODO
     "TD003",   # missing issue link in TODO
     "INP001",  # file is part of implicit namespace package
+    # Stylistic — let raises happen inside try-blocks; the "abstract to
+    # an inner function" refactor adds friction without preventing bugs.
+    "TRY301",
+    # The image / atomic-print paths are inherently sequential; refactoring
+    # into smaller functions would obscure the linear logic. PLR0912/0915
+    # ignored at the file level via per-file-ignores below.
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -157,6 +187,31 @@ ignore = [
     "B904",    # raise from in tests
 ]
 "custom_components/escpos_printer/__init__.py" = ["BLE001"]
+# BLE001 is enabled integration-wide via the `select` block above. Per-file
+# ignores below silence cases where catching ``Exception`` is the correct
+# behavior (legacy adapter `try/except` around vendor calls). The list is
+# intentionally short so new ``except Exception`` introductions surface
+# in code review.
+"custom_components/escpos_printer/printer/network_adapter.py" = ["BLE001"]
+"custom_components/escpos_printer/printer/usb_adapter.py" = ["BLE001"]
+"custom_components/escpos_printer/printer/bluetooth_adapter.py" = ["BLE001"]
+"custom_components/escpos_printer/printer/print_operations.py" = ["BLE001"]
+"custom_components/escpos_printer/printer/barcode_operations.py" = ["BLE001"]
+"custom_components/escpos_printer/printer/control_operations.py" = ["BLE001"]
+"custom_components/escpos_printer/services/print_handlers.py" = ["BLE001"]
+"custom_components/escpos_printer/services/control_handlers.py" = ["BLE001"]
+"custom_components/escpos_printer/notify.py" = ["BLE001"]
+# Image / atomic-print methods are intentionally long and linear; the
+# Protocol contract carries the per-step intent better than a stack of
+# small helpers would. PLR0915 (too many statements) and PLR0912 (too
+# many branches) fire on these files specifically.
+"custom_components/escpos_printer/printer/image_operations.py" = [
+    "BLE001", "PLR0915",
+]
+"custom_components/escpos_printer/printer/image_processor.py" = ["PLR0912"]
+"custom_components/escpos_printer/printer/base_adapter.py" = [
+    "BLE001", "PLR0915",
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["custom_components.escpos_printer"]
@@ -188,6 +243,7 @@ namespace_packages = false
 module = [
     "escpos.*",
     "PIL.*",
+    "pillow_heif.*",
     "qrcode.*",
     "barcode.*",
     "pytest_homeassistant_custom_component.*",

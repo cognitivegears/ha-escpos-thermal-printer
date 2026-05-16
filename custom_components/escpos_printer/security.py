@@ -1,63 +1,121 @@
-"""
-Security utilities for ESCPOS Thermal Printer integration.
+"""Security utilities for the ESC/POS Thermal Printer integration.
 
-This module provides security-focused validation and sanitization functions
-to protect against common vulnerabilities including injection attacks,
-resource exhaustion, and information disclosure.
+This module is the single source of truth for input validation, log
+sanitization, and the numeric bounds shared between ``services.yaml``,
+the voluptuous schemas, and the adapter-level validators.
+
+Functions here are deliberately split into two flavors:
+
+- Synchronous validators (cheap CPU / string work) — safe on the event loop.
+- ``*_async`` wrappers (DNS resolution, filesystem stat, file open) — must
+  be awaited from the event loop; they hop to an executor internally.
 """
 
 from __future__ import annotations
 
+import base64
+import binascii
+import ipaddress
 import logging
 import os
+from pathlib import Path
 import re
-from typing import Any
+import socket
+import stat
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+
+from .const import DITHER_MODES, IMPL_MODES, ROTATION_VALUES
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 
-# Security constants
+# ---------------------------------------------------------------------------
+# Bounds & limits (single source of truth — reused by voluptuous schemas,
+# the adapter's belt-and-braces validators, and `services.yaml` selectors).
+# ---------------------------------------------------------------------------
+
 MAX_TEXT_LENGTH = 10000  # Maximum text length to prevent resource exhaustion
 MAX_QR_DATA_LENGTH = 2000  # Maximum QR code data length
 MAX_BARCODE_LENGTH = 100  # Maximum barcode data length
-MAX_IMAGE_SIZE_MB = 10  # Maximum image download size in MB
+MAX_IMAGE_SIZE_MB = 10  # Maximum image download / decoded size, MB
 MAX_FEED_LINES = 50  # Maximum feed lines to prevent paper waste
 MAX_BEEP_TIMES = 10  # Maximum beep repetitions
 
-# URL validation patterns
-VALID_URL_SCHEMES = {"http", "https"}
-VALID_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp"}
+# Image processing bounds (mirror in `services.yaml` + voluptuous schemas).
+IMAGE_WIDTH_MIN = 16
+IMAGE_WIDTH_MAX = 2048
+IMAGE_THRESHOLD_MIN = 1
+IMAGE_THRESHOLD_MAX = 254
+IMAGE_FRAGMENT_MIN = 16
+IMAGE_FRAGMENT_MAX = 1024
+IMAGE_CHUNK_DELAY_MIN = 0
+IMAGE_CHUNK_DELAY_MAX = 5000
 
-# Path traversal protection
-# Do not block path separators; instead, prevent traversal sequences and unsafe expansions.
-FORBIDDEN_PATH_SEQUENCES = {"..", "~", "$", "`"}
+# Maximum decoded pixel count for a single image. Set process-globally on
+# ``PIL.Image.MAX_IMAGE_PIXELS`` by ``image_processor`` so PIL's bomb
+# protection fires deterministically.
+MAX_IMAGE_PIXELS = 20_000_000
+
+# Post-processing height (rows) and per-print slice count caps. Both
+# protect against paper-waste DoS (legitimate receipts rarely exceed
+# either limit; an attacker can otherwise burn the entire roll).
+MAX_PROCESSED_HEIGHT = 8192
+MAX_SLICES = 64
+
+# URL validation
+VALID_URL_SCHEMES = frozenset({"http", "https"})
+VALID_URL_PORTS = frozenset({None, 80, 443})
+MAX_URL_LENGTH = 2000
+
+# Local file validation. HEIC/HEIF/AVIF are accepted when ``pillow-heif``
+# is installed (see ``printer/image_processor._register_heif_opener``).
+# The allowlist is the union of every format we *might* be able to
+# decode — Pillow's ``formats=`` parameter in the actual decode step is
+# the real gate, so listing them here without the opener is a no-op.
+VALID_IMAGE_EXTENSIONS = frozenset(
+    {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp",
+     ".heic", ".heif", ".avif"}
+)
+
+# Permitted data-URI subtypes. Pinned so a future regression can't
+# accidentally enable SVG (no Pillow renderer; cairo-based fallbacks are
+# an XML attack surface). HEIC/HEIF/AVIF added so iOS / drone-style
+# camera proxies can paste snapshots inline.
+_DATA_URI_RE = re.compile(
+    r"^data:image/(?P<subtype>png|jpe?g|gif|bmp|tiff|webp|heic|heif|avif);base64,"
+    r"(?P<data>[A-Za-z0-9+/=\s]+)$"
+)
+
+# Maximum input size for a base64 data URI before we even attempt to
+# regex-match or decode. base64 expands 3 bytes -> 4 chars, so a 10 MB
+# decoded payload is roughly 13.4 MB of base64; add headroom for the
+# ``data:image/...;base64,`` prefix.
+MAX_BASE64_INPUT_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024 * 4 // 3 + 256
+
+# Maximum length of an entity_id object-id segment (the part after the dot).
+# Anchors the regex so an attacker can't hand us a megabyte string to
+# burn CPU on.
+MAX_ENTITY_ID_OBJECT_LEN = 64
 
 
 def validate_text_input(text: str, max_length: int = MAX_TEXT_LENGTH) -> str:
-    """Validate and sanitize text input.
-
-    Args:
-        text: Input text to validate
-        max_length: Maximum allowed length
-
-    Returns:
-        Sanitized text
-
-    Raises:
-        HomeAssistantError: If validation fails
-    """
+    """Validate and sanitize printable-text input."""
     if not isinstance(text, str):
         raise HomeAssistantError("Text input must be a string")
 
     if len(text) > max_length:
-        raise HomeAssistantError(f"Text length exceeds maximum of {max_length} characters")
+        raise HomeAssistantError(
+            f"Text length exceeds maximum of {max_length} characters"
+        )
 
-    # Remove null bytes and other control characters that could cause issues
-    sanitized = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
+    # Strip C0 control characters except CR/LF/HT (which ESC/POS handles).
+    sanitized = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
 
-    # Log warning for potentially suspicious content without exposing the content
     if len(sanitized) != len(text):
         _LOGGER.warning("Text input contained control characters that were removed")
 
@@ -65,22 +123,14 @@ def validate_text_input(text: str, max_length: int = MAX_TEXT_LENGTH) -> str:
 
 
 def validate_qr_data(data: str) -> str:
-    """Validate QR code data.
-
-    Args:
-        data: QR code data to validate
-
-    Returns:
-        Validated data
-
-    Raises:
-        HomeAssistantError: If validation fails
-    """
+    """Validate QR code data."""
     if not isinstance(data, str):
         raise HomeAssistantError("QR data must be a string")
 
     if len(data) > MAX_QR_DATA_LENGTH:
-        raise HomeAssistantError(f"QR data length exceeds maximum of {MAX_QR_DATA_LENGTH} characters")
+        raise HomeAssistantError(
+            f"QR data length exceeds maximum of {MAX_QR_DATA_LENGTH} characters"
+        )
 
     if not data.strip():
         raise HomeAssistantError("QR data cannot be empty")
@@ -89,28 +139,18 @@ def validate_qr_data(data: str) -> str:
 
 
 def validate_barcode_data(code: str, bc_type: str) -> tuple[str, str]:
-    """Validate barcode data and type.
-
-    Args:
-        code: Barcode data
-        bc_type: Barcode type
-
-    Returns:
-        Tuple of (validated_code, validated_bc_type)
-
-    Raises:
-        HomeAssistantError: If validation fails
-    """
+    """Validate barcode data + type and normalize aliases."""
     if not isinstance(code, str) or not isinstance(bc_type, str):
         raise HomeAssistantError("Barcode code and type must be strings")
 
     if len(code) > MAX_BARCODE_LENGTH:
-        raise HomeAssistantError(f"Barcode data length exceeds maximum of {MAX_BARCODE_LENGTH} characters")
+        raise HomeAssistantError(
+            f"Barcode data length exceeds maximum of {MAX_BARCODE_LENGTH} characters"
+        )
 
     if not code.strip():
         raise HomeAssistantError("Barcode data cannot be empty")
 
-    # Validate barcode type (expanded set with common aliases)
     aliases = {
         "UPC-A": "UPCA",
         "UPC": "UPCA",
@@ -120,181 +160,387 @@ def validate_barcode_data(code: str, bc_type: str) -> tuple[str, str]:
         "JAN8": "EAN8",
     }
     valid_types = {
-        "EAN13",
-        "EAN8",
-        "UPCA",
-        "UPC-A",
-        "UPC-E",
-        "CODE39",
-        "CODE93",
-        "CODE128",
-        "ITF",
-        "ITF14",
-        "CODABAR",
-        "NW7",
-        "JAN",
-        "JAN13",
-        "JAN8",
+        "EAN13", "EAN8", "UPCA", "UPC-A", "UPC-E",
+        "CODE39", "CODE93", "CODE128",
+        "ITF", "ITF14", "CODABAR", "NW7",
+        "JAN", "JAN13", "JAN8",
     }
     bc_upper = bc_type.upper()
     if bc_upper not in valid_types:
-        _LOGGER.warning("Unknown barcode type '%s', proceeding with caution", bc_type)
-    # Normalize aliases to common forms expected by python-escpos
+        _LOGGER.warning(
+            "Unknown barcode type '%s', proceeding with caution", bc_type
+        )
     bc_canonical = aliases.get(bc_upper, bc_upper)
     return code, bc_canonical
 
 
+# ---------------------------------------------------------------------------
+# URL validation (SSRF-aware).
+# ---------------------------------------------------------------------------
+
+
 def validate_image_url(url: str) -> str:
-    """Validate image URL for security.
+    """Cheap synchronous URL validation.
 
-    Args:
-        url: Image URL to validate
-
-    Returns:
-        Validated URL
-
-    Raises:
-        HomeAssistantError: If validation fails
+    Rejects URLs that are structurally bad (wrong scheme, no hostname, too
+    long, contain credentials, use non-default ports, contain IDN
+    punycode). Does **not** resolve DNS — use
+    :func:`validate_image_url_and_resolve` from the event loop to also
+    check the resolved address is public.
     """
     if not isinstance(url, str):
         raise HomeAssistantError("Image URL must be a string")
 
+    if len(url) > MAX_URL_LENGTH:
+        raise HomeAssistantError("URL is too long")
+
     try:
         parsed = urlparse(url)
-    except Exception as e:
-        raise HomeAssistantError(f"Invalid URL format: {e}") from e
+    except ValueError as exc:
+        raise HomeAssistantError(f"Invalid URL format: {exc}") from exc
 
-    # Validate scheme
     if parsed.scheme not in VALID_URL_SCHEMES:
-        raise HomeAssistantError(f"Invalid URL scheme. Only {VALID_URL_SCHEMES} are allowed")
+        raise HomeAssistantError(
+            f"Invalid URL scheme. Only {sorted(VALID_URL_SCHEMES)} are allowed"
+        )
 
-    # Validate hostname exists
     if not parsed.hostname:
         raise HomeAssistantError("URL must include a valid hostname")
 
-    # Basic length check (tightened to align with tests/policies)
-    if len(url) > 2000:
-        raise HomeAssistantError("URL is too long")
+    if parsed.username or parsed.password:
+        raise HomeAssistantError("URLs with embedded credentials are not allowed")
+
+    # IDN/punycode: a homograph URL renders visually identical to a
+    # legitimate one in logs/toasts. Reject `xn--`-encoded hostnames.
+    if "xn--" in parsed.hostname.lower():
+        raise HomeAssistantError(
+            "Internationalized (IDN/punycode) hostnames are not allowed"
+        )
+
+    # Restrict to default ports for the scheme. Catches both 22 (SSH) and
+    # 8123 (HA itself).
+    if parsed.port not in VALID_URL_PORTS:
+        raise HomeAssistantError(
+            f"URL port {parsed.port} not allowed; only {sorted(p for p in VALID_URL_PORTS if p)} are permitted"
+        )
 
     return url
 
 
-def validate_local_image_path(path: str, allowed_extensions: set[str] = VALID_IMAGE_EXTENSIONS) -> str:
-    """Validate local image file path for security.
+def _is_public_address(addr: str) -> bool:
+    """Return True if ``addr`` is a globally routable IP address."""
+    try:
+        ip = ipaddress.ip_address(addr)
+    except ValueError:
+        return False
+    return not (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_reserved
+        or ip.is_multicast
+        or ip.is_unspecified
+    )
 
-    Args:
-        path: File path to validate
-        allowed_extensions: Set of allowed file extensions
 
-    Returns:
-        Validated and normalized path
+def _resolve_hostname_sync(hostname: str, port: int | None) -> list[str]:
+    """Resolve ``hostname`` to a list of IP literals; raise on failure."""
+    try:
+        infos = socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
+    except OSError as exc:
+        raise HomeAssistantError(
+            f"Could not resolve image URL hostname: {exc}"
+        ) from exc
+    addrs = sorted({str(info[4][0]) for info in infos})
+    if not addrs:
+        raise HomeAssistantError("Could not resolve image URL hostname")
+    return addrs
 
-    Raises:
-        HomeAssistantError: If validation fails
+
+async def validate_image_url_and_resolve(
+    hass: HomeAssistant, url: str
+) -> tuple[str, list[str]]:
+    """Validate ``url`` and resolve its hostname, rejecting private targets.
+
+    Returns ``(validated_url, resolved_addresses)``. The caller should pin
+    one of the resolved addresses for the actual fetch (defeats DNS
+    rebinding); see ``image_sources._resolve_http``.
     """
-    if not isinstance(path, str):
+    validated = validate_image_url(url)
+    parsed = urlparse(validated)
+    hostname = parsed.hostname
+    if hostname is None:  # pragma: no cover — validate_image_url enforces it
+        raise HomeAssistantError("URL must include a valid hostname")
+    addrs = await hass.async_add_executor_job(
+        _resolve_hostname_sync, hostname, parsed.port
+    )
+    bad = [a for a in addrs if not _is_public_address(a)]
+    if bad:
+        raise HomeAssistantError(
+            "Image URL resolves to a non-public address "
+            "(private, loopback, link-local, reserved, or multicast)"
+        )
+    return validated, addrs
+
+
+# ---------------------------------------------------------------------------
+# Local-file validation.
+# ---------------------------------------------------------------------------
+
+
+def _validate_local_path_sync(
+    raw_path: str,
+    allowed: frozenset[str] = VALID_IMAGE_EXTENSIONS,
+    *,
+    max_bytes: int | None = None,
+) -> Path:
+    """Resolve and validate a local image path.
+
+    Returns the resolved ``Path`` (symlinks dereferenced). Raises
+    :class:`HomeAssistantError` on any failure. Blocking — call from an
+    executor thread only.
+
+    ``max_bytes`` lets callers raise the per-file cap when ``auto_resize``
+    is set (the decoded image will be downscaled before the pixel-count
+    cap fires).
+    """
+    if not isinstance(raw_path, str):
         raise HomeAssistantError("Image path must be a string")
 
-    # Basic check for traversal or shell-expansion risk
-    if any(seq in path for seq in FORBIDDEN_PATH_SEQUENCES):
-        # Keep message consistent with existing tests and docs
-        raise HomeAssistantError("Path contains forbidden characters")
+    if max_bytes is None:
+        max_bytes = MAX_IMAGE_SIZE_MB * 1024 * 1024
 
-    # Normalize path to prevent directory traversal
-    normalized_path = os.path.normpath(path)
-
-    # Absolute paths are allowed; Home Assistant typically uses /config paths.
-    # Additional runtime restrictions (e.g., whitelisting /config or media) should
-    # be enforced by the caller/environment if needed.
-
-    # Validate file extension
-    _, ext = os.path.splitext(normalized_path.lower())
-    if ext not in allowed_extensions:
-        raise HomeAssistantError(f"File extension '{ext}' not allowed. Allowed: {allowed_extensions}")
-
-    # Check if file exists and is readable
-    if not os.path.isfile(normalized_path):
-        raise HomeAssistantError("Image file does not exist or is not a regular file")
-
-    # Basic file size check (prevent extremely large files)
     try:
-        file_size = os.path.getsize(normalized_path)
-        if file_size > MAX_IMAGE_SIZE_MB * 1024 * 1024:
-            raise HomeAssistantError(f"Image file too large (max {MAX_IMAGE_SIZE_MB}MB)")
-    except OSError as e:
-        raise HomeAssistantError(f"Cannot access image file: {e}") from e
+        resolved = Path(raw_path).resolve(strict=True)
+    except FileNotFoundError as exc:
+        raise HomeAssistantError(
+            "Image file does not exist or is not a regular file"
+        ) from exc
+    except OSError as exc:
+        raise HomeAssistantError(f"Cannot access image file: {exc}") from exc
 
-    return normalized_path
+    if resolved.suffix.lower() not in allowed:
+        raise HomeAssistantError(
+            f"File extension '{resolved.suffix}' not allowed. "
+            f"Allowed: {sorted(allowed)}"
+        )
+
+    try:
+        st = resolved.stat()
+    except OSError as exc:
+        raise HomeAssistantError(f"Cannot access image file: {exc}") from exc
+    if not stat.S_ISREG(st.st_mode):
+        raise HomeAssistantError("Image path is not a regular file")
+    if st.st_size > max_bytes:
+        mb = max_bytes // (1024 * 1024)
+        raise HomeAssistantError(f"Image file too large (max {mb}MB)")
+
+    return resolved
 
 
-def validate_numeric_input(value: Any, min_val: int, max_val: int, field_name: str) -> int:
-    """Validate numeric input within bounds.
+def open_local_image_no_follow(
+    path: Path, *, max_bytes: int | None = None
+) -> bytes:
+    """Open ``path`` with ``O_NOFOLLOW`` and return its bytes.
 
-    Args:
-        value: Value to validate
-        min_val: Minimum allowed value
-        max_val: Maximum allowed value
-        field_name: Name of the field for error messages
-
-    Returns:
-        Validated integer value
-
-    Raises:
-        HomeAssistantError: If validation fails
+    Used together with :func:`_validate_local_path_sync` to defeat
+    TOCTOU symlink swaps between stat and open. Caller is expected to
+    have already validated the path (size, extension, allowlist).
     """
+    if max_bytes is None:
+        max_bytes = MAX_IMAGE_SIZE_MB * 1024 * 1024
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            raise HomeAssistantError("Image path is not a regular file")
+        if st.st_size > max_bytes:
+            mb = max_bytes // (1024 * 1024)
+            raise HomeAssistantError(f"Image file too large (max {mb}MB)")
+        with os.fdopen(fd, "rb", closefd=True) as handle:
+            fd = -1  # ownership transferred to the file object
+            return handle.read(max_bytes + 1)
+    finally:
+        if fd >= 0:
+            os.close(fd)
+
+
+# ---------------------------------------------------------------------------
+# Base64 data URI validation.
+# ---------------------------------------------------------------------------
+
+
+def validate_base64_image(value: str) -> bytes:
+    """Decode a ``data:image/...;base64,...`` URI and enforce the size cap.
+
+    Caps the input length **before** regex/decoding so an attacker
+    cannot OOM us via a 200 MB base64 string.
+    """
+    if not isinstance(value, str):
+        raise HomeAssistantError("Base64 image must be a string")
+    if len(value) > MAX_BASE64_INPUT_BYTES:
+        raise HomeAssistantError(
+            f"Base64 image string too large (max ~{MAX_IMAGE_SIZE_MB}MB decoded)"
+        )
+
+    match = _DATA_URI_RE.match(value.strip())
+    if not match:
+        raise HomeAssistantError(
+            "Base64 image must be a data:image/<subtype>;base64,... URI "
+            "with subtype png/jpeg/jpg/gif/bmp/tiff/webp"
+        )
+
+    # Strip whitespace via bytes.translate instead of re.sub to avoid an
+    # extra full-size string allocation.
+    encoded_bytes = match.group("data").encode("ascii", errors="ignore")
+    encoded_bytes = encoded_bytes.translate(None, b" \t\r\n")
+    try:
+        raw = base64.b64decode(encoded_bytes, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise HomeAssistantError(f"Invalid base64 data: {exc}") from exc
+
+    if len(raw) > MAX_IMAGE_SIZE_MB * 1024 * 1024:
+        raise HomeAssistantError(f"Image too large (max {MAX_IMAGE_SIZE_MB}MB)")
+    return raw
+
+
+# ---------------------------------------------------------------------------
+# Entity-id and choice validation.
+# ---------------------------------------------------------------------------
+
+
+_ENTITY_OBJECT_RE = re.compile(rf"^[a-z0-9_]{{1,{MAX_ENTITY_ID_OBJECT_LEN}}}$")
+
+
+def validate_entity_id_for_domain(value: str, domain: str) -> str:
+    """Validate ``value`` is an entity_id in the given domain."""
+    if not isinstance(value, str):
+        raise HomeAssistantError("Entity id must be a string")
+    parts = value.split(".")
+    if len(parts) != 2 or parts[0] != domain or not parts[1]:
+        raise HomeAssistantError(
+            f"Expected entity_id in domain '{domain}', got: {value}"
+        )
+    if not _ENTITY_OBJECT_RE.match(parts[1]):
+        raise HomeAssistantError(f"Invalid entity_id: {value}")
+    return value
+
+
+def _validate_choice(value: Any, choices: frozenset[Any], field_name: str) -> Any:
+    """Return ``value`` if it is in ``choices``; otherwise raise.
+
+    Uses :class:`ServiceValidationError` so the failure surfaces in the
+    HA frontend as a translatable user-facing message rather than as an
+    integration fault.
+    """
+    if value not in choices:
+        raise ServiceValidationError(
+            f"{field_name} must be one of {sorted(choices)}; got {value!r}"
+        )
+    return value
+
+
+def validate_dither_mode(value: str) -> str:
+    """Whitelist dither mode against ``DITHER_MODES``."""
+    if not isinstance(value, str):
+        raise ServiceValidationError("dither must be a string")
+    return str(_validate_choice(value, DITHER_MODES, "dither"))
+
+
+def validate_impl_mode(value: str) -> str:
+    """Whitelist python-escpos image impl against ``IMPL_MODES``."""
+    if not isinstance(value, str):
+        raise ServiceValidationError("impl must be a string")
+    return str(_validate_choice(value, IMPL_MODES, "impl"))
+
+
+def validate_rotation(value: Any) -> int:
+    """Validate rotation angle is one of 0/90/180/270."""
+    try:
+        rotation = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ServiceValidationError("rotation must be an integer") from exc
+    return int(_validate_choice(rotation, ROTATION_VALUES, "rotation"))
+
+
+def validate_numeric_input(
+    value: Any, min_val: int, max_val: int, field_name: str
+) -> int:
+    """Validate numeric input within bounds."""
     try:
         num_value = int(value)
-    except (ValueError, TypeError) as e:
-        raise HomeAssistantError(f"{field_name} must be a valid integer") from e
+    except (TypeError, ValueError) as exc:
+        raise HomeAssistantError(
+            f"{field_name} must be a valid integer"
+        ) from exc
 
     if not (min_val <= num_value <= max_val):
-        raise HomeAssistantError(f"{field_name} must be between {min_val} and {max_val}")
+        raise HomeAssistantError(
+            f"{field_name} must be between {min_val} and {max_val}"
+        )
 
     return num_value
 
 
+# ---------------------------------------------------------------------------
+# Log sanitization.
+# ---------------------------------------------------------------------------
+
 # Bluetooth MACs are hardware identifiers (treated as personal data under
 # GDPR). Redact while preserving the OUI (first 3 octets) so support logs
 # remain useful for vendor lookups without exposing the full address.
-_MAC_RE = re.compile(r'\b([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b')
+_MAC_RE = re.compile(r"\b([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b")
 
-# Default sensitive-field names compiled into a single alternation so the
-# common path costs one regex pass instead of one per field name.
 _DEFAULT_SENSITIVE_FIELDS = (
     "password", "token", "key", "secret", "data", "text",
     "address", "mac", "alias",
+    # New: redact image-pipeline field labels (URLs, file paths, hostnames).
+    "url", "path", "host", "image", "source",
 )
 _DEFAULT_FIELD_RE = re.compile(
     rf'({"|".join(_DEFAULT_SENSITIVE_FIELDS)})=([^\s,)]+)',
     re.IGNORECASE,
 )
 
+# URL userinfo: `scheme://user:pass@host/...` → `scheme://[REDACTED]@host/...`.
+_URL_USERINFO_RE = re.compile(r"(?P<scheme>[A-Za-z][A-Za-z0-9+.\-]*://)[^@/\s]+@")
 
-def sanitize_log_message(message: str, sensitive_fields: list[str] | None = None) -> str:
+# Redact bare HA-style filesystem paths so error text from PIL/aiohttp
+# doesn't leak install layout. Order matters: list longer prefixes first.
+_PATH_PREFIXES = (
+    "/addon_configs/", "/config/", "/media/", "/share/", "/ssl/", "/data/",
+)
+_PATH_RE = re.compile(
+    r"(?P<prefix>" + "|".join(re.escape(p) for p in _PATH_PREFIXES) + r")[^\s'\")]+"
+)
+
+
+def sanitize_log_message(
+    message: str, sensitive_fields: list[str] | None = None
+) -> str:
     """Sanitize log messages to prevent information disclosure.
 
-    Args:
-        message: Log message to sanitize
-        sensitive_fields: List of field names that should be redacted
-
-    Returns:
-        Sanitized log message
+    Redacts named ``field=value`` pairs, URL userinfo, filesystem paths
+    under HA's standard mount points, and Bluetooth MACs (preserving the
+    OUI). Idempotent.
     """
     sanitized = message
     if "=" in sanitized:
         if sensitive_fields is None:
-            sanitized = _DEFAULT_FIELD_RE.sub(r'\1=[REDACTED]', sanitized)
+            sanitized = _DEFAULT_FIELD_RE.sub(r"\1=[REDACTED]", sanitized)
         else:
             for field in sensitive_fields:
-                pattern = rf'({field})=([^\s,)]+)'
+                pattern = rf"({field})=([^\s,)]+)"
                 sanitized = re.sub(
-                    pattern, r'\1=[REDACTED]', sanitized, flags=re.IGNORECASE
+                    pattern, r"\1=[REDACTED]", sanitized, flags=re.IGNORECASE
                 )
 
-    # Redact Bluetooth MAC addresses in any format (XX:XX:XX:XX:XX:XX or
-    # XX-XX-XX-XX-XX-XX) wherever they appear. Keep the OUI (first 3
-    # octets) for vendor lookups; redact the last 3 octets which uniquely
-    # identify the device.
+    if "://" in sanitized:
+        sanitized = _URL_USERINFO_RE.sub(r"\g<scheme>[REDACTED]@", sanitized)
+
+    if "/" in sanitized:
+        sanitized = _PATH_RE.sub(r"\g<prefix>[REDACTED]", sanitized)
+
     if ":" in sanitized or "-" in sanitized:
         sanitized = _MAC_RE.sub(
             lambda m: m.group(0)[:8] + ":XX:XX:XX", sanitized
@@ -303,22 +549,17 @@ def sanitize_log_message(message: str, sensitive_fields: list[str] | None = None
     return sanitized
 
 
+# ---------------------------------------------------------------------------
+# Misc validators (existing, unchanged behavior).
+# ---------------------------------------------------------------------------
+
+
 def validate_timeout(timeout: float) -> float:
-    """Validate timeout value.
-
-    Args:
-        timeout: Timeout value in seconds
-
-    Returns:
-        Validated timeout
-
-    Raises:
-        HomeAssistantError: If validation fails
-    """
+    """Validate timeout value."""
     if not isinstance(timeout, (int, float)) or timeout <= 0:
         raise HomeAssistantError("Timeout must be a positive number")
 
-    if timeout > 300:  # 5 minutes max
+    if timeout > 300:
         raise HomeAssistantError("Timeout cannot exceed 300 seconds")
 
     return float(timeout)
@@ -328,14 +569,7 @@ _BT_MAC_RE = re.compile(r"^([0-9A-F]{2}:){5}[0-9A-F]{2}$")
 
 
 def validate_bluetooth_mac(mac: str) -> str:
-    """Validate and normalize a Bluetooth MAC address.
-
-    Accepts MACs separated by ``:`` or ``-`` and returns the canonical
-    upper-case ``XX:XX:XX:XX:XX:XX`` form.
-
-    Raises:
-        HomeAssistantError: If the value isn't a well-formed MAC.
-    """
+    """Validate and normalize a Bluetooth MAC address."""
     if not isinstance(mac, str):
         raise HomeAssistantError("Bluetooth MAC must be a string")
     candidate = mac.strip().upper().replace("-", ":")
@@ -347,11 +581,7 @@ def validate_bluetooth_mac(mac: str) -> str:
 
 
 def validate_rfcomm_channel(channel: int) -> int:
-    """Validate an RFCOMM channel number.
-
-    RFCOMM channels are 1-30 (per the Bluetooth Core spec). Most ESC/POS
-    printers advertise the SPP service on channel 1.
-    """
+    """Validate an RFCOMM channel number (1-30)."""
     try:
         value = int(channel)
     except (ValueError, TypeError) as exc:
@@ -361,10 +591,10 @@ def validate_rfcomm_channel(channel: int) -> int:
     return value
 
 
-# Security-focused validation decorators
 def secure_service_call(func):  # type: ignore[no-untyped-def]
-    """Decorator to add security validation to service calls."""
+    """Decorator hook for cross-cutting security validations."""
+
     async def wrapper(*args, **kwargs):  # type: ignore[no-untyped-def]
-        # Add any cross-cutting security validations here
         return await func(*args, **kwargs)
+
     return wrapper

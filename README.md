@@ -25,7 +25,7 @@ individually or broadcast to all
 ## Features
 
 - Print text with formatting (bold, underline, alignment, font sizes)
-- Print QR codes, barcodes, and images
+- Print QR codes, barcodes, and images — from URLs, files, camera/image entities, or base64 ([guide](docs/images.md))
 - Paper feed and cut control
 - Buzzer/beeper support
 - UTF-8 text with automatic character conversion
@@ -114,7 +114,7 @@ Omit `target` to broadcast to all configured printers.
 | `escpos_printer.print_message` | Print formatted message via notify entity (supports all text formatting + UTF-8) |
 | `escpos_printer.print_qr` | Print QR codes |
 | `escpos_printer.print_barcode` | Print barcodes (EAN13, CODE128, etc.) |
-| `escpos_printer.print_image` | Print images from URL or local path |
+| `escpos_printer.print_image` | Print images from URL, file, camera/image entity, or base64 — see [Images guide](docs/images.md) |
 | `escpos_printer.feed` | Feed paper |
 | `escpos_printer.cut` | Cut paper |
 | `escpos_printer.beep` | Sound the buzzer |
@@ -145,6 +145,7 @@ See [docs/bluetooth.md](docs/bluetooth.md) for the full pairing walkthrough, con
 | [USB printers](docs/usb.md) | USB setup, permissions, container pass-through |
 | [Bluetooth printers](docs/bluetooth.md) | Pairing, RFCOMM, container caveats |
 | [Services](docs/services.md) | Service parameter reference |
+| [Images](docs/images.md) | Image printing — sources, processing, reliability, recipes |
 | [Automations](docs/automations.md) | Automation examples |
 | [Notifications](docs/notifications.md) | Notify entity and `print_message` service |
 | [Multi-printer targeting](docs/multi-printer.md) | `target:` blocks, area / entity / device targeting |

@@ -6,8 +6,9 @@ on:
   pull_request:
     branches: [ main, develop ]
   schedule:
-    # Weekly on Sundays at 3 AM UTC
-    - cron: '0 3 * * 0'
+    # Daily at 3 AM UTC — image-pipeline code has a wide ingress surface
+    # and we want CVEs against Pillow / aiohttp / httpx surfaced quickly.
+    - cron: '0 3 * * *'
 
 permissions:
   contents: read
@@ -51,9 +52,32 @@ jobs:
           # `-lll` fails the build on HIGH severity only; MEDIUM/LOW findings
           # appear in the SARIF report uploaded below but do not block.
           # `-c pyproject.toml` picks up [tool.bandit] skips that mirror the
-          # ruff S101/S110 ignores.
-          bandit -c pyproject.toml -r custom_components/escpos_printer -f sarif -o bandit.sarif || true
-          bandit -c pyproject.toml -r custom_components/escpos_printer -lll
+          # ruff S101/S110 ignores. `scripts/` is included because it runs
+          # with elevated privileges in dependabot-auto-sync.yml.
+          bandit -c pyproject.toml -r custom_components/escpos_printer scripts -f sarif -o bandit.sarif || true
+          bandit -c pyproject.toml -r custom_components/escpos_printer scripts -lll
+
+      - name: Semgrep - Project-specific security rules
+        run: |
+          # Project-specific rules under .github/semgrep/ catch regressions
+          # of the Phase 2 findings that Bandit can't (SSRF setup, path
+          # validators, Pillow decoders, log sanitization). See the rule
+          # file for the rationale.
+          python -m pip install "semgrep==1.95.0"
+          semgrep --config .github/semgrep/escpos.yml --error \
+            --sarif --output semgrep.sarif \
+            custom_components/escpos_printer || true
+          # Hard gate: fail the build on any ERROR-severity rule hit.
+          semgrep --config .github/semgrep/escpos.yml \
+            --severity ERROR --error \
+            custom_components/escpos_printer
+
+      - name: Upload Semgrep SARIF to Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
 
       - name: pip-audit - Dependency audit
         # pip-audit doesn't emit SARIF natively; the JSON report is kept as a

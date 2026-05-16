@@ -8,7 +8,7 @@ from collections.abc import Callable
 import contextlib
 import logging
 import textwrap
-from typing import Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
@@ -22,8 +22,18 @@ from ..security import (
 from .barcode_operations import BarcodeOperationsMixin
 from .config import BasePrinterConfig
 from .control_operations import ControlOperationsMixin
+from .image_operations import (
+    ImageOperationsMixin,
+    ImageStats,
+    _print_prepared_under_lock,
+    prepare_image_for_print,
+)
+from .image_processor import FALLBACK_PROFILE_WIDTH
 from .mapping_utils import map_align, map_cut, map_multiplier, map_underline
-from .print_operations import PrintOperationsMixin
+from .print_operations import PrintOperationsMixin, _print_text_under_lock
+
+if TYPE_CHECKING:
+    from homeassistant.core import Context
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -43,11 +53,24 @@ def _get_usb_printer() -> type[Any]:
 
 class EscposPrinterAdapterBase(
     PrintOperationsMixin,
+    ImageOperationsMixin,
     BarcodeOperationsMixin,
     ControlOperationsMixin,
     ABC,
 ):
     """Abstract base class for ESC/POS printer adapters."""
+
+    # Per-transport default for the inter-slice delay in
+    # ``print_image``. 0 ms is fine for fast transports (TCP/USB);
+    # Bluetooth-SPP needs ~50 ms to drain its buffer between writes.
+    # Subclasses override.
+    default_chunk_delay_ms: ClassVar[int] = 0
+
+    # Per-printer reliability profile overrides — populated by
+    # ``async_setup_entry`` from the options flow. Keys may include
+    # ``fragment_height``, ``chunk_delay_ms``, ``impl``. Empty dict
+    # means "transport defaults".
+    reliability_profile_defaults: dict[str, Any]
 
     def __init__(self, config: BasePrinterConfig) -> None:
         self._config: BasePrinterConfig = config
@@ -66,6 +89,15 @@ class EscposPrinterAdapterBase(
         self._last_latency_ms: int | None = None
         self._last_error_reason: str | None = None
         self._last_error_errno: int | None = None
+        self._cached_profile_width: int | None = None
+        self._profile_width_lookup_done: bool = False
+        self._profile_width_warning_logged = False
+        # Image-pipeline diagnostics counters / snapshot fields. Updated
+        # by ImageOperationsMixin and surfaced via get_diagnostics().
+        self._image_stats: ImageStats = ImageStats()
+        # Per-printer reliability profile defaults, populated by
+        # ``async_setup_entry``. Empty dict means "use transport defaults".
+        self.reliability_profile_defaults = {}
 
     @property
     def config(self) -> BasePrinterConfig:
@@ -150,6 +182,12 @@ class EscposPrinterAdapterBase(
             "last_latency_ms": self._last_latency_ms,
             "last_error_reason": self._last_error_reason,
             "last_error_errno": self._last_error_errno,
+            "default_chunk_delay_ms": self.default_chunk_delay_ms,
+            "profile_width": self._cached_profile_width,
+            "reliability_profile_defaults": dict(
+                self.reliability_profile_defaults
+            ),
+            "image_pipeline": self._image_stats.as_dict(),
         }
 
     async def _acquire_printer(self, hass: HomeAssistant) -> tuple[Any, bool]:
@@ -224,8 +262,77 @@ class EscposPrinterAdapterBase(
                 _LOGGER.debug("Unknown printer profile '%s': %s", self._config.profile, sanitize_log_message(str(e)))
         return None
 
+    def _get_profile_pixel_width(
+        self, hass: HomeAssistant | None = None
+    ) -> int | None:
+        """Return the printer profile's max pixel width (cached).
+
+        Falls back to :data:`FALLBACK_PROFILE_WIDTH`, logs a single
+        WARNING per adapter instance, and (when ``hass`` is provided)
+        raises a repairs issue so the miss is visible in the UI. A
+        silent log line is easy to miss; silently miscalibrated images
+        are the resulting #1 support question.
+        """
+        if self._profile_width_lookup_done:
+            return self._cached_profile_width
+        width: int | None = None
+        printer = self._printer
+        if printer is not None:
+            try:
+                data = printer.profile.profile_data["media"]["width"]["pixels"]
+                if isinstance(data, (int, float)):
+                    width = int(data)
+            except (AttributeError, KeyError, TypeError, ValueError):
+                width = None
+        self._cached_profile_width = width
+        self._profile_width_lookup_done = True
+        if width is None and not self._profile_width_warning_logged:
+            _LOGGER.warning(
+                "Printer profile does not expose media.width.pixels; "
+                "falling back to %dpx for image width. Set image_width "
+                "explicitly or check the python-escpos profile data.",
+                FALLBACK_PROFILE_WIDTH,
+            )
+            self._profile_width_warning_logged = True
+            if hass is not None:
+                self._raise_profile_width_repair_issue(hass)
+        return width
+
+    def _raise_profile_width_repair_issue(self, hass: HomeAssistant) -> None:
+        """File a repair issue so the user sees the fallback in the UI."""
+        try:
+            from homeassistant.helpers import issue_registry as ir  # noqa: PLC0415
+
+            from ..const import DOMAIN  # noqa: PLC0415
+        except ImportError:
+            return
+        profile_name = (
+            getattr(self._config, "profile", None) or "default"
+        )
+        try:
+            ir.async_create_issue(
+                hass,
+                DOMAIN,
+                f"profile_width_fallback_{profile_name}",
+                is_fixable=False,
+                severity=ir.IssueSeverity.WARNING,
+                translation_key="profile_width_fallback",
+                translation_placeholders={
+                    "profile": profile_name,
+                    "fallback": str(FALLBACK_PROFILE_WIDTH),
+                },
+            )
+        except Exception as exc:
+            _LOGGER.debug(
+                "Could not create profile_width repair issue: %s", exc
+            )
+
     async def _apply_cut_and_feed(self, hass: HomeAssistant, printer: Any, cut: str | None, feed: int | None) -> None:
-        """Apply feed and cut operations to the printer."""
+        """Apply feed and cut operations to the printer.
+
+        ``feed=None`` means "no explicit feed" (no lines emitted).
+        ``feed=0`` is equivalent. Adapters treat the two interchangeably.
+        """
         # feed first, then cut
         if feed is not None:
             lines = validate_numeric_input(feed, 0, MAX_FEED_LINES, "feed")
@@ -263,3 +370,47 @@ class EscposPrinterAdapterBase(
         for cb in list(self._status_listeners):
             with contextlib.suppress(Exception):
                 cb(True)
+
+    async def print_text_with_image(
+        self,
+        hass: HomeAssistant,
+        *,
+        text_kwargs: dict[str, Any],
+        image_kwargs: dict[str, Any],
+        cut: str | None,
+        feed: int | None,
+        context: Context | None = None,
+    ) -> None:
+        """Print text and an image as a single atomic receipt.
+
+        Pre-resolves the image bytes **outside** the lock so a slow
+        camera doesn't monopolize the printer queue. Then takes the
+        lock once and runs both halves under the same acquisition so
+        no other caller can interleave between text and image.
+
+        ``text_kwargs`` and ``image_kwargs`` are the per-half kwargs
+        (without ``cut``/``feed`` — those are applied once at the end).
+        """
+        image_source = image_kwargs.pop("image")
+        prepared = await prepare_image_for_print(
+            self, hass, image_source, context=context, **image_kwargs
+        )
+
+        async with self._lock:
+            printer, owned = await self._acquire_printer(hass)
+            try:
+                try:
+                    await _print_text_under_lock(
+                        self, hass, printer, **text_kwargs
+                    )
+                    await _print_prepared_under_lock(hass, printer, prepared)
+                    await self._apply_cut_and_feed(hass, printer, cut, feed)
+                except (asyncio.CancelledError, Exception):
+                    with contextlib.suppress(Exception):
+                        await self._apply_cut_and_feed(
+                            hass, printer, cut or "full", feed or 1
+                        )
+                    raise
+            finally:
+                await self._release_printer(hass, printer, owned=owned)
+        await self._mark_success()

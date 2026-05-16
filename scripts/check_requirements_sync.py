@@ -31,6 +31,11 @@ from packaging.specifiers import SpecifierSet
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
+# Packages allowed to use non-`==` specifiers in pyproject.toml.
+# Mirror the rationale in CLAUDE.md and
+# `scripts/sync_manifest_requirements.py` MANIFEST_OVERRIDES.
+ALLOWED_NON_PINNED: set[str] = set()
+
 
 def parse_pyproject() -> dict[str, SpecifierSet]:
     data = tomllib.loads((ROOT / "pyproject.toml").read_text())
@@ -40,6 +45,32 @@ def parse_pyproject() -> dict[str, SpecifierSet]:
         r = Requirement(dep)
         result[r.name.lower()] = r.specifier
     return result
+
+
+def check_pinned_shape(specs: dict[str, SpecifierSet]) -> list[str]:
+    """Return a list of error messages for non-``==``-pinned pyproject deps.
+
+    CLAUDE.md "Dependency Management" mandates `==` for runtime deps so
+    builds are reproducible and so a silent transitive bump can't change
+    behavior between dev/CI/prod. Packages explicitly allow-listed in
+    ``ALLOWED_NON_PINNED`` are exempt.
+    """
+    problems: list[str] = []
+    for name, spec in sorted(specs.items()):
+        if name in ALLOWED_NON_PINNED:
+            continue
+        spec_str = str(spec)
+        if not spec_str:
+            problems.append(f"{name}: no version specifier (must be ==X.Y.Z)")
+            continue
+        # Accept either a single `==X.Y.Z` or a single `==`-anchored clause.
+        if not all(
+            clause.strip().startswith("==") for clause in spec_str.split(",")
+        ):
+            problems.append(
+                f"{name}: specifier '{spec_str}' is not pinned with `==`"
+            )
+    return problems
 
 
 def parse_manifest() -> dict[str, SpecifierSet]:
@@ -80,6 +111,13 @@ def main() -> int:
     missing = set(py.keys()) ^ set(mf.keys())
     if missing:
         print(f"❌ Package sets differ between pyproject and manifest: {sorted(missing)}", file=sys.stderr)
+        return 1
+
+    shape_problems = check_pinned_shape(py)
+    if shape_problems:
+        print("❌ pyproject.toml dependencies must be pinned with `==`:", file=sys.stderr)
+        for msg in shape_problems:
+            print(f"  - {msg}", file=sys.stderr)
         return 1
 
     problems = [

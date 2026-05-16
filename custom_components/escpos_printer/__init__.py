@@ -23,6 +23,7 @@ from .const import (
     CONF_OUT_EP,
     CONF_PRODUCT_ID,
     CONF_PROFILE,
+    CONF_RELIABILITY_PROFILE,
     CONF_RFCOMM_CHANNEL,
     CONF_STATUS_INTERVAL,
     CONF_TIMEOUT,
@@ -37,6 +38,8 @@ from .const import (
     DEFAULT_OUT_EP,
     DEFAULT_RFCOMM_CHANNEL,
     DOMAIN,
+    RELIABILITY_PROFILE_AUTO,
+    RELIABILITY_PROFILE_PRESETS,
 )
 from .printer import (
     BluetoothPrinterConfig,
@@ -194,6 +197,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bo
         )
 
     adapter = create_printer_adapter(config)
+
+    reliability_profile = entry.options.get(
+        CONF_RELIABILITY_PROFILE, RELIABILITY_PROFILE_AUTO
+    )
+    adapter.reliability_profile_defaults = dict(
+        RELIABILITY_PROFILE_PRESETS.get(reliability_profile, {})
+    )
 
     entry.runtime_data = EscposRuntimeData(
         adapter=adapter,

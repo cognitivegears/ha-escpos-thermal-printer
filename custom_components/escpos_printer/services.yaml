@@ -29,11 +29,13 @@ print_text_utf8:
     bold:
       name: Bold
       description: Enable bold text
+      default: false
       selector:
         boolean: {}
     underline:
       name: Underline
       description: Underline style
+      default: "none"
       selector:
         select:
           options:
@@ -43,6 +45,7 @@ print_text_utf8:
     width:
       name: Width
       description: Font width (`normal`, `double`, `triple`, or `1-8`)
+      default: "normal"
       selector:
         select:
           options:
@@ -60,6 +63,7 @@ print_text_utf8:
     height:
       name: Height
       description: Font height (`normal`, `double`, `triple`, or `1-8`)
+      default: "normal"
       selector:
         select:
           options:
@@ -76,7 +80,7 @@ print_text_utf8:
             - "8"
     cut:
       name: Cut
-      description: Paper cutting mode after printing
+      description: Paper cutting mode after printing (defaults to the printer's configured cut mode)
       selector:
         select:
           options:
@@ -86,10 +90,11 @@ print_text_utf8:
     feed:
       name: Feed Lines
       description: Number of lines to feed after printing
+      default: 0
       selector:
         number:
           min: 0
-          max: 10
+          max: 50
           step: 1
           mode: slider
 
@@ -124,11 +129,13 @@ print_text:
     bold:
       name: Bold
       description: Enable bold text
+      default: false
       selector:
         boolean: {}
     underline:
       name: Underline
       description: Underline style
+      default: "none"
       selector:
         select:
           options:
@@ -138,6 +145,7 @@ print_text:
     width:
       name: Width
       description: Font width (`normal`, `double`, `triple`, or `1-8`)
+      default: "normal"
       selector:
         select:
           options:
@@ -155,6 +163,7 @@ print_text:
     height:
       name: Height
       description: Font height (`normal`, `double`, `triple`, or `1-8`)
+      default: "normal"
       selector:
         select:
           options:
@@ -176,7 +185,7 @@ print_text:
         text: {}
     cut:
       name: Cut
-      description: Paper cutting mode after printing
+      description: Paper cutting mode after printing (defaults to the printer's configured cut mode)
       selector:
         select:
           options:
@@ -186,10 +195,11 @@ print_text:
     feed:
       name: Feed Lines
       description: Number of lines to feed after printing
+      default: 0
       selector:
         number:
           min: 0
-          max: 10
+          max: 50
           step: 1
           mode: slider
 
@@ -214,6 +224,7 @@ print_qr:
     size:
       name: Size
       description: QR code size (1-16)
+      default: 3
       selector:
         number:
           min: 1
@@ -223,6 +234,7 @@ print_qr:
     ec:
       name: Error Correction
       description: Error correction level
+      default: "M"
       selector:
         select:
           options:
@@ -241,7 +253,7 @@ print_qr:
             - "right"
     cut:
       name: Cut
-      description: Paper cutting mode after printing
+      description: Paper cutting mode after printing (defaults to the printer's configured cut mode)
       selector:
         select:
           options:
@@ -251,16 +263,23 @@ print_qr:
     feed:
       name: Feed Lines
       description: Number of lines to feed after printing
+      default: 0
       selector:
         number:
           min: 0
-          max: 10
+          max: 50
           step: 1
           mode: slider
 
 print_image:
   name: Print Image
-  description: Print an image by URL or local path. Select one or more printer devices as the target.
+  description: >
+    Print an image from a URL, local file path, camera entity (camera.<id>),
+    image entity (image.<id>), base64 data URI, or Jinja template.
+    See docs/images.md for examples, supported formats, and security notes
+    (URL fetches block private/loopback IPs; local paths must lie inside
+    allowlist_external_dirs; camera/image entities respect per-user
+    permissions of the calling context).
   fields:
     device_id:
       name: Device
@@ -271,14 +290,17 @@ print_image:
           integration: escpos_printer
     image:
       name: Image
-      description: Image URL or local file path
+      description: >
+        URL (http/https), local file path, camera.<entity>, image.<entity>,
+        data:image/...;base64,..., or a Jinja template producing any of these.
       required: true
-      example: "/config/www/logo.png"
+      example: "camera.front_door"
       selector:
-        text: {}
+        template: {}
     high_density:
       name: High Density
       description: Use high-density printing mode
+      default: true
       selector:
         boolean: {}
     align:
@@ -290,9 +312,136 @@ print_image:
             - "left"
             - "center"
             - "right"
+    image_width:
+      name: Width (pixels)
+      description: >
+        Target width in pixels. Defaults to the printer profile's max pixel
+        width (or 512 if unknown — check the log for a WARNING). The image is
+        scaled proportionally and is never upscaled.
+      selector:
+        number:
+          min: 16
+          max: 2048
+          step: 1
+    rotation:
+      name: Rotation
+      description: Rotate the image (degrees, clockwise) before printing.
+      default: 0
+      selector:
+        select:
+          options:
+            - "0"
+            - "90"
+            - "180"
+            - "270"
+    dither:
+      name: Dither Mode
+      description: >
+        How to convert to 1-bit B&W. floyd-steinberg works well for photos;
+        threshold gives crisp logos/text; none disables dithering.
+      default: "floyd-steinberg"
+      selector:
+        select:
+          options:
+            - "floyd-steinberg"
+            - "none"
+            - "threshold"
+    threshold:
+      name: Threshold
+      description: Threshold value (1-254) when dither is "threshold". 100-180 typical for line art.
+      default: 128
+      selector:
+        number:
+          min: 1
+          max: 254
+          step: 1
+    impl:
+      name: Print Implementation
+      description: >
+        ESC/POS image command to use. Leave unset to honor the printer's
+        Reliability profile (default raster). If the chosen impl isn't
+        supported by the installed python-escpos, the integration silently
+        falls back to a kwarg-less printer.image() call.
+      selector:
+        select:
+          options:
+            - label: "Raster (default — Epson)"
+              value: "bitImageRaster"
+            - label: "Graphics (newer ESC/POS)"
+              value: "graphics"
+            - label: "Column (legacy POS-58/80)"
+              value: "bitImageColumn"
+    center:
+      name: Center on Paper
+      description: Horizontally center the image within the printer's paper width.
+      default: false
+      selector:
+        boolean: {}
+    autocontrast:
+      name: Autocontrast
+      description: Stretch contrast before B&W conversion (helps photos).
+      default: false
+      selector:
+        boolean: {}
+    invert:
+      name: Invert Colors
+      description: >
+        Swap black and white before B&W conversion. Useful for dark-mode source
+        images, white-on-black logos, or printing reflected QR codes.
+      default: false
+      selector:
+        boolean: {}
+    mirror:
+      name: Mirror Horizontally
+      description: >
+        Flip the image left-to-right. Useful for receipt-window displays where
+        the print is read through the back of the paper.
+      default: false
+      selector:
+        boolean: {}
+    auto_resize:
+      name: Auto-Resize Large Sources
+      description: >
+        Allow source images up to 40 MB and downscale before processing.
+        Enable when printing phone snapshots, high-resolution cameras, or any
+        source that would otherwise hit the 10 MB cap.
+      default: false
+      selector:
+        boolean: {}
+    fallback_image:
+      name: Fallback Image
+      description: >
+        Optional URL / path / camera entity to print if the primary source
+        fails to resolve. The same processing options apply to both.
+      example: "/config/www/placeholder.png"
+      selector:
+        template: {}
+    fragment_height:
+      name: Fragment Height
+      description: >
+        Rows per chunk when sending the image (issue #45). Smaller values reduce
+        buffer-overrun risk on cheap printers; larger values are faster.
+        Leave unset to honor the printer's Reliability profile.
+      selector:
+        number:
+          min: 16
+          max: 1024
+          step: 16
+    chunk_delay_ms:
+      name: Chunk Delay (ms)
+      description: >
+        Milliseconds to sleep between image chunks. Leave unset to honor the
+        printer's Reliability profile (0 on Network/USB, 50 on Bluetooth).
+        Set higher (e.g. 100-200) if your printer freezes or dumps characters
+        on tall images.
+      selector:
+        number:
+          min: 0
+          max: 5000
+          step: 10
     cut:
       name: Cut
-      description: Paper cutting mode after printing
+      description: Paper cutting mode after printing (defaults to the printer's configured cut mode)
       selector:
         select:
           options:
@@ -302,12 +451,289 @@ print_image:
     feed:
       name: Feed Lines
       description: Number of lines to feed after printing
+      default: 0
       selector:
         number:
           min: 0
-          max: 10
+          max: 50
           step: 1
           mode: slider
+
+print_camera_snapshot:
+  name: Print Camera Snapshot
+  description: >
+    Print a live snapshot from a camera entity. Convenience wrapper around
+    print_image with a camera-entity selector for a friendlier UI.
+  fields:
+    device_id:
+      name: Device
+      description: Select one or more printer devices (if omitted, broadcasts to all printers)
+      required: false
+      selector:
+        device:
+          integration: escpos_printer
+    camera_entity:
+      name: Camera
+      description: Camera entity to snapshot.
+      required: true
+      example: "camera.front_door"
+      selector:
+        entity:
+          domain: camera
+    image_width:
+      name: Width (pixels)
+      description: Target width in pixels. Defaults to the printer profile width.
+      selector:
+        number:
+          min: 16
+          max: 2048
+          step: 1
+    dither:
+      name: Dither Mode
+      default: "floyd-steinberg"
+      selector:
+        select:
+          options:
+            - "floyd-steinberg"
+            - "none"
+            - "threshold"
+    autocontrast:
+      name: Autocontrast
+      default: true
+      selector:
+        boolean: {}
+    auto_resize:
+      name: Auto-Resize
+      default: true
+      selector:
+        boolean: {}
+    cut:
+      name: Cut
+      selector:
+        select:
+          options:
+            - "none"
+            - "partial"
+            - "full"
+    feed:
+      name: Feed Lines
+      default: 2
+      selector:
+        number:
+          min: 0
+          max: 50
+          step: 1
+
+print_image_entity:
+  name: Print Image Entity
+  description: >
+    Print the current frame from an HA image entity (weather radar, ML
+    overlay, generated chart, etc).
+  fields:
+    device_id:
+      name: Device
+      description: Select one or more printer devices (if omitted, broadcasts to all printers)
+      required: false
+      selector:
+        device:
+          integration: escpos_printer
+    image_entity:
+      name: Image Entity
+      description: Image entity to print.
+      required: true
+      example: "image.weather_radar"
+      selector:
+        entity:
+          domain: image
+    image_width:
+      name: Width (pixels)
+      selector:
+        number:
+          min: 16
+          max: 2048
+          step: 1
+    dither:
+      name: Dither Mode
+      default: "floyd-steinberg"
+      selector:
+        select:
+          options:
+            - "floyd-steinberg"
+            - "none"
+            - "threshold"
+    cut:
+      name: Cut
+      selector:
+        select:
+          options:
+            - "none"
+            - "partial"
+            - "full"
+    feed:
+      name: Feed Lines
+      default: 1
+      selector:
+        number:
+          min: 0
+          max: 50
+          step: 1
+
+print_image_url:
+  name: Print Image from URL
+  description: >
+    Print an image fetched from an HTTP(S) URL. SSRF-aware — private,
+    loopback, and link-local addresses are refused.
+  fields:
+    device_id:
+      name: Device
+      description: Select one or more printer devices (if omitted, broadcasts to all printers)
+      required: false
+      selector:
+        device:
+          integration: escpos_printer
+    url:
+      name: URL
+      description: HTTP(S) URL of the image (10 MB max, 40 MB with auto_resize).
+      required: true
+      example: "https://example.com/receipt.png"
+      selector:
+        text: {}
+    image_width:
+      name: Width (pixels)
+      selector:
+        number:
+          min: 16
+          max: 2048
+          step: 1
+    dither:
+      name: Dither Mode
+      default: "floyd-steinberg"
+      selector:
+        select:
+          options:
+            - "floyd-steinberg"
+            - "none"
+            - "threshold"
+    auto_resize:
+      name: Auto-Resize
+      default: true
+      selector:
+        boolean: {}
+    cut:
+      name: Cut
+      selector:
+        select:
+          options:
+            - "none"
+            - "partial"
+            - "full"
+    feed:
+      name: Feed Lines
+      default: 1
+      selector:
+        number:
+          min: 0
+          max: 50
+          step: 1
+
+preview_image:
+  name: Preview Image (no paper)
+  description: >
+    Run the full image pipeline (dither, resize, etc) and write the
+    1-bit PNG to disk WITHOUT printing it. Returns the output path so
+    automations can chain a notification.
+  fields:
+    device_id:
+      name: Device
+      description: Use this printer's profile (width, defaults).
+      required: false
+      selector:
+        device:
+          integration: escpos_printer
+    image:
+      name: Image
+      description: Same source forms as print_image.
+      required: true
+      selector:
+        template: {}
+    output_path:
+      name: Output Path
+      description: >
+        Where to save the PNG. Must be inside allowlist_external_dirs
+        (or under /tmp). Defaults to /tmp/escpos_preview_<entry>.png.
+      selector:
+        text: {}
+    image_width:
+      name: Width (pixels)
+      selector:
+        number:
+          min: 16
+          max: 2048
+          step: 1
+    dither:
+      name: Dither Mode
+      default: "floyd-steinberg"
+      selector:
+        select:
+          options:
+            - "floyd-steinberg"
+            - "none"
+            - "threshold"
+    threshold:
+      name: Threshold
+      default: 128
+      selector:
+        number:
+          min: 1
+          max: 254
+          step: 1
+    autocontrast:
+      name: Autocontrast
+      default: false
+      selector:
+        boolean: {}
+    invert:
+      name: Invert
+      default: false
+      selector:
+        boolean: {}
+    mirror:
+      name: Mirror
+      default: false
+      selector:
+        boolean: {}
+
+calibration_print:
+  name: Calibration Print
+  description: >
+    Print a calibration sheet — a pixel ruler plus a threshold sweep
+    strip — so you can visually pick the best dither/threshold for
+    your printer. Burns ~10 cm of paper.
+  fields:
+    device_id:
+      name: Device
+      description: Printer device.
+      required: false
+      selector:
+        device:
+          integration: escpos_printer
+    cut:
+      name: Cut
+      default: "full"
+      selector:
+        select:
+          options:
+            - "none"
+            - "partial"
+            - "full"
+    feed:
+      name: Feed Lines
+      default: 2
+      selector:
+        number:
+          min: 0
+          max: 50
+          step: 1
 
 print_barcode:
   name: Print Barcode
@@ -350,6 +776,7 @@ print_barcode:
     height:
       name: Height
       description: Barcode height in dots
+      default: 64
       selector:
         number:
           min: 1
@@ -359,6 +786,7 @@ print_barcode:
     width:
       name: Width
       description: Barcode width (2-6)
+      default: 3
       selector:
         number:
           min: 2
@@ -368,6 +796,7 @@ print_barcode:
     pos:
       name: Text Position
       description: Position of human-readable text
+      default: "BELOW"
       selector:
         select:
           options:
@@ -378,6 +807,7 @@ print_barcode:
     font:
       name: Font
       description: Font for human-readable text
+      default: "A"
       selector:
         select:
           options:
@@ -386,24 +816,34 @@ print_barcode:
     align_ct:
       name: Center Align
       description: Center align the barcode
+      default: true
       selector:
         boolean: {}
     check:
       name: Checksum
       description: Enable checksum validation
+      default: false
       selector:
         boolean: {}
     force_software:
       name: Rendering Mode
-      description: Force software rendering mode
+      description: >
+        Force a software-rendered barcode (image) instead of the printer's
+        native barcode command. Use a specific image command if the default
+        rendering looks wrong.
       selector:
         select:
           options:
-            - "true"
-            - "false"
-            - "graphics"
-            - "bitImageColumn"
-            - "bitImageRaster"
+            - label: "Auto (printer native)"
+              value: "false"
+            - label: "Force software (default)"
+              value: "true"
+            - label: "Software: Graphics"
+              value: "graphics"
+            - label: "Software: Column (legacy POS-58/80)"
+              value: "bitImageColumn"
+            - label: "Software: Raster (Epson)"
+              value: "bitImageRaster"
     align:
       name: Alignment
       description: Barcode alignment
@@ -415,7 +855,7 @@ print_barcode:
             - "right"
     cut:
       name: Cut
-      description: Paper cutting mode after printing
+      description: Paper cutting mode after printing (defaults to the printer's configured cut mode)
       selector:
         select:
           options:
@@ -425,10 +865,11 @@ print_barcode:
     feed:
       name: Feed Lines
       description: Number of lines to feed after printing
+      default: 0
       selector:
         number:
           min: 0
-          max: 10
+          max: 50
           step: 1
           mode: slider
 
@@ -450,7 +891,7 @@ feed:
       selector:
         number:
           min: 1
-          max: 10
+          max: 50
           step: 1
           mode: slider
 
@@ -489,6 +930,7 @@ beep:
     times:
       name: Times
       description: Number of beeps
+      default: 1
       selector:
         number:
           min: 1
@@ -498,6 +940,7 @@ beep:
     duration:
       name: Duration
       description: Duration of each beep
+      default: 1
       selector:
         number:
           min: 1
@@ -507,7 +950,10 @@ beep:
 
 print_message:
   name: Print Formatted Message
-  description: Print a message with full text formatting (bold, underline, size, alignment). Targets an ESC/POS notify entity.
+  description: >
+    Print a message with full text formatting (bold, underline, size, alignment)
+    plus an optional image attachment that prints as a single uninterrupted
+    receipt. Targets an ESC/POS notify entity. See docs/images.md.
   target:
     entity:
       domain: notify
@@ -539,11 +985,13 @@ print_message:
     bold:
       name: Bold
       description: Enable bold text
+      default: false
       selector:
         boolean: {}
     underline:
       name: Underline
       description: Underline style
+      default: "none"
       selector:
         select:
           options:
@@ -553,6 +1001,7 @@ print_message:
     width:
       name: Width
       description: Font width (`normal`, `double`, `triple`, or `1-8`)
+      default: "normal"
       selector:
         select:
           options:
@@ -570,6 +1019,7 @@ print_message:
     height:
       name: Height
       description: Font height (`normal`, `double`, `triple`, or `1-8`)
+      default: "normal"
       selector:
         select:
           options:
@@ -587,6 +1037,7 @@ print_message:
     utf8:
       name: UTF-8 Mode
       description: Enable UTF-8 transcoding (converts special characters to printer-compatible encoding)
+      default: false
       selector:
         boolean: {}
     encoding:
@@ -594,9 +1045,135 @@ print_message:
       description: Character encoding override (ignored when UTF-8 mode is enabled)
       selector:
         text: {}
+    image:
+      name: Image
+      description: >
+        Optional image printed after the message. Accepts the same source
+        forms as print_image (URL, file path, camera.<id>, image.<id>,
+        base64 data URI, or template). See docs/images.md.
+      selector:
+        template: {}
+    image_width:
+      name: Image Width (pixels)
+      description: Target image width; defaults to printer profile width.
+      selector:
+        number:
+          min: 16
+          max: 2048
+          step: 1
+    image_align:
+      name: Image Alignment
+      description: Image alignment on the page.
+      selector:
+        select:
+          options:
+            - "left"
+            - "center"
+            - "right"
+    image_dither:
+      name: Image Dither
+      description: Dither mode for the image (see print_image).
+      default: "floyd-steinberg"
+      selector:
+        select:
+          options:
+            - "floyd-steinberg"
+            - "none"
+            - "threshold"
+    image_rotation:
+      name: Image Rotation
+      description: Rotate the image in degrees (clockwise).
+      default: 0
+      selector:
+        select:
+          options:
+            - "0"
+            - "90"
+            - "180"
+            - "270"
+    image_impl:
+      name: Image Implementation
+      description: >
+        ESC/POS image command (see print_image). Leave unset to honor the
+        printer's Reliability profile.
+      selector:
+        select:
+          options:
+            - label: "Raster (default — Epson)"
+              value: "bitImageRaster"
+            - label: "Graphics (newer ESC/POS)"
+              value: "graphics"
+            - label: "Column (legacy POS-58/80)"
+              value: "bitImageColumn"
+    image_center:
+      name: Center Image
+      description: Horizontally center the image on the paper.
+      default: false
+      selector:
+        boolean: {}
+    image_autocontrast:
+      name: Image Autocontrast
+      description: Stretch contrast before B&W conversion.
+      default: false
+      selector:
+        boolean: {}
+    image_invert:
+      name: Image Invert
+      description: Swap black and white before B&W conversion.
+      default: false
+      selector:
+        boolean: {}
+    image_mirror:
+      name: Image Mirror
+      description: Flip image left-to-right.
+      default: false
+      selector:
+        boolean: {}
+    image_auto_resize:
+      name: Image Auto-Resize
+      description: >
+        Allow source images up to 40 MB and downscale before processing.
+      default: false
+      selector:
+        boolean: {}
+    image_fallback_image:
+      name: Image Fallback
+      description: Optional fallback image source if the primary fails.
+      example: "/config/www/placeholder.png"
+      selector:
+        template: {}
+    image_threshold:
+      name: Image Threshold
+      description: Threshold value (1-254) when image_dither is "threshold".
+      default: 128
+      selector:
+        number:
+          min: 1
+          max: 254
+          step: 1
+    image_fragment_height:
+      name: Image Fragment Height
+      description: >
+        Rows per chunk when sending the image. Leave unset to honor the
+        printer's Reliability profile. See print_image notes.
+      selector:
+        number:
+          min: 16
+          max: 1024
+          step: 16
+    image_chunk_delay_ms:
+      name: Image Chunk Delay (ms)
+      description: >
+        Milliseconds to sleep between image chunks. Leave unset to honor the
+        printer's Reliability profile. See print_image notes.
+      selector:
+        number:
+          min: 0
+          max: 5000
+          step: 10
     cut:
       name: Cut
-      description: Paper cutting mode after printing
+      description: Paper cutting mode after printing (defaults to the printer's configured cut mode)
       selector:
         select:
           options:
@@ -606,9 +1183,10 @@ print_message:
     feed:
       name: Feed Lines
       description: Number of lines to feed after printing
+      default: 0
       selector:
         number:
           min: 0
-          max: 10
+          max: 50
           step: 1
           mode: slider
