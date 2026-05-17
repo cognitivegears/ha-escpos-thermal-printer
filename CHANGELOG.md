@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-05-17
+
 ### Added
 
 - **Preview without printing.** New `escpos_printer.preview_image` service
@@ -201,7 +203,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   encoded `BytesIO` after `src.load()` so the encoded + decoded
   surfaces no longer coexist for the duration of the executor job.
 
-### Changed
+### Changed (project / CI)
 
 - **Migrated to typed `runtime_data` config-entry pattern.** `__init__.py`
   now exposes an `EscposRuntimeData` dataclass and `EscposConfigEntry`
@@ -262,7 +264,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Existing `tests/test_bluetooth_battery_sensor.py` extended to cover
   `async_setup_entry` skip / create paths and `device_info`.
 
-### Added
+### Added (project / CI)
 
 - **`quality_scale.yaml` and `manifest.json` `quality_scale: bronze`.**
   Each Bronze/Silver/Gold/Platinum rule audited and tagged
@@ -285,7 +287,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Stale ruff per-file-ignore for `printer.py` (now the `printer/`
   subpackage).
 
-### Fixed
+### Fixed (project)
 
 - `.gitignore` now covers `htmlcov/`, `coverage.xml`, `coverage.json`,
   `.pytest_cache/`. Removed the `CLAUDE.md` ignore (committed elsewhere
@@ -307,6 +309,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   image-processing options. Migration is optional — `print_image` stays
   fully supported and remains the right choice when the source is
   computed by a template.
+
+## [0.5.2] - 2026-05-15
+
+### Fixed
+
+- `notify.<printer>` entity regression that broke image attachments on
+  HA 2026.2.3 transitive dependency bumps.
+
+### Security
+
+- Resolved Bandit warnings (low-severity findings in dev / CI scripts).
+- Pinned `pip-audit` config in `pyproject.toml` for reproducible CI runs.
+
+### Changed
+
+- Refreshed `uv.lock` to pull in HA 2026.2.3 transitive dependency
+  updates.
+- Dependabot now ignores `pytest` (pinned by
+  `pytest-homeassistant-custom-component`) and `dbus-fast` (pinned by
+  HA core); see `.github/dependabot.yml`.
+- Bumped `mypy` 1.19.1 → 2.1.0, `pre-commit` 4.5.1 → 4.6.0,
+  `ruff` 0.15.1 → 0.15.13, `urllib3` 2.6.3 → 2.7.0,
+  `pytest-homeassistant-custom-component` 0.13.314 → 0.13.316,
+  `actions/upload-artifact` v4 → v7,
+  `softprops/action-gh-release` v2 → v3.
+
+## [0.5.1] - 2026-05-12
+
+### Added
+
+- HACS brand icons (`brand/icon.png`, `brand/icon@2x.png`,
+  `brand/logo.png`, `brand/logo@2x.png`) so the integration renders
+  with proper artwork in HACS.
+
+### Changed
+
+- README polish.
 
 ## [0.5.0] - 2026-05-10
 
@@ -392,6 +431,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 Earlier releases — see git history.
 
-[Unreleased]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.5.0...HEAD
-[0.5.0]: https://github.com/cognitivegears/ha-escpos-thermal-printer/releases/tag/v0.5.0
+[Unreleased]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.5.2...v0.6.0
+[0.5.2]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.5.1...v0.5.2
+[0.5.1]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.4.4...v0.5.0
 [0.4.4]: https://github.com/cognitivegears/ha-escpos-thermal-printer/releases/tag/v0.4.4
