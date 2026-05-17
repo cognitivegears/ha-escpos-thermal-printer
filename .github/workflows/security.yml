@@ -63,7 +63,11 @@ jobs:
           # of the Phase 2 findings that Bandit can't (SSRF setup, path
           # validators, Pillow decoders, log sanitization). See the rule
           # file for the rationale.
-          python -m pip install "semgrep==1.95.0"
+          # `setuptools` is required because semgrep 1.95.0 pulls in
+          # opentelemetry-instrumentation 0.46b0, which imports `pkg_resources`.
+          # Python 3.13 no longer ships setuptools by default, so install it
+          # explicitly to avoid `ModuleNotFoundError: No module named 'pkg_resources'`.
+          python -m pip install setuptools "semgrep==1.95.0"
           semgrep --config .github/semgrep/escpos.yml --error \
             --sarif --output semgrep.sarif \
             custom_components/escpos_printer || true
