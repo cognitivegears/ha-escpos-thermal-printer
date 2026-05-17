@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
+import tempfile
 
 from homeassistant.core import ServiceCall, ServiceResponse
 from homeassistant.exceptions import HomeAssistantError
@@ -300,14 +302,21 @@ async def handle_preview_image(call: ServiceCall) -> ServiceResponse:
     )
 
     output_path = call.data.get("output_path")
+    tempdir = Path(tempfile.gettempdir()).resolve()
     if not output_path:
-        output_path = f"/tmp/escpos_preview_{entry.entry_id}.png"  # noqa: S108
-    # Allow /tmp as a sensible fallback even though it's outside the
-    # allowlist — the user is in control of the value and previews
-    # need somewhere to live by default.
+        output_path = str(tempdir / f"escpos_preview_{entry.entry_id}.png")
+    # Allow the system temp dir as a sensible fallback even though it's
+    # outside the allowlist — the user is in control of the value and
+    # previews need somewhere to live by default.
+    try:
+        in_tempdir = (
+            Path(str(output_path)).resolve().is_relative_to(tempdir)
+        )
+    except (OSError, ValueError):
+        in_tempdir = False
     if (
         not call.hass.config.is_allowed_path(str(output_path))
-        and not str(output_path).startswith("/tmp/")  # noqa: S108
+        and not in_tempdir
     ):
         raise HomeAssistantError(
             f"output_path '{output_path}' is outside "
