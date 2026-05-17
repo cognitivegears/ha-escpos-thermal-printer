@@ -50,9 +50,13 @@ async def async_get_config_entry_diagnostics(
         config = adapter.config
 
         # Common diagnostics
+        diag = adapter.get_diagnostics()
+        # Surface image-pipeline stats as a sibling key for easier triage.
+        image_pipeline = diag.pop("image_pipeline", None) if isinstance(diag, dict) else None
         runtime = {
             "status": adapter.get_status(),
-            "diagnostics": adapter.get_diagnostics(),
+            "diagnostics": diag,
+            "image_pipeline": image_pipeline,
             "connection_type": connection_type,
             "profile": config.profile,
             "codepage": config.codepage,

@@ -229,6 +229,7 @@
           "line_width": "Characters per line",
           "default_align": "Default alignment",
           "default_cut": "Default cut mode",
+          "reliability_profile": "Image reliability profile",
           "keepalive": "Keep persistent connection",
           "status_interval": "Status check interval (seconds)"
         },
@@ -239,6 +240,7 @@
           "line_width": "Number of characters per line (columns).",
           "default_align": "Default text alignment for printing.",
           "default_cut": "Default paper cut mode after printing.",
+          "reliability_profile": "Picks safe defaults for image chunk size, inter-chunk delay, and ESC/POS image command. Service-call options always override these.",
           "keepalive": "Keep the connection open between print jobs (network printers only).",
           "status_interval": "How often to check printer status (0 to disable)."
         }
@@ -396,6 +398,12 @@
         "cut": {"name": "Cut", "description": "Cut mode after printing."},
         "feed": {"name": "Feed lines", "description": "Lines to feed after printing."}
       }
+    }
+  },
+  "issues": {
+    "profile_width_fallback": {
+      "title": "Printer profile is missing the pixel width",
+      "description": "The selected printer profile ({profile}) does not expose `media.width.pixels`, so images are being scaled to a generic {fallback}px width. This is usually correct for 58 mm thermals but may print stretched or truncated on 80 mm printers.\n\n**To fix:** open the integration's options, pick the closest matching printer profile, or set `image_width` explicitly in your service calls. If your printer's profile name is correct, the python-escpos profile database may need updating."
     }
   }
 }

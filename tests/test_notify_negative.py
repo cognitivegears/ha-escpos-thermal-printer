@@ -30,14 +30,18 @@ async def test_notify_error_bubbles_as_exception(hass, caplog):  # type: ignore[
 
     fake = MagicMock()
     fake.text.side_effect = RuntimeError("bad printer")
-    with patch("escpos.printer.Network", return_value=fake), pytest.raises(Exception):
+    with patch("escpos.printer.Network", return_value=fake), pytest.raises(Exception) as excinfo:
         await hass.services.async_call(
             NOTIFY_DOMAIN,
             "send_message",
             {"entity_id": entity_id, "message": "Hello"},
             blocking=True,
         )
-    assert any("print_message failed" in rec.message for rec in caplog.records)
+    # The notify error is now sanitized and surfaced via the raised
+    # HomeAssistantError (not a separate _LOGGER.error call — that was
+    # the "double-log anti-pattern" Phase 2 BP-M2 flagged). The message
+    # text still contains "print_message failed".
+    assert "print_message failed" in str(excinfo.value)
 
 
 async def test_notify_handles_title_and_message(hass):  # type: ignore[no-untyped-def]

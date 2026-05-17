@@ -6,8 +6,9 @@ on:
   pull_request:
     branches: [ main, develop ]
   schedule:
-    # Weekly on Sundays at 3 AM UTC
-    - cron: '0 3 * * 0'
+    # Daily at 3 AM UTC — image-pipeline code has a wide ingress surface
+    # and we want CVEs against Pillow / aiohttp / httpx surfaced quickly.
+    - cron: '0 3 * * *'
 
 permissions:
   contents: read
@@ -51,16 +52,86 @@ jobs:
           # `-lll` fails the build on HIGH severity only; MEDIUM/LOW findings
           # appear in the SARIF report uploaded below but do not block.
           # `-c pyproject.toml` picks up [tool.bandit] skips that mirror the
-          # ruff S101/S110 ignores.
-          bandit -c pyproject.toml -r custom_components/escpos_printer -f sarif -o bandit.sarif || true
-          bandit -c pyproject.toml -r custom_components/escpos_printer -lll
+          # ruff S101/S110 ignores. `scripts/` is included because it runs
+          # with elevated privileges in dependabot-auto-sync.yml.
+          bandit -c pyproject.toml -r custom_components/escpos_printer scripts -f sarif -o bandit.sarif || true
+          bandit -c pyproject.toml -r custom_components/escpos_printer scripts -lll
+
+      - name: Install Cosign
+        # Required by the Opengrep install script's --verify-signatures flag,
+        # which validates the binary against the sigstore-signed release.
+        uses: sigstore/cosign-installer@v3
+
+      - name: Install Opengrep
+        # Opengrep is an open-source (LGPL-2.1) fork of Semgrep maintained by
+        # a consortium of AppSec vendors after Semgrep moved CE features
+        # behind a commercial license. Rule format and SARIF output are
+        # backward-compatible with Semgrep, so `.github/opengrep/escpos.yml`
+        # runs unchanged.
+        #
+        # Opengrep is distributed as a signed binary (not on PyPI), so it
+        # can't be tracked by Dependabot's pip ecosystem. Bump OPENGREP_VERSION
+        # below by hand when a new release ships:
+        #   https://github.com/opengrep/opengrep/releases
+        env:
+          OPENGREP_VERSION: v1.21.0
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh \
+            | bash -s -- -v "${OPENGREP_VERSION}" --verify-signatures
+          # The install script puts the binary under ~/.opengrep/cli/latest/
+          # on Linux runners (no ~/.local/bin symlink is created), so add
+          # that directory to PATH for subsequent steps.
+          echo "${HOME}/.opengrep/cli/latest" >> "${GITHUB_PATH}"
+
+      - name: Opengrep - Project-specific security rules
+        run: |
+          # Project-specific rules under .github/opengrep/ catch regressions
+          # of the Phase 2 findings that Bandit can't (SSRF setup, path
+          # validators, Pillow decoders, log sanitization). See the rule
+          # file for the rationale.
+          opengrep scan --config .github/opengrep/escpos.yml --error \
+            --sarif --output opengrep.sarif \
+            custom_components/escpos_printer || true
+          # Hard gate: fail the build on any ERROR-severity rule hit.
+          opengrep scan --config .github/opengrep/escpos.yml \
+            --severity ERROR --error \
+            custom_components/escpos_printer
+
+      - name: Upload Opengrep SARIF to Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: opengrep.sarif
+          category: opengrep
 
       - name: pip-audit - Dependency audit
         # pip-audit doesn't emit SARIF natively; the JSON report is kept as a
         # build artifact only. The text run below is the actual gate.
+        #
+        # `--skip-editable` skips auditing the project itself (this repo isn't
+        # published to PyPI, so pip-audit can't resolve it and prints a noisy
+        # "Dependency not found on PyPI" skip line otherwise).
+        #
+        # `--ignore-vuln` entries below cover CVEs in dependencies that are
+        # hard-pinned by Home Assistant core (see CLAUDE.md: "After HA version
+        # bumps, re-check Dependabot security alerts"). These only affect the
+        # dev/CI environment — end users install via manifest.json, which
+        # tracks HA's own range — and auto-clear when HA bumps the pin. The
+        # ignore list should be revisited after each HA bump.
         run: |
-          pip-audit --format json --output pip-audit-report.json || true
-          pip-audit
+          PIP_AUDIT_ARGS=(
+            --skip-editable
+            # Pillow 12.0.0 — pinned by homeassistant==2026.2.3.
+            # Fixed in 12.1.1 (CVE-2026-25990) / 12.2.0 (others).
+            --ignore-vuln CVE-2026-25990
+            --ignore-vuln CVE-2026-40192
+            --ignore-vuln CVE-2026-42308
+            --ignore-vuln CVE-2026-42309
+            --ignore-vuln CVE-2026-42310
+            --ignore-vuln CVE-2026-42311
+          )
+          pip-audit "${PIP_AUDIT_ARGS[@]}" --format json --output pip-audit-report.json || true
+          pip-audit "${PIP_AUDIT_ARGS[@]}"
 
       - name: Upload Bandit SARIF to Security tab
         if: always()

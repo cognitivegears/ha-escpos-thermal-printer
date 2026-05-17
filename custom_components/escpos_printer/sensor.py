@@ -38,19 +38,79 @@ PARALLEL_UPDATES = 0
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: Any
 ) -> None:
-    """Add a battery sensor for Bluetooth printers.
+    """Add a battery sensor for Bluetooth printers and a last-print sensor.
 
-    Network and USB printers don't have battery state to report — we only
-    create the sensor for the BT branch.
+    Network and USB printers don't have battery state to report — battery
+    sensor only for the BT branch. The last-print diagnostic sensor is
+    always added so users get a live view of the image pipeline.
     """
-    if entry.data.get(CONF_CONNECTION_TYPE) != CONNECTION_TYPE_BLUETOOTH:
-        return
+    sensors: list[SensorEntity] = [LastImagePrintSensor(entry)]
 
-    mac = entry.data.get(CONF_BT_MAC, "")
-    if not mac:
-        return
+    if entry.data.get(CONF_CONNECTION_TYPE) == CONNECTION_TYPE_BLUETOOTH:
+        mac = entry.data.get(CONF_BT_MAC, "")
+        if mac:
+            sensors.append(BluetoothPrinterBatterySensor(entry, mac))
 
-    async_add_entities([BluetoothPrinterBatterySensor(entry, mac)], update_before_add=True)
+    async_add_entities(sensors, update_before_add=True)
+
+
+class LastImagePrintSensor(SensorEntity):
+    """Diagnostic sensor exposing the last image-print outcome.
+
+    State is the count of successful image prints since startup; the
+    interesting per-print fields (source kind, decoded dims, slice
+    count, last error class) ride along as attributes so users can
+    build dashboards without parsing diagnostics downloads.
+    """
+
+    _attr_has_entity_name = True
+    _attr_name = "Last image print"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_should_poll = True
+    _attr_icon = "mdi:image-outline"
+
+    def __init__(self, entry: ConfigEntry) -> None:
+        self._entry = entry
+        self._attr_unique_id = f"{entry.entry_id}_last_image_print"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        connection_type = self._entry.data.get(CONF_CONNECTION_TYPE)
+        if connection_type == CONNECTION_TYPE_BLUETOOTH:
+            model = "Bluetooth Printer"
+        elif connection_type == "usb":
+            model = "USB Printer"
+        else:
+            model = "Network Printer"
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._entry.entry_id)},
+            name=f"ESC/POS Printer {self._entry.title}",
+            manufacturer="ESC/POS",
+            model=model,
+        )
+
+    async def async_update(self) -> None:
+        """Pull the in-memory ImageStats snapshot off the adapter."""
+        runtime = getattr(self._entry, "runtime_data", None)
+        adapter = getattr(runtime, "adapter", None) if runtime else None
+        stats = getattr(adapter, "_image_stats", None)
+        if stats is None:
+            self._attr_available = False
+            self._attr_native_value = None
+            self._attr_extra_state_attributes = {}
+            return
+        self._attr_available = True
+        self._attr_native_value = stats.total_prints
+        self._attr_extra_state_attributes = {
+            "total_failures": stats.total_failures,
+            "last_source_kind": stats.last_source_kind,
+            "last_decoded_dims": list(stats.last_decoded_dims)
+            if stats.last_decoded_dims
+            else None,
+            "last_decoded_bytes": stats.last_decoded_bytes,
+            "last_slice_count": stats.last_slice_count,
+            "last_error_class": stats.last_error_class,
+        }
 
 
 class BluetoothPrinterBatterySensor(SensorEntity):

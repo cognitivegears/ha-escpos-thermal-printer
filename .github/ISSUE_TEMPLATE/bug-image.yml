@@ -1,0 +1,124 @@
+name: Image bug report
+description: Something is wrong with `print_image` or `notify.<printer>` with an image attachment.
+title: "[image] "
+labels: ["bug", "image"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report! The image pipeline has a few moving
+        parts (source resolver, Pillow processing, ESC/POS chunking,
+        adapter transport). Filling in the fields below means we can
+        triage without a long back-and-forth.
+
+        **Please scrub any secrets** (URL credentials, internal IPs,
+        camera entity names you'd rather not publish) before
+        submitting.
+
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant version
+      description: Settings → About → Home Assistant version
+      placeholder: "2026.5.0"
+    validations:
+      required: true
+
+  - type: input
+    id: integration_version
+    attributes:
+      label: Integration version
+      description: From the integration card or `manifest.json`
+      placeholder: "0.6.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: transport
+    attributes:
+      label: Connection type
+      options:
+        - Network (TCP/IP)
+        - USB
+        - Bluetooth (RFCOMM)
+    validations:
+      required: true
+
+  - type: input
+    id: profile
+    attributes:
+      label: Printer profile
+      description: From the integration options or `manifest.json` (e.g. `TM-T20II`, `default`, blank for auto-detect)
+      placeholder: "default"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: source_kind
+    attributes:
+      label: Image source kind
+      description: Do NOT paste the actual value — we only need to know which resolver was exercised.
+      options:
+        - HTTP / HTTPS URL
+        - Local file path
+        - Camera entity (camera.<id>)
+        - Image entity (image.<id>)
+        - Base64 data URI
+        - Jinja template
+    validations:
+      required: true
+
+  - type: input
+    id: dimensions
+    attributes:
+      label: Image dimensions
+      description: Approximate width × height pixels (e.g. `1920x1080`)
+      placeholder: "640x480"
+    validations:
+      required: false
+
+  - type: input
+    id: bytes
+    attributes:
+      label: Approximate file size
+      description: Roughly in KB or MB (e.g. `2.3 MB`)
+      placeholder: "1 MB"
+    validations:
+      required: false
+
+  - type: textarea
+    id: behaviour
+    attributes:
+      label: What happens
+      description: Paste the error message you see in HA, and what the receipt actually prints (if anything). **Scrub secrets first.**
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: log_excerpt
+    attributes:
+      label: Log excerpt
+      description: |
+        Set the integration's logging to debug:
+        ```yaml
+        logger:
+          logs:
+            custom_components.escpos_printer: debug
+        ```
+        Then paste the lines around the failure. **Scrub URLs / paths / secrets first.**
+      render: shell
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics dump (optional)
+      description: Settings → Devices → ESC/POS → ⋮ → Download diagnostics. Particularly useful is `runtime.image_pipeline`.
+      render: json

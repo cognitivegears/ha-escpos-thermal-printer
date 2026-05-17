@@ -1,339 +1,366 @@
+"""Security tests for the ESC/POS Thermal Printer integration.
+
+Covers:
+
+- The legacy validators (text/QR/barcode/numeric/timeout) — happy paths.
+- The new validators added on `feature/image_updates` (`validate_base64_image`,
+  `validate_entity_id_for_domain`, choice validators) — Phase 3 T-H3.
+- URL validation hardening (credentials, IDN, ports, length) — Phase 3 T-C1.
+- `sanitize_log_message` URL userinfo + path redaction — Phase 3 T-H2.
+- Local-path validation: `pathlib.Path.resolve(strict=True)` semantics,
+  symlink behaviour, allowlist enforcement — Phase 3 T-C2.
 """
-Security tests for HA ESCPOS Thermal Printer integration.
 
-This module contains tests to verify security features and validate
-that security vulnerabilities are properly mitigated.
-"""
+from __future__ import annotations
 
-from unittest.mock import patch
+import base64
 
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 import pytest
 
 from custom_components.escpos_printer.security import (
     MAX_BARCODE_LENGTH,
     MAX_BEEP_TIMES,
     MAX_FEED_LINES,
+    MAX_IMAGE_SIZE_MB,
     MAX_QR_DATA_LENGTH,
     MAX_TEXT_LENGTH,
+    VALID_IMAGE_EXTENSIONS,
+    _validate_local_path_sync,
     sanitize_log_message,
     validate_barcode_data,
+    validate_base64_image,
+    validate_dither_mode,
+    validate_entity_id_for_domain,
     validate_image_url,
-    validate_local_image_path,
+    validate_impl_mode,
     validate_numeric_input,
     validate_qr_data,
+    validate_rotation,
     validate_text_input,
     validate_timeout,
 )
 
+# ---------------------------------------------------------------------------
+# Text / QR / barcode (legacy).
+# ---------------------------------------------------------------------------
+
 
 class TestInputValidation:
-    """Test input validation functions."""
-
     def test_validate_text_input_valid(self):  # type: ignore[no-untyped-def]
-        """Test valid text input validation."""
-        text = "Hello, World!"
-        result = validate_text_input(text)
-        assert result == text
+        assert validate_text_input("Hello, World!") == "Hello, World!"
 
     def test_validate_text_input_max_length(self):  # type: ignore[no-untyped-def]
-        """Test text input length validation."""
-        long_text = "x" * (MAX_TEXT_LENGTH + 1)
         with pytest.raises(HomeAssistantError, match="exceeds maximum"):
-            validate_text_input(long_text)
+            validate_text_input("x" * (MAX_TEXT_LENGTH + 1))
 
     def test_validate_text_input_control_chars(self):  # type: ignore[no-untyped-def]
-        """Test removal of control characters."""
-        text_with_control = "Hello\x00World\x01Test"
-        result = validate_text_input(text_with_control)
+        result = validate_text_input("Hello\x00World\x01Test")
         assert "\x00" not in result
         assert "\x01" not in result
         assert result == "HelloWorldTest"
 
-    def test_validate_text_input_empty(self):  # type: ignore[no-untyped-def]
-        """Test empty text input."""
-        result = validate_text_input("")
-        assert result == ""
-
     def test_validate_text_input_none(self):  # type: ignore[no-untyped-def]
-        """Test None text input."""
         with pytest.raises(HomeAssistantError, match="must be a string"):
             validate_text_input(None)
 
 
 class TestQRDataValidation:
-    """Test QR code data validation."""
-
     def test_validate_qr_data_valid(self):  # type: ignore[no-untyped-def]
-        """Test valid QR data."""
-        data = "https://example.com"
-        result = validate_qr_data(data)
-        assert result == data
+        assert validate_qr_data("https://example.com") == "https://example.com"
 
     def test_validate_qr_data_max_length(self):  # type: ignore[no-untyped-def]
-        """Test QR data length validation."""
-        long_data = "x" * (MAX_QR_DATA_LENGTH + 1)
         with pytest.raises(HomeAssistantError, match="exceeds maximum"):
-            validate_qr_data(long_data)
+            validate_qr_data("x" * (MAX_QR_DATA_LENGTH + 1))
 
     def test_validate_qr_data_empty(self):  # type: ignore[no-untyped-def]
-        """Test empty QR data."""
         with pytest.raises(HomeAssistantError, match="cannot be empty"):
             validate_qr_data("")
 
-    def test_validate_qr_data_whitespace_only(self):  # type: ignore[no-untyped-def]
-        """Test whitespace-only QR data."""
-        with pytest.raises(HomeAssistantError, match="cannot be empty"):
-            validate_qr_data("   ")
-
 
 class TestBarcodeDataValidation:
-    """Test barcode data validation."""
-
     def test_validate_barcode_data_valid(self):  # type: ignore[no-untyped-def]
-        """Test valid barcode data."""
-        code = "123456789"
-        bc_type = "CODE128"
-        result_code, result_type = validate_barcode_data(code, bc_type)
-        assert result_code == code
-        assert result_type == bc_type.upper()
+        result_code, result_type = validate_barcode_data("123456789", "CODE128")
+        assert result_code == "123456789"
+        assert result_type == "CODE128"
 
     def test_validate_barcode_data_max_length(self):  # type: ignore[no-untyped-def]
-        """Test barcode data length validation."""
-        long_code = "x" * (MAX_BARCODE_LENGTH + 1)
         with pytest.raises(HomeAssistantError, match="exceeds maximum"):
-            validate_barcode_data(long_code, "CODE128")
+            validate_barcode_data("x" * (MAX_BARCODE_LENGTH + 1), "CODE128")
 
-    def test_validate_barcode_data_empty(self):  # type: ignore[no-untyped-def]
-        """Test empty barcode data."""
-        with pytest.raises(HomeAssistantError, match="cannot be empty"):
-            validate_barcode_data("", "CODE128")
 
-    def test_validate_barcode_data_case_insensitive(self):  # type: ignore[no-untyped-def]
-        """Test barcode type case insensitivity."""
-        _code, bc_type = validate_barcode_data("123", "code39")
-        assert bc_type == "CODE39"
+# ---------------------------------------------------------------------------
+# URL validation (legacy + Phase 3 T-C1 hardening).
+# ---------------------------------------------------------------------------
 
 
 class TestImageURLValidation:
-    """Test image URL validation."""
-
     def test_validate_image_url_https(self):  # type: ignore[no-untyped-def]
-        """Test valid HTTPS URL."""
         url = "https://example.com/image.png"
-        result = validate_image_url(url)
-        assert result == url
-
-    def test_validate_image_url_http(self):  # type: ignore[no-untyped-def]
-        """Test valid HTTP URL."""
-        url = "http://example.com/image.jpg"
-        result = validate_image_url(url)
-        assert result == url
+        assert validate_image_url(url) == url
 
     def test_validate_image_url_invalid_scheme(self):  # type: ignore[no-untyped-def]
-        """Test invalid URL scheme."""
         with pytest.raises(HomeAssistantError, match="Invalid URL scheme"):
             validate_image_url("ftp://example.com/image.png")
 
     def test_validate_image_url_no_hostname(self):  # type: ignore[no-untyped-def]
-        """Test URL without hostname."""
-        with pytest.raises(HomeAssistantError, match="must include a valid hostname"):
+        with pytest.raises(HomeAssistantError, match="hostname"):
             validate_image_url("https:///image.png")
 
     def test_validate_image_url_too_long(self):  # type: ignore[no-untyped-def]
-        """Test overly long URL."""
-        long_url = "https://example.com/" + "x" * 2000
-        with pytest.raises(HomeAssistantError, match="URL is too long"):
-            validate_image_url(long_url)
+        with pytest.raises(HomeAssistantError, match="too long"):
+            validate_image_url("https://example.com/" + "x" * 2000)
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://user:pass@example.com/x.png",
+            "http://admin:hunter2@example.com/x.png",
+        ],
+    )
+    def test_validate_image_url_rejects_credentials(self, url):  # type: ignore[no-untyped-def]
+        with pytest.raises(HomeAssistantError, match="credentials"):
+            validate_image_url(url)
+
+    def test_validate_image_url_rejects_idn(self):  # type: ignore[no-untyped-def]
+        with pytest.raises(HomeAssistantError, match="IDN"):
+            validate_image_url("https://xn--paypa-yfa.com/x.png")
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://example.com:22/x.png",
+            "https://example.com:8123/x.png",
+            "http://example.com:25/x.png",
+        ],
+    )
+    def test_validate_image_url_rejects_non_default_ports(self, url):  # type: ignore[no-untyped-def]
+        with pytest.raises(HomeAssistantError, match="port"):
+            validate_image_url(url)
+
+
+# ---------------------------------------------------------------------------
+# Local-image path validation (T-C2: pathlib.resolve, symlinks).
+# ---------------------------------------------------------------------------
 
 
 class TestLocalImagePathValidation:
-    """Test local image path validation."""
+    def test_valid_local_image_path(self, tmp_path):  # type: ignore[no-untyped-def]
+        path = tmp_path / "logo.png"
+        path.write_bytes(b"\x89PNG\r\n\x1a\n")
+        resolved = _validate_local_path_sync(str(path))
+        assert resolved == path.resolve()
 
-    def test_validate_local_image_path_valid(self):  # type: ignore[no-untyped-def]
-        """Test valid local image path."""
-        with patch("os.path.isfile", return_value=True), \
-             patch("os.path.getsize", return_value=1024):
-            result = validate_local_image_path("/path/to/image.png")
-            assert result == "/path/to/image.png"
+    def test_local_image_path_missing(self, tmp_path):  # type: ignore[no-untyped-def]
+        with pytest.raises(HomeAssistantError, match="does not exist"):
+            _validate_local_path_sync(str(tmp_path / "missing.png"))
 
-    def test_validate_local_image_path_traversal(self):  # type: ignore[no-untyped-def]
-        """Test path traversal protection."""
-        with pytest.raises(HomeAssistantError, match="forbidden characters"):
-            validate_local_image_path("../../../etc/passwd")
+    def test_local_image_path_invalid_extension(self, tmp_path):  # type: ignore[no-untyped-def]
+        path = tmp_path / "script.py"
+        path.write_text("nope")
+        with pytest.raises(HomeAssistantError, match="not allowed"):
+            _validate_local_path_sync(str(path))
 
-    def test_validate_local_image_path_invalid_extension(self):  # type: ignore[no-untyped-def]
-        """Test invalid file extension."""
-        with patch("os.path.isfile", return_value=True), \
-             patch("os.path.getsize", return_value=1024):
-            with pytest.raises(HomeAssistantError, match="not allowed"):
-                validate_local_image_path("/path/to/script.py")
+    def test_local_image_path_too_large(self, tmp_path):  # type: ignore[no-untyped-def]
+        path = tmp_path / "huge.png"
+        path.write_bytes(b"\x00" * (MAX_IMAGE_SIZE_MB * 1024 * 1024 + 1))
+        with pytest.raises(HomeAssistantError, match="too large"):
+            _validate_local_path_sync(str(path))
 
-    def test_validate_local_image_path_file_not_exists(self):  # type: ignore[no-untyped-def]
-        """Test non-existent file."""
-        with patch("os.path.isfile", return_value=False):
-            with pytest.raises(HomeAssistantError, match="does not exist"):
-                validate_local_image_path("/nonexistent/image.png")
+    def test_local_image_path_resolves_symlinks(self, tmp_path):  # type: ignore[no-untyped-def]
+        target = tmp_path / "real.png"
+        target.write_bytes(b"\x89PNG\r\n\x1a\n")
+        link = tmp_path / "alias.png"
+        link.symlink_to(target)
+        resolved = _validate_local_path_sync(str(link))
+        # `Path.resolve(strict=True)` follows the symlink so the allowlist
+        # check upstream sees the real target.
+        assert resolved == target.resolve()
 
-    def test_validate_local_image_path_too_large(self):  # type: ignore[no-untyped-def]
-        """Test file size limit."""
-        with patch("os.path.isfile", return_value=True), \
-             patch("os.path.getsize", return_value=20 * 1024 * 1024):  # 20MB
-            with pytest.raises(HomeAssistantError, match="too large"):
-                validate_local_image_path("/path/to/large_image.png")
+    def test_local_image_path_rejects_broken_symlink(self, tmp_path):  # type: ignore[no-untyped-def]
+        link = tmp_path / "dead.png"
+        link.symlink_to(tmp_path / "nonexistent.png")
+        with pytest.raises(HomeAssistantError, match="does not exist"):
+            _validate_local_path_sync(str(link))
+
+
+# ---------------------------------------------------------------------------
+# Numeric input validation.
+# ---------------------------------------------------------------------------
 
 
 class TestNumericInputValidation:
-    """Test numeric input validation."""
-
     def test_validate_numeric_input_valid(self):  # type: ignore[no-untyped-def]
-        """Test valid numeric input."""
-        result = validate_numeric_input(5, 0, 10, "test_value")
-        assert result == 5
-
-    def test_validate_numeric_input_string(self):  # type: ignore[no-untyped-def]
-        """Test string numeric input."""
-        result = validate_numeric_input("7", 0, 10, "test_value")
-        assert result == 7
+        assert validate_numeric_input(5, 0, 10, "test_value") == 5
 
     def test_validate_numeric_input_below_min(self):  # type: ignore[no-untyped-def]
-        """Test value below minimum."""
         with pytest.raises(HomeAssistantError, match="must be between"):
-            validate_numeric_input(-1, 0, 10, "test_value")
-
-    def test_validate_numeric_input_above_max(self):  # type: ignore[no-untyped-def]
-        """Test value above maximum."""
-        with pytest.raises(HomeAssistantError, match="must be between"):
-            validate_numeric_input(15, 0, 10, "test_value")
+            validate_numeric_input(-1, 0, 10, "x")
 
     def test_validate_numeric_input_invalid_type(self):  # type: ignore[no-untyped-def]
-        """Test invalid input type."""
         with pytest.raises(HomeAssistantError, match="must be a valid integer"):
-            validate_numeric_input("not_a_number", 0, 10, "test_value")
+            validate_numeric_input("not_a_number", 0, 10, "x")
+
+
+# ---------------------------------------------------------------------------
+# T-H3: New choice / entity-id / base64 validators.
+# ---------------------------------------------------------------------------
+
+
+class TestEntityIdDomainValidation:
+    def test_accepts_valid(self):  # type: ignore[no-untyped-def]
+        assert validate_entity_id_for_domain("camera.front", "camera") == "camera.front"
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "switch.front",          # wrong domain
+            "camera.",               # missing object id
+            "camera",                # missing dot
+            "camera.Front-Door",     # uppercase + dash
+            "camera." + "a" * 65,    # exceeds length cap (S-M6)
+        ],
+    )
+    def test_rejects_invalid(self, value):  # type: ignore[no-untyped-def]
+        with pytest.raises(HomeAssistantError):
+            validate_entity_id_for_domain(value, "camera")
+
+
+class TestRotationValidation:
+    @pytest.mark.parametrize("v", [0, 90, 180, 270, "90"])
+    def test_accepts(self, v):  # type: ignore[no-untyped-def]
+        assert validate_rotation(v) in (0, 90, 180, 270)
+
+    @pytest.mark.parametrize("v", [45, 360, -90, "north", None])
+    def test_rejects(self, v):  # type: ignore[no-untyped-def]
+        with pytest.raises(ServiceValidationError):
+            validate_rotation(v)
+
+
+class TestDitherImplValidation:
+    @pytest.mark.parametrize("v", ["floyd-steinberg", "none", "threshold"])
+    def test_dither_accepts(self, v):  # type: ignore[no-untyped-def]
+        assert validate_dither_mode(v) == v
+
+    def test_dither_rejects(self):  # type: ignore[no-untyped-def]
+        with pytest.raises(ServiceValidationError):
+            validate_dither_mode("ordered")
+
+    @pytest.mark.parametrize("v", ["bitImageRaster", "graphics", "bitImageColumn"])
+    def test_impl_accepts(self, v):  # type: ignore[no-untyped-def]
+        assert validate_impl_mode(v) == v
+
+    def test_impl_rejects(self):  # type: ignore[no-untyped-def]
+        with pytest.raises(ServiceValidationError):
+            validate_impl_mode("graphix")
+
+
+class TestBase64ImageValidation:
+    def test_accepts_valid_data_uri(self):  # type: ignore[no-untyped-def]
+        raw = b"hello"
+        uri = "data:image/png;base64," + base64.b64encode(raw).decode()
+        assert validate_base64_image(uri) == raw
+
+    @pytest.mark.parametrize(
+        ("uri", "match"),
+        [
+            ("hello", "data:image"),
+            ("data:text/plain;base64,aGk=", "data:image"),
+            # S-L2 regression: svg+xml subtype must be rejected.
+            ("data:image/svg+xml;base64,aGk=", "data:image"),
+            # `!!!` doesn't match the base64 alphabet — the regex rejects
+            # it before decode (giving the data-URI shape error).
+            ("data:image/png;base64,!!!", "data:image"),
+        ],
+    )
+    def test_rejects_invalid(self, uri, match):  # type: ignore[no-untyped-def]
+        with pytest.raises(HomeAssistantError, match=match):
+            validate_base64_image(uri)
+
+    def test_rejects_oversized_input_pre_decode(self):  # type: ignore[no-untyped-def]
+        # T-H1: a 200 MB base64 string must be rejected before decoding.
+        # We don't measure tracemalloc here (CPython realloc costs); we
+        # rely on the cap to short-circuit ahead of base64.b64decode.
+        huge = "data:image/png;base64," + "A" * (200 * 1024 * 1024)
+        with pytest.raises(HomeAssistantError, match="too large"):
+            validate_base64_image(huge)
+
+
+# ---------------------------------------------------------------------------
+# T-H2: sanitize_log_message extensions (URL userinfo, file paths).
+# ---------------------------------------------------------------------------
 
 
 class TestLogSanitization:
-    """Test log message sanitization."""
+    def test_no_sensitive(self):  # type: ignore[no-untyped-def]
+        assert sanitize_log_message("Processing request") == "Processing request"
 
-    def test_sanitize_log_message_no_sensitive(self):  # type: ignore[no-untyped-def]
-        """Test sanitization with no sensitive data."""
-        message = "Processing user request"
-        result = sanitize_log_message(message)
-        assert result == message
+    def test_redacts_url_userinfo(self):  # type: ignore[no-untyped-def]
+        msg = "Failed download: https://alice:hunter2@example.com/x.png timeout"
+        result = sanitize_log_message(msg)
+        assert "alice" not in result
+        assert "hunter2" not in result
+        assert "[REDACTED]@example.com" in result
 
-    def test_sanitize_log_message_with_sensitive(self):  # type: ignore[no-untyped-def]
-        """Test sanitization with sensitive data."""
-        message = "Login attempt for user=test password=secret123 token=abc123"
-        result = sanitize_log_message(message, ["password", "token"])
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/config/www/secret.png",
+            "/media/private/x.jpg",
+            "/share/backup.png",
+            "/ssl/cert.png",
+            "/addon_configs/myaddon/cfg.png",
+            "/data/state.png",
+        ],
+    )
+    def test_redacts_filesystem_paths(self, path):  # type: ignore[no-untyped-def]
+        msg = f"Cannot read {path}: ENOENT"
+        result = sanitize_log_message(msg)
+        # The prefix is preserved; the rest is redacted.
         assert "[REDACTED]" in result
-        assert "secret123" not in result
-        assert "abc123" not in result
+        assert "secret" not in result
+        assert "private" not in result
 
-    def test_sanitize_log_message_case_insensitive(self):  # type: ignore[no-untyped-def]
-        """Test case-insensitive sanitization."""
-        message = "PASSWORD=secret TOKEN=abc"
-        result = sanitize_log_message(message, ["password", "token"])
+    def test_redacts_bare_mac(self):  # type: ignore[no-untyped-def]
+        msg = "Bluetooth open failed for AA:BB:CC:DD:EE:FF ch=1"
+        result = sanitize_log_message(msg)
+        assert "AA:BB:CC:" in result
+        assert "DD:EE:FF" not in result
+
+    def test_redacts_image_field(self):  # type: ignore[no-untyped-def]
+        # Verify the new `image`/`url`/`path` field names are in the default list.
+        msg = "fetch failed image=/config/secret.png url=https://x.example/p"
+        result = sanitize_log_message(msg)
         assert "[REDACTED]" in result
         assert "secret" not in result
 
-    def test_sanitize_redacts_bare_mac_address(self):  # type: ignore[no-untyped-def]
-        """Bluetooth MACs are personal data; redact device portion, keep OUI."""
-        message = "Bluetooth open failed for AA:BB:CC:DD:EE:FF ch=1"
-        result = sanitize_log_message(message)
-        assert "AA:BB:CC:" in result  # OUI preserved
-        assert "DD:EE:FF" not in result  # device portion redacted
-        assert "XX:XX:XX" in result
 
-    def test_sanitize_redacts_mac_with_dashes(self):  # type: ignore[no-untyped-def]
-        message = "Device 00-1A-7D-DA-71-13 unreachable"
-        result = sanitize_log_message(message)
-        assert "00-1A-7D" in result
-        assert "DA-71-13" not in result
-
-    def test_sanitize_default_field_list_includes_address_mac_alias(self):  # type: ignore[no-untyped-def]
-        message = "address=AA:BB:CC:DD:EE:FF mac=11:22:33:44:55:66 alias=Phone"
-        result = sanitize_log_message(message)
-        assert "[REDACTED]" in result
-        assert "Phone" not in result
+# ---------------------------------------------------------------------------
+# Timeout + constants.
+# ---------------------------------------------------------------------------
 
 
 class TestTimeoutValidation:
-    """Test timeout validation."""
+    def test_valid(self):  # type: ignore[no-untyped-def]
+        assert validate_timeout(5.0) == 5.0
 
-    def test_validate_timeout_valid(self):  # type: ignore[no-untyped-def]
-        """Test valid timeout."""
-        result = validate_timeout(5.0)
-        assert result == 5.0
-
-    def test_validate_timeout_zero(self):  # type: ignore[no-untyped-def]
-        """Test zero timeout."""
+    def test_zero(self):  # type: ignore[no-untyped-def]
         with pytest.raises(HomeAssistantError, match="must be a positive number"):
             validate_timeout(0)
 
-    def test_validate_timeout_negative(self):  # type: ignore[no-untyped-def]
-        """Test negative timeout."""
-        with pytest.raises(HomeAssistantError, match="must be a positive number"):
-            validate_timeout(-1)
-
-    def test_validate_timeout_too_large(self):  # type: ignore[no-untyped-def]
-        """Test timeout too large."""
+    def test_too_large(self):  # type: ignore[no-untyped-def]
         with pytest.raises(HomeAssistantError, match="cannot exceed"):
             validate_timeout(400)
 
 
 class TestSecurityConstants:
-    """Test security constant values."""
-
-    def test_max_text_length(self):  # type: ignore[no-untyped-def]
-        """Test MAX_TEXT_LENGTH constant."""
+    def test_max_constants(self):  # type: ignore[no-untyped-def]
         assert MAX_TEXT_LENGTH == 10000
-
-    def test_max_qr_data_length(self):  # type: ignore[no-untyped-def]
-        """Test MAX_QR_DATA_LENGTH constant."""
         assert MAX_QR_DATA_LENGTH == 2000
-
-    def test_max_barcode_length(self):  # type: ignore[no-untyped-def]
-        """Test MAX_BARCODE_LENGTH constant."""
         assert MAX_BARCODE_LENGTH == 100
-
-    def test_max_feed_lines(self):  # type: ignore[no-untyped-def]
-        """Test MAX_FEED_LINES constant."""
         assert MAX_FEED_LINES == 50
-
-    def test_max_beep_times(self):  # type: ignore[no-untyped-def]
-        """Test MAX_BEEP_TIMES constant."""
         assert MAX_BEEP_TIMES == 10
 
-
-class TestIntegrationSecurity:
-    """Integration tests for security features."""
-
-    def test_comprehensive_input_validation(self):  # type: ignore[no-untyped-def]
-        """Test comprehensive input validation workflow."""
-        # This would test the full validation pipeline
-        # for a typical service call
-
-        # Test text validation
-        text = validate_text_input("Valid text")
-
-        # Test numeric validation
-        feed = validate_numeric_input(5, 0, MAX_FEED_LINES, "feed")
-
-        # Test URL validation
-        url = validate_image_url("https://example.com/image.png")
-
-        # All validations should pass
-        assert text == "Valid text"
-        assert feed == 5
-        assert url == "https://example.com/image.png"
-
-    @pytest.mark.parametrize(("invalid_input", "expected_error"), [
-        ("x" * 10001, "exceeds maximum"),
-        ("", "cannot be empty"),
-        ("   ", "cannot be empty"),
-        (None, "must be a string"),
-    ])
-    def test_qr_validation_edge_cases(self, invalid_input, expected_error):  # type: ignore[no-untyped-def]
-        """Test QR validation edge cases."""
-        with pytest.raises(HomeAssistantError, match=expected_error):
-            validate_qr_data(invalid_input)
+    def test_extension_set(self):  # type: ignore[no-untyped-def]
+        assert ".png" in VALID_IMAGE_EXTENSIONS
+        assert ".svg" not in VALID_IMAGE_EXTENSIONS

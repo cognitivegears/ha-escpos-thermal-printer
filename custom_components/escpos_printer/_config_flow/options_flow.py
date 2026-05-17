@@ -28,15 +28,30 @@ from ..const import (
     CONF_KEEPALIVE,
     CONF_LINE_WIDTH,
     CONF_PROFILE,
+    CONF_RELIABILITY_PROFILE,
     CONF_STATUS_INTERVAL,
     CONF_TIMEOUT,
+    CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
     CONNECTION_TYPE_USB,
     DEFAULT_ALIGN,
     DEFAULT_CUT,
     DEFAULT_LINE_WIDTH,
     DEFAULT_TIMEOUT,
+    RELIABILITY_PROFILE_AUTO,
+    RELIABILITY_PROFILE_BALANCED,
+    RELIABILITY_PROFILE_BLUETOOTH,
+    RELIABILITY_PROFILE_CONSERVATIVE,
+    RELIABILITY_PROFILE_FAST_LAN,
 )
+
+_RELIABILITY_LABELS: dict[str, str] = {
+    RELIABILITY_PROFILE_AUTO: "Auto (recommended)",
+    RELIABILITY_PROFILE_FAST_LAN: "Fast LAN (Epson TM-T20/T88, 0 ms delay)",
+    RELIABILITY_PROFILE_BALANCED: "Balanced (most USB / Star TSP)",
+    RELIABILITY_PROFILE_CONSERVATIVE: "Conservative (cheap POS-58/80)",
+    RELIABILITY_PROFILE_BLUETOOTH: "Bluetooth-safe (slow SPP printers)",
+}
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -187,6 +202,18 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlow):
         # Check connection type to show appropriate options
         connection_type = self.config_entry.data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
 
+        # Reliability profile: defaults to "auto" for new entries.
+        # Bluetooth defaults to "bluetooth_safe" since SPP transports
+        # need the throttle on first use; the user can still pick auto
+        # if their hardware is fast enough.
+        current_reliability = self.config_entry.options.get(
+            CONF_RELIABILITY_PROFILE,
+            RELIABILITY_PROFILE_BLUETOOTH
+            if connection_type == CONNECTION_TYPE_BLUETOOTH
+            else RELIABILITY_PROFILE_AUTO,
+        )
+        reliability_choices = dict(_RELIABILITY_LABELS)
+
         # Build schema - USB printers don't have keepalive option
         if connection_type == CONNECTION_TYPE_USB:
             data_schema = vol.Schema(
@@ -214,6 +241,9 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlow):
                         ),
                     ): vol.In(["left", "center", "right"]),
                     vol.Optional(CONF_DEFAULT_CUT, default=current_cut): vol.In(cut_choices),
+                    vol.Optional(
+                        CONF_RELIABILITY_PROFILE, default=current_reliability
+                    ): vol.In(reliability_choices),
                     vol.Optional(
                         CONF_STATUS_INTERVAL,
                         default=self.config_entry.options.get(CONF_STATUS_INTERVAL, 0),
@@ -246,6 +276,9 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlow):
                         ),
                     ): vol.In(["left", "center", "right"]),
                     vol.Optional(CONF_DEFAULT_CUT, default=current_cut): vol.In(cut_choices),
+                    vol.Optional(
+                        CONF_RELIABILITY_PROFILE, default=current_reliability
+                    ): vol.In(reliability_choices),
                     vol.Optional(
                         CONF_KEEPALIVE,
                         default=self.config_entry.options.get(CONF_KEEPALIVE, False),
