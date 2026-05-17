@@ -107,9 +107,31 @@ jobs:
       - name: pip-audit - Dependency audit
         # pip-audit doesn't emit SARIF natively; the JSON report is kept as a
         # build artifact only. The text run below is the actual gate.
+        #
+        # `--skip-editable` skips auditing the project itself (this repo isn't
+        # published to PyPI, so pip-audit can't resolve it and prints a noisy
+        # "Dependency not found on PyPI" skip line otherwise).
+        #
+        # `--ignore-vuln` entries below cover CVEs in dependencies that are
+        # hard-pinned by Home Assistant core (see CLAUDE.md: "After HA version
+        # bumps, re-check Dependabot security alerts"). These only affect the
+        # dev/CI environment — end users install via manifest.json, which
+        # tracks HA's own range — and auto-clear when HA bumps the pin. The
+        # ignore list should be revisited after each HA bump.
         run: |
-          pip-audit --format json --output pip-audit-report.json || true
-          pip-audit
+          PIP_AUDIT_ARGS=(
+            --skip-editable
+            # Pillow 12.0.0 — pinned by homeassistant==2026.2.3.
+            # Fixed in 12.1.1 (CVE-2026-25990) / 12.2.0 (others).
+            --ignore-vuln CVE-2026-25990
+            --ignore-vuln CVE-2026-40192
+            --ignore-vuln CVE-2026-42308
+            --ignore-vuln CVE-2026-42309
+            --ignore-vuln CVE-2026-42310
+            --ignore-vuln CVE-2026-42311
+          )
+          pip-audit "${PIP_AUDIT_ARGS[@]}" --format json --output pip-audit-report.json || true
+          pip-audit "${PIP_AUDIT_ARGS[@]}"
 
       - name: Upload Bandit SARIF to Security tab
         if: always()
