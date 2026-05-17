@@ -16,9 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   a notification. Tune `dither`/`threshold`/`image_width` in Developer
   Tools instead of burning paper.
 - **Focused convenience services.** `print_camera_snapshot`,
-  `print_image_entity`, `print_image_url` — each takes only the
-  relevant field with a proper UI selector (camera/image entity
-  picker; URL text), funneling into the same handler as `print_image`.
+  `print_image_entity`, `print_image_url`, and `print_image_path` —
+  each takes only the relevant field with a proper UI selector (camera/
+  image entity picker; URL or path text), funneling into the same handler
+  as `print_image`. All focused services now expose the **full image
+  option set** (rotation, mirror, invert, autocontrast, threshold,
+  dither, alignment, center, high-density, cut, feed) inline, with rarely-
+  used reliability knobs (`impl`, `fragment_height`, `chunk_delay_ms`,
+  `fallback_image`) collapsed under `advanced: true` so the default form
+  stays readable.
 - **Calibration print.** `escpos_printer.calibration_print` prints a
   ruler + a threshold-sweep strip so users pick the right
   `dither: threshold` value without trial-and-error roll burning.
@@ -286,6 +292,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   as a personal scratch file; previously dead).
 - `CONTRIBUTING.md` Python version was stale at "3.11 or later"; now
   matches the `>=3.13.2` requirement in `pyproject.toml`.
+
+### Migration notes
+
+- **Existing `print_image` automations continue to work unchanged.** The
+  `image` field still accepts the same literal strings it always did
+  (URL, file path, `camera.<id>`, `image.<id>`, base64). The UI now also
+  renders Jinja templates, so a literal path may appear inside a code-
+  style editor when you edit the automation — that's expected; the value
+  itself is unchanged.
+- For a friendlier UI, switch to the focused service that matches your
+  source type: `print_image_url`, `print_image_path` (new),
+  `print_camera_snapshot`, or `print_image_entity`. All accept the same
+  image-processing options. Migration is optional — `print_image` stays
+  fully supported and remains the right choice when the source is
+  computed by a template.
 
 ## [0.5.0] - 2026-05-10
 

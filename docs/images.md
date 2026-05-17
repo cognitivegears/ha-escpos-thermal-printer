@@ -246,13 +246,43 @@ data:
 
 ## Convenience services
 
-When the source type is fixed, use the focused services for a friendlier UI (entity pickers, etc.) — they all funnel into the same pipeline as `print_image`.
+When the source type is fixed, use the focused services for a friendlier UI (entity pickers, plain text fields) — they all funnel into the same pipeline as `print_image` and expose the same image-processing options (rotation, mirror, threshold, dither, etc.). Rarely-used knobs (`impl`, `fragment_height`, `chunk_delay_ms`, `fallback_image`) are marked **advanced** and only appear when Home Assistant's advanced mode is on.
 
-| Service                          | Source field    | Selector       |
-|----------------------------------|-----------------|----------------|
-| `escpos_printer.print_camera_snapshot` | `camera_entity` | camera entity  |
-| `escpos_printer.print_image_entity`    | `image_entity`  | image entity   |
-| `escpos_printer.print_image_url`       | `url`           | plain text     |
+| Service                                | Source field    | Selector        |
+|----------------------------------------|-----------------|-----------------|
+| `escpos_printer.print_image_url`       | `url`           | plain text      |
+| `escpos_printer.print_image_path`      | `path`          | plain text      |
+| `escpos_printer.print_camera_snapshot` | `camera_entity` | camera entity   |
+| `escpos_printer.print_image_entity`    | `image_entity`  | image entity    |
+
+### Upgrading from earlier versions
+
+If you already have an automation calling `escpos_printer.print_image` with a literal URL or local path, **it keeps working unchanged** — the field still accepts the same string you were passing before:
+
+```yaml
+# This is the old way and it still works.
+service: escpos_printer.print_image
+data:
+  image: /config/www/logo.png
+```
+
+The `image` field now uses a template editor in the UI, so you may see your literal path inside a code-style box the next time you edit the automation. That's expected — the editor accepts plain text alongside Jinja templates.
+
+For new automations (and if you'd like a friendlier form), switch to the focused service that matches your source:
+
+```yaml
+# New, recommended form for a local file.
+service: escpos_printer.print_image_path
+data:
+  path: /config/www/logo.png
+
+# Or, for an HTTP image:
+service: escpos_printer.print_image_url
+data:
+  url: https://example.com/receipt.png
+```
+
+The generic `print_image` service is still fully supported — it's the right choice when the source is computed by a template (e.g. picking between a camera entity and a fallback URL based on time of day).
 
 ## Preview without printing
 

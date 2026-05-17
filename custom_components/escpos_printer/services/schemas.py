@@ -74,8 +74,10 @@ from ..security import (
     MAX_BARCODE_LENGTH,
     MAX_BASE64_INPUT_BYTES,
     MAX_FEED_LINES,
+    MAX_IMAGE_PATH_LENGTH,
     MAX_QR_DATA_LENGTH,
     MAX_TEXT_LENGTH,
+    MAX_URL_LENGTH,
 )
 
 # `device_id` is a free-form field used by handlers to target a specific
@@ -115,12 +117,23 @@ def _image_source_validator(value: Any) -> Any:
 
 _IMAGE_SOURCE = _image_source_validator
 
-def _image_option_fragment(prefix: str = "") -> dict[Any, Any]:
+def _image_option_fragment(
+    prefix: str = "",
+    *,
+    autocontrast: bool = False,
+    auto_resize: bool = False,
+) -> dict[Any, Any]:
     """Build the image-option fragment keyed with an optional prefix.
 
     Notify uses ``image_`` to disambiguate from the surrounding text
     options; the plain service call uses bare keys. ``ATTR_IMAGE_WIDTH``
     is already namespaced (``image_width``) so it never gets a prefix.
+
+    ``autocontrast`` / ``auto_resize`` override the schema-level default
+    for those two keys so each focused service's voluptuous default can
+    match its ``services.yaml`` UI default. Without this override, a UI
+    form caller and a YAML-script caller of the same service would get
+    different behaviour for the same omitted key.
     """
     def k(name: str) -> str:
         if not prefix or name == ATTR_IMAGE_WIDTH:
@@ -149,10 +162,10 @@ def _image_option_fragment(prefix: str = "") -> dict[Any, Any]:
         ),
         vol.Optional(k(ATTR_IMPL)): vol.In(IMPL_MODES),
         vol.Optional(k(ATTR_CENTER), default=False): cv.boolean,
-        vol.Optional(k(ATTR_AUTOCONTRAST), default=False): cv.boolean,
+        vol.Optional(k(ATTR_AUTOCONTRAST), default=autocontrast): cv.boolean,
         vol.Optional(k(ATTR_INVERT), default=False): cv.boolean,
         vol.Optional(k(ATTR_MIRROR), default=False): cv.boolean,
-        vol.Optional(k(ATTR_AUTO_RESIZE), default=False): cv.boolean,
+        vol.Optional(k(ATTR_AUTO_RESIZE), default=auto_resize): cv.boolean,
         vol.Optional(k(ATTR_FALLBACK_IMAGE)): _IMAGE_SOURCE,
         vol.Optional(k(ATTR_FRAGMENT_HEIGHT)): vol.All(
             vol.Coerce(int),
@@ -166,6 +179,10 @@ def _image_option_fragment(prefix: str = "") -> dict[Any, Any]:
 
 
 _IMAGE_OPTION_FRAGMENT_PLAIN = _image_option_fragment()
+_IMAGE_OPTION_FRAGMENT_URL = _image_option_fragment(auto_resize=True)
+_IMAGE_OPTION_FRAGMENT_CAMERA = _image_option_fragment(
+    autocontrast=True, auto_resize=True
+)
 _IMAGE_OPTION_FRAGMENT_NOTIFY = {
     vol.Optional(ATTR_IMAGE): _IMAGE_SOURCE,
     **_image_option_fragment("image_"),
@@ -242,11 +259,32 @@ def _entity_id_in_domain(domain: str):  # type: ignore[no-untyped-def]
     return _validate
 
 
+# Per-service source-type guards. Each focused service advertises a
+# specific source shape (URL / local path) in its description; without
+# these guards the underlying ``_classify()`` would happily route a
+# wrong-shape value through a different resolver, contradicting the
+# advertised contract. Downstream guards (SSRF, allowlist, O_NOFOLLOW,
+# entity ACL) still apply — these are defense-in-depth so the schema
+# matches the documented intent.
+def _url_only(value: Any) -> str:
+    s = cv.string(value)
+    if not s.lower().startswith(("http://", "https://")):
+        raise vol.Invalid("URL must start with http:// or https://")
+    return s
+
+
+def _local_path_only(value: Any) -> str:
+    s = cv.string(value)
+    if s.lower().startswith(("http://", "https://", "data:", "camera.", "image.")):
+        raise vol.Invalid("Path must be a local filesystem path")
+    return s
+
+
 PRINT_CAMERA_SNAPSHOT_SCHEMA = vol.Schema(
     {
         vol.Optional("device_id"): _DEVICE_ID,
         vol.Required("camera_entity"): _entity_id_in_domain("camera"),
-        **_IMAGE_OPTION_FRAGMENT_PLAIN,
+        **_IMAGE_OPTION_FRAGMENT_CAMERA,
         vol.Optional(ATTR_CUT): _CUT,
         vol.Optional(ATTR_FEED): _FEED,
     }
@@ -265,8 +303,22 @@ PRINT_IMAGE_ENTITY_SCHEMA = vol.Schema(
 PRINT_IMAGE_URL_SCHEMA = vol.Schema(
     {
         vol.Optional("device_id"): _DEVICE_ID,
-        vol.Required("url"): vol.All(cv.string, vol.Length(min=1, max=2000)),
-        **_IMAGE_OPTION_FRAGMENT_PLAIN,
+        vol.Required("url"): vol.All(
+            _url_only, vol.Length(min=1, max=MAX_URL_LENGTH)
+        ),
+        **_IMAGE_OPTION_FRAGMENT_URL,
+        vol.Optional(ATTR_CUT): _CUT,
+        vol.Optional(ATTR_FEED): _FEED,
+    }
+)
+
+PRINT_IMAGE_PATH_SCHEMA = vol.Schema(
+    {
+        vol.Optional("device_id"): _DEVICE_ID,
+        vol.Required("path"): vol.All(
+            _local_path_only, vol.Length(min=1, max=MAX_IMAGE_PATH_LENGTH)
+        ),
+        **_IMAGE_OPTION_FRAGMENT_URL,
         vol.Optional(ATTR_CUT): _CUT,
         vol.Optional(ATTR_FEED): _FEED,
     }
@@ -381,6 +433,7 @@ __all__ = [
     "PRINT_BARCODE_SCHEMA",
     "PRINT_CAMERA_SNAPSHOT_SCHEMA",
     "PRINT_IMAGE_ENTITY_SCHEMA",
+    "PRINT_IMAGE_PATH_SCHEMA",
     "PRINT_IMAGE_SCHEMA",
     "PRINT_IMAGE_URL_SCHEMA",
     "PRINT_MESSAGE_FIELDS",

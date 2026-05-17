@@ -27,6 +27,7 @@ from custom_components.escpos_printer.const import (
     SERVICE_FEED,
     SERVICE_PRINT_BARCODE,
     SERVICE_PRINT_IMAGE,
+    SERVICE_PRINT_IMAGE_PATH,
     SERVICE_PRINT_QR,
     SERVICE_PRINT_TEXT,
     SERVICE_PRINT_TEXT_UTF8,
@@ -57,6 +58,7 @@ _ALL_SERVICES = (
     SERVICE_PRINT_TEXT,
     SERVICE_PRINT_QR,
     SERVICE_PRINT_IMAGE,
+    SERVICE_PRINT_IMAGE_PATH,
     SERVICE_PRINT_BARCODE,
     SERVICE_FEED,
     SERVICE_CUT,
@@ -160,8 +162,129 @@ def test_print_image_url_schema_caps_length():  # type: ignore[no-untyped-def]
         PRINT_IMAGE_URL_SCHEMA,
     )
 
+    long_url = "https://example.com/" + "x" * 2001
     with pytest.raises(vol.Invalid):
-        PRINT_IMAGE_URL_SCHEMA({"url": "x" * 2001})
+        PRINT_IMAGE_URL_SCHEMA({"url": long_url})
+
+
+def test_print_image_url_schema_rejects_non_url():
+    """The URL service must refuse paths / entities so the contract is enforced at the schema."""
+    from custom_components.escpos_printer.services.schemas import (
+        PRINT_IMAGE_URL_SCHEMA,
+    )
+
+    for bad in (
+        "/config/www/logo.png",
+        "camera.front_door",
+        "image.weather_radar",
+        "data:image/png;base64,iVBOR...",
+        "ftp://example.com/x.png",
+    ):
+        with pytest.raises(vol.Invalid):
+            PRINT_IMAGE_URL_SCHEMA({"url": bad})
+
+
+def test_print_image_url_schema_auto_resize_default_is_true():
+    """The UI form pre-fills ``auto_resize: true`` for the URL service; the schema must agree."""
+    from custom_components.escpos_printer.services.schemas import (
+        PRINT_IMAGE_URL_SCHEMA,
+    )
+
+    out = PRINT_IMAGE_URL_SCHEMA({"url": "https://example.com/x.png"})
+    assert out["auto_resize"] is True
+
+
+def test_print_image_path_schema_requires_path():  # type: ignore[no-untyped-def]
+    from custom_components.escpos_printer.services.schemas import (
+        PRINT_IMAGE_PATH_SCHEMA,
+    )
+
+    with pytest.raises(vol.Invalid):
+        PRINT_IMAGE_PATH_SCHEMA({})
+    out = PRINT_IMAGE_PATH_SCHEMA({"path": "/config/www/logo.png"})
+    assert out["path"] == "/config/www/logo.png"
+
+
+def test_print_image_path_schema_caps_length():  # type: ignore[no-untyped-def]
+    from custom_components.escpos_printer.services.schemas import (
+        PRINT_IMAGE_PATH_SCHEMA,
+    )
+
+    with pytest.raises(vol.Invalid):
+        PRINT_IMAGE_PATH_SCHEMA({"path": "/" + "x" * 1025})
+
+
+def test_print_image_path_schema_rejects_non_path():
+    """The path service must refuse URLs / entities so the contract is enforced at the schema."""
+    from custom_components.escpos_printer.services.schemas import (
+        PRINT_IMAGE_PATH_SCHEMA,
+    )
+
+    for bad in (
+        "https://example.com/x.png",
+        "http://example.com/x.png",
+        "camera.front_door",
+        "image.weather_radar",
+        "data:image/png;base64,iVBOR...",
+    ):
+        with pytest.raises(vol.Invalid):
+            PRINT_IMAGE_PATH_SCHEMA({"path": bad})
+
+
+def test_print_image_path_schema_auto_resize_default_is_true():
+    """The UI form pre-fills ``auto_resize: true`` for the path service; the schema must agree."""
+    from custom_components.escpos_printer.services.schemas import (
+        PRINT_IMAGE_PATH_SCHEMA,
+    )
+
+    out = PRINT_IMAGE_PATH_SCHEMA({"path": "/config/www/logo.png"})
+    assert out["auto_resize"] is True
+
+
+def test_print_camera_snapshot_schema_defaults_match_ui():
+    """services.yaml prefills autocontrast=true and auto_resize=true; the schema must agree."""
+    from custom_components.escpos_printer.services.schemas import (
+        PRINT_CAMERA_SNAPSHOT_SCHEMA,
+    )
+
+    out = PRINT_CAMERA_SNAPSHOT_SCHEMA({"camera_entity": "camera.front_door"})
+    assert out["autocontrast"] is True
+    assert out["auto_resize"] is True
+
+
+def test_print_image_entity_schema_defaults_match_print_image():
+    """The image-entity service uses the conservative (no opt-in) defaults like print_image."""
+    from custom_components.escpos_printer.services.schemas import (
+        PRINT_IMAGE_ENTITY_SCHEMA,
+    )
+
+    out = PRINT_IMAGE_ENTITY_SCHEMA({"image_entity": "image.weather_radar"})
+    assert out["autocontrast"] is False
+    assert out["auto_resize"] is False
+
+
+def test_print_image_path_schema_accepts_image_options():  # type: ignore[no-untyped-def]
+    """All image options (rotation, mirror, threshold, impl, etc) must validate on the new service."""
+    from custom_components.escpos_printer.services.schemas import (
+        PRINT_IMAGE_PATH_SCHEMA,
+    )
+
+    out = PRINT_IMAGE_PATH_SCHEMA(
+        {
+            "path": "/config/www/logo.png",
+            "rotation": 90,
+            "mirror": True,
+            "invert": True,
+            "threshold": 200,
+            "dither": "threshold",
+            "impl": "graphics",
+            "fragment_height": 256,
+            "chunk_delay_ms": 50,
+        }
+    )
+    assert out["rotation"] == 90
+    assert out["mirror"] is True
+    assert out["impl"] == "graphics"
 
 
 def test_preview_image_schema_optional_output_path():  # type: ignore[no-untyped-def]
@@ -185,3 +308,112 @@ def test_calibration_print_schema_defaults():  # type: ignore[no-untyped-def]
     out = CALIBRATION_PRINT_SCHEMA({})
     assert out["cut"] == "full"
     assert out["feed"] == 2
+
+
+# ---------------------------------------------------------------------------
+# services.yaml parity: every focused image service must declare the same
+# common-field metadata (name / description / selector) as the canonical
+# print_image service. Per-service `default:` is intentionally allowed to
+# differ (e.g. `feed` and `auto_resize` vary across services), but the
+# field shape and tooltip text must stay aligned. This test would have
+# caught the YAML `#`-comment truncation bug across four services.
+# ---------------------------------------------------------------------------
+
+
+_FOCUSED_IMAGE_SERVICES = (
+    "print_image_url",
+    "print_image_path",
+    "print_camera_snapshot",
+    "print_image_entity",
+)
+
+# Fields that every image service must expose with identical UI metadata.
+# `image_width` / `cut` / `feed` are excluded because their YAML defaults
+# legitimately vary per service. `rotation`, `dither`, etc. carry their
+# own defaults but should be uniform.
+_PARITY_FIELDS = (
+    "rotation",
+    "dither",
+    "threshold",
+    "mirror",
+    "invert",
+    "autocontrast",
+    "align",
+    "center",
+    "high_density",
+    "impl",
+    "fragment_height",
+    "chunk_delay_ms",
+    "fallback_image",
+)
+
+# Fields whose default *may* differ between services (documented per-service
+# UX choice). Listed explicitly so the parity test stays loud about any
+# *unintended* drift on other fields.
+_DEFAULT_MAY_VARY = frozenset({"auto_resize", "autocontrast", "feed"})
+
+
+def _load_services_yaml() -> dict:
+    services_yaml = (
+        Path(__file__).resolve().parents[1]
+        / "custom_components"
+        / "escpos_printer"
+        / "services.yaml"
+    )
+    return load_yaml_dict(str(services_yaml))
+
+
+def test_image_services_share_common_field_metadata() -> None:
+    """All focused image services must expose the same field metadata as print_image."""
+    services = _load_services_yaml()
+    canonical = services["print_image"]["fields"]
+    mismatches: list[str] = []
+    for svc in _FOCUSED_IMAGE_SERVICES:
+        svc_fields = services[svc]["fields"]
+        for f in _PARITY_FIELDS:
+            if f not in svc_fields:
+                mismatches.append(f"{svc}.{f} missing entirely")
+                continue
+            for attr in ("name", "description", "selector"):
+                expected = canonical[f].get(attr)
+                actual = svc_fields[f].get(attr)
+                if expected != actual:
+                    mismatches.append(
+                        f"{svc}.{f}.{attr} mismatch:\n"
+                        f"  expected: {expected!r}\n"
+                        f"  actual:   {actual!r}"
+                    )
+            # Defaults: must match canonical *unless* listed in _DEFAULT_MAY_VARY.
+            if f not in _DEFAULT_MAY_VARY:
+                expected_default = canonical[f].get("default")
+                actual_default = svc_fields[f].get("default")
+                if expected_default != actual_default:
+                    mismatches.append(
+                        f"{svc}.{f}.default mismatch (not in _DEFAULT_MAY_VARY):\n"
+                        f"  expected: {expected_default!r}\n"
+                        f"  actual:   {actual_default!r}"
+                    )
+    assert not mismatches, (
+        "services.yaml image-service field parity drift:\n  "
+        + "\n  ".join(mismatches)
+    )
+
+
+def test_image_services_no_truncated_descriptions() -> None:
+    """Regression guard for unquoted YAML descriptions containing `#`."""
+    services = _load_services_yaml()
+    for svc in ("print_image", *_FOCUSED_IMAGE_SERVICES):
+        for fname, fdef in services[svc]["fields"].items():
+            desc = fdef.get("description")
+            if desc is None:
+                continue
+            # Description should end with sentence-terminating punctuation
+            # or be a single short phrase. The bug we're guarding against
+            # left tooltips ending mid-word (e.g. ending in "(issue").
+            assert isinstance(desc, str), f"{svc}.{fname} description not a string"
+            assert desc.strip(), f"{svc}.{fname} description is empty"
+            stripped = desc.rstrip().rstrip("\n")
+            assert stripped[-1] in ".)>!?\"'", (
+                f"{svc}.{fname} description appears truncated; ends with: "
+                f"{stripped[-30:]!r}"
+            )

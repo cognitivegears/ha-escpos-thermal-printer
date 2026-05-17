@@ -30,6 +30,11 @@ from ..const import (
     ATTR_TEXT,
     ATTR_UNDERLINE,
     ATTR_WIDTH,
+    SERVICE_PRINT_CAMERA_SNAPSHOT,
+    SERVICE_PRINT_IMAGE,
+    SERVICE_PRINT_IMAGE_ENTITY,
+    SERVICE_PRINT_IMAGE_PATH,
+    SERVICE_PRINT_IMAGE_URL,
 )
 from ..image_sources import extract_image_kwargs, render_template
 from ..security import sanitize_log_message
@@ -204,7 +209,7 @@ async def handle_print_image(call: ServiceCall) -> None:
     """Handle print_image service call."""
     image_value = render_template(call.hass, call.data[ATTR_IMAGE])
     await _dispatch_print_image(
-        call, image_value=image_value, service_name="print_image"
+        call, image_value=image_value, service_name=SERVICE_PRINT_IMAGE
     )
 
 
@@ -213,7 +218,7 @@ async def handle_print_camera_snapshot(call: ServiceCall) -> None:
     await _dispatch_print_image(
         call,
         image_value=call.data["camera_entity"],
-        service_name="print_camera_snapshot",
+        service_name=SERVICE_PRINT_CAMERA_SNAPSHOT,
     )
 
 
@@ -222,15 +227,27 @@ async def handle_print_image_entity(call: ServiceCall) -> None:
     await _dispatch_print_image(
         call,
         image_value=call.data["image_entity"],
-        service_name="print_image_entity",
+        service_name=SERVICE_PRINT_IMAGE_ENTITY,
     )
 
 
 async def handle_print_image_url(call: ServiceCall) -> None:
     """Print an image fetched from an HTTP(S) URL."""
     await _dispatch_print_image(
-        call, image_value=call.data["url"], service_name="print_image_url"
+        call, image_value=call.data["url"], service_name=SERVICE_PRINT_IMAGE_URL
     )
+
+
+async def handle_print_image_path(call: ServiceCall) -> None:
+    """Print an image read from a local file path."""
+    await _dispatch_print_image(
+        call, image_value=call.data["path"], service_name=SERVICE_PRINT_IMAGE_PATH
+    )
+
+
+_PREVIEW_IGNORED_KEYS = frozenset(
+    {"high_density", "impl", "fragment_height", "chunk_delay_ms", "center", "cut", "feed"}
+)
 
 
 async def handle_preview_image(call: ServiceCall) -> ServiceResponse:
@@ -249,6 +266,16 @@ async def handle_preview_image(call: ServiceCall) -> ServiceResponse:
     adapter, defaults, _ = _get_adapter_and_defaults(
         call.hass, entry.entry_id
     )
+    # Surface — at debug level — any printer-communication keys the caller
+    # passed. preview_image silently ignores them (they don't affect the
+    # PNG written to disk); the log line helps users diagnose "I set
+    # fragment_height but the preview looks the same" confusion.
+    passed_printer_only = _PREVIEW_IGNORED_KEYS & call.data.keys()
+    if passed_printer_only:
+        _LOGGER.debug(
+            "preview_image ignoring printer-only keys (no effect on PNG): %s",
+            sorted(passed_printer_only),
+        )
     image_value = render_template(call.hass, call.data[ATTR_IMAGE])
 
     from ..image_sources import resolve_image_bytes  # noqa: PLC0415

@@ -70,7 +70,12 @@ MAX_SLICES = 64
 # URL validation
 VALID_URL_SCHEMES = frozenset({"http", "https"})
 VALID_URL_PORTS = frozenset({None, 80, 443})
-MAX_URL_LENGTH = 2000
+MAX_URL_LENGTH = 2000  # de-facto browser/proxy URL-length safe limit (≈ RFC 7230 §3.1.1 folklore)
+
+# Local file path validation. POSIX PATH_MAX is 4096 on Linux; 1024 is
+# conservative and covers every legitimate HA path universe (/config,
+# /media, Supervisor bind mounts) by a wide margin.
+MAX_IMAGE_PATH_LENGTH = 1024
 
 # Local file validation. HEIC/HEIF/AVIF are accepted when ``pillow-heif``
 # is installed (see ``printer/image_processor._register_heif_opener``).

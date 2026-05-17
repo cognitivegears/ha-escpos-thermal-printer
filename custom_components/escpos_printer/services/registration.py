@@ -17,6 +17,7 @@ from ..const import (
     SERVICE_PRINT_CAMERA_SNAPSHOT,
     SERVICE_PRINT_IMAGE,
     SERVICE_PRINT_IMAGE_ENTITY,
+    SERVICE_PRINT_IMAGE_PATH,
     SERVICE_PRINT_IMAGE_URL,
     SERVICE_PRINT_QR,
     SERVICE_PRINT_TEXT,
@@ -30,6 +31,7 @@ from .print_handlers import (
     handle_print_camera_snapshot,
     handle_print_image,
     handle_print_image_entity,
+    handle_print_image_path,
     handle_print_image_url,
     handle_print_qr,
     handle_print_text,
@@ -44,6 +46,7 @@ from .schemas import (
     PRINT_BARCODE_SCHEMA,
     PRINT_CAMERA_SNAPSHOT_SCHEMA,
     PRINT_IMAGE_ENTITY_SCHEMA,
+    PRINT_IMAGE_PATH_SCHEMA,
     PRINT_IMAGE_SCHEMA,
     PRINT_IMAGE_URL_SCHEMA,
     PRINT_QR_SCHEMA,
@@ -102,6 +105,10 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         schema=PRINT_IMAGE_URL_SCHEMA,
     )
     hass.services.async_register(
+        DOMAIN, SERVICE_PRINT_IMAGE_PATH, handle_print_image_path,
+        schema=PRINT_IMAGE_PATH_SCHEMA,
+    )
+    hass.services.async_register(
         DOMAIN, SERVICE_PREVIEW_IMAGE, handle_preview_image,
         schema=PREVIEW_IMAGE_SCHEMA,
         supports_response=SupportsResponse.ONLY,
@@ -142,6 +149,7 @@ async def async_unload_services(hass: HomeAssistant) -> None:
     hass.services.async_remove(DOMAIN, SERVICE_PRINT_CAMERA_SNAPSHOT)
     hass.services.async_remove(DOMAIN, SERVICE_PRINT_IMAGE_ENTITY)
     hass.services.async_remove(DOMAIN, SERVICE_PRINT_IMAGE_URL)
+    hass.services.async_remove(DOMAIN, SERVICE_PRINT_IMAGE_PATH)
     hass.services.async_remove(DOMAIN, SERVICE_PREVIEW_IMAGE)
     hass.services.async_remove(DOMAIN, SERVICE_CALIBRATION_PRINT)
     hass.services.async_remove(DOMAIN, SERVICE_PRINT_BARCODE)

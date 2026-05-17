@@ -272,18 +272,17 @@ print_qr:
           mode: slider
 
 print_image:
-  name: Print Image
+  name: Print Image (template / mixed source)
   description: >
-    Print an image from a URL, local file path, camera entity (camera.<id>),
-    image entity (image.<id>), base64 data URI, or Jinja template.
-    See docs/images.md for examples, supported formats, and security notes
-    (URL fetches block private/loopback IPs; local paths must lie inside
-    allowlist_external_dirs; camera/image entities respect per-user
-    permissions of the calling context).
+    Print an image from a URL, file path, camera.<id>, image.<id>, base64
+    data URI — or a Jinja template producing any of those. Existing
+    automations using a literal URL or path keep working unchanged. For
+    a friendlier UI, prefer the focused services (Print Image from URL,
+    from Path, Camera Snapshot, Image Entity) — see docs/images.md.
   fields:
     device_id:
       name: Device
-      description: Select one or more printer devices (if omitted, broadcasts to all printers)
+      description: Select one or more printer devices (if omitted, broadcasts to all printers).
       required: false
       selector:
         device:
@@ -292,26 +291,13 @@ print_image:
       name: Image
       description: >
         URL (http/https), local file path, camera.<entity>, image.<entity>,
-        data:image/...;base64,..., or a Jinja template producing any of these.
+        data:image/...;base64,..., or a Jinja template producing any of
+        these. A literal string (e.g. "/config/www/logo.png") works the
+        same as it did before — the template editor accepts plain text.
       required: true
-      example: "camera.front_door"
+      example: /config/www/logo.png
       selector:
         template: {}
-    high_density:
-      name: High Density
-      description: Use high-density printing mode
-      default: true
-      selector:
-        boolean: {}
-    align:
-      name: Alignment
-      description: Image alignment
-      selector:
-        select:
-          options:
-            - "left"
-            - "center"
-            - "right"
     image_width:
       name: Width (pixels)
       description: >
@@ -339,47 +325,27 @@ print_image:
       description: >
         How to convert to 1-bit B&W. floyd-steinberg works well for photos;
         threshold gives crisp logos/text; none disables dithering.
-      default: "floyd-steinberg"
+      default: floyd-steinberg
       selector:
         select:
           options:
-            - "floyd-steinberg"
-            - "none"
-            - "threshold"
+            - floyd-steinberg
+            - none
+            - threshold
     threshold:
       name: Threshold
-      description: Threshold value (1-254) when dither is "threshold". 100-180 typical for line art.
+      description: "Threshold value (1-254) when dither is \"threshold\". 100-180 typical for line art."
       default: 128
       selector:
         number:
           min: 1
           max: 254
           step: 1
-    impl:
-      name: Print Implementation
+    mirror:
+      name: Mirror Horizontally
       description: >
-        ESC/POS image command to use. Leave unset to honor the printer's
-        Reliability profile (default raster). If the chosen impl isn't
-        supported by the installed python-escpos, the integration silently
-        falls back to a kwarg-less printer.image() call.
-      selector:
-        select:
-          options:
-            - label: "Raster (default — Epson)"
-              value: "bitImageRaster"
-            - label: "Graphics (newer ESC/POS)"
-              value: "graphics"
-            - label: "Column (legacy POS-58/80)"
-              value: "bitImageColumn"
-    center:
-      name: Center on Paper
-      description: Horizontally center the image within the printer's paper width.
-      default: false
-      selector:
-        boolean: {}
-    autocontrast:
-      name: Autocontrast
-      description: Stretch contrast before B&W conversion (helps photos).
+        Flip the image left-to-right before printing. Useful for receipt-window
+        displays where the print is read through the back of the paper.
       default: false
       selector:
         boolean: {}
@@ -391,11 +357,9 @@ print_image:
       default: false
       selector:
         boolean: {}
-    mirror:
-      name: Mirror Horizontally
-      description: >
-        Flip the image left-to-right. Useful for receipt-window displays where
-        the print is read through the back of the paper.
+    autocontrast:
+      name: Autocontrast
+      description: Stretch contrast before B&W conversion (helps photos).
       default: false
       selector:
         boolean: {}
@@ -408,18 +372,68 @@ print_image:
       default: false
       selector:
         boolean: {}
-    fallback_image:
-      name: Fallback Image
-      description: >
-        Optional URL / path / camera entity to print if the primary source
-        fails to resolve. The same processing options apply to both.
-      example: "/config/www/placeholder.png"
+    align:
+      name: Alignment
+      description: Image alignment on the paper.
       selector:
-        template: {}
+        select:
+          options:
+            - left
+            - center
+            - right
+    center:
+      name: Center on Paper
+      description: "Horizontally center the image within the printer's paper width."
+      default: false
+      selector:
+        boolean: {}
+    high_density:
+      name: High Density
+      description: Use high-density printing mode if supported.
+      default: true
+      selector:
+        boolean: {}
+    cut:
+      name: Cut
+      description: "Paper cutting mode after printing (defaults to the printer's configured cut mode)."
+      selector:
+        select:
+          options:
+            - none
+            - partial
+            - full
+    feed:
+      name: Feed Lines
+      description: Number of lines to feed after printing.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 50
+          step: 1
+          mode: slider
+    impl:
+      name: Print Implementation
+      advanced: true
+      description: >
+        ESC/POS image command to use. Leave unset to honor the printer's
+        Reliability profile (default raster). If the chosen impl isn't
+        supported by the installed python-escpos, the integration silently
+        falls back to a kwarg-less printer.image() call.
+      selector:
+        select:
+          options:
+            - label: Raster (default — Epson)
+              value: bitImageRaster
+            - label: Graphics (newer ESC/POS)
+              value: graphics
+            - label: Column (legacy POS-58/80)
+              value: bitImageColumn
     fragment_height:
       name: Fragment Height
+      advanced: true
       description: >
-        Rows per chunk when sending the image (issue #45). Smaller values reduce
+        Rows per chunk when sending the image. Smaller values reduce
         buffer-overrun risk on cheap printers; larger values are faster.
         Leave unset to honor the printer's Reliability profile.
       selector:
@@ -429,6 +443,7 @@ print_image:
           step: 16
     chunk_delay_ms:
       name: Chunk Delay (ms)
+      advanced: true
       description: >
         Milliseconds to sleep between image chunks. Leave unset to honor the
         printer's Reliability profile (0 on Network/USB, 50 on Bluetooth).
@@ -439,144 +454,15 @@ print_image:
           min: 0
           max: 5000
           step: 10
-    cut:
-      name: Cut
-      description: Paper cutting mode after printing (defaults to the printer's configured cut mode)
+    fallback_image:
+      name: Fallback Image
+      advanced: true
+      description: >
+        Optional URL / path / camera entity to print if the primary source
+        fails to resolve. The same processing options apply to both.
+      example: /config/www/placeholder.png
       selector:
-        select:
-          options:
-            - "none"
-            - "partial"
-            - "full"
-    feed:
-      name: Feed Lines
-      description: Number of lines to feed after printing
-      default: 0
-      selector:
-        number:
-          min: 0
-          max: 50
-          step: 1
-          mode: slider
-
-print_camera_snapshot:
-  name: Print Camera Snapshot
-  description: >
-    Print a live snapshot from a camera entity. Convenience wrapper around
-    print_image with a camera-entity selector for a friendlier UI.
-  fields:
-    device_id:
-      name: Device
-      description: Select one or more printer devices (if omitted, broadcasts to all printers)
-      required: false
-      selector:
-        device:
-          integration: escpos_printer
-    camera_entity:
-      name: Camera
-      description: Camera entity to snapshot.
-      required: true
-      example: "camera.front_door"
-      selector:
-        entity:
-          domain: camera
-    image_width:
-      name: Width (pixels)
-      description: Target width in pixels. Defaults to the printer profile width.
-      selector:
-        number:
-          min: 16
-          max: 2048
-          step: 1
-    dither:
-      name: Dither Mode
-      default: "floyd-steinberg"
-      selector:
-        select:
-          options:
-            - "floyd-steinberg"
-            - "none"
-            - "threshold"
-    autocontrast:
-      name: Autocontrast
-      default: true
-      selector:
-        boolean: {}
-    auto_resize:
-      name: Auto-Resize
-      default: true
-      selector:
-        boolean: {}
-    cut:
-      name: Cut
-      selector:
-        select:
-          options:
-            - "none"
-            - "partial"
-            - "full"
-    feed:
-      name: Feed Lines
-      default: 2
-      selector:
-        number:
-          min: 0
-          max: 50
-          step: 1
-
-print_image_entity:
-  name: Print Image Entity
-  description: >
-    Print the current frame from an HA image entity (weather radar, ML
-    overlay, generated chart, etc).
-  fields:
-    device_id:
-      name: Device
-      description: Select one or more printer devices (if omitted, broadcasts to all printers)
-      required: false
-      selector:
-        device:
-          integration: escpos_printer
-    image_entity:
-      name: Image Entity
-      description: Image entity to print.
-      required: true
-      example: "image.weather_radar"
-      selector:
-        entity:
-          domain: image
-    image_width:
-      name: Width (pixels)
-      selector:
-        number:
-          min: 16
-          max: 2048
-          step: 1
-    dither:
-      name: Dither Mode
-      default: "floyd-steinberg"
-      selector:
-        select:
-          options:
-            - "floyd-steinberg"
-            - "none"
-            - "threshold"
-    cut:
-      name: Cut
-      selector:
-        select:
-          options:
-            - "none"
-            - "partial"
-            - "full"
-    feed:
-      name: Feed Lines
-      default: 1
-      selector:
-        number:
-          min: 0
-          max: 50
-          step: 1
+        template: {}
 
 print_image_url:
   name: Print Image from URL
@@ -586,7 +472,7 @@ print_image_url:
   fields:
     device_id:
       name: Device
-      description: Select one or more printer devices (if omitted, broadcasts to all printers)
+      description: Select one or more printer devices (if omitted, broadcasts to all printers).
       required: false
       selector:
         device:
@@ -600,60 +486,756 @@ print_image_url:
         text: {}
     image_width:
       name: Width (pixels)
+      description: >
+        Target width in pixels. Defaults to the printer profile's max pixel
+        width (or 512 if unknown — check the log for a WARNING). The image is
+        scaled proportionally and is never upscaled.
       selector:
         number:
           min: 16
           max: 2048
           step: 1
-    dither:
-      name: Dither Mode
-      default: "floyd-steinberg"
+    rotation:
+      name: Rotation
+      description: Rotate the image (degrees, clockwise) before printing.
+      default: 0
       selector:
         select:
           options:
-            - "floyd-steinberg"
-            - "none"
-            - "threshold"
+            - "0"
+            - "90"
+            - "180"
+            - "270"
+    dither:
+      name: Dither Mode
+      description: >
+        How to convert to 1-bit B&W. floyd-steinberg works well for photos;
+        threshold gives crisp logos/text; none disables dithering.
+      default: floyd-steinberg
+      selector:
+        select:
+          options:
+            - floyd-steinberg
+            - none
+            - threshold
+    threshold:
+      name: Threshold
+      description: "Threshold value (1-254) when dither is \"threshold\". 100-180 typical for line art."
+      default: 128
+      selector:
+        number:
+          min: 1
+          max: 254
+          step: 1
+    mirror:
+      name: Mirror Horizontally
+      description: >
+        Flip the image left-to-right before printing. Useful for receipt-window
+        displays where the print is read through the back of the paper.
+      default: false
+      selector:
+        boolean: {}
+    invert:
+      name: Invert Colors
+      description: >
+        Swap black and white before B&W conversion. Useful for dark-mode source
+        images, white-on-black logos, or printing reflected QR codes.
+      default: false
+      selector:
+        boolean: {}
+    autocontrast:
+      name: Autocontrast
+      description: Stretch contrast before B&W conversion (helps photos).
+      default: false
+      selector:
+        boolean: {}
     auto_resize:
-      name: Auto-Resize
+      name: Auto-Resize Large Sources
+      description: >
+        Allow source images up to 40 MB and downscale before processing.
+        Enable when printing phone snapshots, high-resolution cameras, or any
+        source that would otherwise hit the 10 MB cap.
+      default: true
+      selector:
+        boolean: {}
+    align:
+      name: Alignment
+      description: Image alignment on the paper.
+      selector:
+        select:
+          options:
+            - left
+            - center
+            - right
+    center:
+      name: Center on Paper
+      description: "Horizontally center the image within the printer's paper width."
+      default: false
+      selector:
+        boolean: {}
+    high_density:
+      name: High Density
+      description: Use high-density printing mode if supported.
       default: true
       selector:
         boolean: {}
     cut:
       name: Cut
+      description: "Paper cutting mode after printing (defaults to the printer's configured cut mode)."
       selector:
         select:
           options:
-            - "none"
-            - "partial"
-            - "full"
+            - none
+            - partial
+            - full
     feed:
       name: Feed Lines
+      description: Number of lines to feed after printing.
       default: 1
       selector:
         number:
           min: 0
           max: 50
           step: 1
+          mode: slider
+    impl:
+      name: Print Implementation
+      advanced: true
+      description: >
+        ESC/POS image command to use. Leave unset to honor the printer's
+        Reliability profile (default raster). If the chosen impl isn't
+        supported by the installed python-escpos, the integration silently
+        falls back to a kwarg-less printer.image() call.
+      selector:
+        select:
+          options:
+            - label: Raster (default — Epson)
+              value: bitImageRaster
+            - label: Graphics (newer ESC/POS)
+              value: graphics
+            - label: Column (legacy POS-58/80)
+              value: bitImageColumn
+    fragment_height:
+      name: Fragment Height
+      advanced: true
+      description: >
+        Rows per chunk when sending the image. Smaller values reduce
+        buffer-overrun risk on cheap printers; larger values are faster.
+        Leave unset to honor the printer's Reliability profile.
+      selector:
+        number:
+          min: 16
+          max: 1024
+          step: 16
+    chunk_delay_ms:
+      name: Chunk Delay (ms)
+      advanced: true
+      description: >
+        Milliseconds to sleep between image chunks. Leave unset to honor the
+        printer's Reliability profile (0 on Network/USB, 50 on Bluetooth).
+        Set higher (e.g. 100-200) if your printer freezes or dumps characters
+        on tall images.
+      selector:
+        number:
+          min: 0
+          max: 5000
+          step: 10
+    fallback_image:
+      name: Fallback Image
+      advanced: true
+      description: >
+        Optional URL / path / camera entity to print if the primary source
+        fails to resolve. The same processing options apply to both.
+      example: /config/www/placeholder.png
+      selector:
+        template: {}
+
+print_image_path:
+  name: Print Image from Path
+  description: >
+    Print an image from a local file path. The path must lie inside one
+    of Home Assistant's allowlist_external_dirs (typically /config or
+    /media — add directories under homeassistant -> allowlist_external_dirs
+    in configuration.yaml if needed).
+  fields:
+    device_id:
+      name: Device
+      description: Select one or more printer devices (if omitted, broadcasts to all printers).
+      required: false
+      selector:
+        device:
+          integration: escpos_printer
+    path:
+      name: Path
+      description: Local file path to the image (must be inside allowlist_external_dirs, e.g. /config or /media).
+      required: true
+      example: /config/www/logo.png
+      selector:
+        text: {}
+    image_width:
+      name: Width (pixels)
+      description: >
+        Target width in pixels. Defaults to the printer profile's max pixel
+        width (or 512 if unknown — check the log for a WARNING). The image is
+        scaled proportionally and is never upscaled.
+      selector:
+        number:
+          min: 16
+          max: 2048
+          step: 1
+    rotation:
+      name: Rotation
+      description: Rotate the image (degrees, clockwise) before printing.
+      default: 0
+      selector:
+        select:
+          options:
+            - "0"
+            - "90"
+            - "180"
+            - "270"
+    dither:
+      name: Dither Mode
+      description: >
+        How to convert to 1-bit B&W. floyd-steinberg works well for photos;
+        threshold gives crisp logos/text; none disables dithering.
+      default: floyd-steinberg
+      selector:
+        select:
+          options:
+            - floyd-steinberg
+            - none
+            - threshold
+    threshold:
+      name: Threshold
+      description: "Threshold value (1-254) when dither is \"threshold\". 100-180 typical for line art."
+      default: 128
+      selector:
+        number:
+          min: 1
+          max: 254
+          step: 1
+    mirror:
+      name: Mirror Horizontally
+      description: >
+        Flip the image left-to-right before printing. Useful for receipt-window
+        displays where the print is read through the back of the paper.
+      default: false
+      selector:
+        boolean: {}
+    invert:
+      name: Invert Colors
+      description: >
+        Swap black and white before B&W conversion. Useful for dark-mode source
+        images, white-on-black logos, or printing reflected QR codes.
+      default: false
+      selector:
+        boolean: {}
+    autocontrast:
+      name: Autocontrast
+      description: Stretch contrast before B&W conversion (helps photos).
+      default: false
+      selector:
+        boolean: {}
+    auto_resize:
+      name: Auto-Resize Large Sources
+      description: >
+        Allow source images up to 40 MB and downscale before processing.
+        Enable when printing phone snapshots, high-resolution cameras, or any
+        source that would otherwise hit the 10 MB cap.
+      default: true
+      selector:
+        boolean: {}
+    align:
+      name: Alignment
+      description: Image alignment on the paper.
+      selector:
+        select:
+          options:
+            - left
+            - center
+            - right
+    center:
+      name: Center on Paper
+      description: "Horizontally center the image within the printer's paper width."
+      default: false
+      selector:
+        boolean: {}
+    high_density:
+      name: High Density
+      description: Use high-density printing mode if supported.
+      default: true
+      selector:
+        boolean: {}
+    cut:
+      name: Cut
+      description: "Paper cutting mode after printing (defaults to the printer's configured cut mode)."
+      selector:
+        select:
+          options:
+            - none
+            - partial
+            - full
+    feed:
+      name: Feed Lines
+      description: Number of lines to feed after printing.
+      default: 1
+      selector:
+        number:
+          min: 0
+          max: 50
+          step: 1
+          mode: slider
+    impl:
+      name: Print Implementation
+      advanced: true
+      description: >
+        ESC/POS image command to use. Leave unset to honor the printer's
+        Reliability profile (default raster). If the chosen impl isn't
+        supported by the installed python-escpos, the integration silently
+        falls back to a kwarg-less printer.image() call.
+      selector:
+        select:
+          options:
+            - label: Raster (default — Epson)
+              value: bitImageRaster
+            - label: Graphics (newer ESC/POS)
+              value: graphics
+            - label: Column (legacy POS-58/80)
+              value: bitImageColumn
+    fragment_height:
+      name: Fragment Height
+      advanced: true
+      description: >
+        Rows per chunk when sending the image. Smaller values reduce
+        buffer-overrun risk on cheap printers; larger values are faster.
+        Leave unset to honor the printer's Reliability profile.
+      selector:
+        number:
+          min: 16
+          max: 1024
+          step: 16
+    chunk_delay_ms:
+      name: Chunk Delay (ms)
+      advanced: true
+      description: >
+        Milliseconds to sleep between image chunks. Leave unset to honor the
+        printer's Reliability profile (0 on Network/USB, 50 on Bluetooth).
+        Set higher (e.g. 100-200) if your printer freezes or dumps characters
+        on tall images.
+      selector:
+        number:
+          min: 0
+          max: 5000
+          step: 10
+    fallback_image:
+      name: Fallback Image
+      advanced: true
+      description: >
+        Optional URL / path / camera entity to print if the primary source
+        fails to resolve. The same processing options apply to both.
+      example: /config/www/placeholder.png
+      selector:
+        template: {}
+
+print_camera_snapshot:
+  name: Print Camera Snapshot
+  description: >
+    Print a live snapshot from a camera entity. Convenience wrapper around
+    print_image with a camera-entity selector for a friendlier UI.
+  fields:
+    device_id:
+      name: Device
+      description: Select one or more printer devices (if omitted, broadcasts to all printers).
+      required: false
+      selector:
+        device:
+          integration: escpos_printer
+    camera_entity:
+      name: Camera
+      description: Camera entity to snapshot.
+      required: true
+      example: camera.front_door
+      selector:
+        entity:
+          domain: camera
+    image_width:
+      name: Width (pixels)
+      description: >
+        Target width in pixels. Defaults to the printer profile's max pixel
+        width (or 512 if unknown — check the log for a WARNING). The image is
+        scaled proportionally and is never upscaled.
+      selector:
+        number:
+          min: 16
+          max: 2048
+          step: 1
+    rotation:
+      name: Rotation
+      description: Rotate the image (degrees, clockwise) before printing.
+      default: 0
+      selector:
+        select:
+          options:
+            - "0"
+            - "90"
+            - "180"
+            - "270"
+    dither:
+      name: Dither Mode
+      description: >
+        How to convert to 1-bit B&W. floyd-steinberg works well for photos;
+        threshold gives crisp logos/text; none disables dithering.
+      default: floyd-steinberg
+      selector:
+        select:
+          options:
+            - floyd-steinberg
+            - none
+            - threshold
+    threshold:
+      name: Threshold
+      description: "Threshold value (1-254) when dither is \"threshold\". 100-180 typical for line art."
+      default: 128
+      selector:
+        number:
+          min: 1
+          max: 254
+          step: 1
+    mirror:
+      name: Mirror Horizontally
+      description: >
+        Flip the image left-to-right before printing. Useful for receipt-window
+        displays where the print is read through the back of the paper.
+      default: false
+      selector:
+        boolean: {}
+    invert:
+      name: Invert Colors
+      description: >
+        Swap black and white before B&W conversion. Useful for dark-mode source
+        images, white-on-black logos, or printing reflected QR codes.
+      default: false
+      selector:
+        boolean: {}
+    autocontrast:
+      name: Autocontrast
+      description: Stretch contrast before B&W conversion (helps photos).
+      default: true
+      selector:
+        boolean: {}
+    auto_resize:
+      name: Auto-Resize Large Sources
+      description: >
+        Allow source images up to 40 MB and downscale before processing.
+        Enable when printing phone snapshots, high-resolution cameras, or any
+        source that would otherwise hit the 10 MB cap.
+      default: true
+      selector:
+        boolean: {}
+    align:
+      name: Alignment
+      description: Image alignment on the paper.
+      selector:
+        select:
+          options:
+            - left
+            - center
+            - right
+    center:
+      name: Center on Paper
+      description: "Horizontally center the image within the printer's paper width."
+      default: false
+      selector:
+        boolean: {}
+    high_density:
+      name: High Density
+      description: Use high-density printing mode if supported.
+      default: true
+      selector:
+        boolean: {}
+    cut:
+      name: Cut
+      description: "Paper cutting mode after printing (defaults to the printer's configured cut mode)."
+      selector:
+        select:
+          options:
+            - none
+            - partial
+            - full
+    feed:
+      name: Feed Lines
+      description: Number of lines to feed after printing.
+      default: 2
+      selector:
+        number:
+          min: 0
+          max: 50
+          step: 1
+          mode: slider
+    impl:
+      name: Print Implementation
+      advanced: true
+      description: >
+        ESC/POS image command to use. Leave unset to honor the printer's
+        Reliability profile (default raster). If the chosen impl isn't
+        supported by the installed python-escpos, the integration silently
+        falls back to a kwarg-less printer.image() call.
+      selector:
+        select:
+          options:
+            - label: Raster (default — Epson)
+              value: bitImageRaster
+            - label: Graphics (newer ESC/POS)
+              value: graphics
+            - label: Column (legacy POS-58/80)
+              value: bitImageColumn
+    fragment_height:
+      name: Fragment Height
+      advanced: true
+      description: >
+        Rows per chunk when sending the image. Smaller values reduce
+        buffer-overrun risk on cheap printers; larger values are faster.
+        Leave unset to honor the printer's Reliability profile.
+      selector:
+        number:
+          min: 16
+          max: 1024
+          step: 16
+    chunk_delay_ms:
+      name: Chunk Delay (ms)
+      advanced: true
+      description: >
+        Milliseconds to sleep between image chunks. Leave unset to honor the
+        printer's Reliability profile (0 on Network/USB, 50 on Bluetooth).
+        Set higher (e.g. 100-200) if your printer freezes or dumps characters
+        on tall images.
+      selector:
+        number:
+          min: 0
+          max: 5000
+          step: 10
+    fallback_image:
+      name: Fallback Image
+      advanced: true
+      description: >
+        Optional URL / path / camera entity to print if the primary source
+        fails to resolve. The same processing options apply to both.
+      example: /config/www/placeholder.png
+      selector:
+        template: {}
+
+print_image_entity:
+  name: Print Image Entity
+  description: >
+    Print the current frame from an HA image entity (weather radar, ML
+    overlay, generated chart, etc).
+  fields:
+    device_id:
+      name: Device
+      description: Select one or more printer devices (if omitted, broadcasts to all printers).
+      required: false
+      selector:
+        device:
+          integration: escpos_printer
+    image_entity:
+      name: Image Entity
+      description: Image entity to print.
+      required: true
+      example: image.weather_radar
+      selector:
+        entity:
+          domain: image
+    image_width:
+      name: Width (pixels)
+      description: >
+        Target width in pixels. Defaults to the printer profile's max pixel
+        width (or 512 if unknown — check the log for a WARNING). The image is
+        scaled proportionally and is never upscaled.
+      selector:
+        number:
+          min: 16
+          max: 2048
+          step: 1
+    rotation:
+      name: Rotation
+      description: Rotate the image (degrees, clockwise) before printing.
+      default: 0
+      selector:
+        select:
+          options:
+            - "0"
+            - "90"
+            - "180"
+            - "270"
+    dither:
+      name: Dither Mode
+      description: >
+        How to convert to 1-bit B&W. floyd-steinberg works well for photos;
+        threshold gives crisp logos/text; none disables dithering.
+      default: floyd-steinberg
+      selector:
+        select:
+          options:
+            - floyd-steinberg
+            - none
+            - threshold
+    threshold:
+      name: Threshold
+      description: "Threshold value (1-254) when dither is \"threshold\". 100-180 typical for line art."
+      default: 128
+      selector:
+        number:
+          min: 1
+          max: 254
+          step: 1
+    mirror:
+      name: Mirror Horizontally
+      description: >
+        Flip the image left-to-right before printing. Useful for receipt-window
+        displays where the print is read through the back of the paper.
+      default: false
+      selector:
+        boolean: {}
+    invert:
+      name: Invert Colors
+      description: >
+        Swap black and white before B&W conversion. Useful for dark-mode source
+        images, white-on-black logos, or printing reflected QR codes.
+      default: false
+      selector:
+        boolean: {}
+    autocontrast:
+      name: Autocontrast
+      description: Stretch contrast before B&W conversion (helps photos).
+      default: false
+      selector:
+        boolean: {}
+    auto_resize:
+      name: Auto-Resize Large Sources
+      description: >
+        Allow source images up to 40 MB and downscale before processing.
+        Enable when printing phone snapshots, high-resolution cameras, or any
+        source that would otherwise hit the 10 MB cap.
+      default: false
+      selector:
+        boolean: {}
+    align:
+      name: Alignment
+      description: Image alignment on the paper.
+      selector:
+        select:
+          options:
+            - left
+            - center
+            - right
+    center:
+      name: Center on Paper
+      description: "Horizontally center the image within the printer's paper width."
+      default: false
+      selector:
+        boolean: {}
+    high_density:
+      name: High Density
+      description: Use high-density printing mode if supported.
+      default: true
+      selector:
+        boolean: {}
+    cut:
+      name: Cut
+      description: "Paper cutting mode after printing (defaults to the printer's configured cut mode)."
+      selector:
+        select:
+          options:
+            - none
+            - partial
+            - full
+    feed:
+      name: Feed Lines
+      description: Number of lines to feed after printing.
+      default: 1
+      selector:
+        number:
+          min: 0
+          max: 50
+          step: 1
+          mode: slider
+    impl:
+      name: Print Implementation
+      advanced: true
+      description: >
+        ESC/POS image command to use. Leave unset to honor the printer's
+        Reliability profile (default raster). If the chosen impl isn't
+        supported by the installed python-escpos, the integration silently
+        falls back to a kwarg-less printer.image() call.
+      selector:
+        select:
+          options:
+            - label: Raster (default — Epson)
+              value: bitImageRaster
+            - label: Graphics (newer ESC/POS)
+              value: graphics
+            - label: Column (legacy POS-58/80)
+              value: bitImageColumn
+    fragment_height:
+      name: Fragment Height
+      advanced: true
+      description: >
+        Rows per chunk when sending the image. Smaller values reduce
+        buffer-overrun risk on cheap printers; larger values are faster.
+        Leave unset to honor the printer's Reliability profile.
+      selector:
+        number:
+          min: 16
+          max: 1024
+          step: 16
+    chunk_delay_ms:
+      name: Chunk Delay (ms)
+      advanced: true
+      description: >
+        Milliseconds to sleep between image chunks. Leave unset to honor the
+        printer's Reliability profile (0 on Network/USB, 50 on Bluetooth).
+        Set higher (e.g. 100-200) if your printer freezes or dumps characters
+        on tall images.
+      selector:
+        number:
+          min: 0
+          max: 5000
+          step: 10
+    fallback_image:
+      name: Fallback Image
+      advanced: true
+      description: >
+        Optional URL / path / camera entity to print if the primary source
+        fails to resolve. The same processing options apply to both.
+      example: /config/www/placeholder.png
+      selector:
+        template: {}
 
 preview_image:
   name: Preview Image (no paper)
   description: >
     Run the full image pipeline (dither, resize, etc) and write the
     1-bit PNG to disk WITHOUT printing it. Returns the output path so
-    automations can chain a notification.
+    automations can chain a notification. Printer-communication options
+    (high density, impl, fragment height, chunk delay, center, cut, feed)
+    are not exposed here because they have no effect on the file written
+    to disk — they only matter when streaming to a real printer.
   fields:
     device_id:
       name: Device
-      description: Use this printer's profile (width, defaults).
+      description: Select one or more printer devices (if omitted, broadcasts to all printers).
       required: false
       selector:
         device:
           integration: escpos_printer
     image:
       name: Image
-      description: Same source forms as print_image.
+      description: >
+        Same source forms as print_image — URL, file path, camera.<id>,
+        image.<id>, base64 data URI, or a Jinja template.
       required: true
+      example: /config/www/logo.png
       selector:
         template: {}
     output_path:
@@ -665,43 +1247,96 @@ preview_image:
         text: {}
     image_width:
       name: Width (pixels)
+      description: >
+        Target width in pixels. Defaults to the printer profile's max pixel
+        width (or 512 if unknown — check the log for a WARNING). The image is
+        scaled proportionally and is never upscaled.
       selector:
         number:
           min: 16
           max: 2048
           step: 1
-    dither:
-      name: Dither Mode
-      default: "floyd-steinberg"
+    rotation:
+      name: Rotation
+      description: Rotate the image (degrees, clockwise) before printing.
+      default: 0
       selector:
         select:
           options:
-            - "floyd-steinberg"
-            - "none"
-            - "threshold"
+            - "0"
+            - "90"
+            - "180"
+            - "270"
+    dither:
+      name: Dither Mode
+      description: >
+        How to convert to 1-bit B&W. floyd-steinberg works well for photos;
+        threshold gives crisp logos/text; none disables dithering.
+      default: floyd-steinberg
+      selector:
+        select:
+          options:
+            - floyd-steinberg
+            - none
+            - threshold
     threshold:
       name: Threshold
+      description: "Threshold value (1-254) when dither is \"threshold\". 100-180 typical for line art."
       default: 128
       selector:
         number:
           min: 1
           max: 254
           step: 1
-    autocontrast:
-      name: Autocontrast
+    mirror:
+      name: Mirror Horizontally
+      description: >
+        Flip the image left-to-right before printing. Useful for receipt-window
+        displays where the print is read through the back of the paper.
       default: false
       selector:
         boolean: {}
     invert:
-      name: Invert
+      name: Invert Colors
+      description: >
+        Swap black and white before B&W conversion. Useful for dark-mode source
+        images, white-on-black logos, or printing reflected QR codes.
       default: false
       selector:
         boolean: {}
-    mirror:
-      name: Mirror
+    autocontrast:
+      name: Autocontrast
+      description: Stretch contrast before B&W conversion (helps photos).
       default: false
       selector:
         boolean: {}
+    auto_resize:
+      name: Auto-Resize Large Sources
+      description: >
+        Allow source images up to 40 MB and downscale before processing.
+        Enable when printing phone snapshots, high-resolution cameras, or any
+        source that would otherwise hit the 10 MB cap.
+      default: false
+      selector:
+        boolean: {}
+    align:
+      name: Alignment
+      description: Image alignment on the paper.
+      selector:
+        select:
+          options:
+            - left
+            - center
+            - right
+    fallback_image:
+      name: Fallback Image
+      advanced: true
+      description: >
+        Optional URL / path / camera entity to print if the primary source
+        fails to resolve. The same processing options apply to both.
+      example: /config/www/placeholder.png
+      selector:
+        template: {}
 
 calibration_print:
   name: Calibration Print
@@ -719,6 +1354,7 @@ calibration_print:
           integration: escpos_printer
     cut:
       name: Cut
+      description: Paper cutting mode after printing (defaults to the printer's configured cut mode).
       default: "full"
       selector:
         select:
@@ -728,6 +1364,7 @@ calibration_print:
             - "full"
     feed:
       name: Feed Lines
+      description: Number of lines to feed after printing.
       default: 2
       selector:
         number:
