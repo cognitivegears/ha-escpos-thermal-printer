@@ -1,4 +1,5 @@
-# Project-specific Semgrep rules for ha-escpos-thermal-printer.
+# Project-specific Opengrep rules for ha-escpos-thermal-printer.
+# (Rule schema is the Semgrep YAML format; Opengrep is rule-compatible.)
 #
 # These catch regressions of the Phase 2 / Phase 4 findings in
 # `.full-review/05-final-report.md` that off-the-shelf scanners
@@ -59,11 +60,12 @@ rules:
         - "custom_components/escpos_printer/"
 
   - id: unsanitized-logger-with-exception
-    pattern-either:
-      - pattern: _LOGGER.error($MSG, $ERR)
-      - pattern: _LOGGER.warning($MSG, $ERR)
-    pattern-not: _LOGGER.error($MSG, sanitize_log_message(...))
-    pattern-not: _LOGGER.warning($MSG, sanitize_log_message(...))
+    patterns:
+      - pattern-either:
+          - pattern: _LOGGER.error($MSG, $ERR)
+          - pattern: _LOGGER.warning($MSG, $ERR)
+      - pattern-not: _LOGGER.error($MSG, sanitize_log_message(...))
+      - pattern-not: _LOGGER.warning($MSG, sanitize_log_message(...))
     message: >
       `_LOGGER.error(...)` with an exception in `notify.py` or
       `image_sources.py` may leak URL credentials, file paths, or

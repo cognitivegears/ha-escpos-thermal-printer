@@ -60,6 +60,9 @@ security = [
   "bandit-sarif-formatter==1.1.1",
   "pip-audit==2.10.0",
 ]
+# Note: SAST scanning uses Opengrep (an open-source fork of Semgrep) installed
+# as a signed binary in the security-scan workflow. Opengrep is not on PyPI,
+# so its version is pinned directly in `.github/workflows/security.yml`.
 
 [tool.pytest.ini_options]
 # `-q` removed so CI surfaces per-test progress and hanging tests don't

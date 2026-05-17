@@ -57,31 +57,49 @@ jobs:
           bandit -c pyproject.toml -r custom_components/escpos_printer scripts -f sarif -o bandit.sarif || true
           bandit -c pyproject.toml -r custom_components/escpos_printer scripts -lll
 
-      - name: Semgrep - Project-specific security rules
+      - name: Install Cosign
+        # Required by the Opengrep install script's --verify-signatures flag,
+        # which validates the binary against the sigstore-signed release.
+        uses: sigstore/cosign-installer@v3
+
+      - name: Install Opengrep
+        # Opengrep is an open-source (LGPL-2.1) fork of Semgrep maintained by
+        # a consortium of AppSec vendors after Semgrep moved CE features
+        # behind a commercial license. Rule format and SARIF output are
+        # backward-compatible with Semgrep, so `.github/opengrep/escpos.yml`
+        # runs unchanged.
+        #
+        # Opengrep is distributed as a signed binary (not on PyPI), so it
+        # can't be tracked by Dependabot's pip ecosystem. Bump OPENGREP_VERSION
+        # below by hand when a new release ships:
+        #   https://github.com/opengrep/opengrep/releases
+        env:
+          OPENGREP_VERSION: v1.21.0
         run: |
-          # Project-specific rules under .github/semgrep/ catch regressions
+          curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh \
+            | bash -s -- -v "${OPENGREP_VERSION}" --verify-signatures
+          echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+
+      - name: Opengrep - Project-specific security rules
+        run: |
+          # Project-specific rules under .github/opengrep/ catch regressions
           # of the Phase 2 findings that Bandit can't (SSRF setup, path
           # validators, Pillow decoders, log sanitization). See the rule
           # file for the rationale.
-          # `setuptools` is required because semgrep 1.95.0 pulls in
-          # opentelemetry-instrumentation 0.46b0, which imports `pkg_resources`.
-          # Python 3.13 no longer ships setuptools by default, so install it
-          # explicitly to avoid `ModuleNotFoundError: No module named 'pkg_resources'`.
-          python -m pip install setuptools "semgrep==1.95.0"
-          semgrep --config .github/semgrep/escpos.yml --error \
-            --sarif --output semgrep.sarif \
+          opengrep scan --config .github/opengrep/escpos.yml --error \
+            --sarif --output opengrep.sarif \
             custom_components/escpos_printer || true
           # Hard gate: fail the build on any ERROR-severity rule hit.
-          semgrep --config .github/semgrep/escpos.yml \
+          opengrep scan --config .github/opengrep/escpos.yml \
             --severity ERROR --error \
             custom_components/escpos_printer
 
-      - name: Upload Semgrep SARIF to Security tab
+      - name: Upload Opengrep SARIF to Security tab
         if: always()
         uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: semgrep.sarif
-          category: semgrep
+          sarif_file: opengrep.sarif
+          category: opengrep
 
       - name: pip-audit - Dependency audit
         # pip-audit doesn't emit SARIF natively; the JSON report is kept as a
