@@ -48,7 +48,7 @@ dev = [
     # fixtures `mock_pooled_aiohttp` and `slow_aiter`. Pinned to the
     # version that `pytest-homeassistant-custom-component` also requires
     # so the resolver doesn't fight itself.
-    "respx==0.22.0",
+    "respx==0.23.1",
     # Per-patch coverage gate (validate.yml runs `diff-cover` against
     # main to enforce >=90% on changed lines, on top of the global
     # `fail_under=80`). Catches regressions in large PRs where the
