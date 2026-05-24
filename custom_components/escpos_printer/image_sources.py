@@ -124,7 +124,10 @@ def render_template(hass: HomeAssistant, value: Any) -> str:
     """
     if isinstance(value, Template):
         if value.hass is None:
-            value.hass = hass
+            # HA core 2025.10 made Template.hass non-Optional; mypy
+            # against HA master flags this branch as unreachable, but
+            # it is still reachable on older pinned HA versions.
+            value.hass = hass  # type: ignore[unreachable, unused-ignore]
         rendered: Any = value.async_render(parse_result=False)
         return str(rendered)
     if not isinstance(value, str):

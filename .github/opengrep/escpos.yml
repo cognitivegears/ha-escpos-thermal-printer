@@ -17,7 +17,16 @@
 #   fragments (S-H5).
 rules:
   - id: no-raw-aiohttp-clientsession
-    pattern: aiohttp.ClientSession(...)
+    patterns:
+      - pattern: aiohttp.ClientSession(...)
+      # `_build_pinned_session` deliberately constructs a fresh session
+      # per request with a `_StaticResolver`-pinned TCPConnector. HA's
+      # shared session has no public hook to inject a custom resolver,
+      # so reusing it would defeat the DNS-rebinding defense
+      # (S-H1, CWE-918/CWE-350). See _StaticResolver's docstring.
+      - pattern-not-inside: |
+          def _build_pinned_session(...):
+            ...
     message: >
       Use `homeassistant.helpers.aiohttp_client.async_get_clientsession(hass)`
       instead of constructing a new `aiohttp.ClientSession()`. Per-request

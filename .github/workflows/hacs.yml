@@ -50,6 +50,6 @@ jobs:
         # upstream-compromise / accidental-breakage hole. Update by
         # re-pinning to a fresh SHA after reviewing
         # https://github.com/hacs/action/commits/main
-        uses: hacs/action@1d0e4d40fe7d18bb1d23dd2b1ddd0eba39c5a8e8  # main as of 2026-05-24
+        uses: hacs/action@dcb30e72781db3f207d5236b861172774ab0b485  # main as of 2026-05-24
         with:
           category: integration

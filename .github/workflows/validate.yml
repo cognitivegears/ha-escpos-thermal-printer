@@ -28,6 +28,12 @@ jobs:
     continue-on-error: ${{ matrix.continue-on-error == true }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          # gitleaks scans the PR's commit range, which requires the
+          # base commit to be present in history (default depth=1 only
+          # fetches the head SHA, causing `git rev-parse <base>^..<head>`
+          # to fail with "unknown revision"). 0 = full history.
+          fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
           python-version: '3.14'
