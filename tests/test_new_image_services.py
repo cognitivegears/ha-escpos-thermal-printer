@@ -12,13 +12,17 @@ Covers:
 from __future__ import annotations
 
 import io
+from unittest.mock import AsyncMock, patch
 
 from PIL import Image
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.escpos_printer.const import (
+    DOMAIN,
     RELIABILITY_PROFILE_BLUETOOTH,
     RELIABILITY_PROFILE_FAST_LAN,
     RELIABILITY_PROFILE_PRESETS,
+    SERVICE_CALIBRATION_PRINT,
 )
 from custom_components.escpos_printer.image_sources import extract_image_kwargs
 from custom_components.escpos_printer.services.print_handlers import (
@@ -83,3 +87,37 @@ def test_reliability_profile_bluetooth_uses_throttle():
     preset = RELIABILITY_PROFILE_PRESETS[RELIABILITY_PROFILE_BLUETOOTH]
     assert preset["chunk_delay_ms"] >= 100
     assert preset["fragment_height"] <= 256
+
+
+async def test_calibration_print_service_dispatches_to_adapter(hass):  # type: ignore[no-untyped-def]
+    """`calibration_print` service must build a PNG and call adapter.print_image
+    with a base64 data: URI."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="1.2.3.4:9100",
+        data={"host": "1.2.3.4", "port": 9100},
+        unique_id="1.2.3.4:9100",
+    )
+    entry.add_to_hass(hass)
+    with patch("escpos.printer.Network"):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    adapter = entry.runtime_data.adapter
+    with patch.object(
+        adapter, "print_image", new=AsyncMock(return_value=None)
+    ) as print_image_mock:
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_CALIBRATION_PRINT,
+            {},
+            blocking=True,
+        )
+
+    print_image_mock.assert_awaited_once()
+    kwargs = print_image_mock.await_args.kwargs
+    assert kwargs["image"].startswith("data:image/png;base64,")
+    # Defaults documented in the service: cut=full, feed=2.
+    assert kwargs["cut"] == "full"
+    assert kwargs["feed"] == 2
+

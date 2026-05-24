@@ -23,29 +23,25 @@ class EscposCommandParser:
         self._current_encoding = "cp437"  # Default encoding
 
     def parse_command(self, data: bytes) -> dict[str, Any] | None:
-        """Parse ESCPOS command from raw data.
+        """Parse one ESCPOS command from raw data.
 
         When called with an empty bytes object, this still attempts to parse
-        from any data already accumulated in the internal buffer. This allows
-        callers to drain all pending commands by repeatedly invoking this
-        method with empty input after an initial read.
+        from any data already accumulated in the internal buffer. Callers
+        drain all pending commands by repeatedly invoking this method with
+        empty input after an initial read.
+
+        Returns at most one command per call; only the leading parseable
+        command is consumed from the buffer. (Previously this method also
+        pre-parsed and discarded later commands in the same read, dropping
+        anything after the first — that lost real text/feed bytes when
+        python-escpos batched multiple opcodes into one TCP packet.)
         """
         # Add data to buffer when provided; otherwise, continue parsing the
         # already-buffered bytes.
         if data:
             self._buffer.extend(data)
 
-        # Try to parse complete commands from buffer
-        commands = []
-        while self._buffer:
-            command = self._parse_single_command()
-            if command:
-                commands.append(command)
-            else:
-                # No complete command found, keep remaining data in buffer
-                break
-
-        return commands[0] if commands else None
+        return self._parse_single_command()
 
     def _parse_single_command(self) -> dict[str, Any] | None:
         """Parse a single command from the buffer."""
@@ -101,11 +97,57 @@ class EscposCommandParser:
         elif command_byte == ord("t"):
             # ESC t n - Select character code table
             return self._parse_codepage_command()
+        elif command_byte == ord("E"):
+            # ESC E n - Turn emphasized (bold) on/off
+            return self._parse_simple_command("bold", 3)
+        elif command_byte == ord("G"):
+            # ESC G n - Turn double-strike on/off
+            return self._parse_simple_command("double_strike", 3)
+        elif command_byte == ord("R"):
+            # ESC R n - Select international character set
+            return self._parse_simple_command("intl_charset", 3)
+        elif command_byte == ord("M"):
+            # ESC M n - Select character font
+            return self._parse_simple_command("font_select", 3)
+        elif command_byte == ord("3"):
+            # ESC 3 n - Set line spacing
+            return self._parse_simple_command("line_spacing", 3)
+        elif command_byte == ord("2"):
+            # ESC 2 - Restore default line spacing
+            return self._parse_simple_command("default_line_spacing", 2)
+        elif command_byte == ord("p"):
+            # ESC p m t1 t2 - Generate pulse (drawer kick)
+            return self._parse_simple_command("drawer_kick", 5)
+        elif command_byte == ord("("):
+            # ESC ( m pL pH ... - Function set; treat the leading pL/pH
+            # length pair as defining payload bytes so we consume the
+            # whole thing instead of leaving stray parameter bytes that
+            # look like text.
+            return self._parse_esc_paren_command()
         else:
-            # Unknown ESC command, consume ESC and command byte
-            raw_data = bytes(self._buffer[:2])
-            self._buffer = self._buffer[2:]
+            # Unknown ESC command. Most ESC commands are 3 bytes (ESC +
+            # opcode + 1 param). Consume the conservative 3 so the
+            # parameter byte doesn't masquerade as standalone text.
+            if len(self._buffer) < 3:
+                return None
+            raw_data = bytes(self._buffer[:3])
+            self._buffer = self._buffer[3:]
             return {"type": "unknown", "raw_data": raw_data, "parameters": {}}
+
+    def _parse_esc_paren_command(self) -> dict[str, Any] | None:
+        """Parse ESC ( m pL pH ... — variable-length function set."""
+        # ESC ( m pL pH d1..dN where N = pL + pH*256
+        if len(self._buffer) < 5:
+            return None
+        pL = self._buffer[3]
+        pH = self._buffer[4]
+        data_length = pL + (pH * 256)
+        total_length = 5 + data_length
+        if len(self._buffer) < total_length:
+            return None
+        raw_data = bytes(self._buffer[:total_length])
+        self._buffer = self._buffer[total_length:]
+        return {"type": "esc_function_set", "raw_data": raw_data, "parameters": {}}
 
     def _parse_gs_command(self) -> dict[str, Any] | None:
         """Parse GS-prefixed commands."""

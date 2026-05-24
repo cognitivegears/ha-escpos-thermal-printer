@@ -73,12 +73,4 @@ jobs:
         # BT/network integration tests use TCP loopback against the
         # in-tree VirtualPrinter emulator — no real radio or external
         # services required.
-        #
-        # Two pre-existing tests are deselected because they suffer
-        # known test-ordering issues (skip when run alone, fail under
-        # full-suite load). They predate the Bluetooth feature; tracking
-        # for a separate fix.
-        run: |
-          pytest -m integration -v \
-            --deselect tests/integration_tests/scenarios/test_basic_functionality.py::test_service_parameter_variations \
-            --deselect tests/integration_tests/scenarios/test_error_handling.py::test_error_state_persistence
+        run: pytest -m integration -v
