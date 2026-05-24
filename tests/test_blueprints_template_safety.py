@@ -33,6 +33,7 @@ from pathlib import Path
 import types
 from typing import Any
 
+from homeassistant.helpers.template import Template
 import pytest
 import yaml
 
@@ -40,7 +41,6 @@ import yaml
 # before the autouse ``fake_bluetooth_module`` fixture in ``conftest.py``
 # tries to import the printer subpackage.
 from custom_components.escpos_printer import const
-from homeassistant.helpers.template import Template
 
 _ = const  # keep the import live for ruff/mypy
 
