@@ -96,12 +96,6 @@ def test_validator_anchors_domain_to_root_segment(tmp_path) -> None:  # type: ig
     right_dir = misleading_root / "script" / "pack"
     right_dir.mkdir(parents=True)
     bp_ok = right_dir / "good.yaml"
-    bp_ok.write_text(
-        "blueprint:\n"
-        "  name: x\n"
-        "  description: x\n"
-        "  domain: script\n"
-        "  input: {}\n"
-    )
+    bp_ok.write_text("blueprint:\n  name: x\n  description: x\n  domain: script\n  input: {}\n")
     errors_ok = validator.validate_file(bp_ok, root=misleading_root)
     assert not any("file lives under" in e for e in errors_ok), errors_ok

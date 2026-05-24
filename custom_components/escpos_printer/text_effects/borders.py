@@ -158,12 +158,12 @@ def codepage_supports_box_drawing(codepage: str | None) -> bool:
         return False
     try:
         codec_name = get_codec_name(codepage)
-    except (TypeError, ValueError, LookupError):
+    except TypeError, ValueError, LookupError:
         return False
     try:
         for ch in _PROBE_CHARS:
             ch.encode(codec_name, errors="strict")
-    except (UnicodeEncodeError, LookupError):
+    except UnicodeEncodeError, LookupError:
         return False
     return True
 

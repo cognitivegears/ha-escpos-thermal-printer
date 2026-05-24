@@ -40,7 +40,7 @@ def map_multiplier(val: str | int | None) -> int:
     # Accept numeric strings (e.g. "4")
     try:
         return max(1, min(8, int(val)))
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return 1
 
 

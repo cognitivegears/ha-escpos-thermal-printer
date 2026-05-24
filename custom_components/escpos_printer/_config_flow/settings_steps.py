@@ -290,7 +290,7 @@ class SettingsFlowMixin:
                 if width_int < 1 or width_int > 255:
                     _LOGGER.warning("Invalid line width (out of range): %s", custom_width)
                     errors["base"] = "invalid_line_width"
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 _LOGGER.warning("Invalid line width (not a number): %s", custom_width)
                 errors["base"] = "invalid_line_width"
 

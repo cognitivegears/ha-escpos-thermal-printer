@@ -109,11 +109,11 @@ def _is_font_path_allowed(hass: Any, resolved: Path) -> bool:
         return True
     try:
         fonts_dir = Path(hass.config.path("fonts")).resolve()
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return False
     try:
         return Path(resolved_str).resolve().is_relative_to(fonts_dir)
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return False
 
 
@@ -609,7 +609,7 @@ async def _resolve_preview_text_path(
     in_tempdir = False
     try:
         in_tempdir = resolved.is_relative_to(tempdir)
-    except (OSError, ValueError):
+    except OSError, ValueError:
         in_tempdir = False
     resolved_str = str(resolved)
     if not call.hass.config.is_allowed_path(resolved_str) and not in_tempdir:
@@ -908,7 +908,7 @@ async def handle_preview_image(call: ServiceCall) -> ServiceResponse:
     # previews need somewhere to live by default.
     try:
         in_tempdir = Path(output_path).is_relative_to(tempdir)
-    except (OSError, ValueError):
+    except OSError, ValueError:
         in_tempdir = False
     if not call.hass.config.is_allowed_path(output_path) and not in_tempdir:
         raise HomeAssistantError(f"output_path '{output_path}' is outside allowlist_external_dirs")

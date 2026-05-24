@@ -99,7 +99,7 @@ def _char_split(word: str, font: Any, max_width_px: int) -> list[str]:
                 # widths; cumulative bbox of the joined string can be a
                 # hair wider than the sum of truncated per-char widths.
                 ch_w = max(1, math.ceil(getlength(ch)))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 ch_w, _ = _measure(font, ch)
         else:
             ch_w, _ = _measure(font, ch)
@@ -122,7 +122,7 @@ def _word_width(word: str, font: Any) -> int:
     if getlength is not None:
         try:
             measured: int = max(0, math.ceil(getlength(word)))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             measured = -1
         if measured >= 0:
             return measured

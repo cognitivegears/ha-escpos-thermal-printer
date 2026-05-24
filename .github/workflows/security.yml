@@ -161,6 +161,35 @@ jobs:
             --ignore-vuln CVE-2026-42309
             --ignore-vuln CVE-2026-42310
             --ignore-vuln CVE-2026-42311
+            # aiohttp 3.13.3 — pinned by homeassistant==2026.3.4.
+            # All fixed in 3.13.4; clears when HA bumps the pin.
+            --ignore-vuln CVE-2026-22815
+            --ignore-vuln CVE-2026-34513
+            --ignore-vuln CVE-2026-34514
+            --ignore-vuln CVE-2026-34515
+            --ignore-vuln CVE-2026-34516
+            --ignore-vuln CVE-2026-34517
+            --ignore-vuln CVE-2026-34518
+            --ignore-vuln CVE-2026-34519
+            --ignore-vuln CVE-2026-34520
+            --ignore-vuln CVE-2026-34525
+            # cryptography 46.0.5 — pinned by homeassistant==2026.3.4.
+            # Fixed in 46.0.6 / 46.0.7.
+            --ignore-vuln PYSEC-2026-35
+            --ignore-vuln PYSEC-2026-36
+            # PyJWT 2.10.1 — pinned by homeassistant==2026.3.4.
+            # Fixed in 2.12.0.
+            --ignore-vuln PYSEC-2025-183
+            --ignore-vuln PYSEC-2026-120
+            # pytest 9.0.0 — pinned by pytest-homeassistant-custom-component.
+            # Fixed in 9.0.3; clears when the HA test harness bumps.
+            --ignore-vuln CVE-2025-71176
+            # requests 2.32.5 — pinned by homeassistant==2026.3.4.
+            # Fixed in 2.33.0.
+            --ignore-vuln CVE-2026-25645
+            # uv 0.10.6 — pinned by homeassistant==2026.3.4 (dev tooling).
+            # Fixed in 0.11.6.
+            --ignore-vuln GHSA-pjjw-68hj-v9mw
           )
           pip-audit "${PIP_AUDIT_ARGS[@]}" --format json --output pip-audit-report.json || true
           pip-audit "${PIP_AUDIT_ARGS[@]}"

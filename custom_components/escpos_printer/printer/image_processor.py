@@ -119,7 +119,7 @@ def process_image(img: Image.Image, opts: ImageProcessOptions) -> Image.Image:
         oriented = ImageOps.exif_transpose(img)
         if oriented is not None:
             img = oriented
-    except (KeyError, AttributeError, TypeError, OSError):
+    except KeyError, AttributeError, TypeError, OSError:
         _LOGGER.debug("EXIF transpose failed; continuing with original")
 
     # auto_resize: knock huge phone snapshots down *before* the alpha

@@ -210,7 +210,7 @@ async def _resolve_camera(
     _LOGGER.debug("Fetching camera snapshot: %s", entity_id)
     try:
         image = await async_get_image(hass, entity_id, timeout=_ENTITY_FETCH_TIMEOUT_SECONDS)
-    except (HomeAssistantError, Unauthorized):
+    except HomeAssistantError, Unauthorized:
         raise
     except Exception as exc:
         raise HomeAssistantError(
@@ -240,7 +240,7 @@ async def _resolve_image_entity(
     _LOGGER.debug("Fetching image entity: %s", entity_id)
     try:
         image = await async_get_image(hass, entity_id, timeout=_ENTITY_FETCH_TIMEOUT_SECONDS)
-    except (HomeAssistantError, Unauthorized):
+    except HomeAssistantError, Unauthorized:
         raise
     except Exception as exc:
         raise HomeAssistantError(
@@ -269,7 +269,7 @@ def _check_content_length(headers: Mapping[str, str], max_bytes: int) -> None:
         return
     try:
         size = int(raw)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return
     if size > max_bytes:
         raise HomeAssistantError(

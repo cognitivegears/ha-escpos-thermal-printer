@@ -37,9 +37,9 @@ individually or broadcast to all
 
 ### Requirements
 
-- **Home Assistant 2026.2 or later** (older HA versions don't ship the
-  `dbus-fast` 4.x APIs the Bluetooth flow needs; 0.4.x of this
-  integration still works on HA 2024.8+ if you're stuck there)
+- **Home Assistant 2026.3 or later** (the integration tracks HA core's
+  bundled Pillow / dbus-fast pins; 0.4.x of this integration still works
+  on HA 2024.8+ if you're stuck there)
 - Thermal printer with ESC/POS support (most receipt printers)
 - **Network printers:** Accessible on your network (typically port 9100)
 - **USB printers:** Connected directly to your Home Assistant host (requires libusb)
