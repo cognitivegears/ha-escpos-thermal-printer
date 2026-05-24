@@ -37,8 +37,11 @@ async def test_status_check_success_updates_diagnostics(hass):  # type: ignore[n
 
     # Patch socket.create_connection in the adapter module to simulate success.
     class _FakeConn:
-        def __enter__(self): return self
-        def __exit__(self, *_args): return False
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
 
     with patch(
         "custom_components.escpos_printer.printer.network_adapter.socket.create_connection",
@@ -64,8 +67,11 @@ async def test_status_check_failure_marks_offline_and_notifies(hass):  # type: i
 
     # First, force a successful probe so status flips True -> later probes can flip back.
     class _FakeConn:
-        def __enter__(self): return self
-        def __exit__(self, *_args): return False
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
 
     with patch(
         "custom_components.escpos_printer.printer.network_adapter.socket.create_connection",
@@ -100,8 +106,11 @@ async def test_status_listener_unsubscribe(hass):  # type: ignore[no-untyped-def
     unsub()
 
     class _FakeConn:
-        def __enter__(self): return self
-        def __exit__(self, *_args): return False
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
 
     with patch(
         "custom_components.escpos_printer.printer.network_adapter.socket.create_connection",

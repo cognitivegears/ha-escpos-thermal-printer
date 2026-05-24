@@ -1,0 +1,93 @@
+blueprint:
+  name: ESC/POS — Weather Forecast
+  description: >
+    Print a multi-day weather forecast as a table — day, high, low,
+    condition. Pulls from a Home Assistant weather entity via
+    weather.get_forecasts.
+  domain: script
+  source_url: https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/blueprints/script/escpos_printer/weather_forecast.yaml
+  input:
+    printer:
+      name: Printer
+      description: ESC/POS printer device to print to.
+      selector:
+        device:
+          integration: escpos_printer
+    weather_entity:
+      name: Weather entity
+      description: Which weather entity to read.
+      selector:
+        entity:
+          domain: weather
+    days:
+      name: Days
+      description: How many days of forecast to print.
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 14
+          step: 1
+          mode: slider
+    title:
+      name: Title
+      description: Heading printed at the top of the forecast.
+      default: Weather Forecast
+      selector:
+        text: {}
+    max_condition_length:
+      name: Condition truncation
+      description: Trim the weather condition text to this many characters so the table fits a narrow printer.
+      default: 10
+      selector:
+        number:
+          min: 4
+          max: 40
+          step: 1
+# queued — multiple manual fires (e.g. weather changes triggering reprints) should
+# print one after another rather than dropping the second invocation.
+mode: queued
+max_exceeded: silent
+sequence:
+  - service: weather.get_forecasts
+    target:
+      entity_id: !input weather_entity
+    data:
+      type: daily
+    response_variable: forecast_response
+  - variables:
+      days_count: !input days
+      max_condition_length: !input max_condition_length
+      forecast: >
+        {{ ((((forecast_response | default({})).values() | list | first) or {}).forecast | default([]))[:days_count] }}
+      header: [["Day", "Hi", "Lo", "Cond"]]
+      rows: >
+        {% set out = header %}
+        {% for f in forecast %}
+          {% set day = (f.datetime | as_datetime).strftime('%a') %}
+          {% set hi = f.temperature | round(0) | string %}
+          {% set lo = (f.templow | round(0) | string) if f.templow is defined and f.templow is not none else '-' %}
+          {% set cond = (f.condition | string)[:max_condition_length] %}
+          {% set _ = out.append([day, hi, lo, cond]) %}
+        {% endfor %}
+        {{ out if forecast | length > 0 else (header + [['-', '-', '-', 'No data']]) }}
+  - service: escpos_printer.print_box
+    target:
+      device_id: !input printer
+    data:
+      text: !input title
+      style: double
+      align: center
+  - service: escpos_printer.print_table
+    target:
+      device_id: !input printer
+    data:
+      rows: "{{ rows }}"
+      style: single
+      header: true
+      column_aligns: ["left", "right", "right", "left"]
+  - service: escpos_printer.cut
+    target:
+      device_id: !input printer
+    data:
+      mode: full

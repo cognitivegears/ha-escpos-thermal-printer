@@ -159,9 +159,7 @@ def _build_bt_device_choices(
     Always offers a manual-entry fallback so users without bluez D-Bus
     access can still configure paired devices.
     """
-    candidates = (
-        [d for d in devices if d.get("is_imaging")] if imaging_only else list(devices)
-    )
+    candidates = [d for d in devices if d.get("is_imaging")] if imaging_only else list(devices)
     choices: dict[str, str] = {d["_choice_key"]: d["label"] for d in candidates}
     # Surface "Show all" only when filtering imaging-only AND there's something
     # the user can't currently see (avoids redundant choice when no filter is in

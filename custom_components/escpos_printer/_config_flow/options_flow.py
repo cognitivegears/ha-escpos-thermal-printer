@@ -88,9 +88,7 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlow):
             # Fall back to our stored copy (HA 2024.8-2024.10)
             return self._config_entry_compat
 
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle the options flow initialization.
 
         Args:
@@ -112,9 +110,9 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlow):
             line_width = user_input.get(CONF_LINE_WIDTH)
 
             # Handle profile change - reset dependent options
-            old_profile = self.config_entry.options.get(
-                CONF_PROFILE
-            ) or self.config_entry.data.get(CONF_PROFILE, PROFILE_AUTO)
+            old_profile = self.config_entry.options.get(CONF_PROFILE) or self.config_entry.data.get(
+                CONF_PROFILE, PROFILE_AUTO
+            )
 
             if profile not in (old_profile, PROFILE_CUSTOM):
                 _LOGGER.info(
@@ -144,9 +142,9 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlow):
             return self.async_create_entry(title="Options", data=user_input)
 
         # Get current values
-        current_profile = self.config_entry.options.get(
-            CONF_PROFILE
-        ) or self.config_entry.data.get(CONF_PROFILE, PROFILE_AUTO)
+        current_profile = self.config_entry.options.get(CONF_PROFILE) or self.config_entry.data.get(
+            CONF_PROFILE, PROFILE_AUTO
+        )
         current_codepage = self.config_entry.options.get(
             CONF_CODEPAGE
         ) or self.config_entry.data.get(CONF_CODEPAGE, "")
@@ -187,15 +185,13 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlow):
             width_choices[current_line_width] = f"{current_line_width} columns (current)"
 
         # Get cut modes for current profile
-        cut_modes = await self.hass.async_add_executor_job(
-            get_profile_cut_modes, current_profile
-        )
+        cut_modes = await self.hass.async_add_executor_job(get_profile_cut_modes, current_profile)
         cut_choices = {m: m.title() for m in cut_modes}
 
         # Ensure current cut mode is in choices
-        current_cut = self.config_entry.options.get(
-            CONF_DEFAULT_CUT
-        ) or self.config_entry.data.get(CONF_DEFAULT_CUT, DEFAULT_CUT)
+        current_cut = self.config_entry.options.get(CONF_DEFAULT_CUT) or self.config_entry.data.get(
+            CONF_DEFAULT_CUT, DEFAULT_CUT
+        )
         if current_cut not in cut_choices:
             cut_choices[current_cut] = f"{current_cut.title()} (current)"
 
@@ -224,12 +220,8 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlow):
                             CONF_TIMEOUT, self.config_entry.data.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)
                         ),
                     ): vol.Coerce(float),
-                    vol.Optional(CONF_PROFILE, default=current_profile): vol.In(
-                        profile_choices
-                    ),
-                    vol.Optional(CONF_CODEPAGE, default=current_codepage): vol.In(
-                        codepage_choices
-                    ),
+                    vol.Optional(CONF_PROFILE, default=current_profile): vol.In(profile_choices),
+                    vol.Optional(CONF_CODEPAGE, default=current_codepage): vol.In(codepage_choices),
                     vol.Optional(CONF_LINE_WIDTH, default=current_line_width): vol.In(
                         width_choices
                     ),
@@ -241,9 +233,9 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlow):
                         ),
                     ): vol.In(["left", "center", "right"]),
                     vol.Optional(CONF_DEFAULT_CUT, default=current_cut): vol.In(cut_choices),
-                    vol.Optional(
-                        CONF_RELIABILITY_PROFILE, default=current_reliability
-                    ): vol.In(reliability_choices),
+                    vol.Optional(CONF_RELIABILITY_PROFILE, default=current_reliability): vol.In(
+                        reliability_choices
+                    ),
                     vol.Optional(
                         CONF_STATUS_INTERVAL,
                         default=self.config_entry.options.get(CONF_STATUS_INTERVAL, 0),
@@ -259,12 +251,8 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlow):
                             CONF_TIMEOUT, self.config_entry.data.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)
                         ),
                     ): vol.Coerce(float),
-                    vol.Optional(CONF_PROFILE, default=current_profile): vol.In(
-                        profile_choices
-                    ),
-                    vol.Optional(CONF_CODEPAGE, default=current_codepage): vol.In(
-                        codepage_choices
-                    ),
+                    vol.Optional(CONF_PROFILE, default=current_profile): vol.In(profile_choices),
+                    vol.Optional(CONF_CODEPAGE, default=current_codepage): vol.In(codepage_choices),
                     vol.Optional(CONF_LINE_WIDTH, default=current_line_width): vol.In(
                         width_choices
                     ),
@@ -276,9 +264,9 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlow):
                         ),
                     ): vol.In(["left", "center", "right"]),
                     vol.Optional(CONF_DEFAULT_CUT, default=current_cut): vol.In(cut_choices),
-                    vol.Optional(
-                        CONF_RELIABILITY_PROFILE, default=current_reliability
-                    ): vol.In(reliability_choices),
+                    vol.Optional(CONF_RELIABILITY_PROFILE, default=current_reliability): vol.In(
+                        reliability_choices
+                    ),
                     vol.Optional(
                         CONF_KEEPALIVE,
                         default=self.config_entry.options.get(CONF_KEEPALIVE, False),
@@ -311,9 +299,7 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlow):
             _LOGGER.debug("Options: Custom profile entered: %s", custom_profile)
 
             # Validate the profile exists in escpos-printer-db
-            is_valid = await self.hass.async_add_executor_job(
-                is_valid_profile, custom_profile
-            )
+            is_valid = await self.hass.async_add_executor_job(is_valid_profile, custom_profile)
             if not custom_profile or not is_valid:
                 _LOGGER.warning("Invalid profile name: %s", custom_profile)
                 errors["base"] = "invalid_profile"

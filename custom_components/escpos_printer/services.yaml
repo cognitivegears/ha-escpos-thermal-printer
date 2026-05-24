@@ -1827,3 +1827,676 @@ print_message:
           max: 50
           step: 1
           mode: slider
+
+print_box:
+  name: Print Box
+  description: Print text wrapped in a printable border (single/double/ASCII glyphs).
+  fields:
+    device_id:
+      name: Device
+      description: Select one or more printer devices (if omitted, broadcasts to all printers).
+      required: false
+      selector:
+        device:
+          integration: escpos_printer
+    text:
+      name: Text
+      description: >
+        The text to wrap in a border. Supports newlines. ASCII / Latin-1
+        is what fits per-column on a thermal printer; CJK / emoji /
+        combining marks may misalign (each column is one character cell).
+      required: true
+      example: "Hello\nWorld"
+      selector:
+        text:
+          multiline: true
+    style:
+      name: Border Style
+      description: >
+        Border-glyph family. "auto" picks the cp437 single-line glyphs
+        on codepages that support them (CP437, CP850, CP852, CP858,
+        CP860, CP863, CP865, CP866) and falls back to ASCII otherwise.
+      default: "auto"
+      selector:
+        select:
+          options:
+            - "auto"
+            - "single"
+            - "double"
+            - "ascii"
+            - "asterisk"
+            - "hash"
+            - "none"
+    padding:
+      name: Padding
+      description: Blank rows added above and below the content (0-4).
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 4
+          step: 1
+          mode: slider
+    align:
+      name: Alignment
+      description: Text alignment inside the box.
+      default: "left"
+      selector:
+        select:
+          options:
+            - "left"
+            - "center"
+            - "right"
+    total_width:
+      name: Total Width
+      description: >
+        Total printed width in characters including borders. Defaults to
+        the printer's configured line width.
+      selector:
+        number:
+          min: 3
+          max: 200
+          step: 1
+    cut:
+      name: Cut
+      description: Paper cutting mode after printing (defaults to the printer's configured cut mode).
+      selector:
+        select:
+          options:
+            - "none"
+            - "partial"
+            - "full"
+    feed:
+      name: Feed Lines
+      description: Number of lines to feed after printing.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 50
+          step: 1
+          mode: slider
+
+print_table:
+  name: Print Table
+  description: Print a multi-column table (receipt-style) with optional borders and header.
+  fields:
+    device_id:
+      name: Device
+      description: Select one or more printer devices (if omitted, broadcasts to all printers).
+      required: false
+      selector:
+        device:
+          integration: escpos_printer
+    rows:
+      name: Rows
+      description: >
+        A list of rows; each row is a list of cell strings. The first
+        row is treated as a header when "header" is true. Each column
+        is one character cell — CJK / emoji / combining marks may
+        misalign on narrow printers.
+      required: true
+      example: '[["Item","Qty","Price"],["Coffee","2","$6.00"]]'
+      selector:
+        object: {}
+    style:
+      name: Border Style
+      description: >
+        Border glyphs. Same options as print_box. Use "none" for a
+        borderless grid that still aligns columns.
+      default: "auto"
+      selector:
+        select:
+          options:
+            - "auto"
+            - "single"
+            - "double"
+            - "ascii"
+            - "asterisk"
+            - "hash"
+            - "none"
+    column_widths:
+      name: Column Widths
+      description: >
+        Optional explicit column widths in characters. When omitted,
+        total_width is divided evenly across columns. Sum plus
+        separators must fit within total_width.
+      selector:
+        object: {}
+    column_aligns:
+      name: Column Alignments
+      description: >
+        Optional per-column alignment list (e.g. ["left","right","right"]).
+        Defaults to "left" for every column.
+      selector:
+        object: {}
+    header:
+      name: Header Row
+      description: Treat the first row as a header (separated from body by a horizontal rule).
+      default: false
+      selector:
+        boolean: {}
+    row_separators:
+      name: Row Separators
+      description: Insert a horizontal rule between every body row.
+      default: false
+      selector:
+        boolean: {}
+    total_width:
+      name: Total Width
+      description: Total printed width in characters. Defaults to the printer's configured line width.
+      selector:
+        number:
+          min: 3
+          max: 200
+          step: 1
+    cut:
+      name: Cut
+      description: Paper cutting mode after printing (defaults to the printer's configured cut mode).
+      selector:
+        select:
+          options:
+            - "none"
+            - "partial"
+            - "full"
+    feed:
+      name: Feed Lines
+      description: Number of lines to feed after printing.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 50
+          step: 1
+          mode: slider
+
+print_text_image:
+  name: Print Text as Image
+  description: >
+    Render text to a bitmap with a custom TTF/OTF font, optional rotation,
+    and arbitrary point size. The rendered image is printed through the
+    same dither/threshold pipeline as print_image. Use this when you need
+    bigger or styled text than the printer's built-in 32-column font can
+    produce.
+  fields:
+    device_id:
+      name: Device
+      description: Select one or more printer devices (if omitted, broadcasts to all printers).
+      required: false
+      selector:
+        device:
+          integration: escpos_printer
+    # --- Content / typography (the fields you usually set) ---
+    text:
+      name: Text
+      description: The text to render. Supports newlines.
+      required: true
+      example: "HEADER"
+      selector:
+        text:
+          multiline: true
+    font:
+      name: Font
+      description: Bundled font family. Ignored when "font_path" is set.
+      default: "dejavu_mono"
+      selector:
+        select:
+          options:
+            - "dejavu_mono"
+            - "dejavu_sans"
+            - "dejavu_serif"
+    font_path:
+      name: Custom Font Path
+      description: >
+        Drop a .ttf or .otf file in <config>/fonts/ and reference it
+        here. Paths under allowlist_external_dirs also work. Overrides
+        the bundled "font" field when provided.
+      selector:
+        text: {}
+    font_size:
+      name: Font Size (pt)
+      description: Point size for the rendered text (8 to 96).
+      default: 16
+      selector:
+        number:
+          min: 8
+          max: 96
+          step: 1
+    line_spacing:
+      name: Line Spacing
+      description: Multiplier applied to the font's natural line height.
+      default: 1.1
+      selector:
+        number:
+          min: 1.0
+          max: 3.0
+          step: 0.1
+    align:
+      name: Alignment
+      description: Horizontal alignment of each rendered line within the canvas.
+      default: "left"
+      selector:
+        select:
+          options:
+            - "left"
+            - "center"
+            - "right"
+    rotation:
+      name: Rotation
+      description: Clockwise rotation in degrees applied before binarisation.
+      default: 0
+      selector:
+        select:
+          options:
+            - "0"
+            - "90"
+            - "180"
+            - "270"
+    cut:
+      name: Cut
+      description: Paper cutting mode after printing (defaults to the printer's configured cut mode).
+      selector:
+        select:
+          options:
+            - "none"
+            - "partial"
+            - "full"
+    feed:
+      name: Feed Lines
+      description: Number of lines to feed after printing.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 50
+          step: 1
+          mode: slider
+    # --- Image-pipeline tuning (advanced; mirrors print_image / print_message
+    # `image_*` knobs — same field names, same defaults) ---
+    image_width:
+      name: Image Width (pixels)
+      description: Target image width; defaults to the printer profile width.
+      selector:
+        number:
+          min: 16
+          max: 2048
+          step: 1
+    image_high_density:
+      name: High Density
+      description: Use double-density vertical printing (smaller, sharper output).
+      default: true
+      selector:
+        boolean: {}
+    image_dither:
+      name: Dither
+      description: Dither mode applied to the rendered text before printing.
+      default: "floyd-steinberg"
+      selector:
+        select:
+          options:
+            - "floyd-steinberg"
+            - "none"
+            - "threshold"
+    image_threshold:
+      name: Threshold
+      description: Black/white threshold (1-254) used when dither is "threshold" or "none".
+      default: 128
+      selector:
+        number:
+          min: 1
+          max: 254
+          step: 1
+    image_impl:
+      name: Image Implementation
+      description: ESC/POS image command family (see print_image).
+      selector:
+        select:
+          options:
+            - "bitImageRaster"
+            - "graphics"
+            - "bitImageColumn"
+    image_center:
+      name: Center
+      description: Center the rendered text canvas horizontally on the page.
+      default: false
+      selector:
+        boolean: {}
+    image_autocontrast:
+      name: Autocontrast
+      description: Stretch tonal range before binarisation (rarely useful for text).
+      default: false
+      selector:
+        boolean: {}
+    image_invert:
+      name: Invert
+      description: Print white text on black ink.
+      default: false
+      selector:
+        boolean: {}
+    image_mirror:
+      name: Mirror
+      description: Mirror the canvas horizontally.
+      default: false
+      selector:
+        boolean: {}
+    image_fragment_height:
+      name: Fragment Height (pixels)
+      description: Per-slice height for buffered raster output.
+      selector:
+        number:
+          min: 16
+          max: 1024
+          step: 16
+    image_chunk_delay_ms:
+      name: Chunk Delay (ms)
+      description: Delay between raster slices (defaults to the printer's per-transport value).
+      selector:
+        number:
+          min: 0
+          max: 5000
+          step: 10
+
+print_separator:
+  name: Print Separator
+  description: >
+    Print a single decorative rule built by repeating one character to
+    fill the printer's line width. Examples — "-" for a single rule,
+    "=" for a heavy rule, "*" or "_" for decorative bars.
+  fields:
+    device_id:
+      name: Device
+      description: Select one or more printer devices (if omitted, broadcasts to all printers).
+      required: false
+      selector:
+        device:
+          integration: escpos_printer
+    char:
+      name: Character
+      description: Single printable ASCII character to repeat. Defaults to "-".
+      default: "-"
+      example: "="
+      selector:
+        text: {}
+    width:
+      name: Width
+      description: Number of times the character repeats. Defaults to the printer's line width.
+      selector:
+        number:
+          min: 1
+          max: 200
+          step: 1
+    repeat:
+      name: Repeat
+      description: Number of consecutive lines to print. Use 2 for a double rule.
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 10
+          step: 1
+          mode: slider
+    cut:
+      name: Cut
+      description: Paper cutting mode after printing (defaults to the printer's configured cut mode).
+      selector:
+        select:
+          options:
+            - "none"
+            - "partial"
+            - "full"
+    feed:
+      name: Feed Lines
+      description: Number of lines to feed after printing.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 50
+          step: 1
+          mode: slider
+
+print_kvtable:
+  name: Print Key/Value Table
+  description: >
+    Print a two-column label/value table — receipt totals, sensor
+    readings, ingredient lists. Labels left-aligned, values per
+    "value_align" (default right).
+  fields:
+    device_id:
+      name: Device
+      description: Select one or more printer devices (if omitted, broadcasts to all printers).
+      required: false
+      selector:
+        device:
+          integration: escpos_printer
+    items:
+      name: Items
+      description: >
+        List of [label, value] pairs. Example
+        [["Subtotal","$10.00"], ["Tax","$0.80"], ["Total","$10.80"]].
+      required: true
+      example: '[["Subtotal","$10.00"],["Tax","$0.80"],["Total","$10.80"]]'
+      selector:
+        object: {}
+    style:
+      name: Border Style
+      description: >
+        Border-glyph family. Defaults to "none" (borderless) which is
+        the common receipt-totals look.
+      default: "none"
+      selector:
+        select:
+          options:
+            - "auto"
+            - "single"
+            - "double"
+            - "ascii"
+            - "asterisk"
+            - "hash"
+            - "none"
+    total_width:
+      name: Total Width
+      description: Total printed width in characters. Defaults to the printer's line width.
+      selector:
+        number:
+          min: 3
+          max: 200
+          step: 1
+    label_width:
+      name: Label Width
+      description: >
+        Characters reserved for the label column. If omitted, sized
+        from the longest label up to ~60% of total width.
+      selector:
+        number:
+          min: 1
+          max: 200
+          step: 1
+    value_align:
+      name: Value Alignment
+      description: Alignment for the value column. Defaults to right (typical for totals).
+      default: "right"
+      selector:
+        select:
+          options:
+            - "left"
+            - "center"
+            - "right"
+    cut:
+      name: Cut
+      description: Paper cutting mode after printing (defaults to the printer's configured cut mode).
+      selector:
+        select:
+          options:
+            - "none"
+            - "partial"
+            - "full"
+    feed:
+      name: Feed Lines
+      description: Number of lines to feed after printing.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 50
+          step: 1
+          mode: slider
+
+preview_box:
+  name: Preview Box (no paper)
+  description: >
+    Run the print_box layout pipeline and write the rendered text to a
+    .txt file WITHOUT printing it. Lets you iterate on borders, padding,
+    and width without burning paper. The cut/feed fields are deliberately
+    omitted — a text file has no paper. Returns {path, width, line_count,
+    codepage} as service response data — enable "Return response data" in
+    Developer Tools to see the values.
+  fields:
+    device_id:
+      name: Device
+      description: >
+        Select the printer whose codepage and line width should drive the
+        preview. If multiple devices are selected, only the first is used.
+      required: false
+      selector:
+        device:
+          integration: escpos_printer
+    text:
+      name: Text
+      description: The text to wrap in a border. Supports newlines.
+      required: true
+      example: "Hello\nWorld"
+      selector:
+        text:
+          multiline: true
+    style:
+      name: Border Style
+      description: Same options as print_box.
+      default: "auto"
+      selector:
+        select:
+          options:
+            - "auto"
+            - "single"
+            - "double"
+            - "ascii"
+            - "asterisk"
+            - "hash"
+            - "none"
+    padding:
+      name: Padding
+      description: Blank rows added above and below the content (0-4).
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 4
+          step: 1
+          mode: slider
+    align:
+      name: Alignment
+      description: Text alignment inside the box.
+      default: "left"
+      selector:
+        select:
+          options:
+            - "left"
+            - "center"
+            - "right"
+    total_width:
+      name: Total Width
+      description: Total printed width in characters including borders.
+      selector:
+        number:
+          min: 3
+          max: 200
+          step: 1
+    output_path:
+      name: Output Path
+      description: >
+        Where to save the rendered text. Must be inside
+        allowlist_external_dirs (or under /tmp). Defaults to
+        /tmp/escpos_preview_box_<entry>.txt.
+      selector:
+        text: {}
+
+preview_table:
+  name: Preview Table (no paper)
+  description: >
+    Run the print_table layout pipeline and write the rendered text to
+    a .txt file WITHOUT printing it. Lets you iterate on column widths,
+    alignment, and borders without burning paper. The cut/feed fields
+    are deliberately omitted — a text file has no paper. Returns
+    {path, width, line_count, codepage} as service response data —
+    enable "Return response data" in Developer Tools to see the values.
+  fields:
+    device_id:
+      name: Device
+      description: >
+        Select the printer whose codepage and line width should drive the
+        preview. If multiple devices are selected, only the first is used.
+      required: false
+      selector:
+        device:
+          integration: escpos_printer
+    rows:
+      name: Rows
+      description: >
+        List of rows; each row is a list of cell strings. Each column is
+        one character cell — CJK / emoji / combining marks may misalign.
+      required: true
+      example: '[["Item","Qty","Price"],["Apple","2","$1.00"]]'
+      selector:
+        object: {}
+    style:
+      name: Border Style
+      description: Same options as print_table.
+      default: "auto"
+      selector:
+        select:
+          options:
+            - "auto"
+            - "single"
+            - "double"
+            - "ascii"
+            - "asterisk"
+            - "hash"
+            - "none"
+    column_widths:
+      name: Column Widths
+      description: Optional list of per-column widths (characters).
+      selector:
+        object: {}
+    column_aligns:
+      name: Column Alignments
+      description: Optional list of per-column alignments (left/center/right).
+      selector:
+        object: {}
+    header:
+      name: Header Row
+      description: Treat the first row as a header (separated by a horizontal rule).
+      default: false
+      selector:
+        boolean: {}
+    row_separators:
+      name: Row Separators
+      description: Insert a horizontal rule between every body row.
+      default: false
+      selector:
+        boolean: {}
+    total_width:
+      name: Total Width
+      description: Total printed width in characters.
+      selector:
+        number:
+          min: 3
+          max: 200
+          step: 1
+    output_path:
+      name: Output Path
+      description: >
+        Where to save the rendered text. Must be inside
+        allowlist_external_dirs (or under /tmp). Defaults to
+        /tmp/escpos_preview_table_<entry>.txt.
+      selector:
+        text: {}

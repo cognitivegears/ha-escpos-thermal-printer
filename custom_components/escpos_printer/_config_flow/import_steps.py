@@ -50,9 +50,7 @@ class ImportFlowMixin:
     # These attributes are expected from the main flow class
     hass: Any
 
-    async def async_step_import(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_import(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Support YAML import if provided.
 
         Args:

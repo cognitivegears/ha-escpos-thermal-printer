@@ -43,10 +43,14 @@ class NetworkPrinterAdapter(EscposPrinterAdapterBase):
 
     async def _status_check(self, hass: HomeAssistant) -> None:
         """Non-invasive TCP reachability check for network printers."""
+
         def _probe() -> tuple[bool, str | None, int | None]:
             start = time.perf_counter()
             try:
-                with socket.create_connection((self._network_config.host, self._network_config.port), timeout=min(self._network_config.timeout, 3.0)):
+                with socket.create_connection(
+                    (self._network_config.host, self._network_config.port),
+                    timeout=min(self._network_config.timeout, 3.0),
+                ):
                     latency_ms = int((time.perf_counter() - start) * 1000)
                     return True, None, latency_ms
             except OSError as e:
@@ -66,7 +70,11 @@ class NetworkPrinterAdapter(EscposPrinterAdapterBase):
         if self._status != ok:
             self._status = ok
             if not ok:
-                _LOGGER.warning("Printer %s:%s not reachable", self._network_config.host, self._network_config.port)
+                _LOGGER.warning(
+                    "Printer %s:%s not reachable",
+                    self._network_config.host,
+                    self._network_config.port,
+                )
             # Notify listeners
             for cb in list(self._status_listeners):
                 with contextlib.suppress(Exception):

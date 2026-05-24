@@ -26,7 +26,9 @@ class StateChangeSimulator:
         """Initialize the state change simulator."""
         self.hass = hass
 
-    async def set_state(self, entity_id: str, state: str, attributes: dict[str, Any] | None = None) -> None:
+    async def set_state(
+        self, entity_id: str, state: str, attributes: dict[str, Any] | None = None
+    ) -> None:
         """Set the state of an entity."""
         if attributes is None:
             attributes = {}
@@ -34,8 +36,13 @@ class StateChangeSimulator:
         self.hass.states.async_set(entity_id, state, attributes)
         _LOGGER.debug("Set state: %s = %s (attributes: %s)", entity_id, state, attributes)
 
-    async def trigger_state_change(self, entity_id: str, from_state: str, to_state: str,
-                                  attributes: dict[str, Any] | None = None) -> None:
+    async def trigger_state_change(
+        self,
+        entity_id: str,
+        from_state: str,
+        to_state: str,
+        attributes: dict[str, Any] | None = None,
+    ) -> None:
         """Trigger a state change from one value to another."""
         # Set initial state
         await self.set_state(entity_id, from_state)
@@ -57,8 +64,12 @@ class StateChangeSimulator:
 
         result = current_state.state == expected_state
         if not result:
-            _LOGGER.debug("State verification failed for %s: expected %s, got %s",
-                         entity_id, expected_state, current_state.state)
+            _LOGGER.debug(
+                "State verification failed for %s: expected %s, got %s",
+                entity_id,
+                expected_state,
+                current_state.state,
+            )
         return result
 
 
@@ -76,7 +87,9 @@ class AutomationTester:
         """Register a callback to record service calls (domain, service, data)."""
         self._tracker = callback
 
-    async def _execute_automation_actions(self, actions: list[dict[str, Any]], automation_id: str) -> None:
+    async def _execute_automation_actions(
+        self, actions: list[dict[str, Any]], automation_id: str
+    ) -> None:
         """Execute automation actions sequentially.
 
         This method ensures actions are executed one at a time, matching real
@@ -121,7 +134,7 @@ class AutomationTester:
 
     async def load_automation(self, automation_config: dict[str, Any]) -> str:
         """Load an automation into Home Assistant."""
-        automation_id = automation_config.get('id', f"test_automation_{len(self._automations)}")
+        automation_id = automation_config.get("id", f"test_automation_{len(self._automations)}")
 
         # Store the automation config
         self._automations[automation_id] = automation_config
@@ -132,19 +145,24 @@ class AutomationTester:
             entity_id,
             "on",
             {
-                "friendly_name": automation_config.get('alias', automation_id),
-                "automation_config": automation_config
-            }
+                "friendly_name": automation_config.get("alias", automation_id),
+                "automation_config": automation_config,
+            },
         )
 
         _LOGGER.debug("Loaded automation: %s", automation_id)
         # Ensure state listener is registered once
         if self._unsub_state is None:
+
             def _on_state(event: Any) -> None:
                 try:
                     ent_id = event.data.get("entity_id")
-                    new_state = event.data.get("new_state").state if event.data.get("new_state") else None
-                    old_state = event.data.get("old_state").state if event.data.get("old_state") else None
+                    new_state = (
+                        event.data.get("new_state").state if event.data.get("new_state") else None
+                    )
+                    old_state = (
+                        event.data.get("old_state").state if event.data.get("old_state") else None
+                    )
                     for aid, cfg in list(self._automations.items()):
                         triggers = cfg.get("trigger")
                         if not triggers:
@@ -191,7 +209,9 @@ class AutomationTester:
                                 self.hass.loop,
                             )
                         except Exception as e:
-                            _LOGGER.debug("Failed to schedule automation actions for %s: %s", aid, e)
+                            _LOGGER.debug(
+                                "Failed to schedule automation actions for %s: %s", aid, e
+                            )
                 except Exception as e:
                     _LOGGER.exception("Automation runner error: %s", e)
 
@@ -210,7 +230,7 @@ class AutomationTester:
                 entity_id = cond.get("entity_id")
                 expected = cond.get("state")
                 st = self.hass.states.get(entity_id)
-                return (st is not None and st.state == expected)
+                return st is not None and st.state == expected
         except Exception:
             return False
         return True
@@ -221,10 +241,7 @@ class AutomationTester:
             raise ValueError(f"Automation {automation_id} not found")
 
         # Fire an event to trigger the automation
-        event_data = {
-            "automation_id": automation_id,
-            "trigger_data": trigger_data
-        }
+        event_data = {"automation_id": automation_id, "trigger_data": trigger_data}
 
         self.hass.bus.async_fire("automation_triggered", event_data)
         _LOGGER.debug("Triggered automation: %s with data: %s", automation_id, trigger_data)
@@ -259,14 +276,15 @@ class NotificationTester:
             entity_id = f"notify.{entity_id}"
         self._default_entity_id = entity_id
 
-    async def send_notification(self, message: str, target: str = "escpos_printer",
-                               title: str | None = None) -> None:
+    async def send_notification(
+        self, message: str, target: str = "escpos_printer", title: str | None = None
+    ) -> None:
         """Send a notification to the printer."""
         notification_data = {
             "message": message,
             "target": target,
             "title": title,
-            "timestamp": asyncio.get_event_loop().time()
+            "timestamp": asyncio.get_event_loop().time(),
         }
 
         self._notifications.append(notification_data)
@@ -332,7 +350,9 @@ class HATestEnvironment:
                     "timestamp": event.time_fired.timestamp(),
                 }
                 self._service_calls.append(call_info)
-                _LOGGER.debug("Service call tracked: %s.%s", call_info.get("domain"), call_info.get("service"))
+                _LOGGER.debug(
+                    "Service call tracked: %s.%s", call_info.get("domain"), call_info.get("service")
+                )
                 # Mirror to emulator state to avoid network dependency in tests
                 # When a virtual printer server is provided, reflect service calls
                 # into the emulator so tests can assert printer behavior reliably,
@@ -345,6 +365,7 @@ class HATestEnvironment:
                         from datetime import datetime
 
                         from tests.integration_tests.emulator.printer_state import Command
+
                         cmd_type = None
                         raw = b""
                         params = {}
@@ -358,20 +379,34 @@ class HATestEnvironment:
                             params = {"lines": int(svc_data.get("lines", 1)), "__mirrored__": True}
                         elif svc == "cut":
                             cmd_type = "cut"
-                            params = {"mode": str(svc_data.get("mode", "full")), "__mirrored__": True}
+                            params = {
+                                "mode": str(svc_data.get("mode", "full")),
+                                "__mirrored__": True,
+                            }
                         elif svc == "print_qr":
                             cmd_type = "qr"
                             params = {"data": str(svc_data.get("data", "")), "__mirrored__": True}
                         elif svc == "print_barcode":
                             cmd_type = "barcode"
-                            params = {"code": str(svc_data.get("code", "")), "bc": str(svc_data.get("bc", "")), "__mirrored__": True}
+                            params = {
+                                "code": str(svc_data.get("code", "")),
+                                "bc": str(svc_data.get("bc", "")),
+                                "__mirrored__": True,
+                            }
                         if cmd_type:
-                            cmd = Command(timestamp=datetime.now(), command_type=cmd_type, raw_data=raw, parameters=params)
+                            cmd = Command(
+                                timestamp=datetime.now(),
+                                command_type=cmd_type,
+                                raw_data=raw,
+                                parameters=params,
+                            )
                             # Ensure each mirrored text call is treated as a distinct block
                             with contextlib.suppress(Exception):
                                 self._printer_server.printer_state.start_new_text_block()
                             # Schedule update on loop and track the future for synchronization
-                            future = asyncio.run_coroutine_threadsafe(self._printer_server.printer_state.update_state(cmd), self.hass.loop)
+                            future = asyncio.run_coroutine_threadsafe(
+                                self._printer_server.printer_state.update_state(cmd), self.hass.loop
+                            )
                             try:
                                 # Track the future so we can wait for it before assertions
                                 self._pending_mirror_futures.append(future)
@@ -384,7 +419,9 @@ class HATestEnvironment:
                                 if es is not None:
                                     bumps = 3 if cmd_type == "text" else 1
                                     for _ in range(bumps):
-                                        future = asyncio.run_coroutine_threadsafe(es.process_command(cmd_type), self.hass.loop)
+                                        future = asyncio.run_coroutine_threadsafe(
+                                            es.process_command(cmd_type), self.hass.loop
+                                        )
                                         with contextlib.suppress(Exception):
                                             self._pending_mirror_futures.append(future)
                             except Exception:
@@ -399,6 +436,7 @@ class HATestEnvironment:
         try:
             if not self._printer_server:
                 from tests.integration_tests.emulator import get_active_server
+
                 srv = get_active_server()
                 if srv is not None:
                     self._printer_server = srv
@@ -406,7 +444,9 @@ class HATestEnvironment:
             pass
         # If no integration services are registered, provide minimal fallback services
         try:
-            if self._printer_server and not self.hass.services.has_service("escpos_printer", "print_text"):
+            if self._printer_server and not self.hass.services.has_service(
+                "escpos_printer", "print_text"
+            ):
                 from homeassistant.core import ServiceCall
 
                 async def _fb_print_text(call: ServiceCall) -> None:
@@ -420,7 +460,9 @@ class HATestEnvironment:
                         pass
                     # Mirror text into state and tick error simulator
                     with contextlib.suppress(Exception):
-                        await self._printer_server.printer_state.update_state_sync("text", txt.encode(), {"__force_new__": True})
+                        await self._printer_server.printer_state.update_state_sync(
+                            "text", txt.encode(), {"__force_new__": True}
+                        )
                     # Bump command count to trigger programmable errors as needed
                     for _ in range(3):
                         await self._printer_server.error_simulator.process_command("text")
@@ -431,14 +473,18 @@ class HATestEnvironment:
 
                 async def _fb_feed(call: ServiceCall) -> None:
                     try:
-                        await self._printer_server.printer_state.update_state_sync("feed", b"", {"lines": int(call.data.get("lines", 1))})
+                        await self._printer_server.printer_state.update_state_sync(
+                            "feed", b"", {"lines": int(call.data.get("lines", 1))}
+                        )
                         await self._printer_server.error_simulator.process_command("feed")
                     except Exception:
                         pass
 
                 async def _fb_cut(call: ServiceCall) -> None:
                     try:
-                        await self._printer_server.printer_state.update_state_sync("cut", b"", {"mode": str(call.data.get("mode", "full"))})
+                        await self._printer_server.printer_state.update_state_sync(
+                            "cut", b"", {"mode": str(call.data.get("mode", "full"))}
+                        )
                         await self._printer_server.error_simulator.process_command("cut")
                     except Exception:
                         pass
@@ -473,13 +519,13 @@ class HATestEnvironment:
 
                 # Use asyncio.wait with timeout (non-blocking)
                 _done, pending = await asyncio.wait(
-                    asyncio_futures,
-                    timeout=timeout,
-                    return_when=asyncio.ALL_COMPLETED
+                    asyncio_futures, timeout=timeout, return_when=asyncio.ALL_COMPLETED
                 )
                 # Log if any didn't complete
                 if pending:
-                    _LOGGER.warning("Some mirror operations did not complete in time: %d pending", len(pending))
+                    _LOGGER.warning(
+                        "Some mirror operations did not complete in time: %d pending", len(pending)
+                    )
                     # Cancel pending futures to prevent resource leaks
                     for future in pending:
                         future.cancel()
@@ -509,7 +555,7 @@ class HATestEnvironment:
             domain=DOMAIN,
             title=f"{config.get('host', 'localhost')}:{config.get('port', 9100)}",
             data=config,
-            unique_id=f"{config.get('host', 'localhost')}:{config.get('port', 9100)}"
+            unique_id=f"{config.get('host', 'localhost')}:{config.get('port', 9100)}",
         )
 
         # Add the entry to HA
@@ -539,7 +585,10 @@ class HATestEnvironment:
                 adapter = EscposPrinterAdapter(pcfg)
                 self.hass.data.setdefault(domain_str, {})[entry.entry_id] = {
                     "adapter": adapter,
-                    "defaults": {"align": entry.data.get("default_align"), "cut": entry.data.get("default_cut")},
+                    "defaults": {
+                        "align": entry.data.get("default_align"),
+                        "cut": entry.data.get("default_cut"),
+                    },
                 }
 
                 async def _svc_print_text(call: ServiceCall) -> None:
@@ -617,8 +666,8 @@ class HATestEnvironment:
         self.config_entry = entry
         _LOGGER.info("Initialized ESCPOS integration with config: %s", config)
         # Compute default notify entity id for notification tester
-        host = config.get('host', 'localhost').replace('.', '_')
-        port = config.get('port', 9100)
+        host = config.get("host", "localhost").replace(".", "_")
+        port = config.get("port", 9100)
         self.notification_tester.set_default_entity_id(f"notify.esc_pos_printer_{host}_{port}")
         return entry
 
@@ -632,10 +681,12 @@ class HATestEnvironment:
             "entry_id": self.config_entry.entry_id,
             "state": entry_state.state if entry_state else "unknown",
             "data": self.config_entry.data,
-            "options": self.config_entry.options
+            "options": self.config_entry.options,
         }
 
-    def get_service_calls(self, domain: str | None = None, service: str | None = None) -> list[dict[str, Any]]:
+    def get_service_calls(
+        self, domain: str | None = None, service: str | None = None
+    ) -> list[dict[str, Any]]:
         """Get tracked service calls, optionally filtered by domain and service."""
         calls = self._service_calls
 
@@ -657,9 +708,13 @@ class HATestEnvironment:
         # Allow network I/O (socket writes/reads) to settle between HA tasks
         await asyncio.sleep(0.2)
 
-    async def create_test_entity(self, entity_id: str, entity_type: str,
-                                initial_state: str = "unknown",
-                                attributes: dict[str, Any] | None = None) -> None:
+    async def create_test_entity(
+        self,
+        entity_id: str,
+        entity_type: str,
+        initial_state: str = "unknown",
+        attributes: dict[str, Any] | None = None,
+    ) -> None:
         """Create a test entity for automation testing."""
         if attributes is None:
             attributes = {}

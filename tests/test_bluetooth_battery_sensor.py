@@ -41,24 +41,18 @@ async def test_sensor_async_setup_entry_skips_battery_for_non_bluetooth():
     await async_setup_entry(MagicMock(), entry, add)  # type: ignore[arg-type]
     add.assert_called_once()
     sensors = list(add.call_args.args[0])
-    assert not any(
-        isinstance(s, BluetoothPrinterBatterySensor) for s in sensors
-    )
+    assert not any(isinstance(s, BluetoothPrinterBatterySensor) for s in sensors)
     assert any(isinstance(s, LastImagePrintSensor) for s in sensors)
 
 
 async def test_sensor_async_setup_entry_skips_battery_for_bluetooth_without_mac():
     """A Bluetooth entry missing the MAC should still register the last-print sensor."""
-    entry = _FakeEntry(
-        data={CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH, CONF_BT_MAC: ""}
-    )
+    entry = _FakeEntry(data={CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH, CONF_BT_MAC: ""})
     add = MagicMock()
     await async_setup_entry(MagicMock(), entry, add)  # type: ignore[arg-type]
     add.assert_called_once()
     sensors = list(add.call_args.args[0])
-    assert not any(
-        isinstance(s, BluetoothPrinterBatterySensor) for s in sensors
-    )
+    assert not any(isinstance(s, BluetoothPrinterBatterySensor) for s in sensors)
 
 
 async def test_sensor_async_setup_entry_creates_for_bluetooth_with_mac():
@@ -73,9 +67,7 @@ async def test_sensor_async_setup_entry_creates_for_bluetooth_with_mac():
     await async_setup_entry(MagicMock(), entry, add)  # type: ignore[arg-type]
     add.assert_called_once()
     sensors = list(add.call_args.args[0])
-    assert any(
-        isinstance(s, BluetoothPrinterBatterySensor) for s in sensors
-    )
+    assert any(isinstance(s, BluetoothPrinterBatterySensor) for s in sensors)
     assert any(isinstance(s, LastImagePrintSensor) for s in sensors)
 
 

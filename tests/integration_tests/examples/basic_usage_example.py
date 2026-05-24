@@ -25,7 +25,7 @@ async def basic_printer_test() -> None:
     logger.info("Starting basic printer functionality test...")
 
     # Start virtual printer
-    async with VirtualPrinter(host='127.0.0.1', port=9100) as printer:
+    async with VirtualPrinter(host="127.0.0.1", port=9100) as printer:
         logger.info("Virtual printer started on port 9100")
 
         # Simulate some printer operations
@@ -38,10 +38,10 @@ async def basic_printer_test() -> None:
         # Simulate receiving some ESCPOS commands
         # In a real test, these would come from the HA integration
         sample_commands = [
-            b'\x1b@',  # Initialize printer
-            b'Hello World\n',  # Text data
-            b'\x1bd\x01',  # Feed 1 line
-            b'\x1bi',  # Partial cut
+            b"\x1b@",  # Initialize printer
+            b"Hello World\n",  # Text data
+            b"\x1bd\x01",  # Feed 1 line
+            b"\x1bi",  # Partial cut
         ]
 
         # Process commands (this would normally happen automatically)
@@ -72,11 +72,11 @@ async def mock_data_generation_example() -> None:
     qr_data = MockDataGenerator.generate_qr_data()
     logger.info(f"Generated QR data: {qr_data}")
 
-    barcode_data = MockDataGenerator.generate_barcode_data('CODE128')
+    barcode_data = MockDataGenerator.generate_barcode_data("CODE128")
     logger.info(f"Generated barcode data: {barcode_data}")
 
     # Generate automation configuration
-    automation_config = MockDataGenerator.generate_automation_config('state')
+    automation_config = MockDataGenerator.generate_automation_config("state")
     logger.info(f"Generated automation config: {automation_config['id']}")
 
     # Generate notification data
@@ -92,36 +92,36 @@ async def verification_utilities_example() -> None:
 
     # Create mock data for testing
     mock_print_history = [
-        type('MockPrintJob', (), {
-            'content_type': 'text',
-            'data': b'Hello World',
-            'parameters': {'align': 'center'}
-        })()
+        type(
+            "MockPrintJob",
+            (),
+            {"content_type": "text", "data": b"Hello World", "parameters": {"align": "center"}},
+        )()
     ]
 
     mock_command_log = [
-        type('MockCommand', (), {
-            'command_type': 'text',
-            'raw_data': b'Hello World',
-            'parameters': {'text': 'Hello World'}
-        })()
+        type(
+            "MockCommand",
+            (),
+            {
+                "command_type": "text",
+                "raw_data": b"Hello World",
+                "parameters": {"text": "Hello World"},
+            },
+        )()
     ]
 
     # Test verification utilities
     text_received = VerificationUtilities.verify_printer_received(
-        'text', mock_print_history, mock_command_log
+        "text", mock_print_history, mock_command_log
     )
     logger.info(f"Text command received: {text_received}")
 
-    content_found = VerificationUtilities.verify_print_content(
-        'Hello World', mock_print_history
-    )
+    content_found = VerificationUtilities.verify_print_content("Hello World", mock_print_history)
     logger.info(f"Content found: {content_found}")
 
     # Test command sequence verification
-    sequence_valid = VerificationUtilities.verify_command_sequence(
-        ['text'], mock_command_log
-    )
+    sequence_valid = VerificationUtilities.verify_command_sequence(["text"], mock_command_log)
     logger.info(f"Command sequence valid: {sequence_valid}")
 
     logger.info("Verification utilities demonstration completed!")
@@ -131,7 +131,7 @@ async def error_simulation_example() -> None:
     """Demonstrate error simulation capabilities."""
     logger.info("Demonstrating error simulation...")
 
-    async with VirtualPrinter(host='127.0.0.1', port=9101) as printer:
+    async with VirtualPrinter(host="127.0.0.1", port=9101) as printer:
         logger.info("Virtual printer with error simulation started")
 
         # Get initial status
@@ -139,7 +139,7 @@ async def error_simulation_example() -> None:
         logger.info(f"Initial status: online={initial_status['online']}")
 
         # Simulate printer going offline
-        await printer.simulate_error('offline')
+        await printer.simulate_error("offline")
         logger.info("Simulated printer offline error")
 
         # Check status after error

@@ -121,12 +121,8 @@ _PRINT_BARCODE_SCHEMA: dict[vol.Marker | str, Any] = {
             "CODABAR",
         ]
     ),
-    vol.Optional(ATTR_BARCODE_HEIGHT): vol.All(
-        vol.Coerce(int), vol.Range(min=1, max=255)
-    ),
-    vol.Optional(ATTR_BARCODE_WIDTH): vol.All(
-        vol.Coerce(int), vol.Range(min=2, max=6)
-    ),
+    vol.Optional(ATTR_BARCODE_HEIGHT): vol.All(vol.Coerce(int), vol.Range(min=1, max=255)),
+    vol.Optional(ATTR_BARCODE_WIDTH): vol.All(vol.Coerce(int), vol.Range(min=2, max=6)),
     vol.Optional(ATTR_CUT): vol.In(["none", "partial", "full"]),
     vol.Optional(ATTR_FEED): vol.All(vol.Coerce(int), vol.Range(min=0, max=10)),
 }

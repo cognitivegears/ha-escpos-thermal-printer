@@ -26,7 +26,9 @@ _LOGGER = logging.getLogger(__name__)
 PARALLEL_UPDATES = 0
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry, async_add_entities) -> None:  # type: ignore[no-untyped-def]
+async def async_setup_entry(  # type: ignore[no-untyped-def]
+    hass: HomeAssistant, entry: EscposConfigEntry, async_add_entities
+) -> None:
     adapter = entry.runtime_data.adapter
     entity = EscposOnlineSensor(hass, entry, adapter)
     async_add_entities([entity])

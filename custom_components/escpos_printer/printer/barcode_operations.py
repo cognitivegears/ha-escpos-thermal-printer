@@ -98,7 +98,10 @@ class BarcodeOperationsMixin:
             except TypeError as e:
                 # Older python-escpos may not accept force_software; retry without it
                 if "force_software" in kwargs:
-                    _LOGGER.debug("force_software unsupported; retrying without it: %s", sanitize_log_message(str(e)))
+                    _LOGGER.debug(
+                        "force_software unsupported; retrying without it: %s",
+                        sanitize_log_message(str(e)),
+                    )
                     kwargs.pop("force_software", None)
                     printer.barcode(
                         v_code,

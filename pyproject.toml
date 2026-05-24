@@ -17,6 +17,10 @@ dependencies = [
   "python-barcode==0.16.1",
   "pyusb==1.3.1",
   "dbus-fast==4.0.4",
+  # Visual-width measurement for the text-effects box / table padders so
+  # CJK / fullwidth / emoji columns line up under the 1-col-per-glyph
+  # text mode (instead of silently misaligning via len()).
+  "wcwidth==0.2.13",
 ]
 
 [build-system]
@@ -212,6 +216,8 @@ ignore = [
     "BLE001", "PLR0915",
 ]
 "custom_components/escpos_printer/printer/image_processor.py" = ["PLR0912"]
+"custom_components/escpos_printer/text_effects/table.py" = ["PLR0912"]
+"custom_components/escpos_printer/text_effects/font_render.py" = ["PLR0912"]
 "custom_components/escpos_printer/printer/base_adapter.py" = [
     "BLE001", "PLR0915",
 ]
@@ -251,6 +257,7 @@ module = [
     "barcode.*",
     "pytest_homeassistant_custom_component.*",
     "usb.*",
+    "wcwidth.*",
 ]
 ignore_missing_imports = true
 

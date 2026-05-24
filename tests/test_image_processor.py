@@ -59,9 +59,7 @@ def test_dither_threshold_produces_pure_black_and_white() -> None:
     img = Image.new("L", (10, 1))
     for x in range(10):
         img.putpixel((x, 0), x * 25)  # 0, 25, 50, ..., 225
-    out = process_image(
-        img, ImageProcessOptions(width=10, dither="threshold", threshold=128)
-    )
+    out = process_image(img, ImageProcessOptions(width=10, dither="threshold", threshold=128))
     assert out.mode == "1"
     pixels = list(out.getdata())
     # Values 0..125 -> 0, values 150..225 -> 255 (PIL "1" mode reports 0/255)
@@ -122,9 +120,7 @@ def test_decompression_bomb_raises() -> None:
     try:
         buf = io.BytesIO()
         Image.new("L", (40, 40)).save(buf, format="PNG")
-        with pytest.raises(
-            (PIL.Image.DecompressionBombError, PIL.Image.DecompressionBombWarning)
-        ):
+        with pytest.raises((PIL.Image.DecompressionBombError, PIL.Image.DecompressionBombWarning)):
             process_image_from_bytes(buf.getvalue(), ImageProcessOptions(width=20))
     finally:
         PIL.Image.MAX_IMAGE_PIXELS = original
@@ -184,9 +180,7 @@ def test_invert_swaps_black_and_white() -> None:
     img = _solid(8, 8, color=255)
     out = process_image(
         img,
-        ImageProcessOptions(
-            width=8, invert=True, dither="threshold", threshold=128
-        ),
+        ImageProcessOptions(width=8, invert=True, dither="threshold", threshold=128),
     )
     assert set(out.getdata()) == {0}
 
@@ -195,9 +189,7 @@ def test_mirror_flips_horizontally() -> None:
     """Mirror reverses pixel order horizontally; vertical is unchanged."""
     img = Image.new("L", (4, 1))
     img.putdata([0, 64, 128, 255])
-    out = process_image(
-        img, ImageProcessOptions(width=4, mirror=True, dither="none")
-    )
+    out = process_image(img, ImageProcessOptions(width=4, mirror=True, dither="none"))
     # After mirror, first column is the old last column (255 -> 1 in mode "1").
     pixels = list(out.getdata())
     # Mode "1" dither=none: PIL maps via floor — 255 stays 255, 0 stays 0.

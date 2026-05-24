@@ -56,9 +56,7 @@ def _get_bluetooth_escpos_cls() -> type[Any]:
     return _BluetoothEscpos
 
 
-def make_bluetooth_escpos(
-    transport: RfcommTransport, profile: Any | None = None
-) -> Any:
+def make_bluetooth_escpos(transport: RfcommTransport, profile: Any | None = None) -> Any:
     """Return a python-escpos printer wired to the given RFCOMM transport."""
     cls = _get_bluetooth_escpos_cls()
     return cls(transport, profile)

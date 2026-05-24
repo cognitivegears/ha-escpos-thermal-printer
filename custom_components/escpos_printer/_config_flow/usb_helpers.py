@@ -69,6 +69,7 @@ def _can_connect_usb(  # noqa: PLR0911, PLR0912
     Returns:
         Tuple of (success, error_message, errno). error_message and errno are None on success.
     """
+
     def _get_errno(exc: Exception) -> int | None:
         return getattr(exc, "errno", None)
 
@@ -224,23 +225,27 @@ def _discover_usb_printers() -> list[dict[str, Any]]:
                         # Serial number access may fail due to permissions or device quirks;
                         # it's optional and used only to distinguish identical printers
                         pass
-                    printers.append({
-                        "vendor_id": device.idVendor,
-                        "product_id": device.idProduct,
-                        "manufacturer": manufacturer,
-                        "product": product,
-                        "serial_number": serial,
-                        "label": f"{manufacturer} {product} ({device.idVendor:04X}:{device.idProduct:04X})",
-                    })
+                    printers.append(
+                        {
+                            "vendor_id": device.idVendor,
+                            "product_id": device.idProduct,
+                            "manufacturer": manufacturer,
+                            "product": product,
+                            "serial_number": serial,
+                            "label": f"{manufacturer} {product} ({device.idVendor:04X}:{device.idProduct:04X})",
+                        }
+                    )
                 except Exception:
-                    printers.append({
-                        "vendor_id": device.idVendor,
-                        "product_id": device.idProduct,
-                        "manufacturer": "Unknown",
-                        "product": "Thermal Printer",
-                        "serial_number": None,
-                        "label": f"Thermal Printer ({device.idVendor:04X}:{device.idProduct:04X})",
-                    })
+                    printers.append(
+                        {
+                            "vendor_id": device.idVendor,
+                            "product_id": device.idProduct,
+                            "manufacturer": "Unknown",
+                            "product": "Thermal Printer",
+                            "serial_number": None,
+                            "label": f"Thermal Printer ({device.idVendor:04X}:{device.idProduct:04X})",
+                        }
+                    )
     except Exception as e:
         _LOGGER.debug("USB device enumeration failed: %s", e)
 
@@ -277,25 +282,29 @@ def _discover_all_usb_devices() -> list[dict[str, Any]]:
                     pass
                 # Note if this is a known thermal printer vendor
                 is_known_printer = device.idVendor in THERMAL_PRINTER_VIDS
-                devices.append({
-                    "vendor_id": device.idVendor,
-                    "product_id": device.idProduct,
-                    "manufacturer": manufacturer,
-                    "product": product,
-                    "serial_number": serial,
-                    "is_known_printer": is_known_printer,
-                    "label": f"{manufacturer} {product} ({device.idVendor:04X}:{device.idProduct:04X})",
-                })
+                devices.append(
+                    {
+                        "vendor_id": device.idVendor,
+                        "product_id": device.idProduct,
+                        "manufacturer": manufacturer,
+                        "product": product,
+                        "serial_number": serial,
+                        "is_known_printer": is_known_printer,
+                        "label": f"{manufacturer} {product} ({device.idVendor:04X}:{device.idProduct:04X})",
+                    }
+                )
             except Exception:
-                devices.append({
-                    "vendor_id": device.idVendor,
-                    "product_id": device.idProduct,
-                    "manufacturer": "Unknown",
-                    "product": "USB Device",
-                    "serial_number": None,
-                    "is_known_printer": device.idVendor in THERMAL_PRINTER_VIDS,
-                    "label": f"USB Device ({device.idVendor:04X}:{device.idProduct:04X})",
-                })
+                devices.append(
+                    {
+                        "vendor_id": device.idVendor,
+                        "product_id": device.idProduct,
+                        "manufacturer": "Unknown",
+                        "product": "USB Device",
+                        "serial_number": None,
+                        "is_known_printer": device.idVendor in THERMAL_PRINTER_VIDS,
+                        "label": f"USB Device ({device.idVendor:04X}:{device.idProduct:04X})",
+                    }
+                )
     except Exception as e:
         _LOGGER.debug("USB device enumeration failed: %s", e)
 

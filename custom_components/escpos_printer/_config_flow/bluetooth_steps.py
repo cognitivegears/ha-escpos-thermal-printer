@@ -129,9 +129,7 @@ class BluetoothFlowMixin:
         # transparently disable it — handles printers that don't advertise the
         # class correctly (most cheap ESC/POS hardware doesn't).
         imaging_only = not self._show_all_bt_devices
-        if imaging_only and not any(
-            d.get("is_imaging") for d in self._paired_bt_devices
-        ):
+        if imaging_only and not any(d.get("is_imaging") for d in self._paired_bt_devices):
             imaging_only = False
         device_choices = _build_bt_device_choices(
             self._paired_bt_devices, imaging_only=imaging_only
@@ -150,9 +148,7 @@ class BluetoothFlowMixin:
         # channel. Otherwise we route to bluetooth_channel_retry on
         # `bt_channel_refused` to ask for a channel specifically.
         if self.show_advanced_options:
-            schema_dict[
-                vol.Optional(CONF_RFCOMM_CHANNEL, default=DEFAULT_RFCOMM_CHANNEL)
-            ] = int
+            schema_dict[vol.Optional(CONF_RFCOMM_CHANNEL, default=DEFAULT_RFCOMM_CHANNEL)] = int
         data_schema = vol.Schema(schema_dict)
         return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
             step_id="bluetooth_select", data_schema=data_schema, errors=errors
@@ -220,9 +216,7 @@ class BluetoothFlowMixin:
             step_id="bluetooth_channel_retry",
             data_schema=vol.Schema(
                 {
-                    vol.Required(
-                        CONF_RFCOMM_CHANNEL, default=pending.get("channel", 2)
-                    ): int,
+                    vol.Required(CONF_RFCOMM_CHANNEL, default=pending.get("channel", 2)): int,
                 }
             ),
             errors=errors,

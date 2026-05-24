@@ -104,8 +104,7 @@ async def test_print_image_url_service_dispatches(hass, tmp_path):  # type: igno
     with (
         patch("escpos.printer.Network", return_value=fake),
         patch(
-            "custom_components.escpos_printer.printer.image_operations"
-            ".resolve_image_bytes",
+            "custom_components.escpos_printer.printer.image_operations.resolve_image_bytes",
             return_value=(raw, "image/png"),
         ),
     ):

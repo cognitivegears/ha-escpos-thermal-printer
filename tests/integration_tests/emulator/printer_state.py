@@ -12,6 +12,7 @@ from typing import Any
 @dataclass
 class PrintJob:
     """Represents a single print job with its metadata."""
+
     timestamp: datetime
     content_type: str
     data: Any
@@ -24,16 +25,17 @@ class PrintJob:
     def as_dict(self) -> dict[str, Any]:
         """Convert print job to dictionary for serialization."""
         return {
-            'timestamp': self.timestamp.isoformat(),
-            'content_type': self.content_type,
-            'data': self.data,
-            'parameters': self.parameters
+            "timestamp": self.timestamp.isoformat(),
+            "content_type": self.content_type,
+            "data": self.data,
+            "parameters": self.parameters,
         }
 
 
 @dataclass
 class Command:
     """Represents a parsed ESCPOS command."""
+
     timestamp: datetime
     command_type: str
     raw_data: bytes
@@ -42,10 +44,10 @@ class Command:
     def as_dict(self) -> dict[str, Any]:
         """Convert command to dictionary for serialization."""
         return {
-            'timestamp': self.timestamp.isoformat(),
-            'command_type': self.command_type,
-            'raw_data': self.raw_data.hex(),
-            'parameters': self.parameters
+            "timestamp": self.timestamp.isoformat(),
+            "command_type": self.command_type,
+            "raw_data": self.raw_data.hex(),
+            "parameters": self.parameters,
         }
 
 
@@ -72,13 +74,28 @@ class PrinterState:
                 recent_text = (
                     self._last_text_time is not None and (now - self._last_text_time) < 0.005
                 )
-                force_new = bool(command.parameters.get("__force_new__")) if isinstance(command.parameters, dict) else False
+                force_new = (
+                    bool(command.parameters.get("__force_new__"))
+                    if isinstance(command.parameters, dict)
+                    else False
+                )
                 # If this is a mirrored reflection and we very recently recorded a text op,
                 # drop this duplicate to avoid double-counting (mirror + network).
-                if isinstance(command.parameters, dict) and command.parameters.get("__mirrored__") and recent_text and self.command_log and self.command_log[-1].command_type == "text":
+                if (
+                    isinstance(command.parameters, dict)
+                    and command.parameters.get("__mirrored__")
+                    and recent_text
+                    and self.command_log
+                    and self.command_log[-1].command_type == "text"
+                ):
                     self._last_text_time = now
                     return
-                if recent_text and (not force_new) and self.command_log and self.command_log[-1].command_type == "text":
+                if (
+                    recent_text
+                    and (not force_new)
+                    and self.command_log
+                    and self.command_log[-1].command_type == "text"
+                ):
                     # Merge into previous text command
                     self.command_log[-1].raw_data += command.raw_data
                     # Also extend the most recent text print job if present
@@ -119,11 +136,11 @@ class PrinterState:
         """Get current printer status."""
         async with self._lock:
             return {
-                'online': self.online,
-                'paper_status': self.paper_status,
-                'buffer_size': len(self.buffer),
-                'print_history_count': len(self.print_history),
-                'command_log_count': len(self.command_log)
+                "online": self.online,
+                "paper_status": self.paper_status,
+                "buffer_size": len(self.buffer),
+                "print_history_count": len(self.print_history),
+                "command_log_count": len(self.command_log),
             }
 
     async def clear_buffer(self) -> None:
@@ -131,13 +148,12 @@ class PrinterState:
         async with self._lock:
             self.buffer.clear()
 
-    async def _add_print_job(self, content_type: str, data: bytes, parameters: dict[str, Any]) -> None:
+    async def _add_print_job(
+        self, content_type: str, data: bytes, parameters: dict[str, Any]
+    ) -> None:
         """Add a new print job to history."""
         job = PrintJob(
-            timestamp=datetime.now(),
-            content_type=content_type,
-            data=data,
-            parameters=parameters
+            timestamp=datetime.now(), content_type=content_type, data=data, parameters=parameters
         )
         self.print_history.append(job)
 
@@ -174,7 +190,9 @@ class PrinterState:
             # Reset text timing to prevent stale state affecting future commands
             self._last_text_time = None
 
-    async def update_state_sync(self, command_type: str, data: bytes, parameters: dict[str, Any]) -> None:
+    async def update_state_sync(
+        self, command_type: str, data: bytes, parameters: dict[str, Any]
+    ) -> None:
         """Compatibility wrapper used by tests to update state.
 
         Implemented as an async method so tests can `await` it directly.
@@ -186,10 +204,7 @@ class PrinterState:
         if command_type == "text":
             params["__force_new__"] = True
         command = Command(
-            timestamp=datetime.now(),
-            command_type=command_type,
-            raw_data=data,
-            parameters=params
+            timestamp=datetime.now(), command_type=command_type, raw_data=data, parameters=params
         )
         # Ensure each sync invocation starts a new logical block for text
         if command_type == "text":

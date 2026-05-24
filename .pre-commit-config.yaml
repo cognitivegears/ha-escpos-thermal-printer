@@ -13,6 +13,13 @@ repos:
         language: python
         additional_dependencies: [packaging]
         pass_filenames: false
+      - id: validate-blueprints
+        name: Validate bundled HA blueprints
+        entry: python scripts/validate_blueprints.py blueprints
+        language: python
+        additional_dependencies: [pyyaml]
+        files: ^blueprints/.*\.yaml$
+        pass_filenames: false
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.13
@@ -27,6 +34,10 @@ repos:
       - id: end-of-file-fixer
       - id: trailing-whitespace
       - id: check-yaml
+        # HA blueprints use !input / other custom tags that vanilla
+        # PyYAML can't construct. Validate them via the dedicated
+        # validate-blueprints hook above instead.
+        args: [--unsafe]
       - id: check-toml
       - id: check-merge-conflict
 

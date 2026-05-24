@@ -53,6 +53,12 @@ def test_services_yaml_validates_against_homeassistant_schema() -> None:
 # ---------------------------------------------------------------------------
 
 
+from custom_components.escpos_printer.const import (
+    SERVICE_PRINT_BOX,
+    SERVICE_PRINT_TABLE,
+    SERVICE_PRINT_TEXT_IMAGE,
+)
+
 _ALL_SERVICES = (
     SERVICE_PRINT_TEXT_UTF8,
     SERVICE_PRINT_TEXT,
@@ -60,6 +66,9 @@ _ALL_SERVICES = (
     SERVICE_PRINT_IMAGE,
     SERVICE_PRINT_IMAGE_PATH,
     SERVICE_PRINT_BARCODE,
+    SERVICE_PRINT_BOX,
+    SERVICE_PRINT_TABLE,
+    SERVICE_PRINT_TEXT_IMAGE,
     SERVICE_FEED,
     SERVICE_CUT,
     SERVICE_BEEP,
@@ -85,8 +94,7 @@ async def test_every_service_has_schema(hass, service_name):  # type: ignore[no-
     services = hass.services.async_services_for_domain(DOMAIN)
     svc = services[service_name]
     assert svc.schema is not None, (
-        f"{service_name} registered with schema=None — Bronze action-setup "
-        f"violation"
+        f"{service_name} registered with schema=None — Bronze action-setup violation"
     )
 
 
@@ -97,9 +105,7 @@ async def test_every_service_has_schema(hass, service_name):  # type: ignore[no-
 
 def test_print_image_schema_rejects_unknown_field():  # type: ignore[no-untyped-def]
     with pytest.raises(vol.Invalid):
-        PRINT_IMAGE_SCHEMA(
-            {"image": "/config/x.png", "totally_unknown_field": 1}
-        )
+        PRINT_IMAGE_SCHEMA({"image": "/config/x.png", "totally_unknown_field": 1})
 
 
 def test_print_image_schema_rejects_out_of_range_width():  # type: ignore[no-untyped-def]
@@ -310,6 +316,28 @@ def test_calibration_print_schema_defaults():  # type: ignore[no-untyped-def]
     assert out["feed"] == 2
 
 
+def test_print_text_image_schema_rejects_fallback_image():  # type: ignore[no-untyped-def]
+    """Phase 2 S-M4 regression — ``print_text_image`` must NOT inherit
+    the ``fallback_image`` field from ``_image_option_fragment``.
+
+    The service produces its own image bytes, so a source-shaped
+    fallback is meaningless. Accepting it would silently broaden the
+    parity invariant documented in CLAUDE.md and re-introduce an SSRF-
+    adjacent attack surface (the underlying field is template-typed).
+    """
+    from custom_components.escpos_printer.services.schemas import (
+        PRINT_TEXT_IMAGE_SCHEMA,
+    )
+
+    with pytest.raises(vol.Invalid, match="extra keys not allowed"):
+        PRINT_TEXT_IMAGE_SCHEMA(
+            {
+                "text": "hi",
+                "fallback_image": "http://attacker.example/probe",
+            }
+        )
+
+
 # ---------------------------------------------------------------------------
 # services.yaml parity: every focused image service must declare the same
 # common-field metadata (name / description / selector) as the canonical
@@ -393,9 +421,8 @@ def test_image_services_share_common_field_metadata() -> None:
                         f"  expected: {expected_default!r}\n"
                         f"  actual:   {actual_default!r}"
                     )
-    assert not mismatches, (
-        "services.yaml image-service field parity drift:\n  "
-        + "\n  ".join(mismatches)
+    assert not mismatches, "services.yaml image-service field parity drift:\n  " + "\n  ".join(
+        mismatches
     )
 
 
@@ -414,6 +441,5 @@ def test_image_services_no_truncated_descriptions() -> None:
             assert desc.strip(), f"{svc}.{fname} description is empty"
             stripped = desc.rstrip().rstrip("\n")
             assert stripped[-1] in ".)>!?\"'", (
-                f"{svc}.{fname} description appears truncated; ends with: "
-                f"{stripped[-30:]!r}"
+                f"{svc}.{fname} description appears truncated; ends with: {stripped[-30:]!r}"
             )

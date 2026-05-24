@@ -36,16 +36,10 @@ class _PrinterHost(Protocol):
 
     def _connect(self) -> Any: ...
     def _wrap_text(self, text: str) -> str: ...
-    def _get_profile_pixel_width(
-        self, hass: HomeAssistant | None = None
-    ) -> int | None: ...
+    def get_profile_pixel_width(self, hass: HomeAssistant | None = None) -> int | None: ...
 
-    async def _acquire_printer(
-        self, hass: HomeAssistant
-    ) -> tuple[Any, bool]: ...
-    async def _release_printer(
-        self, hass: HomeAssistant, printer: Any, *, owned: bool
-    ) -> None: ...
+    async def _acquire_printer(self, hass: HomeAssistant) -> tuple[Any, bool]: ...
+    async def _release_printer(self, hass: HomeAssistant, printer: Any, *, owned: bool) -> None: ...
     async def _apply_cut_and_feed(
         self,
         hass: HomeAssistant,
@@ -117,6 +111,7 @@ class PrintOperationsMixin:
         def _map_qr_ec(level: str) -> Any:
             try:
                 from escpos import escpos as _esc  # noqa: PLC0415
+
                 return {
                     "L": getattr(_esc, "QR_ECLEVEL_L", "L"),
                     "M": getattr(_esc, "QR_ECLEVEL_M", "M"),
@@ -177,9 +172,7 @@ async def _print_text_under_lock(
                 if hasattr(p, "charcode"):
                     p.charcode(codepage)
             except Exception as e:
-                _LOGGER.debug(
-                    "Codepage set failed: %s", sanitize_log_message(str(e))
-                )
+                _LOGGER.debug("Codepage set failed: %s", sanitize_log_message(str(e)))
 
         if hasattr(p, "set"):
             use_custom_size = wmult > 1 or hmult > 1
@@ -199,9 +192,7 @@ async def _print_text_under_lock(
                     try:
                         p._set_codepage(encoding)
                     except Exception:
-                        _LOGGER.warning(
-                            "Unsupported encoding/codepage: %s", encoding
-                        )
+                        _LOGGER.warning("Unsupported encoding/codepage: %s", encoding)
                 text_bytes = text_to_print.encode(encoding, errors="replace")
                 if hasattr(p, "_raw"):
                     p._raw(text_bytes)

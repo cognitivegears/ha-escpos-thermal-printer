@@ -31,7 +31,9 @@ def _enable_sockets_for_integration(request: Any) -> None:
     included via pytest-homeassistant-custom-component.
     """
     node = request.node
-    if node.get_closest_marker("integration") or "tests/integration_tests/" in str(getattr(node, "fspath", "")):
+    if node.get_closest_marker("integration") or "tests/integration_tests/" in str(
+        getattr(node, "fspath", "")
+    ):
         # Will raise if fixture is absent; in our env it should exist
         request.getfixturevalue("socket_enabled")
 

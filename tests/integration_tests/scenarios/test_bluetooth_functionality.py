@@ -65,6 +65,7 @@ async def bt_adapter_over_loopback(
 ) -> AsyncGenerator[tuple[BluetoothPrinterAdapter, Any, Any]]:
     """Yield ``(adapter, server, hass)`` wired to a virtual TCP printer."""
     async with VirtualPrinter(host="127.0.0.1", port=9110) as server:
+
         def _factory(_mac: str, _channel: int, timeout: float) -> _LoopbackTransport:
             return _LoopbackTransport("127.0.0.1", 9110, timeout)
 

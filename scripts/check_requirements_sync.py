@@ -64,12 +64,8 @@ def check_pinned_shape(specs: dict[str, SpecifierSet]) -> list[str]:
             problems.append(f"{name}: no version specifier (must be ==X.Y.Z)")
             continue
         # Accept either a single `==X.Y.Z` or a single `==`-anchored clause.
-        if not all(
-            clause.strip().startswith("==") for clause in spec_str.split(",")
-        ):
-            problems.append(
-                f"{name}: specifier '{spec_str}' is not pinned with `==`"
-            )
+        if not all(clause.strip().startswith("==") for clause in spec_str.split(",")):
+            problems.append(f"{name}: specifier '{spec_str}' is not pinned with `==`")
     return problems
 
 
@@ -110,7 +106,10 @@ def main() -> int:
 
     missing = set(py.keys()) ^ set(mf.keys())
     if missing:
-        print(f"❌ Package sets differ between pyproject and manifest: {sorted(missing)}", file=sys.stderr)
+        print(
+            f"❌ Package sets differ between pyproject and manifest: {sorted(missing)}",
+            file=sys.stderr,
+        )
         return 1
 
     shape_problems = check_pinned_shape(py)

@@ -114,14 +114,14 @@ class UsbFlowMixin:
                     await self.async_set_unique_id(unique_id)  # type: ignore[attr-defined]
                     self._abort_if_unique_id_configured()  # type: ignore[attr-defined]
 
-                _LOGGER.debug(
-                    "Attempting USB connection test to %04X:%04X", vendor_id, product_id
-                )
+                _LOGGER.debug("Attempting USB connection test to %04X:%04X", vendor_id, product_id)
                 ok, error_code, errno = await self.hass.async_add_executor_job(
                     _can_connect_usb, vendor_id, product_id, timeout
                 )
                 if ok:
-                    _LOGGER.debug("USB connection test succeeded for %04X:%04X", vendor_id, product_id)
+                    _LOGGER.debug(
+                        "USB connection test succeeded for %04X:%04X", vendor_id, product_id
+                    )
 
                     profile = user_input.get(CONF_PROFILE, PROFILE_AUTO)
                     self._user_data = {
@@ -165,7 +165,9 @@ class UsbFlowMixin:
 
         # Build schema based on whether printers were found
         if device_choices:
-            default_device = next(iter(device_choices.keys())) if self._discovered_printers else "__browse_all__"
+            default_device = (
+                next(iter(device_choices.keys())) if self._discovered_printers else "__browse_all__"
+            )
             data_schema = vol.Schema(
                 {
                     vol.Required("usb_device", default=default_device): vol.In(device_choices),
@@ -215,7 +217,9 @@ class UsbFlowMixin:
             else:
                 vendor_id = selected_usb_device["vendor_id"]
                 product_id = selected_usb_device["product_id"]
-                device_name = f"{selected_usb_device['manufacturer']} {selected_usb_device['product']}"
+                device_name = (
+                    f"{selected_usb_device['manufacturer']} {selected_usb_device['product']}"
+                )
                 serial_number = selected_usb_device.get("serial_number")
 
             if not errors:
@@ -236,13 +240,18 @@ class UsbFlowMixin:
 
                 _LOGGER.debug(
                     "Attempting USB connection test to %04X:%04X (in_ep=%02X, out_ep=%02X)",
-                    vendor_id, product_id, in_ep, out_ep
+                    vendor_id,
+                    product_id,
+                    in_ep,
+                    out_ep,
                 )
                 ok, error_code, errno = await self.hass.async_add_executor_job(
                     _can_connect_usb, vendor_id, product_id, timeout, in_ep, out_ep
                 )
                 if ok:
-                    _LOGGER.debug("USB connection test succeeded for %04X:%04X", vendor_id, product_id)
+                    _LOGGER.debug(
+                        "USB connection test succeeded for %04X:%04X", vendor_id, product_id
+                    )
 
                     profile = user_input.get(CONF_PROFILE, PROFILE_AUTO)
                     self._user_data = {
@@ -297,7 +306,9 @@ class UsbFlowMixin:
             }
         )
 
-        return self.async_show_form(step_id="usb_all_devices", data_schema=data_schema, errors=errors)  # type: ignore[attr-defined,no-any-return]
+        return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
+            step_id="usb_all_devices", data_schema=data_schema, errors=errors
+        )
 
     async def async_step_usb_manual(
         self, user_input: dict[str, Any] | None = None
@@ -339,13 +350,18 @@ class UsbFlowMixin:
 
                 _LOGGER.debug(
                     "Attempting USB connection test to %04X:%04X (in_ep=%02X, out_ep=%02X)",
-                    vendor_id, product_id, in_ep, out_ep
+                    vendor_id,
+                    product_id,
+                    in_ep,
+                    out_ep,
                 )
                 ok, error_code, errno = await self.hass.async_add_executor_job(
                     _can_connect_usb, vendor_id, product_id, timeout, in_ep, out_ep
                 )
                 if ok:
-                    _LOGGER.debug("USB connection test succeeded for %04X:%04X", vendor_id, product_id)
+                    _LOGGER.debug(
+                        "USB connection test succeeded for %04X:%04X", vendor_id, product_id
+                    )
 
                     profile = user_input.get(CONF_PROFILE, PROFILE_AUTO)
                     self._user_data = {
@@ -390,9 +406,7 @@ class UsbFlowMixin:
 
         return self.async_show_form(step_id="usb_manual", data_schema=data_schema, errors=errors)  # type: ignore[attr-defined,no-any-return]
 
-    async def async_step_usb(
-        self, discovery_info: UsbServiceInfo
-    ) -> ConfigFlowResult:
+    async def async_step_usb(self, discovery_info: UsbServiceInfo) -> ConfigFlowResult:
         """Handle USB discovery from Home Assistant.
 
         This method is called by HA when a USB device matching the manifest's
@@ -430,7 +444,8 @@ class UsbFlowMixin:
             CONF_IN_EP: DEFAULT_IN_EP,
             CONF_OUT_EP: DEFAULT_OUT_EP,
             CONF_TIMEOUT: DEFAULT_TIMEOUT,
-            "_printer_name": discovery_info.description or f"USB Printer {vendor_id:04X}:{product_id:04X}",
+            "_printer_name": discovery_info.description
+            or f"USB Printer {vendor_id:04X}:{product_id:04X}",
         }
 
         # Show confirmation step

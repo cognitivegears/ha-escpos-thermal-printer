@@ -25,12 +25,15 @@ async def test_print_image_url_download_error(hass, caplog):  # type: ignore[no-
     await _setup_entry(hass)
 
     fake = MagicMock()
+
     # Mock ClientSession.get to raise
     async def _raise(*args, **kwargs):  # type: ignore[no-untyped-def]
         raise aiohttp.ClientError("download failed")
 
-    with patch("escpos.printer.Network", return_value=fake), \
-        patch("aiohttp.ClientSession.get", new=AsyncMock(side_effect=_raise)):
+    with (
+        patch("escpos.printer.Network", return_value=fake),
+        patch("aiohttp.ClientSession.get", new=AsyncMock(side_effect=_raise)),
+    ):
         with pytest.raises(Exception):
             await hass.services.async_call(
                 DOMAIN,

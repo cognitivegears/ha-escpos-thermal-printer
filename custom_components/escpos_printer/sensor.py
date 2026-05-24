@@ -104,9 +104,7 @@ class LastImagePrintSensor(SensorEntity):
         self._attr_extra_state_attributes = {
             "total_failures": stats.total_failures,
             "last_source_kind": stats.last_source_kind,
-            "last_decoded_dims": list(stats.last_decoded_dims)
-            if stats.last_decoded_dims
-            else None,
+            "last_decoded_dims": list(stats.last_decoded_dims) if stats.last_decoded_dims else None,
             "last_decoded_bytes": stats.last_decoded_bytes,
             "last_slice_count": stats.last_slice_count,
             "last_error_class": stats.last_error_class,
@@ -146,9 +144,7 @@ class BluetoothPrinterBatterySensor(SensorEntity):
         try:
             percentage = await query_bt_battery_percentage(self._mac)
         except Exception as exc:  # defensive; bluez can throw anything
-            _LOGGER.debug(
-                "Battery query failed for %s: %s", self._entry.entry_id, exc
-            )
+            _LOGGER.debug("Battery query failed for %s: %s", self._entry.entry_id, exc)
             self._attr_available = False
             return
         if percentage is None:

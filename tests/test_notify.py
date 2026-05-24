@@ -139,10 +139,13 @@ async def test_print_message_utf8_mode(hass):  # type: ignore[no-untyped-def]
     entity_id = _get_notify_entity_id(hass)
 
     fake = MagicMock()
-    with patch("escpos.printer.Network", return_value=fake), patch(
-        "custom_components.escpos_printer.notify.transcode_to_codepage",
-        return_value="transcoded text",
-    ) as mock_transcode:
+    with (
+        patch("escpos.printer.Network", return_value=fake),
+        patch(
+            "custom_components.escpos_printer.notify.transcode_to_codepage",
+            return_value="transcoded text",
+        ) as mock_transcode,
+    ):
         await hass.services.async_call(
             DOMAIN,
             "print_message",

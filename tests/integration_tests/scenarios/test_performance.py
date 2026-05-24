@@ -19,9 +19,9 @@ class TestPerformance:
         # Create multiple concurrent print tasks
         async def print_job(job_id: int) -> int:
             text = MockDataGenerator.generate_text_content(100)  # 100 chars each
-            await printer_state.update_state_sync('text', text.encode(), {})
+            await printer_state.update_state_sync("text", text.encode(), {})
             if job_id % 5 == 0:  # Every 5th job, feed paper
-                await printer_state.update_state_sync('feed', b'', {'lines': 1})
+                await printer_state.update_state_sync("feed", b"", {"lines": 1})
             return job_id
 
         # Launch 20 concurrent print jobs
@@ -40,7 +40,7 @@ class TestPerformance:
 
         # Check printer state
         status = await printer_state.get_status()
-        assert status['online'] is True
+        assert status["online"] is True
 
         history = await printer_state.get_print_history()
         assert len(history) > 0
@@ -55,11 +55,11 @@ class TestPerformance:
 
         for i in range(100):
             text = f"Rapid operation {i}"
-            await printer_state.update_state_sync('text', text.encode(), {})
+            await printer_state.update_state_sync("text", text.encode(), {})
 
             # Every 10 operations, perform a cut
             if i % 10 == 0:
-                await printer_state.update_state_sync('cut', b'', {'mode': 'partial'})
+                await printer_state.update_state_sync("cut", b"", {"mode": "partial"})
 
         end_time = time.time()
         duration = end_time - start_time
@@ -70,7 +70,7 @@ class TestPerformance:
 
         # Verify printer remained stable
         status = await printer_state.get_status()
-        assert status['online'] is True
+        assert status["online"] is True
 
         history = await printer_state.get_print_history()
         assert len(history) > 0
@@ -90,15 +90,15 @@ class TestPerformance:
 
         # Process all large texts
         for i, text in enumerate(large_texts):
-            await printer_state.update_state_sync('text', text.encode(), {})
+            await printer_state.update_state_sync("text", text.encode(), {})
 
             # Process buffer periodically to prevent overflow
             if i % 10 == 0:
-                await printer_state.update_state_sync('cut', b'', {'mode': 'full'})
+                await printer_state.update_state_sync("cut", b"", {"mode": "full"})
 
         # Verify printer handled large data load
         status = await printer_state.get_status()
-        assert status['online'] is True
+        assert status["online"] is True
 
         history = await printer_state.get_print_history()
         assert len(history) > 0
@@ -117,20 +117,18 @@ class TestPerformance:
             barcode_data = MockDataGenerator.generate_barcode_data()
             text_data = MockDataGenerator.generate_text_content(200)
 
-            batch_data.append({
-                'qr': qr_data,
-                'barcode': barcode_data,
-                'text': text_data
-            })
+            batch_data.append({"qr": qr_data, "barcode": barcode_data, "text": text_data})
 
         # Process batch efficiently
         start_time = time.time()
 
         for item in batch_data:
-            await printer_state.update_state_sync('qr', item['qr'].encode(), {})
-            await printer_state.update_state_sync('barcode', item['barcode'].encode(), {'bc': 'CODE128'})
-            await printer_state.update_state_sync('text', item['text'].encode(), {})
-            await printer_state.update_state_sync('cut', b'', {'mode': 'partial'})
+            await printer_state.update_state_sync("qr", item["qr"].encode(), {})
+            await printer_state.update_state_sync(
+                "barcode", item["barcode"].encode(), {"bc": "CODE128"}
+            )
+            await printer_state.update_state_sync("text", item["text"].encode(), {})
+            await printer_state.update_state_sync("cut", b"", {"mode": "partial"})
 
         end_time = time.time()
         duration = end_time - start_time
@@ -144,7 +142,7 @@ class TestPerformance:
 
         # Verify all operations completed successfully
         status = await printer_state.get_status()
-        assert status['online'] is True
+        assert status["online"] is True
 
         history = await printer_state.get_print_history()
         assert len(history) >= batch_size  # At least one print job per batch item
@@ -157,32 +155,34 @@ class TestPerformance:
         # Generate high load with multiple operation types
         operations = []
         for _i in range(30):
-            operations.extend([
-                ('text', MockDataGenerator.generate_text_content(150).encode(), {}),
-                ('qr', MockDataGenerator.generate_qr_data().encode(), {}),
-                ('feed', b'', {'lines': 1}),
-            ])
+            operations.extend(
+                [
+                    ("text", MockDataGenerator.generate_text_content(150).encode(), {}),
+                    ("qr", MockDataGenerator.generate_qr_data().encode(), {}),
+                    ("feed", b"", {"lines": 1}),
+                ]
+            )
 
         # Execute operations
         for op_type, data, params in operations:
             await printer_state.update_state_sync(op_type, data, params)
 
         # Trigger final cut to process remaining buffer
-        await printer_state.update_state_sync('cut', b'', {'mode': 'full'})
+        await printer_state.update_state_sync("cut", b"", {"mode": "full"})
 
         # Clear history to test cleanup
         await printer_state.clear_history()
 
         # Verify cleanup worked
         status = await printer_state.get_status()
-        assert status['print_history_count'] == 0
-        assert status['command_log_count'] == 0
-        assert status['buffer_size'] == 0
+        assert status["print_history_count"] == 0
+        assert status["command_log_count"] == 0
+        assert status["buffer_size"] == 0
 
         # Verify printer still functional after cleanup
-        await printer_state.update_state_sync('text', b'Post-cleanup test', {})
+        await printer_state.update_state_sync("text", b"Post-cleanup test", {})
         final_status = await printer_state.get_status()
-        assert final_status['online'] is True
+        assert final_status["online"] is True
 
     @pytest.mark.asyncio
     async def test_thread_safety_under_concurrency(self, virtual_printer) -> None:  # type: ignore[no-untyped-def]
@@ -193,10 +193,10 @@ class TestPerformance:
             """Worker function that performs multiple operations."""
             for i in range(num_operations):
                 text = f"Worker {worker_id}, Op {i}"
-                await printer_state.update_state_sync('text', text.encode(), {})
+                await printer_state.update_state_sync("text", text.encode(), {})
 
                 if i % 3 == 0:  # Occasional feed/cut operations
-                    await printer_state.update_state_sync('feed', b'', {'lines': 1})
+                    await printer_state.update_state_sync("feed", b"", {"lines": 1})
 
             return worker_id, num_operations
 
@@ -224,7 +224,7 @@ class TestPerformance:
 
         # Verify printer state integrity
         status = await printer_state.get_status()
-        assert status['online'] is True
+        assert status["online"] is True
 
         history = await printer_state.get_print_history()
         assert len(history) > 0
@@ -240,7 +240,7 @@ class TestPerformance:
         for i in range(50):
             start_time = time.time()
             text = f"Timing test {i}"
-            await printer_state.update_state_sync('text', text.encode(), {})
+            await printer_state.update_state_sync("text", text.encode(), {})
             end_time = time.time()
 
             response_times.append(end_time - start_time)
@@ -282,27 +282,29 @@ class TestPerformance:
             # Time the batch processing
             start_time = time.time()
             for text in batch_data:
-                await printer_state.update_state_sync('text', text.encode(), {})
+                await printer_state.update_state_sync("text", text.encode(), {})
             end_time = time.time()
 
             duration = end_time - start_time
             operations_per_second = batch_size / duration
 
-            scalability_results.append({
-                'batch_size': batch_size,
-                'duration': duration,
-                'ops_per_second': operations_per_second
-            })
+            scalability_results.append(
+                {
+                    "batch_size": batch_size,
+                    "duration": duration,
+                    "ops_per_second": operations_per_second,
+                }
+            )
 
         # Verify scalability characteristics
         # Performance should be reasonably consistent or show expected scaling
         for result in scalability_results:
             # Each batch should process at reasonable speed
-            assert result['ops_per_second'] > 5  # At least 5 operations per second
+            assert result["ops_per_second"] > 5  # At least 5 operations per second
 
         # Verify printer remained stable throughout
         status = await printer_state.get_status()
-        assert status['online'] is True
+        assert status["online"] is True
 
         history = await printer_state.get_print_history()
-        assert len(history) >= sum(r['batch_size'] for r in scalability_results)
+        assert len(history) >= sum(r["batch_size"] for r in scalability_results)

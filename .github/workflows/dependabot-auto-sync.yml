@@ -50,4 +50,3 @@ jobs:
           else
             echo "No manifest changes needed."
           fi
-

@@ -17,15 +17,20 @@ _LOGGER = logging.getLogger(__name__)
 class ClientConnection:
     """Represents a client connection to the virtual printer."""
 
-    def __init__(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter,
-                 printer_state: PrinterState, command_parser: EscposCommandParser,
-                 error_simulator: ErrorSimulator | None = None) -> None:
+    def __init__(
+        self,
+        reader: asyncio.StreamReader,
+        writer: asyncio.StreamWriter,
+        printer_state: PrinterState,
+        command_parser: EscposCommandParser,
+        error_simulator: ErrorSimulator | None = None,
+    ) -> None:
         """Initialize client connection."""
         self.reader = reader
         self.writer = writer
         self.printer_state = printer_state
         self.command_parser = command_parser
-        self.client_address = writer.get_extra_info('peername')
+        self.client_address = writer.get_extra_info("peername")
         self.error_simulator = error_simulator
         self._running = True
 
@@ -65,13 +70,13 @@ class ClientConnection:
             _LOGGER.debug("Parsed command: %s", command)
             cmd_obj = Command(
                 timestamp=datetime.now(),
-                command_type=command['type'],
-                raw_data=command['raw_data'],
-                parameters=command['parameters']
+                command_type=command["type"],
+                raw_data=command["raw_data"],
+                parameters=command["parameters"],
             )
             if self.error_simulator is not None:
                 with contextlib.suppress(Exception):
-                    await self.error_simulator.process_command(command['type'])
+                    await self.error_simulator.process_command(command["type"])
             await self.printer_state.update_state(cmd_obj)
             # Simulate minimal processing time to better reflect real devices
             with contextlib.suppress(Exception):
@@ -85,7 +90,7 @@ class ClientConnection:
         # Most ESCPOS commands don't require responses, but some do
         # For now, we'll implement basic responses for status queries
 
-        if command['type'] == 'status_request':
+        if command["type"] == "status_request":
             # Send printer status response
             status = await self.printer_state.get_status()
             response = self._create_status_response(status)
@@ -98,9 +103,9 @@ class ClientConnection:
         # Real printers have specific status byte formats
         status_byte = 0x00
 
-        if not status['online']:
+        if not status["online"]:
             status_byte |= 0x08  # Offline bit
-        if status['paper_status'] != 'loaded':
+        if status["paper_status"] != "loaded":
             status_byte |= 0x20  # Paper error bit
 
         return bytes([status_byte])
@@ -113,7 +118,7 @@ class ClientConnection:
 class VirtualPrinterServer:
     """Virtual ESCPOS printer server that emulates a thermal printer."""
 
-    def __init__(self, host: str = '127.0.0.1', port: int = 9100, timeout: float = 5.0) -> None:
+    def __init__(self, host: str = "127.0.0.1", port: int = 9100, timeout: float = 5.0) -> None:
         """Initialize the virtual printer server."""
         self.host = host
         self.port = port
@@ -134,11 +139,7 @@ class VirtualPrinterServer:
         _LOGGER.info("Starting virtual printer server on %s:%s", self.host, self.port)
 
         try:
-            self.server = await asyncio.start_server(
-                self._handle_connection,
-                self.host,
-                self.port
-            )
+            self.server = await asyncio.start_server(self._handle_connection, self.host, self.port)
 
             self._running = True
             _LOGGER.info("Virtual printer server started successfully")
@@ -170,21 +171,26 @@ class VirtualPrinterServer:
         self._running = False
         _LOGGER.info("Virtual printer server stopped")
 
-    async def _handle_connection(self, reader: asyncio.StreamReader,
-                                writer: asyncio.StreamWriter) -> None:
+    async def _handle_connection(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
         """Handle a new client connection."""
         # Reject connections if offline error active
         try:
             if self.error_simulator is not None:
                 active = await self.error_simulator.get_active_errors()
-                if 'offline' in active:
-                    _LOGGER.info("Rejecting connection while offline: %s", writer.get_extra_info('peername'))
+                if "offline" in active:
+                    _LOGGER.info(
+                        "Rejecting connection while offline: %s", writer.get_extra_info("peername")
+                    )
                     writer.close()
                     await writer.wait_closed()
                     return
         except Exception:
             pass
-        client = ClientConnection(reader, writer, self.printer_state, self.command_parser, self.error_simulator)
+        client = ClientConnection(
+            reader, writer, self.printer_state, self.command_parser, self.error_simulator
+        )
         self.clients.append(client)
 
         try:
@@ -243,7 +249,7 @@ class VirtualPrinterServer:
 class VirtualPrinter:
     """Context manager for the virtual printer server."""
 
-    def __init__(self, host: str = '127.0.0.1', port: int = 9100, timeout: float = 5.0) -> None:
+    def __init__(self, host: str = "127.0.0.1", port: int = 9100, timeout: float = 5.0) -> None:
         """Initialize the virtual printer context manager."""
         self.server = VirtualPrinterServer(host, port, timeout)
         self._task: asyncio.Task | None = None

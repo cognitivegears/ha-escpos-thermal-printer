@@ -122,9 +122,7 @@ async def _call_print_text_utf8(
     codepage = adapter_config.codepage or "CP437"
 
     # Transcode UTF-8 text to the target codepage
-    transcoded_text = await hass.async_add_executor_job(
-        transcode_to_codepage, text, codepage
-    )
+    transcoded_text = await hass.async_add_executor_job(transcode_to_codepage, text, codepage)
 
     await adapter.print_text(
         hass,

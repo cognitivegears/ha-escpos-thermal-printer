@@ -87,14 +87,18 @@ def build_manifest_requirements() -> list[str]:
         if not version:
             version = locked.get(name.lower())
         if not version:
-            raise SystemExit(f"Cannot determine exact version for {name}. Pin it in pyproject or lock with uv.")
+            raise SystemExit(
+                f"Cannot determine exact version for {name}. Pin it in pyproject or lock with uv."
+            )
         out.append(f"{name}=={version}")
     return out
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Sync manifest requirements with pinned versions")
-    parser.add_argument("--check", action="store_true", help="Only check for drift; non-zero exit on mismatch")
+    parser.add_argument(
+        "--check", action="store_true", help="Only check for drift; non-zero exit on mismatch"
+    )
     args = parser.parse_args()
 
     desired = build_manifest_requirements()
@@ -117,7 +121,7 @@ def main() -> int:
                 want = desired_set[k].specifier
                 have = current_set[k].specifier
                 # If desired has exact '==' pins, they must be allowed by current
-                eqs = [s.strip()[2:] for s in str(want).split(',') if s.strip().startswith('==')]
+                eqs = [s.strip()[2:] for s in str(want).split(",") if s.strip().startswith("==")]
                 if eqs:
                     problems.extend(
                         f"{k}: manifest does not allow pinned version {v}"

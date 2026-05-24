@@ -24,4 +24,3 @@ updates:
       # breaks HA installs. Let HA core drive the version; revisit when HA
       # bumps it.
       - dependency-name: "dbus-fast"
-

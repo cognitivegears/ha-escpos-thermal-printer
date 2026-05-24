@@ -17,14 +17,10 @@ async def test_print_text_service(printer_with_ha) -> None:  # type: ignore[no-u
 
     # Call the print_text service
     await ha_env.hass.services.async_call(
-        'escpos_printer',
-        'print_text',
-        {
-            'text': test_text,
-            'align': 'center',
-            'bold': True
-        },
-        blocking=True
+        "escpos_printer",
+        "print_text",
+        {"text": test_text, "align": "center", "bold": True},
+        blocking=True,
     )
 
     # Wait for processing
@@ -34,7 +30,7 @@ async def test_print_text_service(printer_with_ha) -> None:  # type: ignore[no-u
     print_history = await printer.get_print_history()
     command_log = await printer.get_command_log()
 
-    assert VerificationUtilities.verify_printer_received('text', print_history, command_log)
+    assert VerificationUtilities.verify_printer_received("text", print_history, command_log)
     assert VerificationUtilities.verify_print_content(test_text, print_history)
 
 
@@ -48,14 +44,7 @@ async def test_print_qr_service(printer_with_ha) -> None:  # type: ignore[no-unt
 
     # Call the print_qr service
     await ha_env.hass.services.async_call(
-        'escpos_printer',
-        'print_qr',
-        {
-            'data': qr_data,
-            'size': 6,
-            'align': 'center'
-        },
-        blocking=True
+        "escpos_printer", "print_qr", {"data": qr_data, "size": 6, "align": "center"}, blocking=True
     )
 
     # Wait for processing
@@ -65,7 +54,7 @@ async def test_print_qr_service(printer_with_ha) -> None:  # type: ignore[no-unt
     print_history = await printer.get_print_history()
     command_log = await printer.get_command_log()
 
-    assert VerificationUtilities.verify_printer_received('qr', print_history, command_log)
+    assert VerificationUtilities.verify_printer_received("qr", print_history, command_log)
 
 
 @pytest.mark.asyncio
@@ -74,19 +63,14 @@ async def test_print_barcode_service(printer_with_ha) -> None:  # type: ignore[n
     printer, ha_env, _config = printer_with_ha
 
     # Generate test barcode data
-    barcode_data = MockDataGenerator.generate_barcode_data('CODE128')
+    barcode_data = MockDataGenerator.generate_barcode_data("CODE128")
 
     # Call the print_barcode service
     await ha_env.hass.services.async_call(
-        'escpos_printer',
-        'print_barcode',
-        {
-            'code': barcode_data,
-            'bc': 'CODE128',
-            'height': 64,
-            'width': 3
-        },
-        blocking=True
+        "escpos_printer",
+        "print_barcode",
+        {"code": barcode_data, "bc": "CODE128", "height": 64, "width": 3},
+        blocking=True,
     )
 
     # Wait for processing
@@ -96,7 +80,7 @@ async def test_print_barcode_service(printer_with_ha) -> None:  # type: ignore[n
     print_history = await printer.get_print_history()
     command_log = await printer.get_command_log()
 
-    assert VerificationUtilities.verify_printer_received('barcode', print_history, command_log)
+    assert VerificationUtilities.verify_printer_received("barcode", print_history, command_log)
 
 
 @pytest.mark.asyncio
@@ -105,20 +89,10 @@ async def test_feed_and_cut_services(printer_with_ha) -> None:  # type: ignore[n
     printer, ha_env, _config = printer_with_ha
 
     # Test feed service
-    await ha_env.hass.services.async_call(
-        'escpos_printer',
-        'feed',
-        {'lines': 3},
-        blocking=True
-    )
+    await ha_env.hass.services.async_call("escpos_printer", "feed", {"lines": 3}, blocking=True)
 
     # Test cut service
-    await ha_env.hass.services.async_call(
-        'escpos_printer',
-        'cut',
-        {'mode': 'full'},
-        blocking=True
-    )
+    await ha_env.hass.services.async_call("escpos_printer", "cut", {"mode": "full"}, blocking=True)
 
     # Wait for processing
     await ha_env.async_block_till_done()
@@ -126,8 +100,8 @@ async def test_feed_and_cut_services(printer_with_ha) -> None:  # type: ignore[n
     # Verify the printer received both commands
     command_log = await printer.get_command_log()
 
-    assert VerificationUtilities.verify_printer_received('feed', [], command_log)
-    assert VerificationUtilities.verify_printer_received('cut', [], command_log)
+    assert VerificationUtilities.verify_printer_received("feed", [], command_log)
+    assert VerificationUtilities.verify_printer_received("cut", [], command_log)
 
 
 @pytest.mark.asyncio
@@ -137,28 +111,23 @@ async def test_multiple_services_sequence(printer_with_ha) -> None:  # type: ign
 
     # Execute a sequence of services
     services_sequence = [
-        ('print_text', {'text': 'Header', 'align': 'center', 'bold': True}),
-        ('feed', {'lines': 1}),
-        ('print_qr', {'data': 'https://example.com', 'size': 4}),
-        ('feed', {'lines': 1}),
-        ('print_text', {'text': 'Footer', 'align': 'center'}),
-        ('cut', {'mode': 'partial'})
+        ("print_text", {"text": "Header", "align": "center", "bold": True}),
+        ("feed", {"lines": 1}),
+        ("print_qr", {"data": "https://example.com", "size": 4}),
+        ("feed", {"lines": 1}),
+        ("print_text", {"text": "Footer", "align": "center"}),
+        ("cut", {"mode": "partial"}),
     ]
 
     for service, data in services_sequence:
-        await ha_env.hass.services.async_call(
-            'escpos_printer',
-            service,
-            data,
-            blocking=True
-        )
+        await ha_env.hass.services.async_call("escpos_printer", service, data, blocking=True)
 
     # Wait for processing
     await ha_env.async_block_till_done()
 
     # Verify the command sequence
     command_log = await printer.get_command_log()
-    expected_sequence = ['text', 'feed', 'qr', 'feed', 'text', 'cut']
+    expected_sequence = ["text", "feed", "qr", "feed", "text", "cut"]
 
     assert VerificationUtilities.verify_command_sequence(expected_sequence, command_log)
 
@@ -176,30 +145,25 @@ async def test_service_parameter_variations(printer_with_ha) -> None:  # type: i
 
     # Test different text formatting options
     formatting_options: list[dict[str, object]] = [
-        {'bold': True, 'underline': 'single', 'align': 'left'},
-        {'bold': False, 'underline': 'double', 'align': 'center'},
-        {'bold': True, 'underline': 'none', 'align': 'right'},
-        {'width': 'double', 'height': 'double', 'align': 'center'}
+        {"bold": True, "underline": "single", "align": "left"},
+        {"bold": False, "underline": "double", "align": "center"},
+        {"bold": True, "underline": "none", "align": "right"},
+        {"width": "double", "height": "double", "align": "center"},
     ]
 
     for i, options in enumerate(formatting_options):
         test_text = f"Test formatting {i + 1}"
-        data: dict[str, object] = {'text': test_text}
+        data: dict[str, object] = {"text": test_text}
         data.update(options)
 
-        await ha_env.hass.services.async_call(
-            'escpos_printer',
-            'print_text',
-            data,
-            blocking=True
-        )
+        await ha_env.hass.services.async_call("escpos_printer", "print_text", data, blocking=True)
 
     # Wait for processing
     await ha_env.async_block_till_done()
 
     # Verify all text commands were processed
     command_log = await printer.get_command_log()
-    text_commands = [cmd for cmd in command_log if cmd.command_type == 'text']
+    text_commands = [cmd for cmd in command_log if cmd.command_type == "text"]
     assert len(text_commands) == len(formatting_options)
 
 
@@ -213,18 +177,10 @@ async def test_printer_state_tracking(printer_with_ha) -> None:  # type: ignore[
 
     # Perform some operations
     await ha_env.hass.services.async_call(
-        'escpos_printer',
-        'print_text',
-        {'text': 'State tracking test'},
-        blocking=True
+        "escpos_printer", "print_text", {"text": "State tracking test"}, blocking=True
     )
 
-    await ha_env.hass.services.async_call(
-        'escpos_printer',
-        'feed',
-        {'lines': 2},
-        blocking=True
-    )
+    await ha_env.hass.services.async_call("escpos_printer", "feed", {"lines": 2}, blocking=True)
 
     await ha_env.async_block_till_done()
 
@@ -232,5 +188,5 @@ async def test_printer_state_tracking(printer_with_ha) -> None:  # type: ignore[
     final_state = await printer.get_status()
 
     # Verify state changes
-    assert final_state['command_log_count'] > initial_state['command_log_count']
-    assert final_state['online'] == initial_state['online']  # Should remain online
+    assert final_state["command_log_count"] > initial_state["command_log_count"]
+    assert final_state["online"] == initial_state["online"]  # Should remain online

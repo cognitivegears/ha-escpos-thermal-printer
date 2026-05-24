@@ -101,9 +101,7 @@ def _classify(source: str) -> tuple[SourceKind, str]:
     lower = stripped.lower()
     if lower.startswith("data:"):
         if not lower.startswith("data:image/"):
-            raise HomeAssistantError(
-                "Only data:image/<subtype>;base64,... data URIs are supported"
-            )
+            raise HomeAssistantError("Only data:image/<subtype>;base64,... data URIs are supported")
         return "data", stripped
     if lower.startswith("camera."):
         return "camera", stripped
@@ -164,9 +162,7 @@ async def resolve_image_bytes(
             _LOGGER.debug("Resolving base64 data URI image (len=%d)", len(value))
             return validate_base64_image(value), SOURCE_DATA_URI
         case "camera":
-            return await _resolve_camera(
-                hass, value, context=context, auto_resize=auto_resize
-            )
+            return await _resolve_camera(hass, value, context=context, auto_resize=auto_resize)
         case "image":
             return await _resolve_image_entity(
                 hass, value, context=context, auto_resize=auto_resize
@@ -191,9 +187,7 @@ async def _check_user_can_read_entity(
     if user is None or user.is_admin:
         return
     if not user.permissions.check_entity(entity_id, POLICY_READ):
-        raise Unauthorized(
-            context=context, entity_id=entity_id, permission=POLICY_READ
-        )
+        raise Unauthorized(context=context, entity_id=entity_id, permission=POLICY_READ)
 
 
 async def _resolve_camera(
@@ -215,15 +209,12 @@ async def _resolve_camera(
 
     _LOGGER.debug("Fetching camera snapshot: %s", entity_id)
     try:
-        image = await async_get_image(
-            hass, entity_id, timeout=_ENTITY_FETCH_TIMEOUT_SECONDS
-        )
+        image = await async_get_image(hass, entity_id, timeout=_ENTITY_FETCH_TIMEOUT_SECONDS)
     except (HomeAssistantError, Unauthorized):
         raise
     except Exception as exc:
         raise HomeAssistantError(
-            f"Failed to fetch camera image '{entity_id}': "
-            f"{sanitize_log_message(str(exc))}"
+            f"Failed to fetch camera image '{entity_id}': {sanitize_log_message(str(exc))}"
         ) from exc
     _check_size(len(image.content), auto_resize=auto_resize)
     return image.content, image.content_type
@@ -248,23 +239,18 @@ async def _resolve_image_entity(
 
     _LOGGER.debug("Fetching image entity: %s", entity_id)
     try:
-        image = await async_get_image(
-            hass, entity_id, timeout=_ENTITY_FETCH_TIMEOUT_SECONDS
-        )
+        image = await async_get_image(hass, entity_id, timeout=_ENTITY_FETCH_TIMEOUT_SECONDS)
     except (HomeAssistantError, Unauthorized):
         raise
     except Exception as exc:
         raise HomeAssistantError(
-            f"Failed to fetch image entity '{entity_id}': "
-            f"{sanitize_log_message(str(exc))}"
+            f"Failed to fetch image entity '{entity_id}': {sanitize_log_message(str(exc))}"
         ) from exc
     _check_size(len(image.content), auto_resize=auto_resize)
     return image.content, image.content_type
 
 
-async def _stream_to_buffer(
-    aiter: Any, max_bytes: int
-) -> bytearray:
+async def _stream_to_buffer(aiter: Any, max_bytes: int) -> bytearray:
     """Consume an async byte iterator into a bytearray, aborting on overflow."""
     buf = bytearray()
     async for chunk in aiter:
@@ -320,16 +306,12 @@ async def _resolve_http_httpx(
                 if response.is_redirect:
                     location = response.headers.get("location")
                     if not location:
-                        raise HomeAssistantError(
-                            "HTTP redirect without Location header"
-                        )
+                        raise HomeAssistantError("HTTP redirect without Location header")
                     current = urljoin(current, location)
                     continue
                 response.raise_for_status()
                 _check_content_length(response.headers, max_bytes)
-                buf = await _stream_to_buffer(
-                    response.aiter_bytes(), max_bytes
-                )
+                buf = await _stream_to_buffer(response.aiter_bytes(), max_bytes)
                 content_type = response.headers.get("content-type")
                 return bytes(buf), content_type
         except HomeAssistantError:
@@ -338,9 +320,7 @@ async def _resolve_http_httpx(
             raise HomeAssistantError(
                 f"Failed to download image: {sanitize_log_message(str(exc))}"
             ) from exc
-    raise HomeAssistantError(
-        f"Too many redirects fetching image (>{_MAX_REDIRECTS})"
-    )
+    raise HomeAssistantError(f"Too many redirects fetching image (>{_MAX_REDIRECTS})")
 
 
 async def _resolve_http_aiohttp(
@@ -368,16 +348,12 @@ async def _resolve_http_aiohttp(
                 if response.status in (301, 302, 303, 307, 308):
                     location = response.headers.get("Location")
                     if not location:
-                        raise HomeAssistantError(
-                            "HTTP redirect without Location header"
-                        )
+                        raise HomeAssistantError("HTTP redirect without Location header")
                     current = urljoin(current, location)
                     continue
                 response.raise_for_status()
                 _check_content_length(response.headers, max_bytes)
-                buf = await _stream_to_buffer(
-                    response.content.iter_chunked(65536), max_bytes
-                )
+                buf = await _stream_to_buffer(response.content.iter_chunked(65536), max_bytes)
                 content_type = response.headers.get("Content-Type")
                 return bytes(buf), content_type
         except HomeAssistantError:
@@ -386,9 +362,7 @@ async def _resolve_http_aiohttp(
             raise HomeAssistantError(
                 f"Failed to download image: {sanitize_log_message(str(exc))}"
             ) from exc
-    raise HomeAssistantError(
-        f"Too many redirects fetching image (>{_MAX_REDIRECTS})"
-    )
+    raise HomeAssistantError(f"Too many redirects fetching image (>{_MAX_REDIRECTS})")
 
 
 async def _resolve_http(
@@ -442,14 +416,8 @@ def _check_size(num_bytes: int, *, auto_resize: bool = False) -> None:
     max_bytes = _MAX_BYTES_AUTO_RESIZE if auto_resize else _MAX_BYTES
     if num_bytes > max_bytes:
         mb = max_bytes // (1024 * 1024)
-        hint = (
-            ""
-            if auto_resize
-            else " — enable auto_resize to allow up to 4x this cap"
-        )
-        raise HomeAssistantError(
-            f"Image too large ({num_bytes} bytes; max {mb}MB){hint}"
-        )
+        hint = "" if auto_resize else " — enable auto_resize to allow up to 4x this cap"
+        raise HomeAssistantError(f"Image too large ({num_bytes} bytes; max {mb}MB){hint}")
 
 
 # ---------------------------------------------------------------------------
@@ -499,6 +467,7 @@ def extract_image_kwargs(
     historic ``image_dither`` / ``dither`` confusion without breaking
     existing callers.
     """
+
     def k(name: str) -> str:
         if not prefix or name in (ATTR_IMAGE, ATTR_IMAGE_WIDTH):
             return name

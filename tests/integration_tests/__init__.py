@@ -42,6 +42,7 @@ def _import_ha_environment() -> tuple[type[Any], type[Any], type[Any], type[Any]
             NotificationTester,
             StateChangeSimulator,
         )
+
         return HATestEnvironment, StateChangeSimulator, AutomationTester, NotificationTester
     except ImportError as e:
         raise ImportError(
@@ -51,6 +52,7 @@ def _import_ha_environment() -> tuple[type[Any], type[Any], type[Any], type[Any]
             "or use only the virtual printer emulator."
         ) from e
 
+
 from .fixtures import MockDataGenerator, VerificationUtilities
 
 
@@ -59,26 +61,27 @@ def get_ha_environment() -> Any:
     """Get HA environment classes, importing them only when needed."""
     return _import_ha_environment()
 
+
 __version__ = "1.0.0"
 
 __all__ = [
-    'Command',
-    'ErrorSimulator',
-    'EscposCommandParser',
-    'MockDataGenerator',
-    'PrintJob',
-    'PrinterState',
+    "Command",
+    "ErrorSimulator",
+    "EscposCommandParser",
+    "MockDataGenerator",
+    "PrintJob",
+    "PrinterState",
     # Test Utilities
-    'VerificationUtilities',
-    'VirtualPrinter',
+    "VerificationUtilities",
+    "VirtualPrinter",
     # Virtual Printer Emulator
-    'VirtualPrinterServer',
+    "VirtualPrinterServer",
     # Home Assistant Environment (lazy loaded)
-    '_import_ha_environment',  # Function to import HA components when needed
-    'create_connection_error',
-    'create_intermittent_error',
-    'create_offline_error',
-    'create_paper_out_error',
-    'create_timeout_error',
-    'get_ha_environment'      # Convenience function for HA components
+    "_import_ha_environment",  # Function to import HA components when needed
+    "create_connection_error",
+    "create_intermittent_error",
+    "create_offline_error",
+    "create_paper_out_error",
+    "create_timeout_error",
+    "get_ha_environment",  # Convenience function for HA components
 ]

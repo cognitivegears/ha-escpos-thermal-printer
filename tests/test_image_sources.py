@@ -301,6 +301,7 @@ async def test_resolve_http_falls_back_only_on_import_error(  # type: ignore[no-
     hass, monkeypatch, mock_pooled_aiohttp
 ):
     """When httpx is importable, an HTTP 404 must NOT trigger aiohttp fallback."""
+
     # Allow URL validation.
     def fake_getaddrinfo(_host, _port, **_kw):  # type: ignore[no-untyped-def]
         return [(socket.AF_INET, socket.SOCK_STREAM, 0, "", ("93.184.216.34", 0))]

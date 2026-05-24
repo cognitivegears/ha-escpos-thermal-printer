@@ -123,6 +123,7 @@ class EscposPrinterAdapterBase(
 
         # Establish initial connection if keeping alive
         if self._keepalive and self._printer is None:
+
             def _mk() -> Any:
                 return self._connect()
 
@@ -137,7 +138,9 @@ class EscposPrinterAdapterBase(
             async def _tick(now: Any) -> None:
                 await self._status_check(hass)
 
-            self._cancel_status = async_track_time_interval(hass, _tick, timedelta(seconds=self._status_interval))
+            self._cancel_status = async_track_time_interval(
+                hass, _tick, timedelta(seconds=self._status_interval)
+            )
         # Perform an initial status probe only when status checks are enabled
         if self._status_interval > 0:
             await self._status_check(hass)
@@ -172,6 +175,7 @@ class EscposPrinterAdapterBase(
 
     def get_diagnostics(self) -> dict[str, Any]:
         """Return diagnostic information about the adapter."""
+
         def _iso(dt_obj: Any) -> str | None:
             return dt_obj.isoformat() if dt_obj is not None else None
 
@@ -184,9 +188,7 @@ class EscposPrinterAdapterBase(
             "last_error_errno": self._last_error_errno,
             "default_chunk_delay_ms": self.default_chunk_delay_ms,
             "profile_width": self._cached_profile_width,
-            "reliability_profile_defaults": dict(
-                self.reliability_profile_defaults
-            ),
+            "reliability_profile_defaults": dict(self.reliability_profile_defaults),
             "image_pipeline": self._image_stats.as_dict(),
         }
 
@@ -227,7 +229,9 @@ class EscposPrinterAdapterBase(
             if not line:
                 wrapped_lines.append("")
                 continue
-            wrapped_lines.extend(textwrap.wrap(line, width=cols, replace_whitespace=False, drop_whitespace=False))
+            wrapped_lines.extend(
+                textwrap.wrap(line, width=cols, replace_whitespace=False, drop_whitespace=False)
+            )
         return "\n".join(wrapped_lines)
 
     # Static methods delegated to mapping_utils for backward compatibility
@@ -259,12 +263,14 @@ class EscposPrinterAdapterBase(
 
                 return escpos_profile.get_profile(self._config.profile)
             except Exception as e:
-                _LOGGER.debug("Unknown printer profile '%s': %s", self._config.profile, sanitize_log_message(str(e)))
+                _LOGGER.debug(
+                    "Unknown printer profile '%s': %s",
+                    self._config.profile,
+                    sanitize_log_message(str(e)),
+                )
         return None
 
-    def _get_profile_pixel_width(
-        self, hass: HomeAssistant | None = None
-    ) -> int | None:
+    def get_profile_pixel_width(self, hass: HomeAssistant | None = None) -> int | None:
         """Return the printer profile's max pixel width (cached).
 
         Falls back to :data:`FALLBACK_PROFILE_WIDTH`, logs a single
@@ -306,9 +312,7 @@ class EscposPrinterAdapterBase(
             from ..const import DOMAIN  # noqa: PLC0415
         except ImportError:
             return
-        profile_name = (
-            getattr(self._config, "profile", None) or "default"
-        )
+        profile_name = getattr(self._config, "profile", None) or "default"
         try:
             ir.async_create_issue(
                 hass,
@@ -323,11 +327,11 @@ class EscposPrinterAdapterBase(
                 },
             )
         except Exception as exc:
-            _LOGGER.debug(
-                "Could not create profile_width repair issue: %s", exc
-            )
+            _LOGGER.debug("Could not create profile_width repair issue: %s", exc)
 
-    async def _apply_cut_and_feed(self, hass: HomeAssistant, printer: Any, cut: str | None, feed: int | None) -> None:
+    async def _apply_cut_and_feed(
+        self, hass: HomeAssistant, printer: Any, cut: str | None, feed: int | None
+    ) -> None:
         """Apply feed and cut operations to the printer.
 
         ``feed=None`` means "no explicit feed" (no lines emitted).
@@ -337,6 +341,7 @@ class EscposPrinterAdapterBase(
         if feed is not None:
             lines = validate_numeric_input(feed, 0, MAX_FEED_LINES, "feed")
             if lines > 0:
+
                 def _feed() -> None:
                     # Some versions have ln(); otherwise send newlines
                     if hasattr(printer, "ln"):
@@ -352,6 +357,7 @@ class EscposPrinterAdapterBase(
 
         cut_mode = self._map_cut(cut)
         if cut_mode:
+
             def _cut() -> None:
                 try:
                     printer.cut(mode=cut_mode)
@@ -400,16 +406,12 @@ class EscposPrinterAdapterBase(
             printer, owned = await self._acquire_printer(hass)
             try:
                 try:
-                    await _print_text_under_lock(
-                        self, hass, printer, **text_kwargs
-                    )
+                    await _print_text_under_lock(self, hass, printer, **text_kwargs)
                     await _print_prepared_under_lock(hass, printer, prepared)
                     await self._apply_cut_and_feed(hass, printer, cut, feed)
                 except (asyncio.CancelledError, Exception):
                     with contextlib.suppress(Exception):
-                        await self._apply_cut_and_feed(
-                            hass, printer, cut or "full", feed or 1
-                        )
+                        await self._apply_cut_and_feed(hass, printer, cut or "full", feed or 1)
                     raise
             finally:
                 await self._release_printer(hass, printer, owned=owned)

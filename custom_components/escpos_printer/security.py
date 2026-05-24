@@ -83,9 +83,40 @@ MAX_IMAGE_PATH_LENGTH = 1024
 # decode — Pillow's ``formats=`` parameter in the actual decode step is
 # the real gate, so listing them here without the opener is a no-op.
 VALID_IMAGE_EXTENSIONS = frozenset(
-    {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp",
-     ".heic", ".heif", ".avif"}
+    {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp", ".heic", ".heif", ".avif"}
 )
+
+# Text-effects bounds. ``MAX_BOX_WIDTH`` is generous (covers 80-column
+# wide-receipt printers) and ``MAX_TABLE_*`` keeps a single service call
+# from blowing the paper budget. ``MAX_FONT_SIZE_PT`` caps the rendered
+# image height — at 72-DPI a 96-pt font is already ~130 px tall per
+# line, well above what a 384-px-wide receipt printer can show
+# legibly.
+MAX_BOX_WIDTH = 200
+MAX_TABLE_ROWS = 200
+MAX_TABLE_COLS = 12
+MAX_TABLE_CELL_LENGTH = 1000
+# Maximum consecutive separator lines a single ``print_separator`` call
+# may emit. Ten lines is already a heavy decorative block; this cap
+# stops a runaway automation from consuming a whole receipt of paper.
+MAX_SEPARATOR_REPEAT = 10
+MAX_FONT_SIZE_PT = 96
+MAX_FONT_PATH_LENGTH = MAX_IMAGE_PATH_LENGTH
+ALLOWED_FONT_EXTENSIONS = frozenset({".ttf", ".otf"})
+
+# Maximum size of a user-supplied TTF/OTF file. Real-world fonts top out
+# in the low-MB range (DejaVuSans is ~740 KB); 16 MB is generous and
+# prevents an attacker-supplied multi-GB file from pinning FreeType's
+# parser in tens of seconds of allocation work.
+MAX_FONT_SIZE_BYTES = 16 * 1024 * 1024
+
+# Cap on the rendered text-image canvas. ``MAX_RENDER_HEIGHT_PX`` is the
+# pre-rotation height ceiling — chosen to match ``MAX_PROCESSED_HEIGHT``
+# so a canvas that passes here cannot stall the downstream slice
+# pipeline. ``MAX_RENDER_PIXELS`` is a belt-and-braces total-area cap
+# against any rotation/expand explosion that doubles memory.
+MAX_RENDER_HEIGHT_PX = MAX_PROCESSED_HEIGHT  # 8192
+MAX_RENDER_PIXELS = 5_000_000  # ~5 MP — well above any legitimate receipt
 
 # Permitted data-URI subtypes. Pinned so a future regression can't
 # accidentally enable SVG (no Pillow renderer; cairo-based fallbacks are
@@ -114,9 +145,7 @@ def validate_text_input(text: str, max_length: int = MAX_TEXT_LENGTH) -> str:
         raise HomeAssistantError("Text input must be a string")
 
     if len(text) > max_length:
-        raise HomeAssistantError(
-            f"Text length exceeds maximum of {max_length} characters"
-        )
+        raise HomeAssistantError(f"Text length exceeds maximum of {max_length} characters")
 
     # Strip C0 control characters except CR/LF/HT (which ESC/POS handles).
     sanitized = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
@@ -165,16 +194,25 @@ def validate_barcode_data(code: str, bc_type: str) -> tuple[str, str]:
         "JAN8": "EAN8",
     }
     valid_types = {
-        "EAN13", "EAN8", "UPCA", "UPC-A", "UPC-E",
-        "CODE39", "CODE93", "CODE128",
-        "ITF", "ITF14", "CODABAR", "NW7",
-        "JAN", "JAN13", "JAN8",
+        "EAN13",
+        "EAN8",
+        "UPCA",
+        "UPC-A",
+        "UPC-E",
+        "CODE39",
+        "CODE93",
+        "CODE128",
+        "ITF",
+        "ITF14",
+        "CODABAR",
+        "NW7",
+        "JAN",
+        "JAN13",
+        "JAN8",
     }
     bc_upper = bc_type.upper()
     if bc_upper not in valid_types:
-        _LOGGER.warning(
-            "Unknown barcode type '%s', proceeding with caution", bc_type
-        )
+        _LOGGER.warning("Unknown barcode type '%s', proceeding with caution", bc_type)
     bc_canonical = aliases.get(bc_upper, bc_upper)
     return code, bc_canonical
 
@@ -218,9 +256,7 @@ def validate_image_url(url: str) -> str:
     # IDN/punycode: a homograph URL renders visually identical to a
     # legitimate one in logs/toasts. Reject `xn--`-encoded hostnames.
     if "xn--" in parsed.hostname.lower():
-        raise HomeAssistantError(
-            "Internationalized (IDN/punycode) hostnames are not allowed"
-        )
+        raise HomeAssistantError("Internationalized (IDN/punycode) hostnames are not allowed")
 
     # Restrict to default ports for the scheme. Catches both 22 (SSH) and
     # 8123 (HA itself).
@@ -253,18 +289,14 @@ def _resolve_hostname_sync(hostname: str, port: int | None) -> list[str]:
     try:
         infos = socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
     except OSError as exc:
-        raise HomeAssistantError(
-            f"Could not resolve image URL hostname: {exc}"
-        ) from exc
+        raise HomeAssistantError(f"Could not resolve image URL hostname: {exc}") from exc
     addrs = sorted({str(info[4][0]) for info in infos})
     if not addrs:
         raise HomeAssistantError("Could not resolve image URL hostname")
     return addrs
 
 
-async def validate_image_url_and_resolve(
-    hass: HomeAssistant, url: str
-) -> tuple[str, list[str]]:
+async def validate_image_url_and_resolve(hass: HomeAssistant, url: str) -> tuple[str, list[str]]:
     """Validate ``url`` and resolve its hostname, rejecting private targets.
 
     Returns ``(validated_url, resolved_addresses)``. The caller should pin
@@ -276,9 +308,7 @@ async def validate_image_url_and_resolve(
     hostname = parsed.hostname
     if hostname is None:  # pragma: no cover — validate_image_url enforces it
         raise HomeAssistantError("URL must include a valid hostname")
-    addrs = await hass.async_add_executor_job(
-        _resolve_hostname_sync, hostname, parsed.port
-    )
+    addrs = await hass.async_add_executor_job(_resolve_hostname_sync, hostname, parsed.port)
     bad = [a for a in addrs if not _is_public_address(a)]
     if bad:
         raise HomeAssistantError(
@@ -318,16 +348,13 @@ def _validate_local_path_sync(
     try:
         resolved = Path(raw_path).resolve(strict=True)
     except FileNotFoundError as exc:
-        raise HomeAssistantError(
-            "Image file does not exist or is not a regular file"
-        ) from exc
+        raise HomeAssistantError("Image file does not exist or is not a regular file") from exc
     except OSError as exc:
         raise HomeAssistantError(f"Cannot access image file: {exc}") from exc
 
     if resolved.suffix.lower() not in allowed:
         raise HomeAssistantError(
-            f"File extension '{resolved.suffix}' not allowed. "
-            f"Allowed: {sorted(allowed)}"
+            f"File extension '{resolved.suffix}' not allowed. Allowed: {sorted(allowed)}"
         )
 
     try:
@@ -343,9 +370,99 @@ def _validate_local_path_sync(
     return resolved
 
 
-def open_local_image_no_follow(
-    path: Path, *, max_bytes: int | None = None
-) -> bytes:
+def validate_font_path(
+    raw_path: str,
+    *,
+    hass: HomeAssistant | None = None,
+) -> Path:
+    """Resolve and validate a user-supplied font path.
+
+    Mirrors :func:`_validate_local_path_sync` but for ``.ttf`` / ``.otf``
+    files and without the per-file size cap (font files are routinely
+    in the multi-megabyte range). The user-supplied path itself must
+    not be a symlink (``Path.is_symlink``) — this defeats the "drop a
+    symlink in ``<config>/fonts/`` pointing at ``/etc/...``" trick
+    that would otherwise let an attacker make Pillow parse arbitrary
+    on-disk binaries. The resolved path is then rejected if it falls
+    outside ``hass``'s ``allowlist_external_dirs`` (when ``hass`` is
+    supplied — the standalone form is used by unit tests).
+
+    Blocking — call from an executor thread when ``hass`` is set,
+    because ``hass.config.is_allowed_path`` may stat the filesystem.
+    """
+    if not isinstance(raw_path, str):
+        raise HomeAssistantError("Font path must be a string")
+    if len(raw_path) > MAX_FONT_PATH_LENGTH:
+        raise HomeAssistantError(f"Font path exceeds maximum length {MAX_FONT_PATH_LENGTH}")
+    try:
+        raw_is_symlink = Path(raw_path).is_symlink()
+    except OSError as exc:
+        raise HomeAssistantError(f"Cannot access font file: {exc}") from exc
+    if raw_is_symlink:
+        raise HomeAssistantError("Font path must not be a symlink")
+    try:
+        resolved = Path(raw_path).resolve(strict=True)
+    except FileNotFoundError as exc:
+        raise HomeAssistantError("Font file does not exist or is not a regular file") from exc
+    except OSError as exc:
+        raise HomeAssistantError(f"Cannot access font file: {exc}") from exc
+
+    if resolved.suffix.lower() not in ALLOWED_FONT_EXTENSIONS:
+        raise HomeAssistantError(
+            f"Font extension '{resolved.suffix}' not allowed. "
+            f"Allowed: {sorted(ALLOWED_FONT_EXTENSIONS)}"
+        )
+
+    try:
+        st = resolved.stat()
+    except OSError as exc:
+        raise HomeAssistantError(f"Cannot access font file: {exc}") from exc
+    if not stat.S_ISREG(st.st_mode):
+        raise HomeAssistantError("Font path is not a regular file")
+    if st.st_size > MAX_FONT_SIZE_BYTES:
+        mb = MAX_FONT_SIZE_BYTES // (1024 * 1024)
+        raise HomeAssistantError(f"Font file too large (max {mb}MB)")
+
+    if hass is not None and not hass.config.is_allowed_path(str(resolved)):
+        raise HomeAssistantError(f"Font path '{resolved}' is outside allowlist_external_dirs")
+
+    return resolved
+
+
+def validate_rows(rows: Any) -> list[list[str]]:
+    """Validate the ``rows`` argument of the print_table service.
+
+    Enforces row/column/cell bounds and sanitizes every cell through
+    :func:`validate_text_input` so the table renderer never sees control
+    characters. Accepts any sequence-of-sequences; coerces non-string
+    cells to ``str`` (mirroring the renderer's own coercion).
+    """
+    if not isinstance(rows, (list, tuple)):
+        raise HomeAssistantError("rows must be a list of rows")
+    if len(rows) > MAX_TABLE_ROWS:
+        raise HomeAssistantError(f"rows length {len(rows)} exceeds maximum {MAX_TABLE_ROWS}")
+    if not rows:
+        raise HomeAssistantError("rows must contain at least one row")
+    out: list[list[str]] = []
+    for row in rows:
+        if not isinstance(row, (list, tuple)):
+            raise HomeAssistantError("each row must be a list of cells")
+        if len(row) > MAX_TABLE_COLS:
+            raise HomeAssistantError(f"row width {len(row)} exceeds maximum {MAX_TABLE_COLS}")
+        cells: list[str] = []
+        for cell in row:
+            if cell is None:
+                cells.append("")
+                continue
+            text = str(cell)
+            if len(text) > MAX_TABLE_CELL_LENGTH:
+                raise HomeAssistantError(f"cell length exceeds maximum {MAX_TABLE_CELL_LENGTH}")
+            cells.append(validate_text_input(text, max_length=MAX_TABLE_CELL_LENGTH))
+        out.append(cells)
+    return out
+
+
+def open_local_image_no_follow(path: Path, *, max_bytes: int | None = None) -> bytes:
     """Open ``path`` with ``O_NOFOLLOW`` and return its bytes.
 
     Used together with :func:`_validate_local_path_sync` to defeat
@@ -354,14 +471,33 @@ def open_local_image_no_follow(
     """
     if max_bytes is None:
         max_bytes = MAX_IMAGE_SIZE_MB * 1024 * 1024
+    return _read_no_follow(path, max_bytes=max_bytes, kind="Image")
+
+
+def open_local_font_no_follow(path: Path, *, max_bytes: int | None = None) -> bytes:
+    """Open ``path`` with ``O_NOFOLLOW`` and return its bytes (for fonts).
+
+    Mirrors :func:`open_local_image_no_follow` but with the font size cap
+    (``MAX_FONT_SIZE_BYTES``) instead of the image cap. The caller passes
+    these bytes through :class:`io.BytesIO` to ``ImageFont.truetype`` so
+    Pillow does not re-open the resolved path (which would otherwise be
+    swappable for an attacker-controlled file between validate and load).
+    """
+    if max_bytes is None:
+        max_bytes = MAX_FONT_SIZE_BYTES
+    return _read_no_follow(path, max_bytes=max_bytes, kind="Font")
+
+
+def _read_no_follow(path: Path, *, max_bytes: int, kind: str) -> bytes:
+    """Common O_NOFOLLOW open + size check for image / font readers."""
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
     try:
         st = os.fstat(fd)
         if not stat.S_ISREG(st.st_mode):
-            raise HomeAssistantError("Image path is not a regular file")
+            raise HomeAssistantError(f"{kind} path is not a regular file")
         if st.st_size > max_bytes:
             mb = max_bytes // (1024 * 1024)
-            raise HomeAssistantError(f"Image file too large (max {mb}MB)")
+            raise HomeAssistantError(f"{kind} file too large (max {mb}MB)")
         with os.fdopen(fd, "rb", closefd=True) as handle:
             fd = -1  # ownership transferred to the file object
             return handle.read(max_bytes + 1)
@@ -423,9 +559,7 @@ def validate_entity_id_for_domain(value: str, domain: str) -> str:
         raise HomeAssistantError("Entity id must be a string")
     parts = value.split(".")
     if len(parts) != 2 or parts[0] != domain or not parts[1]:
-        raise HomeAssistantError(
-            f"Expected entity_id in domain '{domain}', got: {value}"
-        )
+        raise HomeAssistantError(f"Expected entity_id in domain '{domain}', got: {value}")
     if not _ENTITY_OBJECT_RE.match(parts[1]):
         raise HomeAssistantError(f"Invalid entity_id: {value}")
     return value
@@ -468,21 +602,15 @@ def validate_rotation(value: Any) -> int:
     return int(_validate_choice(rotation, ROTATION_VALUES, "rotation"))
 
 
-def validate_numeric_input(
-    value: Any, min_val: int, max_val: int, field_name: str
-) -> int:
+def validate_numeric_input(value: Any, min_val: int, max_val: int, field_name: str) -> int:
     """Validate numeric input within bounds."""
     try:
         num_value = int(value)
     except (TypeError, ValueError) as exc:
-        raise HomeAssistantError(
-            f"{field_name} must be a valid integer"
-        ) from exc
+        raise HomeAssistantError(f"{field_name} must be a valid integer") from exc
 
     if not (min_val <= num_value <= max_val):
-        raise HomeAssistantError(
-            f"{field_name} must be between {min_val} and {max_val}"
-        )
+        raise HomeAssistantError(f"{field_name} must be between {min_val} and {max_val}")
 
     return num_value
 
@@ -497,13 +625,24 @@ def validate_numeric_input(
 _MAC_RE = re.compile(r"\b([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b")
 
 _DEFAULT_SENSITIVE_FIELDS = (
-    "password", "token", "key", "secret", "data", "text",
-    "address", "mac", "alias",
+    "password",
+    "token",
+    "key",
+    "secret",
+    "data",
+    "text",
+    "address",
+    "mac",
+    "alias",
     # New: redact image-pipeline field labels (URLs, file paths, hostnames).
-    "url", "path", "host", "image", "source",
+    "url",
+    "path",
+    "host",
+    "image",
+    "source",
 )
 _DEFAULT_FIELD_RE = re.compile(
-    rf'({"|".join(_DEFAULT_SENSITIVE_FIELDS)})=([^\s,)]+)',
+    rf"({'|'.join(_DEFAULT_SENSITIVE_FIELDS)})=([^\s,)]+)",
     re.IGNORECASE,
 )
 
@@ -513,16 +652,19 @@ _URL_USERINFO_RE = re.compile(r"(?P<scheme>[A-Za-z][A-Za-z0-9+.\-]*://)[^@/\s]+@
 # Redact bare HA-style filesystem paths so error text from PIL/aiohttp
 # doesn't leak install layout. Order matters: list longer prefixes first.
 _PATH_PREFIXES = (
-    "/addon_configs/", "/config/", "/media/", "/share/", "/ssl/", "/data/",
+    "/addon_configs/",
+    "/config/",
+    "/media/",
+    "/share/",
+    "/ssl/",
+    "/data/",
 )
 _PATH_RE = re.compile(
     r"(?P<prefix>" + "|".join(re.escape(p) for p in _PATH_PREFIXES) + r")[^\s'\")]+"
 )
 
 
-def sanitize_log_message(
-    message: str, sensitive_fields: list[str] | None = None
-) -> str:
+def sanitize_log_message(message: str, sensitive_fields: list[str] | None = None) -> str:
     """Sanitize log messages to prevent information disclosure.
 
     Redacts named ``field=value`` pairs, URL userinfo, filesystem paths
@@ -536,9 +678,7 @@ def sanitize_log_message(
         else:
             for field in sensitive_fields:
                 pattern = rf"({field})=([^\s,)]+)"
-                sanitized = re.sub(
-                    pattern, r"\1=[REDACTED]", sanitized, flags=re.IGNORECASE
-                )
+                sanitized = re.sub(pattern, r"\1=[REDACTED]", sanitized, flags=re.IGNORECASE)
 
     if "://" in sanitized:
         sanitized = _URL_USERINFO_RE.sub(r"\g<scheme>[REDACTED]@", sanitized)
@@ -547,9 +687,7 @@ def sanitize_log_message(
         sanitized = _PATH_RE.sub(r"\g<prefix>[REDACTED]", sanitized)
 
     if ":" in sanitized or "-" in sanitized:
-        sanitized = _MAC_RE.sub(
-            lambda m: m.group(0)[:8] + ":XX:XX:XX", sanitized
-        )
+        sanitized = _MAC_RE.sub(lambda m: m.group(0)[:8] + ":XX:XX:XX", sanitized)
 
     return sanitized
 
@@ -579,9 +717,7 @@ def validate_bluetooth_mac(mac: str) -> str:
         raise HomeAssistantError("Bluetooth MAC must be a string")
     candidate = mac.strip().upper().replace("-", ":")
     if not _BT_MAC_RE.match(candidate):
-        raise HomeAssistantError(
-            "Invalid Bluetooth MAC address; expected format AA:BB:CC:DD:EE:FF"
-        )
+        raise HomeAssistantError("Invalid Bluetooth MAC address; expected format AA:BB:CC:DD:EE:FF")
     return candidate
 
 

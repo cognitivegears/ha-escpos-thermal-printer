@@ -48,9 +48,7 @@ class EscposConfigFlow(
         self._show_all_bt_devices: bool = False
         self._pending_bt: dict[str, Any] = {}
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle step 1: Connection type selection.
 
         Args:
@@ -85,7 +83,9 @@ class EscposConfigFlow(
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> config_entries.OptionsFlow:
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> config_entries.OptionsFlow:
         """Create options flow handler.
 
         Args:

@@ -40,12 +40,12 @@ SERVICE_PRINT_MESSAGE = "print_message"
 # Schema for the custom entity service. The bulk of the field
 # definitions live in ``services/schemas.py`` so they share bounds and
 # defaults with the global service schema.
-SERVICE_PRINT_MESSAGE_SCHEMA = cv.make_entity_service_schema(
-    PRINT_MESSAGE_FIELDS
-)
+SERVICE_PRINT_MESSAGE_SCHEMA = cv.make_entity_service_schema(PRINT_MESSAGE_FIELDS)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry, async_add_entities) -> None:  # type: ignore[no-untyped-def]
+async def async_setup_entry(  # type: ignore[no-untyped-def]
+    hass: HomeAssistant, entry: EscposConfigEntry, async_add_entities
+) -> None:
     _LOGGER.debug("Setting up notify entity for entry %s", entry.entry_id)
     async_add_entities([EscposNotifyEntity(hass, entry)])
 
@@ -121,9 +121,7 @@ class EscposNotifyEntity(NotifyEntity):
         encoding = kwargs.get("encoding")
         if use_utf8:
             codepage = adapter.config.codepage or "CP437"
-            text = await self._hass.async_add_executor_job(
-                transcode_to_codepage, text, codepage
-            )
+            text = await self._hass.async_add_executor_job(transcode_to_codepage, text, codepage)
             encoding = None  # Let printer use configured codepage
 
         # ``or`` (not ``dict.get(k, default)``) so an explicit ``None``
@@ -155,7 +153,9 @@ class EscposNotifyEntity(NotifyEntity):
 
             image_source = render_template(self._hass, image_source_raw)
             image_kwargs = extract_image_kwargs(
-                {**kwargs, "image": image_source}, defaults, prefix="image_",
+                {**kwargs, "image": image_source},
+                defaults,
+                prefix="image_",
             )
             await adapter.print_text_with_image(
                 self._hass,

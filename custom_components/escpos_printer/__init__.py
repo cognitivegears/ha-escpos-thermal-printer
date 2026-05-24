@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import logging
 import os
+from pathlib import Path
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -79,6 +80,20 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     Services are registered here so they're available for all config entries.
     """
     hass.data.setdefault(DOMAIN, {})
+    # Pre-create ``<config>/fonts/`` so users can drop TTF/OTF files in
+    # there and reference them via ``print_text_image.font_path`` without
+    # editing ``allowlist_external_dirs`` in configuration.yaml. The
+    # integration treats this one directory as locally trusted (see
+    # ``services.print_handlers._is_font_path_allowed``).
+    fonts_dir = Path(hass.config.path("fonts"))
+
+    def _ensure_fonts_dir() -> None:
+        fonts_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        await hass.async_add_executor_job(_ensure_fonts_dir)
+    except OSError as err:
+        _LOGGER.debug("Could not pre-create fonts directory %s: %s", fonts_dir, err)
     return True
 
 
@@ -93,9 +108,7 @@ async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) ->
         True if migration successful
     """
     if config_entry.version == 1:
-        _LOGGER.info(
-            "Migrating config entry %s from version 1 to 2", config_entry.entry_id
-        )
+        _LOGGER.info("Migrating config entry %s from version 1 to 2", config_entry.entry_id)
 
         new_data = dict(config_entry.data)
 
@@ -126,9 +139,7 @@ async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) ->
         # Fall through to v2 -> v3 migration
 
     if config_entry.version == 2:
-        _LOGGER.info(
-            "Migrating config entry %s from version 2 to 3", config_entry.entry_id
-        )
+        _LOGGER.info("Migrating config entry %s from version 2 to 3", config_entry.entry_id)
 
         new_data = dict(config_entry.data)
 
@@ -198,9 +209,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bo
 
     adapter = create_printer_adapter(config)
 
-    reliability_profile = entry.options.get(
-        CONF_RELIABILITY_PROFILE, RELIABILITY_PROFILE_AUTO
-    )
+    reliability_profile = entry.options.get(CONF_RELIABILITY_PROFILE, RELIABILITY_PROFILE_AUTO)
     adapter.reliability_profile_defaults = dict(
         RELIABILITY_PROFILE_PRESETS.get(reliability_profile, {})
     )

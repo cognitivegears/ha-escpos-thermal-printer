@@ -15,30 +15,31 @@ _LOGGER = logging.getLogger(__name__)
 @dataclass
 class ErrorCondition:
     """Represents a programmable error condition."""
+
     error_type: str
     trigger_type: str  # 'immediate', 'after_commands', 'after_time', 'random'
     trigger_value: Any  # Number of commands, seconds, probability
     duration: float | None = None  # How long the error lasts (None = permanent)
-    recovery_type: str = 'manual'  # 'manual', 'auto', 'conditional'
+    recovery_type: str = "manual"  # 'manual', 'auto', 'conditional'
     recovery_condition: Callable | None = None
 
     def should_trigger(self, command_count: int, elapsed_time: float) -> bool:
         """Check if this error condition should be triggered."""
-        if self.trigger_type == 'immediate':
+        if self.trigger_type == "immediate":
             return True
-        elif self.trigger_type == 'after_commands':
+        elif self.trigger_type == "after_commands":
             return bool(command_count >= self.trigger_value)
-        elif self.trigger_type == 'after_time':
+        elif self.trigger_type == "after_time":
             return bool(elapsed_time >= self.trigger_value)
-        elif self.trigger_type == 'random':
+        elif self.trigger_type == "random":
             return bool(random.random() < self.trigger_value)
         return False
 
     def should_recover(self, **kwargs: Any) -> bool:
         """Check if this error should recover."""
-        if self.recovery_type == 'auto' and self.duration:
-            return bool(kwargs.get('elapsed_since_error', 0) >= self.duration)
-        elif self.recovery_type == 'conditional' and self.recovery_condition:
+        if self.recovery_type == "auto" and self.duration:
+            return bool(kwargs.get("elapsed_since_error", 0) >= self.duration)
+        elif self.recovery_type == "conditional" and self.recovery_condition:
             return bool(self.recovery_condition(**kwargs))
         return False
 
@@ -76,9 +77,7 @@ class ErrorSimulator:
             else:
                 # Create and activate a temporary error
                 temp_condition = ErrorCondition(
-                    error_type=error_type,
-                    trigger_type='immediate',
-                    trigger_value=None
+                    error_type=error_type, trigger_type="immediate", trigger_value=None
                 )
                 await self._activate_error(temp_condition)
 
@@ -106,9 +105,9 @@ class ErrorSimulator:
             # Check for error recovery
             for error_type, condition in list(self.active_errors.items()):
                 if condition.should_recover(
-                    elapsed_since_error=kwargs.get('elapsed_since_error', 0),
+                    elapsed_since_error=kwargs.get("elapsed_since_error", 0),
                     command_type=command_type,
-                    **kwargs
+                    **kwargs,
                 ):
                     await self._recover_error(error_type)
 
@@ -117,14 +116,14 @@ class ErrorSimulator:
     async def _activate_error(self, condition: ErrorCondition) -> None:
         """Activate an error condition."""
         error_record = {
-            'timestamp': asyncio.get_event_loop().time(),
-            'error_type': condition.error_type,
-            'action': 'activated',
-            'condition': {
-                'trigger_type': condition.trigger_type,
-                'trigger_value': condition.trigger_value,
-                'duration': condition.duration
-            }
+            "timestamp": asyncio.get_event_loop().time(),
+            "error_type": condition.error_type,
+            "action": "activated",
+            "condition": {
+                "trigger_type": condition.trigger_type,
+                "trigger_value": condition.trigger_value,
+                "duration": condition.duration,
+            },
         }
         self.error_history.append(error_record)
         _LOGGER.info("Activated error: %s", condition.error_type)
@@ -135,18 +134,18 @@ class ErrorSimulator:
             condition = self.active_errors[error_type]
 
             error_record = {
-                'timestamp': asyncio.get_event_loop().time(),
-                'error_type': error_type,
-                'action': 'recovered',
-                'condition': {
-                    'recovery_type': condition.recovery_type,
-                    'duration': condition.duration
-                }
+                "timestamp": asyncio.get_event_loop().time(),
+                "error_type": error_type,
+                "action": "recovered",
+                "condition": {
+                    "recovery_type": condition.recovery_type,
+                    "duration": condition.duration,
+                },
             }
             self.error_history.append(error_record)
 
             # Remove the error condition if it's set to auto-recover
-            if condition.recovery_type in ('auto', 'conditional'):
+            if condition.recovery_type in ("auto", "conditional"):
                 del self.active_errors[error_type]
 
             _LOGGER.info("Recovered from error: %s", error_type)
@@ -172,66 +171,72 @@ class ErrorSimulator:
 
 
 # Predefined error conditions for common scenarios
-def create_offline_error(trigger_type: str = 'immediate', trigger_value: Any = None,
-                        duration: float | None = None) -> ErrorCondition:
+def create_offline_error(
+    trigger_type: str = "immediate", trigger_value: Any = None, duration: float | None = None
+) -> ErrorCondition:
     """Create a printer offline error condition."""
     return ErrorCondition(
-        error_type='offline',
+        error_type="offline",
         trigger_type=trigger_type,
         trigger_value=trigger_value,
         duration=duration,
-        recovery_type='manual'
+        recovery_type="manual",
     )
 
 
-def create_paper_out_error(trigger_type: str = 'after_commands', trigger_value: int = 5,
-                          duration: float | None = None) -> ErrorCondition:
+def create_paper_out_error(
+    trigger_type: str = "after_commands", trigger_value: int = 5, duration: float | None = None
+) -> ErrorCondition:
     """Create a paper out error condition."""
     return ErrorCondition(
-        error_type='paper_out',
+        error_type="paper_out",
         trigger_type=trigger_type,
         trigger_value=trigger_value,
         duration=duration,
-        recovery_type='manual'
+        recovery_type="manual",
     )
 
 
-def create_timeout_error(trigger_type: str = 'random', trigger_value: float = 0.1,
-                        duration: float = 2.0) -> ErrorCondition:
+def create_timeout_error(
+    trigger_type: str = "random", trigger_value: float = 0.1, duration: float = 2.0
+) -> ErrorCondition:
     """Create a timeout error condition."""
     return ErrorCondition(
-        error_type='timeout',
+        error_type="timeout",
         trigger_type=trigger_type,
         trigger_value=trigger_value,
         duration=duration,
-        recovery_type='auto'
+        recovery_type="auto",
     )
 
 
-def create_connection_error(trigger_type: str = 'after_time', trigger_value: float = 30.0,
-                           duration: float = 5.0) -> ErrorCondition:
+def create_connection_error(
+    trigger_type: str = "after_time", trigger_value: float = 30.0, duration: float = 5.0
+) -> ErrorCondition:
     """Create a connection error condition."""
     return ErrorCondition(
-        error_type='connection_error',
+        error_type="connection_error",
         trigger_type=trigger_type,
         trigger_value=trigger_value,
         duration=duration,
-        recovery_type='auto'
+        recovery_type="auto",
     )
 
 
-def create_intermittent_error(error_type: str, interval: float = 10.0,
-                             duration: float = 2.0) -> ErrorCondition:
+def create_intermittent_error(
+    error_type: str, interval: float = 10.0, duration: float = 2.0
+) -> ErrorCondition:
     """Create an intermittent error that occurs at regular intervals."""
+
     def recovery_condition(**kwargs: Any) -> bool:
-        elapsed: float = float(kwargs.get('elapsed_since_error', 0))
+        elapsed: float = float(kwargs.get("elapsed_since_error", 0))
         return bool(elapsed >= duration)
 
     return ErrorCondition(
         error_type=error_type,
-        trigger_type='after_time',
+        trigger_type="after_time",
         trigger_value=interval,
         duration=duration,
-        recovery_type='conditional',
-        recovery_condition=recovery_condition
+        recovery_type="conditional",
+        recovery_condition=recovery_condition,
     )

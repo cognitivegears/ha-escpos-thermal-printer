@@ -128,9 +128,7 @@ class TestBluetoothAdapterStatusCheck:
     @pytest.mark.asyncio
     async def test_status_check_unavailable_platform(self, bt_adapter, hass):
         def _raise_unavailable(_mac, _ch, _to):
-            raise OSError(
-                "AF_BLUETOOTH/BTPROTO_RFCOMM not available on this platform."
-            )
+            raise OSError("AF_BLUETOOTH/BTPROTO_RFCOMM not available on this platform.")
 
         with patch.object(
             bluetooth_transport, "open_rfcomm_transport", side_effect=_raise_unavailable

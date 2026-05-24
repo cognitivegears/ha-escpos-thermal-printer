@@ -1,0 +1,99 @@
+blueprint:
+  name: ESC/POS — Shopping List
+  description: >
+    Print all open items from a Home Assistant todo entity as a
+    receipt-style shopping list. Drops a bordered title at the top
+    and an itemised table below.
+  domain: script
+  source_url: https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/blueprints/script/escpos_printer/shopping_list.yaml
+  input:
+    printer:
+      name: Printer
+      description: ESC/POS printer device to print to.
+      selector:
+        device:
+          integration: escpos_printer
+    todo_entity:
+      name: Todo entity
+      description: Which todo list to print.
+      selector:
+        entity:
+          domain: todo
+    title:
+      name: List title
+      description: Heading printed at the top of the list.
+      default: Shopping List
+      selector:
+        text: {}
+    style:
+      name: Border style
+      description: Border-glyph family for the title + items table.
+      default: auto
+      selector:
+        select:
+          options:
+            - auto
+            - single
+            - double
+            - ascii
+            - asterisk
+            - hash
+            - none
+# queued — manual triggers should print in order rather than dropping concurrent
+# invocations.
+mode: queued
+max_exceeded: silent
+sequence:
+  - service: todo.get_items
+    target:
+      entity_id: !input todo_entity
+    data:
+      status: needs_action
+    response_variable: todo_response
+  - variables:
+      raw_items: >
+        {{ (((todo_response | default({})).values() | list | first) or {}).get('items', []) }}
+      rows: >
+        {% set out = [] %}
+        {% for item in raw_items %}
+          {% set summary = (item.summary | default('') | string).replace('\n', ' ').replace('\r', ' ').replace('|', '/').replace('\t', ' ') | trim %}
+          {% set _ = out.append([summary]) %}
+        {% endfor %}
+        {{ out }}
+  - service: escpos_printer.print_box
+    target:
+      device_id: !input printer
+    data:
+      text: !input title
+      style: !input style
+      align: center
+      padding: 1
+  - if:
+      - condition: template
+        value_template: "{{ raw_items | length > 0 }}"
+    then:
+      - service: escpos_printer.print_table
+        target:
+          device_id: !input printer
+        data:
+          rows: "{{ rows }}"
+          style: !input style
+          header: false
+    else:
+      - service: escpos_printer.print_box
+        target:
+          device_id: !input printer
+        data:
+          text: "(nothing to buy)"
+          style: !input style
+          align: center
+  - service: escpos_printer.print_separator
+    target:
+      device_id: !input printer
+    data:
+      char: "="
+  - service: escpos_printer.cut
+    target:
+      device_id: !input printer
+    data:
+      mode: full
