@@ -61,7 +61,7 @@ def test_dither_threshold_produces_pure_black_and_white() -> None:
         img.putpixel((x, 0), x * 25)  # 0, 25, 50, ..., 225
     out = process_image(img, ImageProcessOptions(width=10, dither="threshold", threshold=128))
     assert out.mode == "1"
-    pixels = list(out.getdata())
+    pixels = list(out.get_flattened_data())
     # Values 0..125 -> 0, values 150..225 -> 255 (PIL "1" mode reports 0/255)
     assert pixels[:6] == [0, 0, 0, 0, 0, 0]
     assert pixels[6:] == [255, 255, 255, 255]
@@ -81,7 +81,7 @@ def test_autocontrast_expands_dynamic_range() -> None:
         img,
         ImageProcessOptions(width=4, autocontrast=True, dither="threshold", threshold=128),
     )
-    pixels = list(out.getdata())
+    pixels = list(out.get_flattened_data())
     # After autocontrast + threshold, we should see a mix of black and white,
     # not the all-one-color result we'd get without autocontrast.
     assert 0 in pixels
@@ -136,7 +136,7 @@ def test_rgba_transparency_flattened_to_white() -> None:
     out = process_image(rgba, ImageProcessOptions(width=10, dither="none"))
     assert out.mode == "1"
     # White paper means transparent pixels render as white (value 255).
-    pixels = list(out.getdata())
+    pixels = list(out.get_flattened_data())
     assert all(p == 255 for p in pixels)
 
 
@@ -182,7 +182,7 @@ def test_invert_swaps_black_and_white() -> None:
         img,
         ImageProcessOptions(width=8, invert=True, dither="threshold", threshold=128),
     )
-    assert set(out.getdata()) == {0}
+    assert set(out.get_flattened_data()) == {0}
 
 
 def test_mirror_flips_horizontally() -> None:
@@ -191,7 +191,7 @@ def test_mirror_flips_horizontally() -> None:
     img.putdata([0, 64, 128, 255])
     out = process_image(img, ImageProcessOptions(width=4, mirror=True, dither="none"))
     # After mirror, first column is the old last column (255 -> 1 in mode "1").
-    pixels = list(out.getdata())
+    pixels = list(out.get_flattened_data())
     # Mode "1" dither=none: PIL maps via floor — 255 stays 255, 0 stays 0.
     assert pixels[0] == 255
     assert pixels[-1] == 0
