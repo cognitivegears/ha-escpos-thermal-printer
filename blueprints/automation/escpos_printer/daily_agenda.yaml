@@ -75,13 +75,13 @@ action:
       events: >
         {{ ((((cal_response | default({})).values() | list | first) or {}).get('events', [])) }}
       kv_items: >
-        {% set out = [] %}
+        {% set ns = namespace(out=[]) %}
         {% for ev in events %}
           {% set start = (ev.start | as_datetime | as_local).strftime('%H:%M') %}
           {% set summary = (ev.summary | default('') | string).replace('\n', ' ').replace('\r', ' ').replace('|', '/').replace('\t', ' ') | trim %}
-          {% set _ = out.append([start, summary[:max_title_length]]) %}
+          {% set ns.out = ns.out + [[start, summary[:max_title_length]]] %}
         {% endfor %}
-        {{ out if out | length > 0 else [['-', 'No events today']] }}
+        {{ ns.out if ns.out | length > 0 else [['-', 'No events today']] }}
   - service: escpos_printer.print_box
     target:
       device_id: !input printer

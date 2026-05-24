@@ -62,15 +62,15 @@ sequence:
         {{ ((((forecast_response | default({})).values() | list | first) or {}).forecast | default([]))[:days_count] }}
       header: [["Day", "Hi", "Lo", "Cond"]]
       rows: >
-        {% set out = header %}
+        {% set ns = namespace(out=header) %}
         {% for f in forecast %}
           {% set day = (f.datetime | as_datetime).strftime('%a') %}
           {% set hi = f.temperature | round(0) | string %}
           {% set lo = (f.templow | round(0) | string) if f.templow is defined and f.templow is not none else '-' %}
           {% set cond = (f.condition | string)[:max_condition_length] %}
-          {% set _ = out.append([day, hi, lo, cond]) %}
+          {% set ns.out = ns.out + [[day, hi, lo, cond]] %}
         {% endfor %}
-        {{ out if forecast | length > 0 else (header + [['-', '-', '-', 'No data']]) }}
+        {{ ns.out if forecast | length > 0 else (header + [['-', '-', '-', 'No data']]) }}
   - service: escpos_printer.print_box
     target:
       device_id: !input printer

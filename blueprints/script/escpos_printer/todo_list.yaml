@@ -80,14 +80,14 @@ sequence:
       raw_items: >
         {{ (((todo_response | default({})).values() | list | first) or {}).get('items', []) }}
       decorated: >
-        {% set rows = [] %}
+        {% set ns = namespace(rows=[]) %}
         {% for item in raw_items %}
           {% set prefix = (loop.index ~ '. ') if numbered else '' %}
           {% set check = '✓ ' if item.status == 'completed' else '' %}
           {% set summary = (item.summary | default('') | string).replace('\n', ' ').replace('\r', ' ').replace('|', '/').replace('\t', ' ') | trim %}
-          {% set _ = rows.append([prefix ~ check ~ summary]) %}
+          {% set ns.rows = ns.rows + [[prefix ~ check ~ summary]] %}
         {% endfor %}
-        {{ rows }}
+        {{ ns.rows }}
   - service: escpos_printer.print_box
     target:
       device_id: !input printer

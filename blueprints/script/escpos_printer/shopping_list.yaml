@@ -54,12 +54,12 @@ sequence:
       raw_items: >
         {{ (((todo_response | default({})).values() | list | first) or {}).get('items', []) }}
       rows: >
-        {% set out = [] %}
+        {% set ns = namespace(out=[]) %}
         {% for item in raw_items %}
           {% set summary = (item.summary | default('') | string).replace('\n', ' ').replace('\r', ' ').replace('|', '/').replace('\t', ' ') | trim %}
-          {% set _ = out.append([summary]) %}
+          {% set ns.out = ns.out + [[summary]] %}
         {% endfor %}
-        {{ out }}
+        {{ ns.out }}
   - service: escpos_printer.print_box
     target:
       device_id: !input printer

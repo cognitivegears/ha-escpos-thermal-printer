@@ -63,19 +63,19 @@ sequence:
         {{ (steps_input | default('') | string).split('\n')
            | map('trim') | reject('eq', '') | list }}
       ingredient_rows: >
-        {% set out = [] %}
+        {% set ns = namespace(out=[]) %}
         {% for line in ingredient_lines %}
           {% set clean = line.replace('|', '/').replace('\t', ' ') %}
-          {% set _ = out.append([clean]) %}
+          {% set ns.out = ns.out + [[clean]] %}
         {% endfor %}
-        {{ out }}
+        {{ ns.out }}
       step_rows: >
-        {% set out = [] %}
+        {% set ns = namespace(out=[]) %}
         {% for s in step_lines %}
           {% set clean = s.replace('|', '/').replace('\t', ' ') %}
-          {% set _ = out.append([loop.index ~ '.', clean]) %}
+          {% set ns.out = ns.out + [[loop.index ~ '.', clean]] %}
         {% endfor %}
-        {{ out }}
+        {{ ns.out }}
   - service: escpos_printer.print_text_image
     target:
       device_id: !input printer

@@ -57,20 +57,20 @@ sequence:
         {{ (subtotal * tax_rate / 100) | round(2) }}
       total: "{{ (subtotal + tax_amount) | round(2) }}"
       line_items: >
-        {% set out = [] %}
+        {% set ns = namespace(out=[]) %}
         {% for it in items_input %}
           {% set name = (it.name | default('') | string).replace('\n', ' ').replace('\r', ' ').replace('|', '/').replace('\t', ' ') | trim %}
-          {% set _ = out.append([name, currency ~ ('%.2f' | format(it.price | float(0)))]) %}
+          {% set ns.out = ns.out + [[name, currency ~ ('%.2f' | format(it.price | float(0)))]] %}
         {% endfor %}
-        {{ out }}
+        {{ ns.out }}
       totals_items: >
-        {% set out = [] %}
-        {% set _ = out.append(['Subtotal', currency ~ ('%.2f' | format(subtotal))]) %}
+        {% set ns = namespace(out=[]) %}
+        {% set ns.out = ns.out + [['Subtotal', currency ~ ('%.2f' | format(subtotal))]] %}
         {% if tax_rate > 0 %}
-          {% set _ = out.append(['Tax (' ~ tax_rate ~ '%)', currency ~ ('%.2f' | format(tax_amount))]) %}
+          {% set ns.out = ns.out + [['Tax (' ~ tax_rate ~ '%)', currency ~ ('%.2f' | format(tax_amount))]] %}
         {% endif %}
-        {% set _ = out.append(['TOTAL', currency ~ ('%.2f' | format(total))]) %}
-        {{ out }}
+        {% set ns.out = ns.out + [['TOTAL', currency ~ ('%.2f' | format(total))]] %}
+        {{ ns.out }}
   - service: escpos_printer.print_text_image
     target:
       device_id: !input printer
