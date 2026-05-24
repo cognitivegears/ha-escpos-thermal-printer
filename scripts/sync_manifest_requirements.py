@@ -30,6 +30,13 @@ MANIFEST_OVERRIDES: dict[str, str] = {
     # within the 12.x line. Range matches HA core's expected Pillow range so
     # pip's resolver doesn't fight with HA's bundled wheel.
     "pillow": ">=12.1.1,<13.0.0",
+    # dbus-fast varies across HA versions within our supported floor:
+    # HA 2026.3/2026.4 ship 3.1.2, HA 2026.5 ships 4.0.4, HA master is on
+    # 5.0.3. Range covers the supported HA window so pip's resolver
+    # doesn't fight with HA bluetooth's manifest pin at install time.
+    # pyproject.toml keeps `dbus-fast==3.1.2` for dev/CI reproducibility
+    # against the locked HA test wheel.
+    "dbus-fast": ">=3.1.2,<6",
 }
 
 
