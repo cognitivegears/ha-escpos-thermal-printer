@@ -24,3 +24,13 @@ updates:
       # breaks HA installs. Let HA core drive the version; revisit when HA
       # bumps it.
       - dependency-name: "dbus-fast"
+      # Pillow is pinned to match Home Assistant core's Pillow pin (HA ships
+      # its own Pillow at runtime). Bumping independently creates an
+      # unresolvable resolver conflict in CI. Let HA drive the version;
+      # revisit when HA bumps it. See pyproject.toml dependencies for context.
+      - dependency-name: "pillow"
+      # respx is hard-pinned by pytest-homeassistant-custom-component
+      # (currently respx==0.22.0). Bumping independently breaks the HA test
+      # harness install. Let the HA test harness drive the version; revisit
+      # if upstream loosens the pin.
+      - dependency-name: "respx"

@@ -73,9 +73,10 @@ def validate_file(path: Path, root: Path | None = None) -> list[str]:
     try:
         # ``_BlueprintLoader`` derives from ``yaml.SafeLoader`` and only
         # *parses* unknown tags — it never instantiates Python objects
-        # from YAML. Safe by construction; ruff's S506 is a false
-        # positive against the literal substring "yaml.load".
-        data: Any = yaml.load(text, Loader=_BlueprintLoader)  # noqa: S506
+        # from YAML. Safe by construction; ruff's S506 and bandit's
+        # B506 both flag the literal "yaml.load" without recognising
+        # the SafeLoader subclass.
+        data: Any = yaml.load(text, Loader=_BlueprintLoader)  # noqa: S506  # nosec B506
     except yaml.YAMLError as err:
         return [f"YAML parse error: {err}"]
     if not isinstance(data, dict):
