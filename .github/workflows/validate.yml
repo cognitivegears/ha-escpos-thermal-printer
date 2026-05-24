@@ -46,7 +46,16 @@ jobs:
       - name: Override Home Assistant to master (canary)
         if: matrix.ha-version == 'master'
         run: |
+          # Upgrade both HA core *and* the test harness in lockstep —
+          # pytest-homeassistant-custom-component is tightly coupled to
+          # a specific HA core version (its fixtures load
+          # device_registry / set DEFAULT_TIME_ZONE the way that release
+          # expects). Upgrading only HA leaves the pinned plugin
+          # disagreeing with master about fixture setup, which surfaces
+          # as `KeyError: 'device_registry'` and timezone-fixture
+          # teardown failures rather than as real HA-master breakages.
           pip install --upgrade git+https://github.com/home-assistant/core.git@dev
+          pip install --upgrade git+https://github.com/MatthewFlamm/pytest-homeassistant-custom-component.git@master
 
       - name: Check dependency sync (manifest vs pyproject)
         run: |
