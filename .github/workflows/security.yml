@@ -49,13 +49,16 @@ jobs:
       - name: Bandit - Python security linting
         run: |
           # Two passes: SARIF for the Security tab, exit-code gate for CI.
-          # `-lll` fails the build on HIGH severity only; MEDIUM/LOW findings
-          # appear in the SARIF report uploaded below but do not block.
+          # CI-M5: `-ll` (MEDIUM-and-above) gate instead of the previous
+          # `-lll` (HIGH-only). MEDIUM findings now block the build rather
+          # than silently accumulating in the Security tab. Project-specific
+          # false positives go in `[tool.bandit] skips` in `pyproject.toml`
+          # so the skip rationale is reviewable.
           # `-c pyproject.toml` picks up [tool.bandit] skips that mirror the
           # ruff S101/S110 ignores. `scripts/` is included because it runs
           # with elevated privileges in dependabot-auto-sync.yml.
           bandit -c pyproject.toml -r custom_components/escpos_printer scripts -f sarif -o bandit.sarif || true
-          bandit -c pyproject.toml -r custom_components/escpos_printer scripts -lll
+          bandit -c pyproject.toml -r custom_components/escpos_printer scripts -ll
 
       - name: Install Cosign
         # Required by the Opengrep install script's --verify-signatures flag,

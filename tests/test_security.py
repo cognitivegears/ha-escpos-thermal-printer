@@ -122,9 +122,22 @@ class TestImageURLValidation:
         with pytest.raises(HomeAssistantError, match="credentials"):
             validate_image_url(url)
 
-    def test_validate_image_url_rejects_idn(self):  # type: ignore[no-untyped-def]
+    @pytest.mark.parametrize(
+        "url",
+        [
+            # Pre-encoded (xn-- form) — the original test case.
+            "https://xn--paypa-yfa.com/x.png",
+            # Raw-Unicode hostnames (T-H3) — S-M6 fix added the
+            # IDNA-encode-then-check branch so these are caught too.
+            # The previous `"xn--" in hostname.lower()` substring test
+            # missed these because urlparse does not IDNA-encode.
+            "https://例え.テスト/x.png",
+            "https://пример.рф/x.png",
+        ],
+    )
+    def test_validate_image_url_rejects_idn(self, url):  # type: ignore[no-untyped-def]
         with pytest.raises(HomeAssistantError, match="IDN"):
-            validate_image_url("https://xn--paypa-yfa.com/x.png")
+            validate_image_url(url)
 
     @pytest.mark.parametrize(
         "url",
@@ -361,6 +374,33 @@ class TestSecurityConstants:
         assert MAX_FEED_LINES == 50
         assert MAX_BEEP_TIMES == 10
 
+    def test_text_effects_max_constants(self):  # type: ignore[no-untyped-def]
+        """T-M3: pin the text-effects bounds added in the 0.7 branch.
+
+        These caps protect against paper-waste / executor-pool DoS via
+        large legal-shape inputs. Locking the numeric values here gives
+        regression evidence when someone "just bumps the constant".
+        """
+        from custom_components.escpos_printer.security import (
+            MAX_BOX_WIDTH,
+            MAX_FONT_SIZE_BYTES,
+            MAX_RENDER_HEIGHT_PX,
+            MAX_RENDER_PIXELS,
+            MAX_SEPARATOR_REPEAT,
+            MAX_TABLE_CELL_LENGTH,
+            MAX_TABLE_COLS,
+            MAX_TABLE_ROWS,
+        )
+
+        assert MAX_BOX_WIDTH == 200
+        assert MAX_TABLE_ROWS == 200
+        assert MAX_TABLE_COLS == 12
+        assert MAX_TABLE_CELL_LENGTH == 1000
+        assert MAX_SEPARATOR_REPEAT == 10
+        assert MAX_RENDER_PIXELS == 5_000_000
+        assert MAX_RENDER_HEIGHT_PX == 8192
+        assert MAX_FONT_SIZE_BYTES == 16 * 1024 * 1024
+
     def test_extension_set(self):  # type: ignore[no-untyped-def]
         assert ".png" in VALID_IMAGE_EXTENSIONS
         assert ".svg" not in VALID_IMAGE_EXTENSIONS
@@ -459,6 +499,47 @@ class TestFontPathValidation:
         link_at_validated_path.symlink_to(decoy)
         with pytest.raises(OSError):
             open_local_font_no_follow(link_at_validated_path)
+
+
+class TestWriteFileNoFollow:
+    """Regression tests for ``security.write_file_no_follow`` (S-M2, T-H1).
+
+    Preview-service file writes go through this primitive so a co-resident
+    attacker cannot plant a symlink under tempdir between path-validation
+    and write to redirect the output into an arbitrary file (the symmetric
+    defense to the read-side ``open_local_font_no_follow``).
+    """
+
+    def test_write_file_no_follow_rejects_symlink_leaf(self, tmp_path):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import write_file_no_follow
+
+        decoy = tmp_path / "decoy.txt"
+        decoy.write_text("untouched")
+        link = tmp_path / "out.txt"
+        link.symlink_to(decoy)
+        with pytest.raises(OSError):  # ELOOP from O_NOFOLLOW
+            write_file_no_follow(str(link), b"PWN!")
+        # The decoy must be unmodified — proves the write was blocked.
+        assert decoy.read_text() == "untouched"
+
+    def test_write_file_no_follow_writes_regular_file(self, tmp_path):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import write_file_no_follow
+
+        out = tmp_path / "out.bin"
+        write_file_no_follow(str(out), b"abc")
+        assert out.read_bytes() == b"abc"
+        # Owner-only mode (0o600) so a co-resident attacker cannot read
+        # an in-flight preview, only the HA process owner.
+        assert oct(out.stat().st_mode)[-3:] == "600"
+
+    def test_write_file_no_follow_truncates_existing(self, tmp_path):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import write_file_no_follow
+
+        out = tmp_path / "existing.bin"
+        out.write_bytes(b"longer existing content")
+        write_file_no_follow(str(out), b"abc")
+        # O_TRUNC must replace the file, not append.
+        assert out.read_bytes() == b"abc"
 
 
 class TestValidateRows:

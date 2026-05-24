@@ -90,7 +90,7 @@ def apply_accent_fallback(text: str, codepage: str) -> str:
         try:
             char.encode(codec)
             result.append(char)
-        except UnicodeEncodeError, LookupError:
+        except (UnicodeEncodeError, LookupError):
             # Character not in codepage, try fallback
             if char in ACCENT_FALLBACK_MAP:
                 result.append(ACCENT_FALLBACK_MAP[char])
@@ -211,7 +211,7 @@ def get_unmappable_chars(text: str, codepage: str) -> list[str]:
             continue
         try:
             char.encode(codec)
-        except UnicodeEncodeError, LookupError:
+        except (UnicodeEncodeError, LookupError):
             # Check if it has a look-alike
             if char not in LOOKALIKE_MAP and char not in ACCENT_FALLBACK_MAP:
                 unmappable.append(char)

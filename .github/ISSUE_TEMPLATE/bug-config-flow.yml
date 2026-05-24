@@ -1,0 +1,73 @@
+name: Config-flow / setup bug
+description: Adding the integration fails. Discovery doesn't pick up the printer. Options flow loses state.
+title: "[setup] "
+labels: ["bug", "config-flow"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report! Config-flow bugs are usually one of:
+        - Discovery (USB / Bluetooth) not finding a device that's
+          plugged in / paired.
+        - Setup form rejecting a value that should be accepted.
+        - Options flow losing state between steps.
+
+        Please include the **full UI text of the error** (or a screenshot)
+        — HA's error strings often pinpoint the rejected field.
+
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant version
+      placeholder: "2026.5.0"
+    validations:
+      required: true
+
+  - type: input
+    id: integration_version
+    attributes:
+      label: Integration version
+      placeholder: "0.7.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Where does it fail?
+      options:
+        - First add (Settings → Devices & Services → Add Integration)
+        - USB discovery picker
+        - Bluetooth discovery picker
+        - Manual MAC / VID-PID entry
+        - Profile / codepage / line-width custom step
+        - Options flow (re-configuring an existing entry)
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: transport
+    attributes:
+      label: Transport
+      options:
+        - Network
+        - USB
+        - Bluetooth
+    validations:
+      required: true
+
+  - type: textarea
+    id: error_text
+    attributes:
+      label: Full UI error text or screenshot
+      description: Paste the toast / form error verbatim. Or drag-drop a screenshot.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines
+      description: Enable debug logging (`logger.logs.custom_components.escpos_printer: debug`), reproduce, paste here.
+      render: text

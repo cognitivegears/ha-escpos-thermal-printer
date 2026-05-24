@@ -51,14 +51,18 @@ jobs:
         id: notes
         run: |
           TAG="${GITHUB_REF##refs/tags/}"
+          # The tag is `v0.7.0`; the CHANGELOG heading is `## [0.7.0]`.
+          # Strip the leading `v` so the awk grep matches (CI-H3 fix; the
+          # `verify` job already does the same).
+          TAG_VERSION="${TAG#v}"
           if [ -f CHANGELOG.md ]; then
-            # Pull the section between "## [TAG]" and the next "## [..." heading.
-            awk -v tag="$TAG" '
+            awk -v tag="$TAG_VERSION" '
               $0 ~ "^## \\[" tag "\\]" { in_section=1; next }
               in_section && $0 ~ "^## \\[" { in_section=0 }
               in_section { print }
             ' CHANGELOG.md > release-body.md
             if [ ! -s release-body.md ]; then
+              echo "::warning::No CHANGELOG section found for $TAG_VERSION; release body will be a stub"
               echo "Release $TAG" > release-body.md
             fi
           else

@@ -1,8 +1,26 @@
 name: Dependabot Auto Sync (manifest)
 
+# CI-C1 hardening: this workflow uses `pull_request_target`, which runs in
+# the BASE repo's context with the BASE repo's `GITHUB_TOKEN` and
+# `contents: write`. Standard defenses against the "pwn-request" pattern:
+#   1. Trigger only when dependency files change (paths: filter below).
+#   2. Run the sync script from a fresh checkout of `main` — NOT the PR
+#      head — so a malicious PR cannot ship a modified
+#      `sync_manifest_requirements.py` and execute it under our token.
+#   3. The PR head is checked out separately so the script reads the PR's
+#      `pyproject.toml` / `uv.lock` but never imports / runs PR-author code.
+#   4. Actions pinned to full SHAs (commit hashes) so an upstream tag
+#      retag cannot affect this elevated-permission workflow.
+#   5. Dependabot actor + same-repo guard already in place; kept as a
+#      belt-and-braces check.
+
 on:
   pull_request_target:
     types: [opened, synchronize]
+    paths:
+      - pyproject.toml
+      - uv.lock
+      - custom_components/escpos_printer/manifest.json
 
 permissions:
   contents: write
@@ -13,22 +31,28 @@ concurrency:
 
 jobs:
   sync-manifest:
-    # Only run for dependabot PRs from the SAME repo (defense-in-depth against
-    # the pull_request_target + PR-head-checkout "pwn-request" pattern). Forks
-    # cannot reach this job because dependabot doesn't open cross-repo PRs.
     if: >-
       github.actor == 'dependabot[bot]' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout PR branch
-        uses: actions/checkout@v6
+      # 1. Trusted script copy from `main` (never executes PR-author code).
+      - name: Checkout main (script source)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          ref: main
+          path: base
+
+      # 2. PR head checkout (data only — manifest, pyproject, lockfile).
+      - name: Checkout PR head (data source)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
+          path: pr
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
         with:
           python-version: '3.12'
 
@@ -38,8 +62,9 @@ jobs:
           pip install packaging
 
       - name: Sync manifest requirements with pyproject/uv.lock
+        working-directory: pr
         run: |
-          python scripts/sync_manifest_requirements.py || true
+          python ../base/scripts/sync_manifest_requirements.py || true
           if ! git diff --quiet -- custom_components/escpos_printer/manifest.json; then
             echo "Changes detected in manifest.json; committing..."
             git config user.name "github-actions[bot]"

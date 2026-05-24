@@ -1,0 +1,9 @@
+# Disable blank issues so reporters pick a tailored template.
+blank_issues_enabled: false
+contact_links:
+  - name: Question or help request
+    url: https://github.com/cognitivegears/ha-escpos-thermal-printer/discussions
+    about: Please ask usage questions in Discussions, not as issues.
+  - name: Security vulnerability
+    url: https://github.com/cognitivegears/ha-escpos-thermal-printer/security/advisories/new
+    about: Report security vulnerabilities privately via GitHub Security Advisories.

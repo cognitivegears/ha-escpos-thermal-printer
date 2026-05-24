@@ -332,7 +332,7 @@ class UsbFlowMixin:
                 # VID/PID must be in range 0x0001-0xFFFF (1-65535)
                 if not (0x0001 <= vendor_id <= 0xFFFF) or not (0x0001 <= product_id <= 0xFFFF):
                     errors["base"] = "invalid_usb_device"
-            except ValueError, TypeError:
+            except (ValueError, TypeError):
                 errors["base"] = "invalid_usb_device"
                 vendor_id, product_id = 0, 0
 
@@ -424,7 +424,7 @@ class UsbFlowMixin:
         try:
             vendor_id = int(discovery_info.vid, 16) if discovery_info.vid else 0
             product_id = int(discovery_info.pid, 16) if discovery_info.pid else 0
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             vendor_id, product_id = 0, 0
 
         if not vendor_id or not product_id:

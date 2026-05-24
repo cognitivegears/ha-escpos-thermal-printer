@@ -45,6 +45,11 @@ MAX_BARCODE_LENGTH = 100  # Maximum barcode data length
 MAX_IMAGE_SIZE_MB = 10  # Maximum image download / decoded size, MB
 MAX_FEED_LINES = 50  # Maximum feed lines to prevent paper waste
 MAX_BEEP_TIMES = 10  # Maximum beep repetitions
+# B-L2: separate semantic bound for beep *duration*. Numerically the same
+# upper bound today, but the schema + validators should not pretend the
+# two fields share a meaning. Units are python-escpos "buzzer ticks"
+# (~100ms per tick on most supported printers).
+MAX_BEEP_DURATION = 10
 
 # Image processing bounds (mirror in `services.yaml` + voluptuous schemas).
 IMAGE_WIDTH_MIN = 16
@@ -118,6 +123,17 @@ MAX_FONT_SIZE_BYTES = 16 * 1024 * 1024
 MAX_RENDER_HEIGHT_PX = MAX_PROCESSED_HEIGHT  # 8192
 MAX_RENDER_PIXELS = 5_000_000  # ~5 MP — well above any legitimate receipt
 
+# B-L5: pin the invariant. The text-image renderer (``text_effects.font_render``)
+# uses ``MAX_RENDER_HEIGHT_PX`` to reject canvases the downstream slicer
+# (``image_processor``) couldn't handle anyway. If a future change splits
+# the two, the renderer could produce a canvas the slicer immediately
+# rejects.
+assert MAX_RENDER_HEIGHT_PX <= MAX_PROCESSED_HEIGHT, (
+    "MAX_RENDER_HEIGHT_PX must not exceed MAX_PROCESSED_HEIGHT — the "
+    "renderer's height cap must stay <= the slicer's height cap so a "
+    "canvas that passes here cannot stall the slice pipeline."
+)
+
 # Permitted data-URI subtypes. Pinned so a future regression can't
 # accidentally enable SVG (no Pillow renderer; cairo-based fallbacks are
 # an XML attack surface). HEIC/HEIF/AVIF added so iOS / drone-style
@@ -148,7 +164,7 @@ def validate_text_input(text: str, max_length: int = MAX_TEXT_LENGTH) -> str:
         raise HomeAssistantError(f"Text length exceeds maximum of {max_length} characters")
 
     # Strip C0 control characters except CR/LF/HT (which ESC/POS handles).
-    sanitized = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
+    sanitized = _CONTROL_CHAR_RE.sub("", text)
 
     if len(sanitized) != len(text):
         _LOGGER.warning("Text input contained control characters that were removed")
@@ -254,9 +270,23 @@ def validate_image_url(url: str) -> str:
         raise HomeAssistantError("URLs with embedded credentials are not allowed")
 
     # IDN/punycode: a homograph URL renders visually identical to a
-    # legitimate one in logs/toasts. Reject `xn--`-encoded hostnames.
-    if "xn--" in parsed.hostname.lower():
-        raise HomeAssistantError("Internationalized (IDN/punycode) hostnames are not allowed")
+    # legitimate one in logs/toasts. Reject IDN hostnames whether the
+    # caller sent them as raw Unicode (``例え.テスト``) or pre-encoded
+    # (``xn--r8jz45g.xn--zckzah``). S-M6: the previous substring check
+    # missed raw-Unicode input because ``urlparse`` does not IDNA-encode
+    # for us — ``parsed.hostname`` for ``例え.テスト`` is the literal
+    # string, not ``xn--``-prefixed. Encode-then-check catches both.
+    hostname_to_check = parsed.hostname
+    if any(ord(c) > 0x7F for c in hostname_to_check):
+        try:
+            hostname_to_check = hostname_to_check.encode("idna").decode("ascii")
+        except UnicodeError as exc:
+            raise HomeAssistantError(f"Invalid IDN hostname: {exc}") from exc
+    if "xn--" in hostname_to_check.lower():
+        raise HomeAssistantError(
+            "Internationalized (IDN/punycode) hostnames are not allowed; "
+            "use the ASCII hostname or a numeric IP to avoid homograph confusion."
+        )
 
     # Restrict to default ports for the scheme. Catches both 22 (SSH) and
     # 8123 (HA itself).
@@ -429,13 +459,71 @@ def validate_font_path(
     return resolved
 
 
+def validate_font_path_with_fonts_dir(raw_path: str, hass: HomeAssistant) -> Path:
+    """Validate a font path, accepting ``<config>/fonts/`` in addition to allowlist.
+
+    Single entrypoint for the ``print_text_image`` handler (S-M1: trust
+    decision moved here from ``services/print_handlers._is_font_path_allowed``
+    so all path-validation policy lives next to ``validate_font_path``).
+
+    The narrowing — only one well-known subdirectory of the HA config
+    dir, only for font loading — keeps HA's broader allowlist model
+    intact for other path-based services. Blocking; call from an
+    executor thread.
+    """
+    # Run extension / size / symlink / regular-file checks first (these
+    # don't depend on the allowlist decision).
+    resolved = validate_font_path(raw_path)
+    resolved_str = str(resolved)
+    if hass.config.is_allowed_path(resolved_str):
+        return resolved
+    try:
+        fonts_dir = Path(hass.config.path("fonts")).resolve()
+    except (OSError, ValueError) as exc:
+        raise HomeAssistantError(
+            f"Font path '{resolved}' is outside allowlist_external_dirs "
+            f"(and <config>/fonts/ is not accessible)"
+        ) from exc
+    try:
+        if Path(resolved_str).resolve().is_relative_to(fonts_dir):
+            return resolved
+    except (OSError, ValueError) as exc:
+        raise HomeAssistantError(
+            f"Font path '{resolved}' is outside allowlist_external_dirs "
+            f"(and not under <config>/fonts/)"
+        ) from exc
+    raise HomeAssistantError(
+        f"Font path '{resolved}' is outside allowlist_external_dirs "
+        f"(and not under <config>/fonts/)"
+    )
+
+
+# Combined control-character strip regex. Used by both `validate_text_input`
+# and `_strip_controls` so the per-cell sanitisation path in `validate_rows`
+# doesn't re-run isinstance + length checks for every cell (M5).
+_CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def _strip_controls(text: str) -> str:
+    """Strip C0 control characters (except CR/LF/HT) from a known-str cell.
+
+    Internal helper used inside ``validate_rows`` / ``sanitise_kv_items``
+    where the caller already enforced ``isinstance(text, str)`` and the
+    length cap. Mirrors the regex pass in :func:`validate_text_input`
+    without the extra type / length re-checks (M5: ~2 ms saved per
+    max-size table).
+    """
+    return _CONTROL_CHAR_RE.sub("", text)
+
+
 def validate_rows(rows: Any) -> list[list[str]]:
     """Validate the ``rows`` argument of the print_table service.
 
     Enforces row/column/cell bounds and sanitizes every cell through
-    :func:`validate_text_input` so the table renderer never sees control
-    characters. Accepts any sequence-of-sequences; coerces non-string
-    cells to ``str`` (mirroring the renderer's own coercion).
+    the internal control-character stripper so the table renderer
+    never sees C0 controls. Accepts any sequence-of-sequences;
+    coerces non-string cells to ``str`` (mirroring the renderer's own
+    coercion).
     """
     if not isinstance(rows, (list, tuple)):
         raise HomeAssistantError("rows must be a list of rows")
@@ -457,8 +545,32 @@ def validate_rows(rows: Any) -> list[list[str]]:
             text = str(cell)
             if len(text) > MAX_TABLE_CELL_LENGTH:
                 raise HomeAssistantError(f"cell length exceeds maximum {MAX_TABLE_CELL_LENGTH}")
-            cells.append(validate_text_input(text, max_length=MAX_TABLE_CELL_LENGTH))
+            cells.append(_strip_controls(text))
         out.append(cells)
+    return out
+
+
+def sanitise_kv_items(items: Any) -> list[list[str]]:
+    """Sanitise the ``items`` payload of ``print_kvtable``.
+
+    Shape-checking lives in :func:`services.schemas._validate_kv_items_shape`
+    (runs on the event loop — cheap). This function does the per-cell
+    control-character strip on the executor (P-H1: per-cell regex work
+    scales with payload size and shouldn't block the loop). The caller
+    has already enforced 2-element lists and the per-cell length cap,
+    so we coerce and strip without re-checking shape.
+    """
+    out: list[list[str]] = []
+    for entry in items:
+        pair: list[str] = []
+        for cell in entry:
+            s = "" if cell is None else str(cell)
+            if len(s) > MAX_TABLE_CELL_LENGTH:
+                raise HomeAssistantError(
+                    f"cell length {len(s)} exceeds maximum {MAX_TABLE_CELL_LENGTH}"
+                )
+            pair.append(_strip_controls(s))
+        out.append(pair)
     return out
 
 
@@ -501,6 +613,33 @@ def _read_no_follow(path: Path, *, max_bytes: int, kind: str) -> bytes:
         with os.fdopen(fd, "rb", closefd=True) as handle:
             fd = -1  # ownership transferred to the file object
             return handle.read(max_bytes + 1)
+    finally:
+        if fd >= 0:
+            os.close(fd)
+
+
+def write_file_no_follow(path: str, data: bytes) -> None:
+    """Write ``data`` to ``path`` with ``O_NOFOLLOW`` (S-M2).
+
+    The path-validation step at the call site uses ``Path.resolve()``;
+    a co-resident attacker who can plant a symlink between validation
+    and write would otherwise make us overwrite the symlink target.
+    ``O_NOFOLLOW`` makes the open fail with ``ELOOP`` if the leaf is a
+    symlink. ``O_EXCL`` + ``O_CREAT`` would refuse to clobber an
+    existing file, but preview writes intentionally overwrite — so we
+    pair ``O_NOFOLLOW`` with ``O_TRUNC`` and explicit owner-only mode.
+
+    Blocking; call from an executor thread.
+    """
+    fd = os.open(
+        path,
+        os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW | os.O_CLOEXEC,
+        0o600,
+    )
+    try:
+        with os.fdopen(fd, "wb", closefd=True) as handle:
+            fd = -1
+            handle.write(data)
     finally:
         if fd >= 0:
             os.close(fd)
@@ -732,10 +871,8 @@ def validate_rfcomm_channel(channel: int) -> int:
     return value
 
 
-def secure_service_call(func):  # type: ignore[no-untyped-def]
-    """Decorator hook for cross-cutting security validations."""
-
-    async def wrapper(*args, **kwargs):  # type: ignore[no-untyped-def]
-        return await func(*args, **kwargs)
-
-    return wrapper
+    # B-L1: ``secure_service_call`` was a never-implemented pass-through
+    # decorator from an earlier iteration. The cross-cutting validation
+    # it advertised (exception sanitisation in particular) now lives in
+    # ``services._handler_utils._wrap_unexpected`` and ``_for_each_target``.
+    # No callers remained, so the decorator was removed.

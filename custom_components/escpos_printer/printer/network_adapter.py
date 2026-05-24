@@ -42,7 +42,17 @@ class NetworkPrinterAdapter(EscposPrinterAdapterBase):
         )
 
     async def _status_check(self, hass: HomeAssistant) -> None:
-        """Non-invasive TCP reachability check for network printers."""
+        """Non-invasive TCP reachability check for network printers.
+
+        P-M2: skip the probe entirely if a print is in flight. Opening a
+        second TCP connection to the same printer mid-print can flap
+        bandwidth-constrained transports (Bluetooth/USB-IP via TCP
+        gateway). The status sensor stays at its last-known value
+        until the print completes — strictly better than corrupting an
+        active job.
+        """
+        if self._lock.locked():
+            return
 
         def _probe() -> tuple[bool, str | None, int | None]:
             start = time.perf_counter()

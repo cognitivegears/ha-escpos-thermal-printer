@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any
 
 from ..const import DEFAULT_CUT
 from ..security import (
@@ -12,42 +11,19 @@ from ..security import (
     validate_qr_data,
     validate_text_input,
 )
+from ._host import _PrinterHost
 from .mapping_utils import map_align, map_multiplier, map_underline
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
-    from .config import BasePrinterConfig
-
 _LOGGER = logging.getLogger(__name__)
 
-
-class _PrinterHost(Protocol):
-    """The surface a print operation mixin requires from ``self``.
-
-    Methods are implemented by :class:`EscposPrinterAdapterBase`. The
-    Protocol lets mypy verify the mixin contract without a runtime
-    inheritance dependency.
-    """
-
-    _config: BasePrinterConfig
-    _printer: Any
-    _lock: asyncio.Lock
-
-    def _connect(self) -> Any: ...
-    def _wrap_text(self, text: str) -> str: ...
-    def get_profile_pixel_width(self, hass: HomeAssistant | None = None) -> int | None: ...
-
-    async def _acquire_printer(self, hass: HomeAssistant) -> tuple[Any, bool]: ...
-    async def _release_printer(self, hass: HomeAssistant, printer: Any, *, owned: bool) -> None: ...
-    async def _apply_cut_and_feed(
-        self,
-        hass: HomeAssistant,
-        printer: Any,
-        cut: str | None,
-        feed: int | None,
-    ) -> None: ...
-    async def _mark_success(self) -> None: ...
+# Re-exported for backward compat (B-M4 moved the canonical declaration
+# into ``_host.py`` so all four mixin families import the contract from
+# its file of record). Tests + adapters that already pulled from here
+# keep working.
+__all__ = ["PrintOperationsMixin", "_PrinterHost"]
 
 
 class PrintOperationsMixin:

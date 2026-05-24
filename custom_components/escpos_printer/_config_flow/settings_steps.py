@@ -284,17 +284,13 @@ class SettingsFlowMixin:
             custom_width = user_input.get("custom_line_width")
             _LOGGER.debug("Custom line width entered: %s", custom_width)
 
-            # Validate line width is a positive number within reasonable bounds
-            try:
-                width_int = int(custom_width)  # type: ignore[arg-type]
-                if width_int < 1 or width_int > 255:
-                    _LOGGER.warning("Invalid line width (out of range): %s", custom_width)
-                    errors["base"] = "invalid_line_width"
-            except ValueError, TypeError:
-                _LOGGER.warning("Invalid line width (not a number): %s", custom_width)
-                errors["base"] = "invalid_line_width"
+            from .network_helpers import validate_custom_line_width  # noqa: PLC0415
 
-            if not errors:
+            width_int, err_code = validate_custom_line_width(custom_width)
+            if err_code:
+                errors["base"] = err_code
+
+            if not errors and width_int is not None:
                 # Create entry
                 data = {
                     **self._user_data,

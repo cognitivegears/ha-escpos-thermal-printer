@@ -574,8 +574,11 @@ ready-to-import automations and scripts that use these patterns.
   render it through `print_text_image` instead — pass the laid-out
   table string as `text` to that service.
 - **No native ESC/POS rotation.** Some printers expose `ESC V` for
-  90° text rotation, but `python-escpos` 3.1 doesn't currently
-  expose it; the image-render path is the portable substitute.
+  90° text rotation, but the `python-escpos` version this integration
+  pins (`python-escpos==3.1`, see `pyproject.toml`) doesn't expose it;
+  the image-render path is the portable substitute. If a future
+  python-escpos release adds the bind, this note is the canary to
+  re-evaluate the text path.
 
 ## CJK / wide-character content {#cjk}
 
@@ -587,13 +590,23 @@ most emoji**, which render two terminal columns wide. The result is
 silently misaligned columns: the data is correct but the visual
 gridlines drift.
 
-When `print_table` (or `print_kvtable`) detects a wide-width
-character anywhere in the input it logs a warning:
+The **first time** `print_box`, `print_table`, or `print_kvtable`
+sees wide-width characters in the input it logs a one-shot warning:
 
 ```
-Table contains wide-width characters (CJK / fullwidth / emoji); column
-alignment may be off…
+Box content contains wide-width characters (CJK / fullwidth /
+emoji); the borders may misalign because textwrap wraps by
+code-point count, not display columns. Use print_text_image for
+accurate layout — see docs/text-effects.md#cjk.
+(This warning fires once per process.)
 ```
+
+The warning is **hint-only** — the renderer still produces output
+even when wide glyphs are present, just without per-glyph column
+awareness. Detection samples the first 256 characters of each
+input; if the only wide glyphs appear later in a long string the
+warning may not fire, but the renderer's output is identical either
+way (the data is correct; only visual alignment differs).
 
 **The recommended workaround** is to render the layout through
 `print_text_image` instead: the image renderer measures actual glyph

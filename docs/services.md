@@ -105,7 +105,7 @@ Every image service accepts the same option set. Rarely-used reliability knobs a
 | center | boolean | Horizontally center the image on the paper. Default `false`. |
 | high_density | boolean | High-density printing mode. Default `true`. |
 | cut | string | `none`, `partial`, `full`. Defaults to the printer's configured cut mode. |
-| feed | int | Lines to feed after printing (0–50). Defaults vary per service (0 for generic, 1 for URL/path/image-entity, 2 for camera snapshot). |
+| feed | int | Lines to feed after printing (0–50). Default depends on the service: `print_image` = `0`; `print_image_url` / `print_image_path` / `print_image_entity` = `1`; `print_camera_snapshot` = `2`; `calibration_print` = `2`. The focused services pick friendlier defaults than `print_image` because their typical use-case prints once and you want a paper buffer for tearing off cleanly. |
 | impl | string | **advanced.** `bitImageRaster`, `graphics`, or `bitImageColumn`. Leave unset to honor the printer's Reliability profile. |
 | fragment_height | int | **advanced.** Rows per chunk when sending the image (range 16–1024). Leave unset to honor the printer's Reliability profile. |
 | chunk_delay_ms | int | **advanced.** Sleep between chunks in ms (range 0–5000). Leave unset to honor the printer's Reliability profile (0 ms on Network/USB, 50 ms on Bluetooth). |
@@ -202,7 +202,7 @@ Render a `print_box` layout to a `.txt` file *without* printing. Returns the out
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | text, style, padding, align, total_width | — | Same fields as `print_box`. `cut` and `feed` are deliberately omitted — a text file has no paper. |
-| output_path | string | Where to save the rendered text. Must be inside `allowlist_external_dirs` (or under `/tmp`). Defaults to `/tmp/escpos_preview_box_<entry>.txt`. |
+| output_path | string | Where to save the rendered text. **Must be inside the system temp directory (typically `/tmp`)** — non-admin HA users could otherwise overwrite arbitrary files in `allowlist_external_dirs`. Defaults to `/tmp/escpos_preview_box_<entry>.txt`. To persist the preview elsewhere, copy the returned `path` in a follow-up automation step. |
 
 Response shape: `{path, width, line_count, codepage}`.
 
@@ -213,7 +213,7 @@ Render a `print_table` layout to a `.txt` file *without* printing. Same contract
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | rows, style, column_widths, column_aligns, header, row_separators, total_width | — | Same fields as `print_table`. `cut` and `feed` are deliberately omitted — a text file has no paper. |
-| output_path | string | Where to save the rendered text. Must be inside `allowlist_external_dirs` (or under `/tmp`). Defaults to `/tmp/escpos_preview_table_<entry>.txt`. |
+| output_path | string | Where to save the rendered text. **Must be inside the system temp directory (typically `/tmp`)** — non-admin HA users could otherwise overwrite arbitrary files in `allowlist_external_dirs`. Defaults to `/tmp/escpos_preview_table_<entry>.txt`. To persist the preview elsewhere, copy the returned `path` in a follow-up automation step. |
 
 Response shape: `{path, width, line_count, codepage}`.
 

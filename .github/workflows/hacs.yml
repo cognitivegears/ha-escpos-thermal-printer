@@ -45,6 +45,11 @@ jobs:
               core.warning(`Skipping metadata update due to permissions: ${e.message}`);
             }
       - name: HACS validation
-        uses: hacs/action@main
+        # CI-H2: pin to a SHA (commit hash) instead of `@main`. HACS does
+        # not publish versioned tags; the floating-main reference was an
+        # upstream-compromise / accidental-breakage hole. Update by
+        # re-pinning to a fresh SHA after reviewing
+        # https://github.com/hacs/action/commits/main
+        uses: hacs/action@1d0e4d40fe7d18bb1d23dd2b1ddd0eba39c5a8e8  # main as of 2026-05-24
         with:
           category: integration

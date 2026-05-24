@@ -196,67 +196,18 @@ def _usb_error_to_key(error_code: str | None) -> str:
     return error_map.get(error_code or "", "cannot_connect_usb")
 
 
-def _discover_usb_printers() -> list[dict[str, Any]]:
-    """Discover connected USB thermal printers.
+def _enumerate_usb_devices(
+    vid_filter: frozenset[int] | None,
+    *,
+    default_product: str,
+) -> list[dict[str, Any]]:
+    """Walk the USB bus and return a list of discovered devices.
 
-    Returns:
-        List of dictionaries containing printer information
-    """
-    try:
-        import usb.core  # noqa: PLC0415
-        import usb.util  # noqa: PLC0415
-    except ImportError:
-        _LOGGER.warning("pyusb not installed, USB printer discovery unavailable")
-        return []
-
-    printers: list[dict[str, Any]] = []
-    try:
-        for device in usb.core.find(find_all=True):
-            if device.idVendor in THERMAL_PRINTER_VIDS:
-                try:
-                    manufacturer = usb.util.get_string(device, device.iManufacturer) or "Unknown"
-                    product = usb.util.get_string(device, device.iProduct) or "Thermal Printer"
-                    # Try to get serial number for unique identification
-                    serial = None
-                    try:
-                        if device.iSerialNumber:
-                            serial = usb.util.get_string(device, device.iSerialNumber)
-                    except Exception:
-                        # Serial number access may fail due to permissions or device quirks;
-                        # it's optional and used only to distinguish identical printers
-                        pass
-                    printers.append(
-                        {
-                            "vendor_id": device.idVendor,
-                            "product_id": device.idProduct,
-                            "manufacturer": manufacturer,
-                            "product": product,
-                            "serial_number": serial,
-                            "label": f"{manufacturer} {product} ({device.idVendor:04X}:{device.idProduct:04X})",
-                        }
-                    )
-                except Exception:
-                    printers.append(
-                        {
-                            "vendor_id": device.idVendor,
-                            "product_id": device.idProduct,
-                            "manufacturer": "Unknown",
-                            "product": "Thermal Printer",
-                            "serial_number": None,
-                            "label": f"Thermal Printer ({device.idVendor:04X}:{device.idProduct:04X})",
-                        }
-                    )
-    except Exception as e:
-        _LOGGER.debug("USB device enumeration failed: %s", e)
-
-    return printers
-
-
-def _discover_all_usb_devices() -> list[dict[str, Any]]:
-    """Discover all connected USB devices (not filtered by vendor).
-
-    Returns:
-        List of dictionaries containing device information
+    Unified backend for :func:`_discover_usb_printers` (printers only —
+    pass ``THERMAL_PRINTER_VIDS``) and :func:`_discover_all_usb_devices`
+    (everything — pass ``None``). Centralises the import-guard,
+    iteration, descriptor-string error handling, and the
+    ``is_known_printer`` annotation (M1).
     """
     try:
         import usb.core  # noqa: PLC0415
@@ -265,24 +216,25 @@ def _discover_all_usb_devices() -> list[dict[str, Any]]:
         _LOGGER.warning("pyusb not installed, USB device discovery unavailable")
         return []
 
-    devices: list[dict[str, Any]] = []
+    out: list[dict[str, Any]] = []
     try:
         for device in usb.core.find(find_all=True):
+            if vid_filter is not None and device.idVendor not in vid_filter:
+                continue
+            is_known_printer = device.idVendor in THERMAL_PRINTER_VIDS
             try:
                 manufacturer = usb.util.get_string(device, device.iManufacturer) or "Unknown"
-                product = usb.util.get_string(device, device.iProduct) or "USB Device"
-                # Try to get serial number for unique identification
+                product = usb.util.get_string(device, device.iProduct) or default_product
                 serial = None
                 try:
                     if device.iSerialNumber:
                         serial = usb.util.get_string(device, device.iSerialNumber)
                 except Exception:
-                    # Serial number access may fail due to permissions or device quirks;
-                    # it's optional and used only to distinguish identical devices
+                    # Serial number access may fail due to permissions or
+                    # device quirks; it's optional and only used to
+                    # distinguish identical devices.
                     pass
-                # Note if this is a known thermal printer vendor
-                is_known_printer = device.idVendor in THERMAL_PRINTER_VIDS
-                devices.append(
+                out.append(
                     {
                         "vendor_id": device.idVendor,
                         "product_id": device.idProduct,
@@ -294,21 +246,36 @@ def _discover_all_usb_devices() -> list[dict[str, Any]]:
                     }
                 )
             except Exception:
-                devices.append(
+                out.append(
                     {
                         "vendor_id": device.idVendor,
                         "product_id": device.idProduct,
                         "manufacturer": "Unknown",
-                        "product": "USB Device",
+                        "product": default_product,
                         "serial_number": None,
-                        "is_known_printer": device.idVendor in THERMAL_PRINTER_VIDS,
-                        "label": f"USB Device ({device.idVendor:04X}:{device.idProduct:04X})",
+                        "is_known_printer": is_known_printer,
+                        "label": f"{default_product} ({device.idVendor:04X}:{device.idProduct:04X})",
                     }
                 )
     except Exception as e:
         _LOGGER.debug("USB device enumeration failed: %s", e)
 
-    return devices
+    return out
+
+
+def _discover_usb_printers() -> list[dict[str, Any]]:
+    """Discover connected USB thermal printers (filtered by vendor)."""
+    out = _enumerate_usb_devices(THERMAL_PRINTER_VIDS, default_product="Thermal Printer")
+    # Keep the historic shape: printer-only listings omit the
+    # ``is_known_printer`` flag (every entry is a known printer anyway).
+    for entry in out:
+        entry.pop("is_known_printer", None)
+    return out
+
+
+def _discover_all_usb_devices() -> list[dict[str, Any]]:
+    """Discover all connected USB devices (not filtered by vendor)."""
+    return _enumerate_usb_devices(None, default_product="USB Device")
 
 
 def _build_usb_device_choices(

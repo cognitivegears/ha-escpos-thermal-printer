@@ -293,64 +293,70 @@ async def test_resolve_http_aiohttp_honors_content_length(  # type: ignore[no-un
 
 
 # ---------------------------------------------------------------------------
-# T-M3: aiohttp fallback bugs — narrowed exception + no UnboundLocalError.
+# S-H1: HTTP fetch is DNS-rebinding-safe (always uses aiohttp with pinned
+# resolver; httpx fast-path was removed).
 # ---------------------------------------------------------------------------
 
 
-async def test_resolve_http_falls_back_only_on_import_error(  # type: ignore[no-untyped-def]
+async def test_resolve_http_http_error_propagates_as_ha_error(  # type: ignore[no-untyped-def]
     hass, monkeypatch, mock_pooled_aiohttp
 ):
-    """When httpx is importable, an HTTP 404 must NOT trigger aiohttp fallback."""
+    """A 4xx from the fetch must surface as HomeAssistantError, not bubble."""
 
-    # Allow URL validation.
     def fake_getaddrinfo(_host, _port, **_kw):  # type: ignore[no-untyped-def]
         return [(socket.AF_INET, socket.SOCK_STREAM, 0, "", ("93.184.216.34", 0))]
 
     monkeypatch.setattr("socket.getaddrinfo", fake_getaddrinfo)
 
-    # Fake httpx that raises HTTPError on .stream/.raise_for_status — the
-    # error must propagate, not be retried via aiohttp.
-    aiohttp_called = []
+    import aiohttp as _aiohttp
 
-    def _aiohttp_factory():  # type: ignore[no-untyped-def]
-        aiohttp_called.append(True)
+    def _factory():  # type: ignore[no-untyped-def]
         from tests.conftest import fake_aiohttp_response
 
-        return fake_aiohttp_response()
+        resp = fake_aiohttp_response()
 
-    mock_pooled_aiohttp(_aiohttp_factory)
+        def _raise():  # type: ignore[no-untyped-def]
+            raise _aiohttp.ClientResponseError(
+                request_info=MagicMock(),
+                history=(),
+                status=404,
+                message="Not Found",
+            )
 
-    class _Resp:
-        is_redirect = False
-        headers: dict[str, str] = {}
+        resp.raise_for_status = _raise
+        return resp
 
-        def raise_for_status(self) -> None:
-            import httpx
+    mock_pooled_aiohttp(_factory)
+    with pytest.raises(HomeAssistantError, match="download image"):
+        await resolve_image_bytes(hass, "https://example.com/x.png")
 
-            request = httpx.Request("GET", "https://example.com/x.png")
-            response = httpx.Response(404, request=request)
-            raise httpx.HTTPStatusError("404", request=request, response=response)
 
-        async def aiter_bytes(self):  # type: ignore[no-untyped-def]
-            yield b""
+async def test_static_resolver_rejects_unrelated_hostname(  # type: ignore[no-untyped-def]
+    hass,
+):
+    """The pinned resolver must refuse lookups for hostnames it was not built for.
 
-        async def __aenter__(self):  # type: ignore[no-untyped-def]
-            return self
+    Defense against a redirect to a different host: even if validation
+    is bypassed, the connector-level resolver only knows the originally
+    pinned hostname.
+    """
+    from custom_components.escpos_printer.image_sources import _StaticResolver
 
-        async def __aexit__(self, *args):  # type: ignore[no-untyped-def]
-            return None
+    resolver = _StaticResolver("example.com", ["93.184.216.34"])
+    with pytest.raises(OSError, match="pre-validated"):
+        await resolver.resolve("evil.example", port=443)
 
-    class _Client:
-        def stream(self, *_a, **_kw):  # type: ignore[no-untyped-def]
-            return _Resp()
 
-    with patch(
-        "homeassistant.helpers.httpx_client.get_async_client",
-        return_value=_Client(),
-    ):
-        with pytest.raises(HomeAssistantError, match="download image"):
-            await resolve_image_bytes(hass, "https://example.com/x.png")
-    assert aiohttp_called == [], "aiohttp must not be called when httpx is available"
+async def test_static_resolver_returns_pinned_address(  # type: ignore[no-untyped-def]
+    hass,
+):
+    """The pinned resolver returns only the pre-validated address for its host."""
+    from custom_components.escpos_printer.image_sources import _StaticResolver
+
+    resolver = _StaticResolver("example.com", ["93.184.216.34"])
+    infos = await resolver.resolve("example.com", port=443)
+    assert len(infos) == 1
+    assert infos[0]["host"] == "93.184.216.34"
 
 
 # ---------------------------------------------------------------------------

@@ -68,15 +68,17 @@ async def test_preview_box_default_path_under_tmpdir(hass) -> None:  # type: ign
     p.unlink()
 
 
-async def test_preview_box_rejects_path_outside_allowlist(hass) -> None:  # type: ignore[no-untyped-def]
+async def test_preview_box_rejects_output_path_outside_tempdir(hass) -> None:  # type: ignore[no-untyped-def]
+    """S-M5: user-supplied output_path must be inside the system tempdir.
+
+    Otherwise a non-admin HA user could call preview_box with
+    output_path=/config/configuration.yaml and clobber it with text.
+    """
     from homeassistant.exceptions import HomeAssistantError
     import pytest
 
     await _setup_entry(hass)
-    with (
-        patch.object(hass.config, "is_allowed_path", return_value=False),
-        pytest.raises(HomeAssistantError, match="allowlist"),
-    ):
+    with pytest.raises(HomeAssistantError, match="temp directory"):
         await hass.services.async_call(
             DOMAIN,
             "preview_box",

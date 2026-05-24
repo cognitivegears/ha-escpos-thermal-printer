@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [0.7.0] - 2026-05-24
 
+### Breaking changes
+
+- **Preview-service `output_path` is now restricted to the system
+  tempdir.** `preview_image`, `preview_box`, and `preview_table`
+  previously accepted any path inside `allowlist_external_dirs`. After
+  security hardening (a non-admin HA user could otherwise call
+  `preview_image` with `output_path: /config/configuration.yaml` and
+  clobber it with rendered PNG bytes — CWE-862/CWE-552), user-supplied
+  `output_path` values outside the system temp directory are rejected
+  with `HomeAssistantError`. If your automation needs the file in
+  `/config/www/`, add a second step that copies the returned `path`.
+
 ### Added
 
 - **Text-effects services** — seven new services for receipt-style
@@ -34,9 +46,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
     glyphs the printer's codepage doesn't carry (CJK, emoji,
     decorative scripts).
   - `escpos_printer.preview_box` / `escpos_printer.preview_table` —
-    render the same layouts to a `.txt` file under `<config>/www/`
-    without printing, so users can tune column widths and border
-    styles without burning paper.
+    render the same layouts to a `.txt` file in the system tempdir
+    (default `/tmp/escpos_preview_<entry>.txt`) without printing, so
+    users can tune column widths and border styles without burning
+    paper. Returns `{path, width, line_count, codepage}` so a
+    follow-up step can copy the file or chain a notification.
 - **Bundled DejaVu fonts** — `DejaVuSans.ttf`, `DejaVuSansMono.ttf`,
   `DejaVuSerif.ttf` (release 2.37) ship with the integration for
   `print_text_image` to work out of the box. Bitstream Vera license
@@ -85,6 +99,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Security
 
+- **DNS rebinding defence for HTTP image fetches.** Each
+  `print_image` / `preview_image` HTTP fetch builds a per-request
+  `aiohttp` session pinned to the IP address validated by
+  `getaddrinfo` (via the new `image_sources._StaticResolver`). A
+  0-TTL hostile DNS server cannot swap public → private between
+  validation and connect. The previous httpx fast-path was removed
+  (httpx 0.28 has no resolver-pin hook). **CWE-918 / CWE-350.**
+- **Preview `output_path` restricted to system tempdir.** Closes a
+  privilege-escalation path where a non-admin HA user could call
+  `preview_image` / `preview_box` / `preview_table` with
+  `output_path: /config/configuration.yaml` and clobber it with
+  rendered bytes. See *Breaking changes*. **CWE-862 / CWE-552.**
+- **Preview file writes use `O_NOFOLLOW`.** A co-resident attacker
+  who plants a symlink between path-validation and image-save
+  cannot redirect the write into an arbitrary file under tempdir.
+  New `security.write_file_no_follow` primitive, symmetric to the
+  existing `open_local_*_no_follow` readers. **CWE-367 / CWE-59.**
+- **IDN hostname check IDNA-encodes first.** The previous
+  `"xn--" in hostname.lower()` substring test missed raw Unicode
+  hostnames (`例え.テスト`); the check now IDNA-encodes before the
+  substring test so raw-Unicode and pre-encoded inputs are both
+  caught. **CWE-918.**
+- **`control_handlers.py` error messages go through
+  `sanitize_log_message`.** `feed` / `cut` / `beep` previously
+  wrapped exceptions with raw `str(err)`, which routinely contains
+  USB serials, BT MACs, and filesystem paths from pyusb / pyserial
+  / python-escpos / aiohttp. All handlers now route through the
+  shared `_for_each_target` helper in
+  `services/_handler_utils.py`. **CWE-209 / CWE-532.**
+- **`asyncio.shield` cleanup on print_text_with_image cancel.** A
+  second cancellation mid-flush can no longer leave paper half-
+  printed.
+- **Font-path trust centralised in `security.py`.** The
+  `<config>/fonts/` narrowed-trust decision now lives in
+  `validate_font_path_with_fonts_dir()` next to the other
+  path-validation policy, instead of split between
+  `print_handlers.py` and `security.py`.
+- **DNS-rebinding hardening also applies to redirects.** Each
+  redirect hop in `_resolve_http_aiohttp` runs through the validator
+  again and gets a fresh DNS pin via a new `_StaticResolver`.
+- **Status-vs-print serialisation hardened** — network / USB /
+  Bluetooth `_status_check` skip when the per-adapter print lock
+  is held, eliminating a flap-during-print race on bandwidth-
+  constrained transports.
 - **Dismissed HA-pinned-package Dependabot security alerts** as
   `tolerable_risk` (Pillow direct + uv.lock transitives: aiohttp,
   cryptography, pyOpenSSL, PyJWT, orjson, requests, uv, pytest).

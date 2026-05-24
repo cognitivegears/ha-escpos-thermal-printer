@@ -13,6 +13,23 @@ updates:
     # Dependabot will update pins in pyproject.toml. A companion workflow
     # auto-syncs Home Assistant manifest requirements on Dependabot PRs.
     open-pull-requests-limit: 10
+    # CI-L5: group related bumps so a busy week opens 2-3 PRs instead of
+    # 8-10. Each group triggers manifest-sync once, not per dependency.
+    groups:
+      ha-test-harness:
+        patterns:
+          - "pytest-homeassistant-custom-component"
+          - "pytest-asyncio"
+          - "pytest-cov"
+      ruff-toolchain:
+        patterns:
+          - "ruff*"
+          - "mypy*"
+      security-tools:
+        patterns:
+          - "bandit*"
+          - "pip-audit*"
+          - "diff-cover*"
     ignore:
       # pytest-homeassistant-custom-component hard-pins pytest==9.0.0 (and
       # any future pin set by that package), so bumping pytest independently

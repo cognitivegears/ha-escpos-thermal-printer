@@ -1241,8 +1241,10 @@ preview_image:
     output_path:
       name: Output Path
       description: >
-        Where to save the PNG. Must be inside allowlist_external_dirs
-        (or under /tmp). Defaults to /tmp/escpos_preview_<entry>.png.
+        Where to save the PNG. Must be inside the system temp directory
+        (typically /tmp). Defaults to /tmp/escpos_preview_<entry>.png.
+        To stage the preview into /config/www/ for a Lovelace card, add
+        a follow-up automation step that copies the returned `path`.
       selector:
         text: {}
     image_width:
@@ -2417,9 +2419,10 @@ preview_box:
     output_path:
       name: Output Path
       description: >
-        Where to save the rendered text. Must be inside
-        allowlist_external_dirs (or under /tmp). Defaults to
-        /tmp/escpos_preview_box_<entry>.txt.
+        Where to save the rendered text. Must be inside the system temp
+        directory (typically /tmp). Defaults to
+        /tmp/escpos_preview_box_<entry>.txt. To persist the preview
+        elsewhere, copy the returned `path` in a follow-up step.
       selector:
         text: {}
 
@@ -2503,8 +2506,9 @@ preview_table:
     output_path:
       name: Output Path
       description: >
-        Where to save the rendered text. Must be inside
-        allowlist_external_dirs (or under /tmp). Defaults to
-        /tmp/escpos_preview_table_<entry>.txt.
+        Where to save the rendered text. Must be inside the system temp
+        directory (typically /tmp). Defaults to
+        /tmp/escpos_preview_table_<entry>.txt. To persist the preview
+        elsewhere, copy the returned `path` in a follow-up step.
       selector:
         text: {}

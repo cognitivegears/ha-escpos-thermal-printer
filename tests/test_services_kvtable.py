@@ -149,3 +149,32 @@ async def test_print_kvtable_rejects_empty_items(hass) -> None:  # type: ignore[
         except vol.Invalid:
             return
         raise AssertionError("expected voluptuous error for empty items")
+
+
+def test_validate_kv_items_shape_does_not_strip() -> None:
+    """T-L2 / P-H1: the schema-level validator must be shape-only.
+
+    Per-cell control-character sanitisation runs in
+    ``security.sanitise_kv_items`` (dispatched to the executor by the
+    handler) — NOT in the voluptuous validator that runs on the event
+    loop. If someone re-inlines the strip into the schema, this test
+    fails by observing that control bytes survived the validator.
+    """
+    from custom_components.escpos_printer.services.schemas import _validate_kv_items
+
+    out = _validate_kv_items([["a\x00b", "c\x07d"]])
+    # Schema must NOT strip — that's the executor sanitiser's job.
+    assert out[0][0] == "a\x00b"
+    assert out[0][1] == "c\x07d"
+
+
+def test_sanitise_kv_items_strips_controls() -> None:
+    """T-L2: confirm the executor sanitiser does the strip that the
+    schema deliberately skips."""
+    from custom_components.escpos_printer.security import sanitise_kv_items
+
+    out = sanitise_kv_items([["a\x00b", "c\x07d"]])
+    # security.sanitise_kv_items uses the shared _strip_controls helper
+    # which strips C0 except CR/LF/HT (matches validate_text_input).
+    assert out[0][0] == "ab"
+    assert out[0][1] == "cd"

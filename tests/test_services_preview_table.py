@@ -51,6 +51,30 @@ async def test_preview_table_writes_file_and_returns_metadata(hass, tmp_path) ->
     assert result["width"] == 11
 
 
+async def test_preview_table_rejects_output_path_outside_tempdir(hass) -> None:  # type: ignore[no-untyped-def]
+    """S-M5/T-H2: user-supplied output_path must be inside the system tempdir.
+
+    Otherwise a non-admin HA user could call preview_table with
+    output_path=/config/configuration.yaml and clobber it with text.
+    Mirrors the equivalent ``test_preview_box_rejects_output_path_outside_tempdir``.
+    """
+    from homeassistant.exceptions import HomeAssistantError
+    import pytest
+
+    await _setup_entry(hass)
+    with pytest.raises(HomeAssistantError, match="temp directory"):
+        await hass.services.async_call(
+            DOMAIN,
+            "preview_table",
+            {
+                "rows": [["A", "B"]],
+                "output_path": "/etc/forbidden.txt",
+            },
+            blocking=True,
+            return_response=True,
+        )
+
+
 async def test_preview_table_default_path_under_tmpdir(hass) -> None:  # type: ignore[no-untyped-def]
     await _setup_entry(hass)
     result = await hass.services.async_call(

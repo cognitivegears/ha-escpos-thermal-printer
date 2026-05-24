@@ -11,10 +11,30 @@ from .width import pad_to_width, sanitize_layout_text
 
 _LOGGER = logging.getLogger(__name__)
 
+# Sample size for the wide-char probe (P-H2). One full pass over a
+# 200x12x1000 max-input table costs ~100 ms on a worst-case ASCII
+# input; sampling keeps the probe O(1) per render. The probe drives a
+# diagnostic warning only — the renderer still produces output if a CJK
+# glyph appears past the sample window, just without the warning.
+_WIDE_CHAR_SAMPLE = 256
+
+# Module-level guard so the wide-char warning fires at most once per
+# Python process (Q-H2). HA surfaces WARNING via the Notifications panel,
+# and a CJK-receipt automation that prints hourly would otherwise spam
+# it on every call.
+_WARNED_WIDE_CHARS_BOX = False
+
 
 def _has_wide_chars(text: str) -> bool:
-    """Return True if any character in ``text`` is East-Asian Wide or Fullwidth."""
-    return any(unicodedata.east_asian_width(c) in ("W", "F") for c in text)
+    """Return True if any of the first ``_WIDE_CHAR_SAMPLE`` chars is wide.
+
+    Sampling-only because this drives a hint-only warning; a leading-
+    ASCII paragraph that mixes in a CJK glyph past the sample window
+    silently loses the hint, which is the same outcome the renderer
+    would have produced anyway (lines were already wrapped on
+    code-point count, not display columns).
+    """
+    return any(unicodedata.east_asian_width(c) in ("W", "F") for c in text[:_WIDE_CHAR_SAMPLE])
 
 
 def _pad_line(line: str, width: int, align: str) -> str:
@@ -77,13 +97,16 @@ def render_box(
         raise ValueError(f"align must be left/center/right, got {align!r}")
 
     text = sanitize_layout_text(text)
-    if _has_wide_chars(text):
+    global _WARNED_WIDE_CHARS_BOX  # noqa: PLW0603
+    if not _WARNED_WIDE_CHARS_BOX and _has_wide_chars(text):
         _LOGGER.warning(
             "Box content contains wide-width characters (CJK / fullwidth / "
             "emoji); the borders may misalign because textwrap wraps by "
             "code-point count, not display columns. Use print_text_image "
-            "for accurate layout — see docs/text-effects.md#cjk."
+            "for accurate layout — see docs/text-effects.md#cjk. "
+            "(This warning fires once per process.)"
         )
+        _WARNED_WIDE_CHARS_BOX = True
     resolved = resolve_style(style, codepage)
     if resolved == "none":
         wrapped = _wrap_lines(text, inner_width)

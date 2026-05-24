@@ -216,8 +216,21 @@ BORDER_STYLES: frozenset[str] = frozenset(
 DEFAULT_BORDER_STYLE = "auto"
 
 # Bundled font names exposed via the ``font`` selector of
-# ``print_text_image``. Resolved to actual ``.ttf`` files in
-# ``text_effects.font_render._BUILTIN_FONT_FILES``.
+# ``print_text_image``. A-M3: kept literal here (importing
+# ``text_effects.font_render`` would create a circular import through
+# ``security``); parity with the renderer's ``_BUILTIN_FONT_FILES`` is
+# enforced by ``tests/text_effects/test_font_render.py``
+# (``test_builtin_font_choices_match_renderer``). The renderer now
+# *raises* on an unknown name (A-M3 — silent fallback removed) so any
+# drift fails loudly instead of silently swapping to the default mono.
+#
+# B-M3 (deferred): the string-choice sets (CONNECTION_TYPE_*,
+# BORDER_STYLES, DITHER_MODES, IMPL_MODES, BUILTIN_FONT_CHOICES) could
+# be `enum.StrEnum` for typed iteration + voluptuous-direct use. Defer
+# the multi-file refactor until a third drift incident makes the
+# payoff clear; the parity tests above + the schema-level `vol.In(...)`
+# already catch the typical "I added a value to one place but not the
+# other" mistake.
 BUILTIN_FONT_CHOICES: tuple[str, ...] = ("dejavu_mono", "dejavu_sans", "dejavu_serif")
 DEFAULT_FONT_NAME = "dejavu_mono"
 DEFAULT_FONT_SIZE = 16

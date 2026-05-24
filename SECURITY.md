@@ -100,29 +100,79 @@ _LOGGER.debug(log_msg)
 - Maximum feed lines: 50
 - Maximum beep repetitions: 10
 
-## Known Limitations
+## Threat Model & Mitigations
 
-These deserve explicit mention so deployers understand the threat model:
+This section documents the **current** security posture (post-Phase 2
+hardening, 0.7.0+). Items previously listed under "Known Limitations"
+have moved to "Mitigated" with the implementation pointer.
 
-- **Trust boundary** — any HA user who can call `escpos_printer.print_image`
-  or `notify.<printer>` can print to your physical paper roll. Restrict
-  service exposure via HA's standard scripts / scenes / Lovelace card
-  permissions for shared installations.
-- **SSRF on out-of-process resolvers** — between our `getaddrinfo`-based
-  IP check and the actual fetch by `httpx` / `aiohttp`, there is a
-  small TOCTOU window. Sophisticated DNS-rebinding attacks against this
-  window are not fully mitigated; pinning to the resolved IP would
-  require a custom transport and break SNI. The validation rejects
-  the common case (a URL whose hostname directly resolves to a private
-  address).
+### Mitigated
+
+- **DNS rebinding for HTTP image fetch** — The URL validator resolves
+  the hostname and returns the address set; the fetcher then builds a
+  per-request `aiohttp` session with `_StaticResolver`
+  (`image_sources._StaticResolver`) pinned to those addresses. A 0-TTL
+  hostile DNS server cannot swap public → private between validation
+  and connect. Each redirect hop runs through the validator again and
+  gets a fresh pin. **CWE-918 / CWE-350.**
+- **TOCTOU symlink swap on local-file reads** — `Path.resolve()`
+  dereferences symlinks during validation; the file is then opened
+  with `O_NOFOLLOW` (`security.open_local_image_no_follow`,
+  `open_local_font_no_follow`) so a symlink swap between stat and
+  open is also defeated. **CWE-59 / CWE-367.**
+- **TOCTOU symlink swap on preview writes** — Preview-service file
+  writes use `O_NOFOLLOW | O_TRUNC | 0o600` via
+  `security.write_file_no_follow`; an attacker who plants a symlink
+  under tempdir between path-validation and image-save cannot redirect
+  the write into an arbitrary file. **CWE-59 / CWE-367.**
+- **Preview `output_path` privilege escalation** — `preview_image`,
+  `preview_box`, `preview_table` now restrict user-supplied
+  `output_path` to the system tempdir. Previously a non-admin HA user
+  could call `preview_image` with
+  `output_path: /config/configuration.yaml` and clobber it with
+  rendered PNG bytes. **CWE-862 / CWE-552.**
+- **IDN homograph bypass** — `validate_image_url` now IDNA-encodes
+  raw-Unicode hostnames before the `xn--` substring check, so both
+  `例え.テスト` and `xn--r8jz45g.xn--zckzah` are rejected. **CWE-918.**
+- **Exception-message information disclosure** — `services/_handler_utils.py`
+  `_for_each_target` routes every service handler's exception through
+  `sanitize_log_message` so USB serials, BT MACs, and filesystem
+  paths from pyusb/pyserial/python-escpos do not leak into the HA
+  Frontend toast. **CWE-209 / CWE-532.**
+- **Font path narrowed trust** — `security.validate_font_path_with_fonts_dir`
+  accepts paths under HA's `allowlist_external_dirs` OR under
+  `<config>/fonts/` (auto-created on integration setup). The
+  `<config>/fonts/` widening is the only narrowing; all other
+  path-based services use the standard allowlist.
+- **Cancel-during-cleanup paper hang** — `print_text_with_image`
+  wraps its cleanup `_apply_cut_and_feed` in `asyncio.shield` so a
+  second cancellation mid-flush cannot leave paper attached.
+
+### Residual / Known limitations
+
+- **Trust boundary** — any HA user who can call
+  `escpos_printer.print_image` or `notify.<printer>` can print to
+  your physical paper roll. Restrict service exposure via HA's
+  standard scripts / scenes / Lovelace card permissions for shared
+  installations.
 - **ESC/POS protocol bytes in printed content** — `validate_text_input`
   strips C0 control characters but not all printable ESC/POS escape
-  sequences. If a downstream POS scanner consumes the receipt as data
-  (rather than a human reading paper), additional sanitization may be
-  warranted.
-- **Camera / image authorization** — see `image_sources.py` for the
-  permission check pattern. Bear in mind HA admins bypass entity
-  permissions by design; admin users can print any camera regardless.
+  sequences. If a downstream POS scanner consumes the receipt as
+  data (rather than a human reading paper), additional sanitization
+  may be warranted.
+- **Camera / image entity authorization** — `_check_user_can_read_entity`
+  forwards `ServiceCall.context` through every image source resolver
+  so a non-admin user invoking `print_camera_snapshot` /
+  `print_image_entity` is blocked from cameras / image entities they
+  cannot read. HA admins bypass entity permissions by design; admin
+  users can print any camera regardless.
+- **Blueprint template safety** — the `variables:` block of every
+  shipped blueprint is rendered through HA's sandboxed Jinja
+  environment. Tests in `tests/test_blueprints_template_safety.py`
+  pin this and include a regression canary asserting that an unsafe
+  `list.append()` template raises. Coverage is `variables:`-only;
+  `data:` blocks are not sandbox-rendered (this matches HA core
+  behaviour).
 
 ## Security Configuration
 
@@ -225,7 +275,9 @@ def test_input_validation():
 ### Integration Tests for Security
 ```python
 def test_path_traversal_protection():
-    # Test path traversal protection
+    # Test path traversal protection via the read-side O_NOFOLLOW opener
+    # (`security.open_local_image_no_follow`), the same primitive used by
+    # `image_sources._resolve_local` to read user-supplied image paths.
     with pytest.raises(HomeAssistantError):
         validate_local_image_path("../../../etc/passwd")
 ```

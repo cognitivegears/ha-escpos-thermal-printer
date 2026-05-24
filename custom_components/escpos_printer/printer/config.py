@@ -1,4 +1,17 @@
-"""Configuration dataclasses for printer adapters."""
+"""Configuration dataclasses for printer adapters.
+
+B-L6: these dataclasses are intentionally NOT ``frozen=True``. The
+single mutation in ``base_adapter.__init__`` rewrites ``timeout`` after
+running it through ``validate_timeout``; making the classes frozen
+would force constructing a replacement instance there, adding a tiny
+allocation per adapter setup for no real safety win (the integration
+never shares config instances across adapters). They use plain
+``@dataclass`` to keep that in-place rewrite legal; ``slots=True``
+would also be fine but isn't applied uniformly because the few config
+types that *don't* get the timeout rewrite already inherit slots
+behaviour from ``BasePrinterConfig`` if we add it there. Status
+flagged here so the next contributor understands the asymmetry.
+"""
 
 from __future__ import annotations
 
@@ -10,7 +23,11 @@ from ..const import DEFAULT_IN_EP, DEFAULT_OUT_EP, DEFAULT_RFCOMM_CHANNEL
 
 @dataclass
 class BasePrinterConfig:
-    """Base printer configuration shared by all connection types."""
+    """Base printer configuration shared by all connection types.
+
+    Not frozen — ``base_adapter.__init__`` rewrites ``timeout`` once
+    after validation. See module docstring for the rationale.
+    """
 
     codepage: str | None = None
     profile: str | None = None

@@ -111,7 +111,15 @@ class UsbPrinterAdapter(EscposPrinterAdapterBase):
         raise last_exc  # pragma: no cover
 
     async def _status_check(self, hass: HomeAssistant) -> None:
-        """Check USB device availability via device enumeration."""
+        """Check USB device availability via device enumeration.
+
+        P-M2: skip enumeration when a print is in flight. ``usb.core.find``
+        on a busy bus can occasionally trip up some USB-IP / virtual-hub
+        configurations; the cost of a stale status reading is strictly
+        lower than the cost of corrupting an active print.
+        """
+        if self._lock.locked():
+            return
 
         def _probe() -> tuple[bool, str | None, int | None]:
             start = time.perf_counter()

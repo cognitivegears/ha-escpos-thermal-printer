@@ -1,0 +1,41 @@
+name: CodeQL
+
+# CI-M4: CodeQL adds data-flow / taint analysis on top of Bandit + Opengrep
+# + ruff-S. The `py/path-injection` and `py/url-redirection` queries catch
+# regressions of the Phase 2 findings (path traversal, SSRF, IDN bypass)
+# through a different code path than the text-pattern scanners.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 4 * * 1'  # weekly Monday 04:00 UTC
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: python
+          queries: security-extended,security-and-quality
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:python"

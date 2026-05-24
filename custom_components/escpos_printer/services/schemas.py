@@ -9,6 +9,7 @@ Python-script callers bypass all validation. See the Bronze quality-scale
 
 from __future__ import annotations
 
+from types import MappingProxyType
 from typing import Any
 
 from homeassistant.components.notify import ATTR_MESSAGE, ATTR_TITLE
@@ -165,6 +166,11 @@ def _image_option_fragment(
     match its ``services.yaml`` UI default. Without this override, a UI
     form caller and a YAML-script caller of the same service would get
     different behaviour for the same omitted key.
+
+    B-L9: the returned dict is wrapped in ``MappingProxyType`` at the
+    module-cached callsites below so the freeze invariant is visible
+    in the source. Without it, a future test fixture could mutate the
+    cached dict and silently re-shape every schema that spreads it.
     """
 
     def k(name: str) -> str:
@@ -210,13 +216,21 @@ def _image_option_fragment(
     }
 
 
-_IMAGE_OPTION_FRAGMENT_PLAIN = _image_option_fragment()
-_IMAGE_OPTION_FRAGMENT_URL = _image_option_fragment(auto_resize=True)
-_IMAGE_OPTION_FRAGMENT_CAMERA = _image_option_fragment(autocontrast=True, auto_resize=True)
-_IMAGE_OPTION_FRAGMENT_NOTIFY = {
-    vol.Optional(ATTR_IMAGE): _IMAGE_SOURCE,
-    **_image_option_fragment("image_"),
-}
+# M4: freeze the module-cached fragments with MappingProxyType. Voluptuous
+# spreads these via ``**fragment`` so it never mutates them, but the
+# read-only view makes the invariant explicit and refuses any future
+# fixture that tries to add/override keys directly.
+_IMAGE_OPTION_FRAGMENT_PLAIN = MappingProxyType(_image_option_fragment())
+_IMAGE_OPTION_FRAGMENT_URL = MappingProxyType(_image_option_fragment(auto_resize=True))
+_IMAGE_OPTION_FRAGMENT_CAMERA = MappingProxyType(
+    _image_option_fragment(autocontrast=True, auto_resize=True)
+)
+_IMAGE_OPTION_FRAGMENT_NOTIFY = MappingProxyType(
+    {
+        vol.Optional(ATTR_IMAGE): _IMAGE_SOURCE,
+        **_image_option_fragment("image_"),
+    }
+)
 
 
 def _image_pipeline_knobs(prefix: str = "") -> dict[Any, Any]:
@@ -527,40 +541,34 @@ PRINT_SEPARATOR_SCHEMA = vol.Schema(
 )
 
 
-def _validate_kv_items(value: Any) -> list[list[str]]:
-    """Validate + sanitise the ``items`` payload for ``print_kvtable``.
+def _validate_kv_items(value: Any) -> list[list[Any]]:
+    """Schema-level shape check for ``print_kvtable.items`` (P-H1).
 
-    Accepts a list of 2-element lists ``[label, value]``. Coerces inner
-    cells to ``str`` (None → empty string), bounded by
-    ``MAX_TABLE_CELL_LENGTH``, and strips control characters via
-    :func:`security.validate_text_input` so the renderer doesn't see
-    them. This is the single source of truth for kvtable shape *and*
-    cell content — the handler no longer re-runs ``validate_rows`` on
-    the result.
+    Runs on the event loop, so this is intentionally shape-only:
+    ``items`` is a non-empty list of 2-element lists, each cell
+    bounded by ``MAX_TABLE_CELL_LENGTH``. The per-cell control-char
+    strip + ``str`` coercion lives in
+    :func:`..security.sanitise_kv_items`, dispatched to the executor
+    by the handler so per-cell regex work does not block the loop.
     """
-    from ..security import validate_text_input  # noqa: PLC0415
-
     if not isinstance(value, list):
         raise vol.Invalid("items must be a list of [label, value] pairs")
     if not value:
         raise vol.Invalid("items must contain at least one entry")
     if len(value) > MAX_TABLE_ROWS:
         raise vol.Invalid(f"items length {len(value)} exceeds maximum {MAX_TABLE_ROWS}")
-    out: list[list[str]] = []
+    out: list[list[Any]] = []
     for entry in value:
         if not isinstance(entry, list) or len(entry) != 2:
             raise vol.Invalid("each item must be a 2-element [label, value] list")
-        pair: list[str] = []
         for cell in entry:
-            s = "" if cell is None else str(cell)
-            if len(s) > MAX_TABLE_CELL_LENGTH:
-                raise vol.Invalid(f"cell length {len(s)} exceeds maximum {MAX_TABLE_CELL_LENGTH}")
-            try:
-                sanitised = validate_text_input(s, max_length=MAX_TABLE_CELL_LENGTH)
-            except Exception as exc:
-                raise vol.Invalid(f"invalid cell content: {exc}") from exc
-            pair.append(sanitised)
-        out.append(pair)
+            if cell is not None:
+                s = str(cell)
+                if len(s) > MAX_TABLE_CELL_LENGTH:
+                    raise vol.Invalid(
+                        f"cell length {len(s)} exceeds maximum {MAX_TABLE_CELL_LENGTH}"
+                    )
+        out.append(entry)
     return out
 
 

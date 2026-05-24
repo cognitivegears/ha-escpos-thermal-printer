@@ -217,7 +217,7 @@ ignore = [
 ]
 "custom_components/escpos_printer/printer/image_processor.py" = ["PLR0912"]
 "custom_components/escpos_printer/text_effects/table.py" = ["PLR0912"]
-"custom_components/escpos_printer/text_effects/font_render.py" = ["PLR0912"]
+"custom_components/escpos_printer/text_effects/font_render.py" = ["PLR0912", "PLR0915"]
 "custom_components/escpos_printer/printer/base_adapter.py" = [
     "BLE001", "PLR0915",
 ]

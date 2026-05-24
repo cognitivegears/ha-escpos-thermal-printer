@@ -443,11 +443,13 @@ def _fake_aiohttp_response(
 
 @pytest.fixture
 def mock_pooled_aiohttp(monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-untyped-def]
-    """Return a helper that installs a fake ``async_get_clientsession``.
+    """Return a helper that installs a fake aiohttp session for image fetches.
 
-    The fake session's ``.get(url)`` returns whatever the test passes in.
-    Used by SSRF / fallback-bug / slow-loris regression tests so we
-    don't need a real HTTP server (Phase 3 T-C1, T-H5, T-M3).
+    Image fetches now run through a per-request session pinned to the
+    validated address set (S-H1 DNS-rebinding fix), so the fixture
+    monkeypatches ``image_sources._build_pinned_session`` instead of
+    the old pooled-client hook. Used by SSRF / slow-loris regression
+    tests so we don't need a real HTTP server.
     """
 
     def _install(response_factory):  # type: ignore[no-untyped-def]
@@ -457,9 +459,14 @@ def mock_pooled_aiohttp(monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-unt
             return response_factory()
 
         session.get = _get
-        from homeassistant.helpers import aiohttp_client
+        session.__aenter__ = AsyncMock(return_value=session)
+        session.__aexit__ = AsyncMock(return_value=None)
+        from custom_components.escpos_printer import image_sources
 
-        monkeypatch.setattr(aiohttp_client, "async_get_clientsession", lambda _hass: session)
+        def _fake_build(_hostname: str, _addrs: list[str]):  # type: ignore[no-untyped-def]
+            return session
+
+        monkeypatch.setattr(image_sources, "_build_pinned_session", _fake_build)
         return session
 
     return _install

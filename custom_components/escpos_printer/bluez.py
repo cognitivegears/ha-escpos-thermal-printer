@@ -179,7 +179,7 @@ async def query_bt_battery_percentage(mac: str) -> int | None:  # noqa: PLR0911
             return None
         try:
             value = int(getattr(pct_var, "value", -1))
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             return None
         return value if 0 <= value <= 100 else None
     return None

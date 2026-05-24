@@ -159,13 +159,19 @@ For ready-to-import scripts and automations see the
 | `escpos_printer.print_qr` | Print QR codes |
 | `escpos_printer.print_barcode` | Print barcodes (EAN13, CODE128, etc.) |
 | `escpos_printer.print_image` | Print images from URL, file, camera/image entity, or base64 — see [Images guide](docs/images.md) |
+| `escpos_printer.print_image_url` | Focused convenience service for HTTP(S) URLs (UI gets a URL field) — see [Images guide](docs/images.md) |
+| `escpos_printer.print_image_path` | Focused convenience service for local file paths — see [Images guide](docs/images.md) |
+| `escpos_printer.print_camera_snapshot` | Print a live snapshot from a `camera.<id>` entity (UI gets an entity picker) |
+| `escpos_printer.print_image_entity` | Print the current frame from an `image.<id>` entity |
 | `escpos_printer.print_box` | Wrap text in a printable border (cp437 / ASCII / asterisk / hash) — see [Text effects guide](docs/text-effects.md) |
 | `escpos_printer.print_table` | Print multi-column rows (receipts, logs) — see [Text effects guide](docs/text-effects.md) |
 | `escpos_printer.print_kvtable` | Print two-column label/value pairs (receipt totals, sensor readings) — see [Text effects guide](docs/text-effects.md) |
 | `escpos_printer.print_separator` | Print a single decorative rule (line of repeated characters) |
 | `escpos_printer.print_text_image` | Render text with a TTF/OTF font and optional 90/180/270° rotation — see [Text effects guide](docs/text-effects.md) |
+| `escpos_printer.preview_image` | Run the image pipeline and write the resulting 1-bit PNG to disk (no paper) — see [Images guide](docs/images.md) |
 | `escpos_printer.preview_box` | Render a `print_box` layout to a `.txt` file (no paper) |
 | `escpos_printer.preview_table` | Render a `print_table` layout to a `.txt` file (no paper) |
+| `escpos_printer.calibration_print` | Print a ruler + threshold sweep strip so you can pick dither/threshold without burning a roll |
 | `escpos_printer.feed` | Feed paper |
 | `escpos_printer.cut` | Cut paper |
 | `escpos_printer.beep` | Sound the buzzer |

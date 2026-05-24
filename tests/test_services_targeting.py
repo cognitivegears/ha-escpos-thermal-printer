@@ -206,6 +206,40 @@ async def test_beep_adapter_error_raises_homeassistant_error(hass):  # type: ign
             )
 
 
+async def test_control_handler_sanitises_path_in_error(hass):  # type: ignore[no-untyped-def]
+    """T-M2 / S-H2: control-handler exceptions must go through ``sanitize_log_message``.
+
+    The pre-fix ``handle_feed`` / ``cut`` / ``beep`` wrapped exceptions
+    with raw ``str(err)`` — pyusb / pyserial / python-escpos messages
+    routinely contain USB serials, BT MACs, and ``/config/...``-style
+    paths that leak to the HA Frontend toast and log without
+    redaction. The fix routes them through ``_for_each_target`` →
+    ``_wrap_unexpected`` → ``sanitize_log_message``. This test pins
+    the contract by driving an exception with a recognisable
+    redacted-prefix path and asserting the redaction landed.
+    """
+    entry = await _setup_entry(hass)
+    adapter = entry.runtime_data.adapter
+
+    async def _leak(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        # /config/ is in ``security._PATH_PREFIXES`` so the sanitiser
+        # must redact it. If the sanitiser is bypassed the verbatim
+        # path leaks.
+        raise RuntimeError("usb open failed at /config/secret/db.sqlite")
+
+    with patch.object(adapter, "feed", side_effect=_leak):
+        with pytest.raises(HomeAssistantError) as exc_info:
+            await hass.services.async_call(
+                DOMAIN,
+                "feed",
+                {"lines": 1},
+                blocking=True,
+            )
+    msg = str(exc_info.value)
+    assert "secret/db.sqlite" not in msg, f"path leaked through sanitiser: {msg}"
+    assert "[REDACTED]" in msg, f"sanitiser was bypassed: {msg}"
+
+
 async def test_print_qr_adapter_error_raises_homeassistant_error(hass):  # type: ignore[no-untyped-def]
     """Print-handler error path: print_qr adapter raises -> HomeAssistantError."""
     entry = await _setup_entry(hass)

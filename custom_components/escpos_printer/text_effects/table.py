@@ -12,16 +12,26 @@ from .width import pad_to_width, sanitize_layout_text
 
 _LOGGER = logging.getLogger(__name__)
 
+# Sample size for the wide-char probe (P-H2). A full per-cell scan over
+# a worst-case 200x12x1000 ASCII table is ~100 ms of pure CPU on top of
+# the ~310 ms textwrap pass. Sampling per cell keeps the warning
+# diagnostic cheap.
+_WIDE_CHAR_SAMPLE = 256
+
+# Module-level guard so the wide-char warning fires at most once per
+# Python process (Q-H2). HA surfaces WARNING via the Notifications panel.
+_WARNED_WIDE_CHARS_TABLE = False
+
 
 def _has_wide_chars(text: str) -> bool:
-    """Return True if any character in ``text`` is East-Asian Wide or Fullwidth.
+    """Return True if any of the first ``_WIDE_CHAR_SAMPLE`` chars is wide.
 
-    These glyphs occupy two terminal columns but ``len()`` counts them as
-    one — so the text-mode column padding silently misaligns. Detection
-    here lets ``render_table`` warn the user once per call rather than
-    failing silently.
+    These glyphs occupy two terminal columns but ``len()`` counts them
+    as one — so the text-mode column padding silently misaligns.
+    Sampling here keeps detection O(1) per cell; the renderer's output
+    is functional even if the warning is missed.
     """
-    return any(unicodedata.east_asian_width(c) in ("W", "F") for c in text)
+    return any(unicodedata.east_asian_width(c) in ("W", "F") for c in text[:_WIDE_CHAR_SAMPLE])
 
 
 def _distribute_widths(total_width: int, n_cols: int, bordered: bool) -> list[int]:
@@ -163,13 +173,16 @@ def render_table(
     between every body row.
     """
     cells, n_cols = _normalize_rows(rows)
-    if any(_has_wide_chars(c) for row in cells for c in row):
+    global _WARNED_WIDE_CHARS_TABLE  # noqa: PLW0603
+    if not _WARNED_WIDE_CHARS_TABLE and any(_has_wide_chars(c) for row in cells for c in row):
         _LOGGER.warning(
             "Table contains wide-width characters (CJK / fullwidth / emoji); "
             "column alignment may be off because text-mode padding assumes one "
             "column per character. Use print_text_image for accurate layout — "
-            "see docs/text-effects.md#cjk."
+            "see docs/text-effects.md#cjk. "
+            "(This warning fires once per process.)"
         )
+        _WARNED_WIDE_CHARS_TABLE = True
     resolved = resolve_style(style, codepage)
     bordered = resolved != "none"
 

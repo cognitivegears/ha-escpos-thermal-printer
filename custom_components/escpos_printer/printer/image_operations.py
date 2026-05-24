@@ -29,13 +29,13 @@ from ..security import (
     validate_numeric_input,
     validate_rotation,
 )
+from ._host import _PrinterHost
 from .image_processor import (
     FALLBACK_PROFILE_WIDTH,
     ImageProcessOptions,
     process_image_from_bytes,
 )
 from .mapping_utils import map_align
-from .print_operations import _PrinterHost
 
 if TYPE_CHECKING:
     from homeassistant.core import Context, HomeAssistant
@@ -172,6 +172,31 @@ async def prepare_image_for_print(
     )
 
 
+async def _try_fallback(
+    hass: HomeAssistant,
+    fallback: str | None,
+    primary: HomeAssistantError,
+    *,
+    context: Context | None,
+    auto_resize: bool,
+) -> tuple[bytes, str | None]:
+    """Run ``fallback`` if set; raise the primary error on any failure.
+
+    Returning the primary preserves the diagnostic the user is most
+    likely to want — the fallback existed precisely because the
+    primary might fail.
+    """
+    if fallback:
+        _LOGGER.debug("Primary image resolve failed (%s); trying fallback", type(primary).__name__)
+        try:
+            return await resolve_image_bytes(
+                hass, fallback, context=context, auto_resize=auto_resize
+            )
+        except HomeAssistantError:
+            raise primary from None
+    raise primary
+
+
 async def _resolve_with_retry(
     hass: HomeAssistant,
     image: str,
@@ -180,53 +205,59 @@ async def _resolve_with_retry(
     auto_resize: bool,
     fallback: str | None,
 ) -> tuple[bytes, str | None]:
-    """Resolve ``image``; retry once on transient camera failure.
+    """Resolve ``image``; retry once on transient camera/http failure.
 
-    The retry is a single 0.5s back-off on the *same* source first.
-    If that still fails and ``fallback`` is set, the fallback is tried
-    once. Returning the original error preserves diagnostics if both
-    paths fail.
+    For camera/http sources (where the upstream may need a beat to
+    warm up), retry once with a 0.5s back-off — unless the failure
+    was already a TimeoutError, in which case the upstream demonstrably
+    needs more than 10s and another half-second will not help
+    (P-M4). Otherwise the original error is returned along with any
+    fallback diagnostic.
+
+    For local/file/data sources retry is meaningless; fall through to
+    the fallback (if any).
     """
     try:
         return await resolve_image_bytes(hass, image, context=context, auto_resize=auto_resize)
     except HomeAssistantError as primary:
         kind, _ = classify_source(image)
-        if kind not in ("camera", "http"):
-            if fallback:
-                _LOGGER.debug(
-                    "Primary image resolve failed (%s); trying fallback",
-                    type(primary).__name__,
+        retryable = kind in ("camera", "http") and not _is_timeout_cause(primary)
+        if retryable:
+            _LOGGER.debug(
+                "Transient image resolve failure (%s); retrying once",
+                type(primary).__name__,
+            )
+            await asyncio.sleep(0.5)
+            with contextlib.suppress(HomeAssistantError):
+                return await resolve_image_bytes(
+                    hass, image, context=context, auto_resize=auto_resize
                 )
-                try:
-                    return await resolve_image_bytes(
-                        hass,
-                        fallback,
-                        context=context,
-                        auto_resize=auto_resize,
-                    )
-                except HomeAssistantError:
-                    raise primary from None
-            raise
-        _LOGGER.debug(
-            "Transient image resolve failure (%s); retrying once",
-            type(primary).__name__,
+        return await _try_fallback(
+            hass, fallback, primary, context=context, auto_resize=auto_resize
         )
-        await asyncio.sleep(0.5)
-        try:
-            return await resolve_image_bytes(hass, image, context=context, auto_resize=auto_resize)
-        except HomeAssistantError:
-            if fallback:
-                _LOGGER.debug("Retry failed; trying fallback")
-                try:
-                    return await resolve_image_bytes(
-                        hass,
-                        fallback,
-                        context=context,
-                        auto_resize=auto_resize,
-                    )
-                except HomeAssistantError:
-                    raise primary from None
-            raise primary from None
+
+
+def _is_timeout_cause(err: BaseException) -> bool:
+    """Return True if ``err`` (or its cause chain) wraps a timeout.
+
+    P-M4: a 10 s HTTP/camera timeout is strong evidence the upstream
+    is not "transient slow" — it's "not ready" — so retrying in 0.5 s
+    just burns another 10 s before the fallback fires. Detecting a
+    timeout in the cause chain lets us skip straight to the fallback.
+    """
+    seen: set[int] = set()
+    current: BaseException | None = err
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, (TimeoutError, asyncio.TimeoutError)):
+            return True
+        # aiohttp wraps the underlying timeout; check the message as a
+        # belt-and-braces signal since the cause may be lost when the
+        # outer HomeAssistantError is constructed from a string.
+        if "timeout" in str(current).lower():
+            return True
+        current = current.__cause__ or current.__context__
+    return False
 
 
 class ImageOperationsMixin:

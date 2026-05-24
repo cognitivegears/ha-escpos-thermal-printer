@@ -10,8 +10,10 @@ so the bounding box grows to fit the rotated content.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 from io import BytesIO
 import math
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final, Literal
 
@@ -45,15 +47,43 @@ def _resolve_font(*, font_name: str | None, font_path: str | None) -> _Resolved:
     """Pick which TTF/OTF file to load.
 
     ``font_path`` takes precedence (it has already been validated by the
-    handler). Otherwise ``font_name`` is mapped to a bundled file; an
-    unknown name silently falls back to the default mono so a typo in an
-    automation still prints rather than failing the call.
+    handler). Otherwise ``font_name`` must be one of ``BUILTIN_FONTS`` —
+    the schema layer (``vol.In(sorted(BUILTIN_FONT_CHOICES))``) enforces
+    this for service callers, so reaching here with an unknown name is a
+    bug (drift between this module and ``const.BUILTIN_FONT_CHOICES``).
+    A-M3: raise loudly rather than silently falling back to mono so the
+    drift is caught instead of masked.
     """
     if font_path:
         return _Resolved(path=str(font_path), name="custom")
-    chosen = font_name if font_name in _BUILTIN_FONT_FILES else "dejavu_mono"
+    chosen = font_name or "dejavu_mono"
+    if chosen not in _BUILTIN_FONT_FILES:
+        raise ValueError(
+            f"unknown bundled font {chosen!r}; expected one of {sorted(_BUILTIN_FONT_FILES)}"
+        )
     file_name = _BUILTIN_FONT_FILES[chosen]
     return _Resolved(path=str(_FONTS_DIR / file_name), name=chosen)
+
+
+# P-M3: user-supplied fonts go through ``open_local_font_no_follow`` and
+# get wrapped in ``BytesIO`` so Pillow's implicit ``(path, idx)`` cache
+# never sees them — meaning every call re-parses up to MAX_FONT_SIZE_BYTES
+# of TTF/OTF data. Cache the parsed ``ImageFont`` per
+# ``(resolved_path, mtime_ns, font_size)`` to amortise that cost. Bound at
+# 8 entries (~8x5 MB worst-case FreeType state).
+@lru_cache(maxsize=8)
+def _cached_custom_font(path: str, mtime_ns: int, font_size: int) -> Any:
+    """Parse and cache a user-supplied font via O_NOFOLLOW read.
+
+    The ``mtime_ns`` key invalidates the cache when the file changes,
+    so editing the TTF in place doesn't get a stale cached parse. The
+    bytes are kept inside the ``ImageFont`` object — re-reading the
+    path is not needed.
+    """
+    from PIL import ImageFont  # noqa: PLC0415
+
+    font_data = open_local_font_no_follow(Path(path))
+    return ImageFont.truetype(BytesIO(font_data), font_size)
 
 
 def _measure(font: Any, text: str) -> tuple[int, int]:
@@ -99,7 +129,7 @@ def _char_split(word: str, font: Any, max_width_px: int) -> list[str]:
                 # widths; cumulative bbox of the joined string can be a
                 # hair wider than the sum of truncated per-char widths.
                 ch_w = max(1, math.ceil(getlength(ch)))
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 ch_w, _ = _measure(font, ch)
         else:
             ch_w, _ = _measure(font, ch)
@@ -122,7 +152,7 @@ def _word_width(word: str, font: Any) -> int:
     if getlength is not None:
         try:
             measured: int = max(0, math.ceil(getlength(word)))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             measured = -1
         if measured >= 0:
             return measured
@@ -197,11 +227,18 @@ def render_text_image(
 ) -> PILImage:
     """Render ``text`` to a grayscale PIL image with the requested font.
 
-    The image's pre-rotation width is ``max_width_px``; the height grows
-    to fit the wrapped text. ``rotation`` is applied last, with
-    ``expand=True`` so the rotated canvas resizes to its new bounding
-    box. The returned image is mode ``"L"`` (8-bit grayscale, 255 =
-    paper, 0 = ink) — the downstream image pipeline binarizes it.
+    ``max_width_px`` is interpreted as the printed-output width (i.e. the
+    paper width). For ``rotation`` 0/180 that equals the canvas width and
+    text wraps to fit. For 90/270 the canvas is rotated before printing,
+    so the canvas's *height* becomes the printed width (capped at
+    ``max_width_px``) and its width runs along the paper feed — wrapping
+    uses ``MAX_RENDER_HEIGHT_PX`` so a long line flows down the receipt
+    instead of breaking at the paper width.
+
+    Rotation is applied last with ``expand=True`` so the rotated canvas
+    resizes to its new bounding box. The returned image is mode ``"L"``
+    (8-bit grayscale, 255 = paper, 0 = ink) — the downstream image
+    pipeline binarizes it.
     """
     # Imported lazily so unit tests that mock the renderer don't pay the
     # PIL import cost, and so the module imports cleanly even if Pillow
@@ -222,18 +259,27 @@ def render_text_image(
     resolved = _resolve_font(font_name=font_name, font_path=font_path)
     try:
         if font_path:
-            # Read the user-supplied font with O_NOFOLLOW so a symlink
-            # cannot be swapped for an attacker-controlled binary between
-            # validate and load. Bundled fonts ship with the integration
-            # and are loaded by path directly.
-            font_data = open_local_font_no_follow(Path(resolved.path))
-            font = ImageFont.truetype(BytesIO(font_data), font_size)
+            # P-M3: cache the parsed ImageFont per (path, mtime_ns, size)
+            # since BytesIO defeats Pillow's implicit FreeType face cache.
+            # mtime_ns picks up edits in place; lru_cache(maxsize=8)
+            # bounds the FreeType state held in memory.
+            try:
+                mtime_ns = os.stat(resolved.path).st_mtime_ns
+            except OSError as exc:
+                raise ValueError(
+                    f"Could not load font {resolved.name!r}: {exc}"
+                ) from exc
+            font = _cached_custom_font(resolved.path, mtime_ns, font_size)
         else:
             font = ImageFont.truetype(resolved.path, font_size)
     except OSError as exc:
         raise ValueError(f"Could not load font {resolved.name!r}: {exc}") from exc
 
-    lines = _wrap_to_pixels(text, font, max_width_px)
+    rotated = rotation in (90, 270)
+    # For 90/270 the canvas's width axis runs along the paper feed (long
+    # axis), so wrap to MAX_RENDER_HEIGHT_PX rather than paper width.
+    wrap_width_px = MAX_RENDER_HEIGHT_PX if rotated else max_width_px
+    lines = _wrap_to_pixels(text, font, wrap_width_px)
     # Use the font ascent/descent so empty paragraphs still occupy a line.
     if hasattr(font, "getmetrics"):
         ascent, descent = font.getmetrics()
@@ -244,25 +290,45 @@ def render_text_image(
     line_h = max(1, round(single_line_h * line_spacing))
     total_h = max(line_h, line_h * len(lines))
 
-    if total_h > MAX_RENDER_HEIGHT_PX:
-        raise ValueError(
-            f"rendered text height {total_h}px exceeds maximum "
-            f"{MAX_RENDER_HEIGHT_PX}px (reduce text length or font_size)"
+    if rotated:
+        # Canvas tightly wraps the longest line; after 90/270° rotation
+        # the canvas height (= total_h) becomes the printed width and must
+        # fit the paper. The canvas width (= longest line) becomes the
+        # length along the feed and is bounded by MAX_RENDER_HEIGHT_PX.
+        canvas_w = max(
+            (_measure(font, line)[0] for line in lines),
+            default=0,
         )
-    if max_width_px * total_h > MAX_RENDER_PIXELS:
+        canvas_w = max(canvas_w, 1)
+    else:
+        canvas_w = max_width_px
+
+    feed_axis_extent = canvas_w if rotated else total_h
+    if feed_axis_extent > MAX_RENDER_HEIGHT_PX:
         raise ValueError(
-            f"rendered text canvas {max_width_px}x{total_h} "
+            f"rendered text extent {feed_axis_extent}px along paper feed "
+            f"exceeds maximum {MAX_RENDER_HEIGHT_PX}px (reduce text length "
+            f"or font_size)"
+        )
+    if rotated and total_h > max_width_px:
+        raise ValueError(
+            f"rotated text stack height {total_h}px exceeds paper width "
+            f"{max_width_px}px (reduce font_size, line_spacing, or line count)"
+        )
+    if canvas_w * total_h > MAX_RENDER_PIXELS:
+        raise ValueError(
+            f"rendered text canvas {canvas_w}x{total_h} "
             f"exceeds maximum {MAX_RENDER_PIXELS} pixels"
         )
 
-    img = Image.new("L", (max_width_px, total_h), color=255)
+    img = Image.new("L", (canvas_w, total_h), color=255)
     draw = ImageDraw.Draw(img)
     for i, line in enumerate(lines):
         w, _ = _measure(font, line)
         if align == "right":
-            x = max(0, max_width_px - w)
+            x = max(0, canvas_w - w)
         elif align == "center":
-            x = max(0, (max_width_px - w) // 2)
+            x = max(0, (canvas_w - w) // 2)
         else:
             x = 0
         draw.text((x, i * line_h), line, fill=0, font=font)

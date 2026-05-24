@@ -288,7 +288,7 @@ class EscposPrinterAdapterBase(
                 data = printer.profile.profile_data["media"]["width"]["pixels"]
                 if isinstance(data, (int, float)):
                     width = int(data)
-            except AttributeError, KeyError, TypeError, ValueError:
+            except (AttributeError, KeyError, TypeError, ValueError):
                 width = None
         self._cached_profile_width = width
         self._profile_width_lookup_done = True
@@ -409,9 +409,27 @@ class EscposPrinterAdapterBase(
                     await _print_text_under_lock(self, hass, printer, **text_kwargs)
                     await _print_prepared_under_lock(hass, printer, prepared)
                     await self._apply_cut_and_feed(hass, printer, cut, feed)
-                except asyncio.CancelledError, Exception:
+                except (asyncio.CancelledError, Exception):
+                    # S-M3: shield the cleanup so a second cancellation
+                    # mid-flush doesn't leave paper half-printed. The
+                    # suppress() catches Exception only — CancelledError
+                    # propagates from the shielded task if it fires again.
+                    #
+                    # T-L4: not unit-tested. Triple-cancel races are
+                    # notoriously hard to write deterministic tests for;
+                    # the shield invariant is covered by manual
+                    # cancellation testing during integration QA. If you
+                    # remove or modify this shield, document why in the
+                    # CHANGELOG so reviewers know the manual coverage
+                    # bar moved.
                     with contextlib.suppress(Exception):
-                        await self._apply_cut_and_feed(hass, printer, cut or "full", feed or 1)
+                        await asyncio.shield(
+                            asyncio.ensure_future(
+                                self._apply_cut_and_feed(
+                                    hass, printer, cut or "full", feed or 1
+                                )
+                            )
+                        )
                     raise
             finally:
                 await self._release_printer(hass, printer, owned=owned)
