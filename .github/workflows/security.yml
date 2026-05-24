@@ -73,14 +73,47 @@ jobs:
         # can't be tracked by Dependabot's pip ecosystem. Bump OPENGREP_VERSION
         # below by hand when a new release ships:
         #   https://github.com/opengrep/opengrep/releases
+        #
+        # We use `gh release download` rather than piping upstream's
+        # install.sh through bash, because install.sh validates the
+        # requested version via an unauthenticated GitHub API call
+        # (api.github.com/repos/opengrep/opengrep/releases) that gets
+        # rate-limited on shared runner IPs and fails with "Failed to
+        # fetch available versions from GitHub". `gh` uses GITHUB_TOKEN
+        # for the 5000/hr authenticated quota.
         env:
           OPENGREP_VERSION: v1.21.0
+          GH_TOKEN: ${{ github.token }}
         run: |
-          curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh \
-            | bash -s -- -v "${OPENGREP_VERSION}" --verify-signatures
-          # The install script puts the binary under ~/.opengrep/cli/latest/
-          # on Linux runners (no ~/.local/bin symlink is created), so add
-          # that directory to PATH for subsequent steps.
+          set -euo pipefail
+          case "$(uname -s)-$(uname -m)" in
+            Linux-x86_64|Linux-amd64) DIST="opengrep_manylinux_x86" ;;
+            Linux-aarch64|Linux-arm64) DIST="opengrep_manylinux_aarch64" ;;
+            Darwin-x86_64|Darwin-amd64) DIST="opengrep_osx_x86" ;;
+            Darwin-aarch64|Darwin-arm64) DIST="opengrep_osx_arm64" ;;
+            *) echo "Unsupported runner $(uname -s)-$(uname -m)" >&2; exit 1 ;;
+          esac
+          INST="${HOME}/.opengrep/cli/${OPENGREP_VERSION}"
+          mkdir -p "${INST}"
+          gh release download "${OPENGREP_VERSION}" \
+            --repo opengrep/opengrep \
+            --pattern "${DIST}" \
+            --pattern "${DIST}.cert" \
+            --pattern "${DIST}.sig" \
+            --dir "${INST}"
+          mv "${INST}/${DIST}"      "${INST}/opengrep"
+          mv "${INST}/${DIST}.cert" "${INST}/opengrep.cert"
+          mv "${INST}/${DIST}.sig"  "${INST}/opengrep.sig"
+          chmod +x "${INST}/opengrep"
+          # Verify the sigstore signature with the cosign installed above.
+          # Identity / issuer regex mirrors install.sh.
+          cosign verify-blob \
+            --cert "${INST}/opengrep.cert" \
+            --signature "${INST}/opengrep.sig" \
+            --certificate-identity-regexp "https://github.com/opengrep/opengrep.+" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "${INST}/opengrep"
+          ln -sfn "${INST}" "${HOME}/.opengrep/cli/latest"
           echo "${HOME}/.opengrep/cli/latest" >> "${GITHUB_PATH}"
 
       - name: Opengrep - Project-specific security rules
