@@ -87,12 +87,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   section replaces the previous brief "Modifying a blueprint" note —
   covers the workflow for drop-in private blueprints, key concepts
   (`!input` substitution, `mode:` placement, selectors, Jinja
-  rendering at call time), minimal script + automation shapes,
-  publishing via raw GitHub URL, and the repo-specific conventions
-  contributors should follow (file location, sanitiser chain,
-  `print_text_utf8` vs `print_text`, validator + extractor +
-  markdown-lint pipeline). Closes the discoverability gap where the
-  only authoring guidance lived in `CLAUDE.md`. The Guest Wi-Fi QR section now leads
+  rendering at call time), minimal script + automation shapes, a
+  three-tier **"Validating your blueprint"** subsection (HA's
+  on-import check / generic `yamllint` / this repo's strict
+  `validate_blueprints.py` service-call lint plus the markdown-bash
+  extractor), publishing via raw GitHub URL, and the repo-specific
+  conventions contributors should follow (file location, sanitiser
+  chain, `print_text_utf8` vs `print_text`, the validator +
+  extractor + markdown-lint pipeline). Closes the discoverability
+  gap where the only authoring guidance lived in `CLAUDE.md`. The Guest Wi-Fi QR section now leads
   with a "Quick start (works on any router — about 2 minutes)" 6-step
   walk-through that gets a non-technical user from blueprint import
   to a printed scan-ready slip without touching YAML or shell
