@@ -40,7 +40,7 @@ include = ["custom_components*", "scripts*"]
 # `[dependency-groups]` is intentionally NOT used to avoid drift.
 dev = [
     "pytest==9.0.0",
-    "pytest-homeassistant-custom-component==0.13.320",
+    "pytest-homeassistant-custom-component==0.13.333",
     "mypy==2.1.0",
     "ruff==0.15.14",
     "pre-commit==4.6.0",
