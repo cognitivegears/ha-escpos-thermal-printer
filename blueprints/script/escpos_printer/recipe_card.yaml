@@ -65,25 +65,34 @@ sequence:
       ingredient_rows: >
         {% set ns = namespace(out=[]) %}
         {% for line in ingredient_lines %}
-          {% set clean = line.replace('|', '/').replace('\t', ' ') %}
+          {% set clean = line.replace('\r', '').replace('|', '/').replace('\t', ' ') %}
           {% set ns.out = ns.out + [[clean]] %}
         {% endfor %}
         {{ ns.out }}
       step_rows: >
         {% set ns = namespace(out=[]) %}
         {% for s in step_lines %}
-          {% set clean = s.replace('|', '/').replace('\t', ' ') %}
+          {# Strip \r from Windows \r\n line endings (split('\n') leaves
+             them); convert | to / and tabs to spaces. #}
+          {% set clean = s.replace('\r', '').replace('|', '/').replace('\t', ' ') %}
           {% set ns.out = ns.out + [[loop.index ~ '.', clean]] %}
         {% endfor %}
         {{ ns.out }}
-  - service: escpos_printer.print_text_image
+  # Text-mode header (double-width / double-height / bold) so the
+  # recipe name still reads as the centerpiece on printers that don't
+  # support raster image commands (PT-210, some Bluetooth POS-58s, etc).
+  # Recipe names commonly contain accents / smart quotes / em-dashes —
+  # ``print_text_utf8`` transcodes UTF-8 → the printer's codepage so
+  # "Crème Brûlée" prints as text, not garbage.
+  - service: escpos_printer.print_text_utf8
     target:
       device_id: !input printer
     data:
       text: !input name
-      font: dejavu_serif
-      font_size: 36
       align: center
+      bold: true
+      width: double
+      height: double
       feed: 1
   - service: escpos_printer.print_kvtable
     target:

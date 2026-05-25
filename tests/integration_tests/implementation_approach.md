@@ -340,12 +340,14 @@ gantt
 #### 1. Edge Cases & Boundary Testing (`test_edge_cases.py`)
 
 **Implementation Strategy:**
+
 - Start with text boundary tests (simplest to implement)
 - Progress to parameter boundary tests
 - Then implement special character/Unicode tests
 - Finally add buffer handling and command malformation tests
 
 **Key Dependencies:**
+
 - Enhanced virtual printer with buffer state tracking
 - Character encoding support in command parser
 - Basic verification utilities
@@ -353,12 +355,14 @@ gantt
 #### 2. Configuration Validation (`test_configuration.py`)
 
 **Implementation Strategy:**
+
 - Begin with basic configuration tests (hosts, ports)
 - Add timeout configuration tests
 - Implement encoding configuration tests
 - Finally add printer model-specific tests
 
 **Key Dependencies:**
+
 - HA integration setup and teardown support
 - Configuration loading and validation utilities
 - Multiple printer model emulation
@@ -366,12 +370,14 @@ gantt
 #### 3. Network Resilience Testing (`test_network_resilience.py`)
 
 **Implementation Strategy:**
+
 - Start with basic connection drop tests
 - Add latency tests
 - Implement packet-level tests
 - Finally add complex network scenario tests
 
 **Key Dependencies:**
+
 - Network simulation layer
 - Connection state tracking
 - Error recovery mechanisms
@@ -379,12 +385,14 @@ gantt
 #### 4. Performance & Load Testing (`test_performance.py`)
 
 **Implementation Strategy:**
+
 - Begin with basic throughput tests
 - Add concurrency tests
 - Implement resource monitoring tests
 - Finally add stress testing and recovery tests
 
 **Key Dependencies:**
+
 - Performance measurement utilities
 - Concurrency control in virtual printer
 - Resource usage monitoring
@@ -392,12 +400,14 @@ gantt
 #### 5. Integration Edge Cases (`test_integration_edge_cases.py`)
 
 **Implementation Strategy:**
+
 - Start with service interaction tests
 - Add event handling tests
 - Implement automation tests
 - Finally add lifecycle and entity interaction tests
 
 **Key Dependencies:**
+
 - HA automation support
 - Event and service tracking
 - Entity state management
@@ -407,7 +417,7 @@ gantt
 
 ### Code Structure
 
-```
+```text
 tests/integration_tests/
 ├── emulator/
 │   ├── __init__.py

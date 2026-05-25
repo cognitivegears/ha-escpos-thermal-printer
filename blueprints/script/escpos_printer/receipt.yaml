@@ -71,14 +71,19 @@ sequence:
         {% endif %}
         {% set ns.out = ns.out + [['TOTAL', currency ~ ('%.2f' | format(total))]] %}
         {{ ns.out }}
-  - service: escpos_printer.print_text_image
+  # Text-mode header (double-width / double-height / bold) so the
+  # receipt title still reads as the centerpiece on printers that don't
+  # support raster image commands. ``print_text_utf8`` transcodes UTF-8
+  # → the printer's codepage for currency symbols / accented brand names.
+  - service: escpos_printer.print_text_utf8
     target:
       device_id: !input printer
     data:
       text: !input title
-      font: dejavu_serif
-      font_size: 32
       align: center
+      bold: true
+      width: double
+      height: double
       feed: 1
   - service: escpos_printer.print_separator
     target:

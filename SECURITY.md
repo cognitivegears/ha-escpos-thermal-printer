@@ -56,6 +56,7 @@ The project includes automated security scanning as part of the development and 
 ### 3. Secure Coding Practices
 
 #### Input Validation
+
 ```python
 # Example of secure input validation
 from .security import validate_text_input, validate_numeric_input
@@ -65,6 +66,7 @@ feed_lines = validate_numeric_input(feed_param, 0, MAX_FEED_LINES, "feed lines")
 ```
 
 #### Secure Logging
+
 ```python
 # Example of secure logging that prevents information disclosure
 from .security import sanitize_log_message
@@ -89,6 +91,7 @@ _LOGGER.debug(log_msg)
   redacts the device-specific portion as personal data under GDPR).
 
 #### Resource Limits
+
 - Maximum text length: 10,000 characters
 - Maximum QR data length: 2,000 characters
 - Maximum barcode data length: 100 characters
@@ -185,6 +188,7 @@ ignores live in `pyproject.toml` under `[tool.ruff.lint] ignore` for the
 flake8-bandit (`S`) rule family.
 
 ### Ruff Security Rules (pyproject.toml)
+
 ```toml
 [tool.ruff.lint]
 select = [
@@ -199,6 +203,7 @@ The `S` ruleset runs as part of the main `ruff check .` invocation in
 ## CI/CD Security Integration
 
 ### GitHub Actions Security Workflow
+
 The project includes automated security scanning in CI/CD:
 
 1. **Dependency Scanning**: Runs on every push and pull request
@@ -219,16 +224,19 @@ pip-audit
 ## Security Considerations
 
 ### Network Security
+
 - All network communications use timeout limits
 - Image downloads are restricted to HTTP/HTTPS protocols
 - No sensitive data is transmitted in URLs or headers
 
 ### File System Security
+
 - Local file access is restricted to allowed image formats
 - Path traversal attacks are prevented through validation
 - Temporary files are properly cleaned up
 
 ### Resource Protection
+
 - Input size limits prevent resource exhaustion attacks
 - Rate limiting considerations for service calls
 - Memory usage is monitored and limited
@@ -245,18 +253,21 @@ If you discover a security vulnerability in this integration:
 ## Security Best Practices for Users
 
 ### Configuration Security
+
 - Use strong, unique passwords for printer access
 - Restrict network access to printers when possible
 - Regularly update printer firmware
 - Monitor printer access logs
 
 ### Operational Security
+
 - Limit user access to printing services
 - Implement logging and monitoring
 - Regularly review and rotate credentials
 - Keep the integration and dependencies updated
 
 ### Network Security
+
 - Use firewalls to restrict printer network access
 - Implement VPNs for remote printer access
 - Monitor network traffic for anomalies
@@ -265,6 +276,7 @@ If you discover a security vulnerability in this integration:
 ## Security Testing
 
 ### Unit Tests for Security
+
 ```python
 def test_input_validation():
     # Test input validation functions
@@ -273,6 +285,7 @@ def test_input_validation():
 ```
 
 ### Integration Tests for Security
+
 ```python
 def test_path_traversal_protection():
     # Test path traversal protection via the read-side O_NOFOLLOW opener
@@ -293,11 +306,13 @@ This integration follows security best practices aligned with:
 ## Maintenance and Updates
 
 ### Regular Security Updates
+
 - Dependencies are regularly updated to address security vulnerabilities
 - Security scans are run weekly to identify new issues
 - Critical security patches are applied promptly
 
 ### Security Monitoring
+
 - Automated vulnerability scanning in CI/CD
 - Regular code reviews with security focus
 - Dependency monitoring for security advisories

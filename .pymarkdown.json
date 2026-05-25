@@ -1,0 +1,20 @@
+{
+  "plugins": {
+    "md013": {
+      "enabled": false,
+      "_comment": "Line length: disabled. Prose-style markdown uses one paragraph per line; CommonMark / GFM doesn't care about line length."
+    },
+    "md024": {
+      "siblings_only": true,
+      "_comment": "Multiple headings with the same content: allow when they're siblings under different parents (CHANGELOG has ### Added under every ## [version])."
+    },
+    "md036": {
+      "enabled": false,
+      "_comment": "Emphasis-as-heading: this repo intentionally uses **Inputs:** / **Notes:** / **Requires:** as in-paragraph labels in the blueprint notes and docs. Promoting these to real headings would push every blueprint section to a 4-deep nesting and inflate the TOC."
+    },
+    "md041": {
+      "enabled": false,
+      "_comment": "First line must be top-level heading: false negatives on .md files that intentionally start with a callout / TOC."
+    }
+  }
+}

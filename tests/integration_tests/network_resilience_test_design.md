@@ -923,6 +923,7 @@ These network resilience tests require significant enhancements to the virtual p
 4. **Recovery Validation**: Focus on testing recovery mechanisms and fault tolerance
 
 The tests should verify that the ESCPOS integration can:
+
 - Detect and handle network failures gracefully
 - Recover when network conditions improve
 - Maintain consistent state across network interruptions

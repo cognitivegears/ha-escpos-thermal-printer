@@ -1,0 +1,298 @@
+blueprint:
+  name: ESC/POS — TODO Ticket (with QR)
+  description: >
+    Upgraded TODO Item — for every new task added to a todo entity,
+    print an individual job-ticket-style slip with a large serif title,
+    due date, description, and a QR code that opens the original task
+    in its source app (Todoist, CalDAV, etc).
+
+    The QR target is a Jinja template you configure once — the default
+    targets Todoist's web app
+    ("https://app.todoist.com/app/task/{{ uid }}"). Available
+    variables in the template: "uid", "summary", "due", "description".
+    Set "Print QR" off (or leave the template blank) for back-ends that
+    don't expose stable per-item URLs (e.g. HA's local todo lists).
+
+    Fires whenever the entity's "items" attribute changes — HA does
+    not emit per-item events, so this prints items that appeared
+    between the previous state and the current one, capped at the
+    "max items per trigger" safety limit.
+  domain: automation
+  source_url: https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/blueprints/automation/escpos_printer/todo_ticket.yaml
+  input:
+    printer:
+      name: Printer
+      description: ESC/POS printer device to print to.
+      selector:
+        device:
+          integration: escpos_printer
+    todo_entity:
+      name: Todo entity
+      description: Which todo list to watch.
+      selector:
+        entity:
+          domain: todo
+    header_text:
+      name: Header text
+      description: Banner printed at the top of each ticket above the task title.
+      default: NEW TASK
+      selector:
+        text: {}
+    print_qr:
+      name: Print QR code
+      description: >
+        Print a QR code linking back to the original task. Disable for
+        back-ends that don't expose stable URLs (local todo lists).
+      default: true
+      selector:
+        boolean: {}
+    url_template:
+      name: QR URL template
+      description: >
+        Jinja template producing the URL to encode. Variables: "uid",
+        "summary", "due", "description". Examples — Todoist:
+        "https://app.todoist.com/app/task/{{ uid }}". Generic CalDAV
+        with iCloud Reminders: "x-apple-reminderkit://REMCDReminder/{{ uid }}".
+      default: "https://app.todoist.com/app/task/{{ uid }}"
+      selector:
+        text: {}
+    qr_size:
+      name: QR size
+      description: QR module size (1-16).
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 16
+          step: 1
+          mode: slider
+    print_description:
+      name: Print description
+      description: >
+        Include the task description (if present) below the title. Some
+        back-ends populate this from notes or comments.
+      default: true
+      selector:
+        boolean: {}
+    max_description_length:
+      name: Description truncation
+      description: Trim descriptions longer than this to keep tickets compact.
+      default: 280
+      selector:
+        number:
+          min: 40
+          max: 2000
+          step: 1
+    max_items_per_trigger:
+      name: Max items per trigger
+      description: Safety cap to stop a bulk-sync flood.
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 20
+          step: 1
+    cut_per_item:
+      name: Cut paper between items
+      description: >
+        When ON, each ticket prints on its own slip. When OFF, all new
+        items in a single trigger share one slip with one cut at the
+        end — saves paper for batches.
+      default: true
+      selector:
+        boolean: {}
+    style:
+      name: Border style
+      default: auto
+      selector:
+        select:
+          options:
+            - auto
+            - single
+            - double
+            - ascii
+            - asterisk
+            - hash
+            - none
+# queued — concurrent state changes (bulk sync) should print in order rather
+# than dropping prints; max_items_per_trigger is the safety cap.
+mode: queued
+max_exceeded: silent
+trigger:
+  - platform: state
+    entity_id: !input todo_entity
+variables:
+  todo_entity_id: !input todo_entity
+  cap: !input max_items_per_trigger
+  cut_per_item: !input cut_per_item
+  print_qr_input: !input print_qr
+  print_description_input: !input print_description
+  max_description_length: !input max_description_length
+  current_items: "{{ state_attr(todo_entity_id, 'items') | default([], true) }}"
+  prior_items: "{{ trigger.from_state.attributes.get('items', []) if trigger.from_state else [] }}"
+  # Build a stable identity for each item: prefer ``uid`` (the primary key
+  # in HA's todo spec; Todoist / CalDAV / Google Tasks all populate it),
+  # fall back to a summary-prefixed key for back-ends that don't expose
+  # uid (e.g. some local-list configurations). This means edits to a
+  # task's summary look like an edit (uid unchanged) rather than an
+  # add+drop pair, and two tasks with identical titles no longer dedup.
+  prior_keys: >
+    {% set ns = namespace(out=[]) %}
+    {% for it in prior_items %}
+      {% if it.uid is defined and it.uid is not none and (it.uid | string) | length > 0 %}
+        {% set ns.out = ns.out + [(it.uid | string)] %}
+      {% else %}
+        {% set ns.out = ns.out + ['summary:' ~ (it.summary | default('') | string)] %}
+      {% endif %}
+    {% endfor %}
+    {{ ns.out }}
+  added_items: >
+    {% set ns = namespace(out=[]) %}
+    {% for item in current_items %}
+      {% if item.uid is defined and item.uid is not none and (item.uid | string) | length > 0 %}
+        {% set key = item.uid | string %}
+      {% else %}
+        {% set key = 'summary:' ~ (item.summary | default('') | string) %}
+      {% endif %}
+      {% if key not in prior_keys %}
+        {% set ns.out = ns.out + [item] %}
+      {% endif %}
+    {% endfor %}
+    {{ ns.out }}
+action:
+  - if:
+      - condition: template
+        value_template: "{{ added_items | length > 0 }}"
+    then:
+      - repeat:
+          for_each: "{{ added_items[:cap] }}"
+          sequence:
+            - variables:
+                # ``(x or '')`` returns '' for the integer 0 too, which would
+                # falsely mark a valid uid=0 as missing. Branch explicitly on
+                # defined+not-none and stringify, so any truthy/falsey value
+                # except undefined/None becomes its string form.
+                uid: >-
+                  {%- if repeat.item.uid is defined and repeat.item.uid is not none -%}
+                    {{ repeat.item.uid | string }}
+                  {%- endif -%}
+                summary: >
+                  {{ ((repeat.item.summary or '') | string)
+                     .replace('\n', ' ').replace('\r', ' ').replace('|', '/').replace('\t', ' ') | trim }}
+                due_raw: "{{ (repeat.item.due or '') | string }}"
+                due: >-
+                  {%- if due_raw | length > 0 -%}
+                    {%- set dt = due_raw | as_datetime -%}
+                    {%- if dt is not none -%}
+                      {{ (dt | as_local).strftime('%Y-%m-%d %H:%M') }}
+                    {%- else -%}
+                      {{ due_raw }}
+                    {%- endif -%}
+                  {%- endif -%}
+                description_raw: "{{ (repeat.item.description or '') | string }}"
+                # Preserve \n for paragraph breaks (print_text_utf8 wraps
+                # them onto separate lines); strip \r so Windows \r\n
+                # doesn't render as garbage; sanitise | and \t for layout.
+                description: >-
+                  {{ (description_raw if description_raw | length <= max_description_length
+                      else description_raw[:max_description_length] ~ '...')
+                     .replace('\r', '').replace('|', '/').replace('\t', ' ') }}
+                meta_rows: >
+                  {% set ns = namespace(out=[]) %}
+                  {% if due | length > 0 %}
+                    {% set ns.out = ns.out + [['Due', due]] %}
+                  {% endif %}
+                  {% set list_name = state_attr(todo_entity_id, 'friendly_name') or todo_entity_id %}
+                  {% set ns.out = ns.out + [['List', list_name]] %}
+                  {% set ns.out = ns.out + [['Added', now().strftime('%Y-%m-%d %H:%M')]] %}
+                  {{ ns.out }}
+            - service: escpos_printer.print_box
+              target:
+                device_id: !input printer
+              data:
+                text: !input header_text
+                style: !input style
+                align: center
+                padding: 0
+            # Text-mode title (double-width / double-height / bold) so tickets
+            # still print on image-less ESC/POS printers. ``print_text_utf8``
+            # transcodes UTF-8 task summaries (em-dashes, accents) to the
+            # printer's codepage — characters outside it (most emoji) fall
+            # back to "?".
+            - service: escpos_printer.print_text_utf8
+              target:
+                device_id: !input printer
+              data:
+                text: "{{ summary }}"
+                align: center
+                bold: true
+                width: double
+                height: double
+                feed: 1
+            - service: escpos_printer.print_kvtable
+              target:
+                device_id: !input printer
+              data:
+                items: "{{ meta_rows }}"
+                value_align: left
+            - if:
+                - condition: template
+                  value_template: "{{ print_description_input and description | trim | length > 0 }}"
+              then:
+                - service: escpos_printer.print_separator
+                  target:
+                    device_id: !input printer
+                # UTF-8 transcoding: task descriptions from Todoist / CalDAV
+                # routinely contain em-dashes, smart quotes, accented characters.
+                # ``print_text`` (raw encoding) would corrupt them.
+                - service: escpos_printer.print_text_utf8
+                  target:
+                    device_id: !input printer
+                  data:
+                    text: "{{ description }}"
+                    align: left
+            - if:
+                - condition: template
+                  value_template: "{{ print_qr_input and uid | length > 0 }}"
+              then:
+                - service: escpos_printer.print_separator
+                  target:
+                    device_id: !input printer
+                - service: escpos_printer.print_qr
+                  target:
+                    device_id: !input printer
+                  data:
+                    data: !input url_template
+                    size: !input qr_size
+                    ec: "M"
+                    align: center
+                    feed: 1
+                - service: escpos_printer.print_text
+                  target:
+                    device_id: !input printer
+                  data:
+                    text: "Scan to open task"
+                    align: center
+            - service: escpos_printer.print_separator
+              target:
+                device_id: !input printer
+              data:
+                char: "="
+            - if:
+                - condition: template
+                  value_template: "{{ cut_per_item }}"
+              then:
+                - service: escpos_printer.cut
+                  target:
+                    device_id: !input printer
+                  data:
+                    mode: full
+      - if:
+          - condition: template
+            value_template: "{{ not cut_per_item }}"
+        then:
+          - service: escpos_printer.cut
+            target:
+              device_id: !input printer
+            data:
+              mode: full

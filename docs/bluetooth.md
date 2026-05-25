@@ -38,7 +38,7 @@ bluetoothctl devices
 
 You'll see a list like:
 
-```
+```text
 Device DC:0D:51:5F:43:3E MPT-II
 Device 4C:24:98:1A:2B:3C PeriPage_A1
 ```

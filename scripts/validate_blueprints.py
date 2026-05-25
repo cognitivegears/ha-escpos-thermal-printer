@@ -11,6 +11,10 @@ breaks during editing:
 - ``blueprint.domain`` is something other than ``automation`` or
   ``script``
 - the directory layout does not match the domain
+- a ``service: escpos_printer.<name>`` reference points at a service
+  that doesn't exist in ``custom_components/escpos_printer/services.yaml``
+- a ``data:`` block at a service call uses field names the service's
+  schema doesn't declare (typo / drift between blueprints and integration)
 
 It does *not* run HA's full blueprint loader (which would pull in
 the whole HA dependency surface for a CI check we want to be cheap).
@@ -28,6 +32,13 @@ from typing import Any
 import yaml
 
 _VALID_DOMAINS = frozenset({"automation", "script"})
+
+# HA service-call data field that's always implicit (target → device_id /
+# entity_id / area_id). Service-specific schemas don't list these.
+_HA_IMPLICIT_DATA_FIELDS = frozenset({"device_id", "entity_id", "area_id"})
+
+# The integration domain for service-call linting.
+_INTEGRATION_DOMAIN = "escpos_printer"
 
 
 class _BlueprintLoader(yaml.SafeLoader):
@@ -54,6 +65,106 @@ def _ignore_unknown(loader: yaml.Loader, tag_suffix: str, node: yaml.Node) -> An
 
 
 _BlueprintLoader.add_multi_constructor("!", _ignore_unknown)
+
+
+def _load_services_yaml(services_path: Path) -> dict[str, set[str]]:
+    """Parse the integration's ``services.yaml`` into ``{service: fields}``.
+
+    Returns an empty dict on any failure (so the service-lint becomes a
+    silent no-op rather than a hard failure when run outside the repo
+    layout, e.g. on a forked copy of just ``blueprints/``).
+    """
+    try:
+        text = services_path.read_text(encoding="utf-8")
+    except OSError:
+        return {}
+    try:
+        # vanilla SafeLoader is fine — services.yaml has no custom tags.
+        data: Any = yaml.safe_load(text)
+    except yaml.YAMLError:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    services: dict[str, set[str]] = {}
+    for svc, body in data.items():
+        if not isinstance(svc, str) or not isinstance(body, dict):
+            continue
+        fields = body.get("fields", {}) or {}
+        if not isinstance(fields, dict):
+            services[svc] = set()
+            continue
+        services[svc] = set(fields.keys())
+    return services
+
+
+def _walk_service_calls(node: Any) -> list[tuple[str, dict[str, Any]]]:
+    """Yield ``(service_str, data_block)`` tuples found anywhere in *node*.
+
+    A "service call" is a mapping with a ``service:`` key whose value is
+    a string. ``data:`` is the sibling mapping (or empty dict if absent).
+    Walks recursively into lists and nested mappings — HA blueprint
+    action sequences are arbitrarily nested via ``repeat:``, ``if:``,
+    ``choose:``, etc.
+    """
+    found: list[tuple[str, dict[str, Any]]] = []
+    if isinstance(node, dict):
+        svc = node.get("service")
+        if isinstance(svc, str):
+            data = node.get("data") if isinstance(node.get("data"), dict) else {}
+            found.append((svc, data))
+        for value in node.values():
+            found.extend(_walk_service_calls(value))
+    elif isinstance(node, list):
+        for item in node:
+            found.extend(_walk_service_calls(item))
+    return found
+
+
+def _lint_service_calls(bp_data: Any, services_index: dict[str, set[str]]) -> list[str]:
+    """Return findings for ``escpos_printer.*`` calls that don't match the schema."""
+    if not services_index:
+        # We couldn't load services.yaml — skip silently rather than failing.
+        return []
+    findings: list[str] = []
+    for svc_str, data in _walk_service_calls(bp_data):
+        if "." not in svc_str:
+            continue
+        domain, _, name = svc_str.partition(".")
+        if domain != _INTEGRATION_DOMAIN:
+            continue
+        if name not in services_index:
+            findings.append(
+                f"service '{svc_str}' is not declared in services.yaml "
+                f"(known: {', '.join(sorted(services_index)) or 'none'})"
+            )
+            continue
+        allowed_fields = services_index[name] | _HA_IMPLICIT_DATA_FIELDS
+        for field_name in data:
+            if not isinstance(field_name, str):
+                continue
+            if field_name in allowed_fields:
+                continue
+            findings.append(
+                f"service '{svc_str}' has unknown data field '{field_name}' "
+                f"(declared: {', '.join(sorted(services_index[name])) or 'none'})"
+            )
+    return findings
+
+
+def _find_services_yaml(blueprint_path: Path) -> Path | None:
+    """Walk up from *blueprint_path* to find a sibling integration's
+    ``services.yaml``.
+
+    The conventional repo layout is
+    ``<repo>/custom_components/escpos_printer/services.yaml`` with
+    blueprints under ``<repo>/blueprints/...``. Walk from the blueprint
+    upward looking for that path.
+    """
+    for parent in [blueprint_path.parent, *blueprint_path.parents]:
+        candidate = parent / "custom_components" / _INTEGRATION_DOMAIN / "services.yaml"
+        if candidate.is_file():
+            return candidate
+    return None
 
 
 def validate_file(path: Path, root: Path | None = None) -> list[str]:
@@ -102,6 +213,17 @@ def validate_file(path: Path, root: Path | None = None) -> list[str]:
             f"file lives under {path.parent} but blueprint.domain={domain!r} "
             f"(domain segment should be the first directory under the scan root)"
         )
+    # Service-call lint: every `escpos_printer.<name>` reference must
+    # resolve to a service declared in the integration's services.yaml,
+    # and each `data:` field name must be declared in that service's
+    # schema. Skips silently when services.yaml isn't reachable (e.g.
+    # the blueprints/ directory exported alone to a fork).
+    services_path = _find_services_yaml(path)
+    if services_path is not None:
+        services_index = _load_services_yaml(services_path)
+        # Walk the entire document tree — ``action:`` / ``sequence:`` are
+        # top-level siblings of ``blueprint:``, not nested inside it.
+        errors.extend(_lint_service_calls(data, services_index))
     return errors
 
 
