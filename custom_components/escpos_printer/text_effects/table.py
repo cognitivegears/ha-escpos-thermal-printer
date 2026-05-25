@@ -20,7 +20,9 @@ _WIDE_CHAR_SAMPLE = 256
 
 # Module-level guard so the wide-char warning fires at most once per
 # Python process (Q-H2). HA surfaces WARNING via the Notifications panel.
-_WARNED_WIDE_CHARS_TABLE = False
+# Wrapped in a single-element list so the per-call read/write is via
+# ``__setitem__`` — see the analogous comment in ``box.py``.
+_WARNED_WIDE_CHARS_TABLE: list[bool] = [False]
 
 
 def _has_wide_chars(text: str) -> bool:
@@ -173,8 +175,9 @@ def render_table(
     between every body row.
     """
     cells, n_cols = _normalize_rows(rows)
-    global _WARNED_WIDE_CHARS_TABLE  # noqa: PLW0603
-    if not _WARNED_WIDE_CHARS_TABLE and any(_has_wide_chars(c) for row in cells for c in row):
+    if not _WARNED_WIDE_CHARS_TABLE[0] and any(
+        _has_wide_chars(c) for row in cells for c in row
+    ):
         _LOGGER.warning(
             "Table contains wide-width characters (CJK / fullwidth / emoji); "
             "column alignment may be off because text-mode padding assumes one "
@@ -182,7 +185,7 @@ def render_table(
             "see docs/text-effects.md#cjk. "
             "(This warning fires once per process.)"
         )
-        _WARNED_WIDE_CHARS_TABLE = True
+        _WARNED_WIDE_CHARS_TABLE[0] = True
     resolved = resolve_style(style, codepage)
     bordered = resolved != "none"
 

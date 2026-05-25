@@ -35,20 +35,35 @@ class _PrinterHost(Protocol):
     _printer: Any
     _lock: asyncio.Lock
 
-    def _connect(self) -> Any: ...
-    def _wrap_text(self, text: str) -> str: ...
-    def get_profile_pixel_width(self, hass: HomeAssistant | None = None) -> int | None: ...
+    # PEP 544 Protocol stubs. Docstring bodies keep the surface readable
+    # without tripping CodeQL's ``py/ineffectual-statement`` rule (which
+    # flags bare ``...`` placeholders).
+    def _connect(self) -> Any:
+        """Open the underlying transport and return the python-escpos object."""
 
-    async def _acquire_printer(self, hass: HomeAssistant) -> tuple[Any, bool]: ...
-    async def _release_printer(self, hass: HomeAssistant, printer: Any, *, owned: bool) -> None: ...
+    def _wrap_text(self, text: str) -> str:
+        """Transcode ``text`` to the active codepage encoding."""
+
+    def get_profile_pixel_width(self, hass: HomeAssistant | None = None) -> int | None:
+        """Return the printer's pixel width per its profile, or ``None``."""
+
+    async def _acquire_printer(self, hass: HomeAssistant) -> tuple[Any, bool]:
+        """Acquire the underlying connection (returns ``(printer, owned)``)."""
+
+    async def _release_printer(self, hass: HomeAssistant, printer: Any, *, owned: bool) -> None:
+        """Release the connection acquired via :meth:`_acquire_printer`."""
+
     async def _apply_cut_and_feed(
         self,
         hass: HomeAssistant,
         printer: Any,
         cut: str | None,
         feed: int | None,
-    ) -> None: ...
-    async def _mark_success(self) -> None: ...
+    ) -> None:
+        """Apply the post-print cut + feed control sequence."""
+
+    async def _mark_success(self) -> None:
+        """Reset failure-count state after a successful operation."""
 
 
 __all__ = ["_PrinterHost"]

@@ -181,7 +181,7 @@ class UsbFlowMixin:
 
         return self.async_show_form(step_id="usb_select", data_schema=data_schema, errors=errors)  # type: ignore[attr-defined,no-any-return]
 
-    async def async_step_usb_all_devices(  # noqa: PLR0912
+    async def async_step_usb_all_devices(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Handle selection from all USB devices (not just known printers).
@@ -209,6 +209,14 @@ class UsbFlowMixin:
                     selected_usb_device = device
                     break
 
+            # Parse endpoint settings up-front so the variables are
+            # unconditionally defined before any later code path uses
+            # them (CodeQL py/uninitialized-local-variable). The values
+            # are only consumed inside the ``not errors`` branches below.
+            timeout = float(user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
+            in_ep = int(user_input.get(CONF_IN_EP, DEFAULT_IN_EP))
+            out_ep = int(user_input.get(CONF_OUT_EP, DEFAULT_OUT_EP))
+
             if selected_usb_device is None:
                 errors["base"] = "invalid_usb_device"
                 vendor_id, product_id = 0, 0
@@ -222,14 +230,11 @@ class UsbFlowMixin:
                 )
                 serial_number = selected_usb_device.get("serial_number")
 
-            if not errors:
-                timeout = float(user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
-                in_ep = int(user_input.get(CONF_IN_EP, DEFAULT_IN_EP))
-                out_ep = int(user_input.get(CONF_OUT_EP, DEFAULT_OUT_EP))
-
-                # Validate endpoint addresses (0x00-0xFF)
-                if not (0x00 <= in_ep <= 0xFF) or not (0x00 <= out_ep <= 0xFF):
-                    errors["base"] = "invalid_endpoint"
+            # Validate endpoint addresses (0x00-0xFF)
+            if not errors and (
+                not (0x00 <= in_ep <= 0xFF) or not (0x00 <= out_ep <= 0xFF)
+            ):
+                errors["base"] = "invalid_endpoint"
 
             if not errors:
                 # Only set unique ID if we have a serial number to distinguish devices
@@ -326,6 +331,14 @@ class UsbFlowMixin:
         if user_input is not None:
             _LOGGER.debug("Config flow USB manual step input: %s", user_input)
 
+            # Parse endpoint settings up-front so the variables are
+            # unconditionally defined before any later code path uses
+            # them (CodeQL py/uninitialized-local-variable). The values
+            # are only consumed inside the ``not errors`` branches below.
+            timeout = float(user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
+            in_ep = int(user_input.get(CONF_IN_EP, DEFAULT_IN_EP))
+            out_ep = int(user_input.get(CONF_OUT_EP, DEFAULT_OUT_EP))
+
             try:
                 vendor_id = int(user_input.get(CONF_VENDOR_ID, 0))
                 product_id = int(user_input.get(CONF_PRODUCT_ID, 0))
@@ -336,14 +349,11 @@ class UsbFlowMixin:
                 errors["base"] = "invalid_usb_device"
                 vendor_id, product_id = 0, 0
 
-            if not errors:
-                timeout = float(user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
-                in_ep = int(user_input.get(CONF_IN_EP, DEFAULT_IN_EP))
-                out_ep = int(user_input.get(CONF_OUT_EP, DEFAULT_OUT_EP))
-
-                # Validate endpoint addresses (0x00-0xFF)
-                if not (0x00 <= in_ep <= 0xFF) or not (0x00 <= out_ep <= 0xFF):
-                    errors["base"] = "invalid_endpoint"
+            # Validate endpoint addresses (0x00-0xFF)
+            if not errors and (
+                not (0x00 <= in_ep <= 0xFF) or not (0x00 <= out_ep <= 0xFF)
+            ):
+                errors["base"] = "invalid_endpoint"
 
             if not errors:
                 # Note: No unique_id set for manual entry - allows multiple identical printers

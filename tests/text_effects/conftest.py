@@ -17,8 +17,8 @@ def _reset_wide_char_warning_flags():
     from custom_components.escpos_printer.text_effects import box as _box
     from custom_components.escpos_printer.text_effects import table as _table
 
-    _box._WARNED_WIDE_CHARS_BOX = False
-    _table._WARNED_WIDE_CHARS_TABLE = False
+    _box._WARNED_WIDE_CHARS_BOX[0] = False
+    _table._WARNED_WIDE_CHARS_TABLE[0] = False
     yield
-    _box._WARNED_WIDE_CHARS_BOX = False
-    _table._WARNED_WIDE_CHARS_TABLE = False
+    _box._WARNED_WIDE_CHARS_BOX[0] = False
+    _table._WARNED_WIDE_CHARS_TABLE[0] = False

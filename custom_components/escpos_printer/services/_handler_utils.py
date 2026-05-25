@@ -15,16 +15,14 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 
 from ..security import sanitize_log_message
 from .target_resolution import _async_get_target_entries, _get_adapter_and_defaults
-
-if TYPE_CHECKING:
-    from homeassistant.config_entries import ConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -43,7 +41,7 @@ def _wrap_unexpected(err: Exception, service_name: str) -> HomeAssistantError:
 
 
 # Body signature: (entry, adapter, defaults, config) -> awaitable
-TargetBody = Callable[["ConfigEntry", Any, dict[str, Any], Any], Awaitable[None]]
+TargetBody = Callable[[ConfigEntry, Any, dict[str, Any], Any], Awaitable[None]]
 
 
 async def _for_each_target(

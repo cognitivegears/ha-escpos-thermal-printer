@@ -21,8 +21,11 @@ _WIDE_CHAR_SAMPLE = 256
 # Module-level guard so the wide-char warning fires at most once per
 # Python process (Q-H2). HA surfaces WARNING via the Notifications panel,
 # and a CJK-receipt automation that prints hourly would otherwise spam
-# it on every call.
-_WARNED_WIDE_CHARS_BOX = False
+# it on every call. Wrapped in a single-element list so the per-call
+# read/write is via ``__setitem__`` — that keeps CodeQL's local
+# data-flow from flagging the assignment as dead (it can't see the
+# cross-call read that consumes the True value).
+_WARNED_WIDE_CHARS_BOX: list[bool] = [False]
 
 
 def _has_wide_chars(text: str) -> bool:
@@ -97,8 +100,7 @@ def render_box(
         raise ValueError(f"align must be left/center/right, got {align!r}")
 
     text = sanitize_layout_text(text)
-    global _WARNED_WIDE_CHARS_BOX  # noqa: PLW0603
-    if not _WARNED_WIDE_CHARS_BOX and _has_wide_chars(text):
+    if not _WARNED_WIDE_CHARS_BOX[0] and _has_wide_chars(text):
         _LOGGER.warning(
             "Box content contains wide-width characters (CJK / fullwidth / "
             "emoji); the borders may misalign because textwrap wraps by "
@@ -106,7 +108,7 @@ def render_box(
             "for accurate layout — see docs/text-effects.md#cjk. "
             "(This warning fires once per process.)"
         )
-        _WARNED_WIDE_CHARS_BOX = True
+        _WARNED_WIDE_CHARS_BOX[0] = True
     resolved = resolve_style(style, codepage)
     if resolved == "none":
         wrapped = _wrap_lines(text, inner_width)

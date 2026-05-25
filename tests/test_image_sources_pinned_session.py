@@ -70,9 +70,12 @@ async def test_static_resolver_returns_aiohttp_shaped_address_dicts() -> None:
 @pytest.mark.asyncio
 async def test_static_resolver_close_is_noop() -> None:
     # Required by the AbstractResolver contract but we hold no real
-    # resources — confirm it's safe to call.
+    # resources — confirm it's safe to call. Bind the await separately
+    # so the assertion is pure (CodeQL py/side-effect-in-assert: asserts
+    # are stripped under ``python -O`` and must not perform real work).
     resolver = _StaticResolver("example.com", ["192.0.2.1"])
-    assert await resolver.close() is None
+    result = await resolver.close()
+    assert result is None
 
 
 @pytest.mark.asyncio
