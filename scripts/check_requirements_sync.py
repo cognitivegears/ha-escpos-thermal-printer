@@ -28,8 +28,13 @@ except Exception:  # pragma: no cover
 
 from packaging.requirements import Requirement
 from packaging.specifiers import SpecifierSet
+from packaging.version import InvalidVersion, Version
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+# See `scripts/sync_manifest_requirements.py` for the rationale: anchor
+# to the *invocation directory* so `dependabot-auto-sync.yml` (which
+# runs this script from `working-directory: pr` against a script copy
+# under `base/`) reads the PR head's files, not main's.
+ROOT = pathlib.Path.cwd()
 
 # Packages allowed to use non-`==` specifiers in pyproject.toml.
 # Mirror the rationale in CLAUDE.md and
@@ -79,25 +84,46 @@ def parse_manifest() -> dict[str, SpecifierSet]:
     return result
 
 
+def _pinned_versions(spec: SpecifierSet) -> list[Version]:
+    """Return the list of exact versions a spec pins via ``==`` clauses.
+
+    ``check_pinned_shape()`` guarantees pyproject specs reach this
+    function as one or more ``==`` clauses, so we can iterate them and
+    treat each as an exact version. Returning an empty list signals
+    ``ALLOWED_NON_PINNED`` (or a future range allowance) — those skip
+    the check.
+    """
+    out: list[Version] = []
+    for clause in str(spec).split(","):
+        s = clause.strip()
+        if not s.startswith("=="):
+            continue
+        raw = s[2:].lstrip("=")
+        try:
+            out.append(Version(raw))
+        except InvalidVersion:
+            continue
+    return out
+
+
 def compatible(spec_py: SpecifierSet, spec_mani: SpecifierSet) -> bool:
-    """Return True if pyproject spec is within manifest spec (or equal)."""
-    # Heuristic: check a small probe set for intersection and containment.
-    probes = [
-        "0.0.0",
-        "7.4.2",
-        "10.0.0",
-        "11.0.0",
-        "11.3.0",
-        "0.16.1",
-        "3.1",
-    ]
-    # If either is empty, treat as wildcard
-    if not str(spec_py):
-        return True
+    """Return True if pyproject's pinned version satisfies the manifest spec.
+
+    pyproject deps are guaranteed ``==``-pinned by
+    :func:`check_pinned_shape`, so the question reduces to "does the
+    pinned version sit inside the manifest's spec?" — a direct
+    membership check that doesn't rely on a hand-maintained probe set.
+    Empty manifest specs (wildcards) and pyproject specs we couldn't
+    pin (e.g. future ``ALLOWED_NON_PINNED`` entries) are treated as
+    compatible since this check is about catching drift, not enforcing
+    pin shape (that's :func:`check_pinned_shape`'s job).
+    """
     if not str(spec_mani):
         return True
-    # Any version allowed by pyproject but not allowed by manifest => incompatible
-    return all(not (v in spec_py and v not in spec_mani) for v in probes)
+    pins = _pinned_versions(spec_py)
+    if not pins:
+        return True
+    return all(p in spec_mani for p in pins)
 
 
 def main() -> int:
