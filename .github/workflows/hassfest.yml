@@ -17,7 +17,7 @@ jobs:
   hassfest:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
       - name: Hassfest validation
         # CI-H2: pin to a SHA instead of `@master`. The HA actions repo
         # does not publish versioned tags for the hassfest sub-action;
