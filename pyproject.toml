@@ -57,7 +57,7 @@ dev = [
     # main to enforce >=90% on changed lines, on top of the global
     # `fail_under=80`). Catches regressions in large PRs where the
     # global average masks new untested code.
-    "diff-cover==10.2.0",
+    "diff-cover==10.2.1",
 ]
 security = [
   "bandit==1.9.4",
