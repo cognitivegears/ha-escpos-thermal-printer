@@ -7,7 +7,7 @@ A small recipe that pairs the [Guest Wi-Fi QR](script/escpos_printer/guest_wifi_
 
 It reuses the credentials *you've already given* the official UniFi integration. No new secrets to manage, no `.env` files, no extra `input_text` helpers — if you can already see your UniFi devices in HA, you're 90% set up.
 
-> **Don't need automation?** If you just want a QR with your typed-in SSID and password, stop here — use the blueprint's [Quick start](README.md#guest-wi-fi-qr) and you're done in 2 minutes.
+> **Don't need automation?** If you just want a QR with your typed-in SSID and password, stop here — see the [Guest Wi-Fi QR Quick start](GUEST_WIFI_QR.md#quick-start-works-on-any-router--about-2-minutes) and you're done in 2 minutes.
 
 ---
 
