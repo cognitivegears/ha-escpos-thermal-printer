@@ -27,7 +27,7 @@ jobs:
             continue-on-error: true
     continue-on-error: ${{ matrix.continue-on-error == true }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           # gitleaks scans the PR's commit range, which requires the
           # base commit to be present in history (default depth=1 only
@@ -107,7 +107,7 @@ jobs:
   integration-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
       - uses: actions/setup-python@v6.2.0
         with:
           python-version: '3.14'
