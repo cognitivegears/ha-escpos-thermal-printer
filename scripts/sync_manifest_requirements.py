@@ -18,7 +18,16 @@ except Exception as exc:  # pragma: no cover
 
 from packaging.requirements import Requirement
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+# Resolve project files relative to the *invocation directory*, not the
+# script's own location. This matters for `dependabot-auto-sync.yml`:
+# that workflow checks the script out of a fresh `main` clone (under
+# `base/`) for supply-chain safety, then runs it from `working-directory:
+# pr` so it reads and writes the PR head's `pyproject.toml` / `uv.lock` /
+# `manifest.json`. A `__file__`-anchored ROOT would silently read `base/`
+# (== main) instead and report "no changes needed" on every Dependabot
+# PR. Local/CI usage runs from the repo root, where `Path.cwd()` is
+# equivalent to the old anchor.
+ROOT = pathlib.Path.cwd()
 MANIFEST = ROOT / "custom_components" / "escpos_printer" / "manifest.json"
 PYPROJECT = ROOT / "pyproject.toml"
 UVLOCK = ROOT / "uv.lock"
