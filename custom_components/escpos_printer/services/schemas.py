@@ -9,6 +9,7 @@ Python-script callers bypass all validation. See the Bronze quality-scale
 
 from __future__ import annotations
 
+from types import MappingProxyType
 from typing import Any
 
 from homeassistant.components.notify import ATTR_MESSAGE, ATTR_TITLE
@@ -25,9 +26,12 @@ from ..const import (
     ATTR_BC,
     ATTR_BOLD,
     ATTR_CENTER,
+    ATTR_CHAR,
     ATTR_CHECK,
     ATTR_CHUNK_DELAY_MS,
     ATTR_CODE,
+    ATTR_COLUMN_ALIGNS,
+    ATTR_COLUMN_WIDTHS,
     ATTR_CUT,
     ATTR_DATA,
     ATTR_DITHER,
@@ -37,26 +41,47 @@ from ..const import (
     ATTR_FALLBACK_IMAGE,
     ATTR_FEED,
     ATTR_FONT,
+    ATTR_FONT_NAME,
+    ATTR_FONT_PATH,
+    ATTR_FONT_SIZE,
     ATTR_FORCE_SOFTWARE,
     ATTR_FRAGMENT_HEIGHT,
+    ATTR_HEADER,
     ATTR_HEIGHT,
     ATTR_HIGH_DENSITY,
     ATTR_IMAGE,
     ATTR_IMAGE_WIDTH,
     ATTR_IMPL,
     ATTR_INVERT,
+    ATTR_ITEMS,
+    ATTR_LABEL_WIDTH,
+    ATTR_LINE_SPACING,
     ATTR_LINES,
     ATTR_MIRROR,
     ATTR_MODE,
+    ATTR_OUTPUT_PATH,
+    ATTR_PADDING,
     ATTR_POS,
+    ATTR_REPEAT,
     ATTR_ROTATION,
+    ATTR_ROW_SEPARATORS,
+    ATTR_ROWS,
     ATTR_SIZE,
+    ATTR_STYLE,
     ATTR_TEXT,
     ATTR_THRESHOLD,
     ATTR_TIMES,
+    ATTR_TOTAL_WIDTH,
     ATTR_UNDERLINE,
+    ATTR_VALUE_ALIGN,
     ATTR_WIDTH,
+    BORDER_STYLES,
+    BUILTIN_FONT_CHOICES,
+    DEFAULT_BORDER_STYLE,
     DEFAULT_DITHER,
+    DEFAULT_FONT_NAME,
+    DEFAULT_FONT_SIZE,
+    DEFAULT_LINE_SPACING,
     DEFAULT_THRESHOLD,
     DITHER_MODES,
     IMPL_MODES,
@@ -73,9 +98,16 @@ from ..security import (
     IMAGE_WIDTH_MIN,
     MAX_BARCODE_LENGTH,
     MAX_BASE64_INPUT_BYTES,
+    MAX_BOX_WIDTH,
     MAX_FEED_LINES,
+    MAX_FONT_PATH_LENGTH,
+    MAX_FONT_SIZE_PT,
     MAX_IMAGE_PATH_LENGTH,
     MAX_QR_DATA_LENGTH,
+    MAX_SEPARATOR_REPEAT,
+    MAX_TABLE_CELL_LENGTH,
+    MAX_TABLE_COLS,
+    MAX_TABLE_ROWS,
     MAX_TEXT_LENGTH,
     MAX_URL_LENGTH,
 )
@@ -100,6 +132,7 @@ _TEXT_SIZE = vol.Any(
 
 _FEED = vol.All(vol.Coerce(int), vol.Range(min=0, max=MAX_FEED_LINES))
 
+
 def _image_source_validator(value: Any) -> Any:
     """Length-cap an image source string before delegating to ``cv.template``.
 
@@ -109,13 +142,12 @@ def _image_source_validator(value: Any) -> Any:
     200 MB base64 string fails at the schema layer.
     """
     if isinstance(value, str) and len(value) > MAX_BASE64_INPUT_BYTES:
-        raise vol.Invalid(
-            f"image source too large (max ~{MAX_BASE64_INPUT_BYTES} chars)"
-        )
+        raise vol.Invalid(f"image source too large (max ~{MAX_BASE64_INPUT_BYTES} chars)")
     return cv.template(value)
 
 
 _IMAGE_SOURCE = _image_source_validator
+
 
 def _image_option_fragment(
     prefix: str = "",
@@ -134,7 +166,13 @@ def _image_option_fragment(
     match its ``services.yaml`` UI default. Without this override, a UI
     form caller and a YAML-script caller of the same service would get
     different behaviour for the same omitted key.
+
+    B-L9: the returned dict is wrapped in ``MappingProxyType`` at the
+    module-cached callsites below so the freeze invariant is visible
+    in the source. Without it, a future test fixture could mutate the
+    cached dict and silently re-shape every schema that spreads it.
     """
+
     def k(name: str) -> str:
         if not prefix or name == ATTR_IMAGE_WIDTH:
             return name
@@ -178,15 +216,46 @@ def _image_option_fragment(
     }
 
 
-_IMAGE_OPTION_FRAGMENT_PLAIN = _image_option_fragment()
-_IMAGE_OPTION_FRAGMENT_URL = _image_option_fragment(auto_resize=True)
-_IMAGE_OPTION_FRAGMENT_CAMERA = _image_option_fragment(
-    autocontrast=True, auto_resize=True
+# M4: freeze the module-cached fragments with MappingProxyType. Voluptuous
+# spreads these via ``**fragment`` so it never mutates them, but the
+# read-only view makes the invariant explicit and refuses any future
+# fixture that tries to add/override keys directly.
+_IMAGE_OPTION_FRAGMENT_PLAIN = MappingProxyType(_image_option_fragment())
+_IMAGE_OPTION_FRAGMENT_URL = MappingProxyType(_image_option_fragment(auto_resize=True))
+_IMAGE_OPTION_FRAGMENT_CAMERA = MappingProxyType(
+    _image_option_fragment(autocontrast=True, auto_resize=True)
 )
-_IMAGE_OPTION_FRAGMENT_NOTIFY = {
-    vol.Optional(ATTR_IMAGE): _IMAGE_SOURCE,
-    **_image_option_fragment("image_"),
-}
+_IMAGE_OPTION_FRAGMENT_NOTIFY = MappingProxyType(
+    {
+        vol.Optional(ATTR_IMAGE): _IMAGE_SOURCE,
+        **_image_option_fragment("image_"),
+    }
+)
+
+
+def _image_pipeline_knobs(prefix: str = "") -> dict[Any, Any]:
+    """Pipeline-only knobs (dither/threshold/impl/rotation/...) without ``fallback_image``.
+
+    Services that *produce* their own image bytes (currently
+    ``print_text_image``) need the downstream pipeline parameters but
+    have no source-image to fall back from. Sharing the full
+    :func:`_image_option_fragment` would silently expose
+    ``fallback_image`` — a field that is meaningless in that context
+    and is not advertised in ``services.yaml`` — to programmatic
+    callers, broadening the parity-invariant contract documented in
+    ``CLAUDE.md``.
+
+    ``prefix`` is forwarded so the caller can disambiguate the bare
+    image keys (``dither``, ``invert``, …) from the surrounding service
+    options. ``print_text_image`` uses ``"image_"`` so its UI fields
+    line up with ``print_message``'s ``image_*`` knobs.
+    """
+    fallback_key = f"{prefix}{ATTR_FALLBACK_IMAGE}" if prefix else ATTR_FALLBACK_IMAGE
+    return {
+        k: v
+        for k, v in _image_option_fragment(prefix).items()
+        if not (isinstance(k, vol.Optional) and k.schema == fallback_key)
+    }
 
 
 PRINT_TEXT_SCHEMA = vol.Schema(
@@ -223,9 +292,7 @@ PRINT_TEXT_UTF8_SCHEMA = vol.Schema(
 PRINT_QR_SCHEMA = vol.Schema(
     {
         vol.Optional("device_id"): _DEVICE_ID,
-        vol.Required(ATTR_DATA): vol.All(
-            cv.string, vol.Length(min=1, max=MAX_QR_DATA_LENGTH)
-        ),
+        vol.Required(ATTR_DATA): vol.All(cv.string, vol.Length(min=1, max=MAX_QR_DATA_LENGTH)),
         vol.Optional(ATTR_SIZE): vol.All(vol.Coerce(int), vol.Range(min=1, max=16)),
         vol.Optional(ATTR_EC): vol.In(["L", "M", "Q", "H"]),
         vol.Optional(ATTR_ALIGN): _ALIGN,
@@ -256,6 +323,7 @@ def _entity_id_in_domain(domain: str):  # type: ignore[no-untyped-def]
         if not value.startswith(f"{domain}."):
             raise vol.Invalid(f"Expected entity_id in domain '{domain}'")
         return value
+
     return _validate
 
 
@@ -303,9 +371,7 @@ PRINT_IMAGE_ENTITY_SCHEMA = vol.Schema(
 PRINT_IMAGE_URL_SCHEMA = vol.Schema(
     {
         vol.Optional("device_id"): _DEVICE_ID,
-        vol.Required("url"): vol.All(
-            _url_only, vol.Length(min=1, max=MAX_URL_LENGTH)
-        ),
+        vol.Required("url"): vol.All(_url_only, vol.Length(min=1, max=MAX_URL_LENGTH)),
         **_IMAGE_OPTION_FRAGMENT_URL,
         vol.Optional(ATTR_CUT): _CUT,
         vol.Optional(ATTR_FEED): _FEED,
@@ -342,19 +408,264 @@ CALIBRATION_PRINT_SCHEMA = vol.Schema(
 )
 
 
+_BORDER_STYLE = vol.In(sorted(BORDER_STYLES))
+
+
+def _validate_rows_shape(value: Any) -> list[list[Any]]:
+    """Schema-level shape check for ``print_table.rows``.
+
+    The deeper per-cell sanitisation lives in
+    :func:`..security.validate_rows` (called by the handler so the
+    sanitised result feeds the renderer). Here we only enforce list-of-
+    lists structure plus the row/column count bounds so a malformed
+    payload fails fast at the service-registry layer.
+    """
+    if not isinstance(value, list):
+        raise vol.Invalid("rows must be a list of rows")
+    if not value:
+        raise vol.Invalid("rows must contain at least one row")
+    if len(value) > MAX_TABLE_ROWS:
+        raise vol.Invalid(f"rows length {len(value)} exceeds maximum {MAX_TABLE_ROWS}")
+    out: list[list[Any]] = []
+    for row in value:
+        if not isinstance(row, list):
+            raise vol.Invalid("each row must be a list")
+        if len(row) > MAX_TABLE_COLS:
+            raise vol.Invalid(f"row width {len(row)} exceeds maximum {MAX_TABLE_COLS}")
+        out.append(row)
+    return out
+
+
+def _validate_column_aligns(value: Any) -> list[str]:
+    """Schema-level check for ``print_table.column_aligns``.
+
+    Mirrors :func:`_validate_rows_shape` — keeps the per-element
+    enumeration in the schema layer so REST/script callers fail fast
+    before the handler runs.
+    """
+    if not isinstance(value, list):
+        raise vol.Invalid("column_aligns must be a list of strings")
+    out: list[str] = []
+    for v in value:
+        if v not in ("left", "center", "right"):
+            raise vol.Invalid(f"column align must be left/center/right; got {v!r}")
+        out.append(str(v))
+    return out
+
+
+def _validate_column_widths(value: Any) -> list[int]:
+    """Schema-level check for ``print_table.column_widths``.
+
+    Bounds each width to ``1..MAX_BOX_WIDTH`` and the list length to
+    ``MAX_TABLE_COLS`` so a malformed payload is rejected at the
+    service-registry layer rather than deep in the renderer.
+    """
+    if not isinstance(value, list):
+        raise vol.Invalid("column_widths must be a list of integers")
+    if len(value) > MAX_TABLE_COLS:
+        raise vol.Invalid(f"column_widths length {len(value)} exceeds maximum {MAX_TABLE_COLS}")
+    out: list[int] = []
+    for v in value:
+        try:
+            iv = int(v)
+        except (TypeError, ValueError) as exc:
+            raise vol.Invalid(f"column width must be an integer; got {v!r}") from exc
+        if not 1 <= iv <= MAX_BOX_WIDTH:
+            raise vol.Invalid(f"column width {iv} out of range 1..{MAX_BOX_WIDTH}")
+        out.append(iv)
+    return out
+
+
+PRINT_BOX_SCHEMA = vol.Schema(
+    {
+        vol.Optional("device_id"): _DEVICE_ID,
+        vol.Required(ATTR_TEXT): vol.All(cv.string, vol.Length(max=MAX_TEXT_LENGTH)),
+        vol.Optional(ATTR_STYLE, default=DEFAULT_BORDER_STYLE): _BORDER_STYLE,
+        vol.Optional(ATTR_PADDING, default=0): vol.All(vol.Coerce(int), vol.Range(min=0, max=4)),
+        vol.Optional(ATTR_ALIGN, default="left"): _ALIGN,
+        vol.Optional(ATTR_TOTAL_WIDTH): vol.All(
+            vol.Coerce(int), vol.Range(min=3, max=MAX_BOX_WIDTH)
+        ),
+        vol.Optional(ATTR_CUT): _CUT,
+        vol.Optional(ATTR_FEED): _FEED,
+    }
+)
+
+
+PRINT_TABLE_SCHEMA = vol.Schema(
+    {
+        vol.Optional("device_id"): _DEVICE_ID,
+        vol.Required(ATTR_ROWS): _validate_rows_shape,
+        vol.Optional(ATTR_STYLE, default=DEFAULT_BORDER_STYLE): _BORDER_STYLE,
+        vol.Optional(ATTR_COLUMN_WIDTHS): _validate_column_widths,
+        vol.Optional(ATTR_COLUMN_ALIGNS): _validate_column_aligns,
+        vol.Optional(ATTR_HEADER, default=False): cv.boolean,
+        vol.Optional(ATTR_ROW_SEPARATORS, default=False): cv.boolean,
+        vol.Optional(ATTR_TOTAL_WIDTH): vol.All(
+            vol.Coerce(int), vol.Range(min=3, max=MAX_BOX_WIDTH)
+        ),
+        vol.Optional(ATTR_CUT): _CUT,
+        vol.Optional(ATTR_FEED): _FEED,
+    }
+)
+
+
+def _validate_separator_char(value: Any) -> str:
+    """Validate a single printable-ASCII character for ``print_separator``.
+
+    Multi-char strings, empty strings, and control characters are
+    rejected here rather than in the handler so REST/script callers get
+    the same fast feedback as the UI selector.
+    """
+    if not isinstance(value, str):
+        raise vol.Invalid(f"char must be a string; got {type(value).__name__}")
+    if len(value) != 1:
+        raise vol.Invalid(f"char must be exactly one character; got {value!r}")
+    code = ord(value)
+    if not 0x20 <= code <= 0x7E:
+        raise vol.Invalid("char must be a printable ASCII character (0x20-0x7E)")
+    return value
+
+
+PRINT_SEPARATOR_SCHEMA = vol.Schema(
+    {
+        vol.Optional("device_id"): _DEVICE_ID,
+        vol.Optional(ATTR_CHAR, default="-"): _validate_separator_char,
+        vol.Optional(ATTR_WIDTH): vol.All(vol.Coerce(int), vol.Range(min=1, max=MAX_BOX_WIDTH)),
+        vol.Optional(ATTR_REPEAT, default=1): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=MAX_SEPARATOR_REPEAT)
+        ),
+        vol.Optional(ATTR_CUT): _CUT,
+        vol.Optional(ATTR_FEED): _FEED,
+    }
+)
+
+
+def _validate_kv_items(value: Any) -> list[list[Any]]:
+    """Schema-level shape check for ``print_kvtable.items`` (P-H1).
+
+    Runs on the event loop, so this is intentionally shape-only:
+    ``items`` is a non-empty list of 2-element lists, each cell
+    bounded by ``MAX_TABLE_CELL_LENGTH``. The per-cell control-char
+    strip + ``str`` coercion lives in
+    :func:`..security.sanitise_kv_items`, dispatched to the executor
+    by the handler so per-cell regex work does not block the loop.
+    """
+    if not isinstance(value, list):
+        raise vol.Invalid("items must be a list of [label, value] pairs")
+    if not value:
+        raise vol.Invalid("items must contain at least one entry")
+    if len(value) > MAX_TABLE_ROWS:
+        raise vol.Invalid(f"items length {len(value)} exceeds maximum {MAX_TABLE_ROWS}")
+    out: list[list[Any]] = []
+    for entry in value:
+        if not isinstance(entry, list) or len(entry) != 2:
+            raise vol.Invalid("each item must be a 2-element [label, value] list")
+        for cell in entry:
+            if cell is not None:
+                s = str(cell)
+                if len(s) > MAX_TABLE_CELL_LENGTH:
+                    raise vol.Invalid(
+                        f"cell length {len(s)} exceeds maximum {MAX_TABLE_CELL_LENGTH}"
+                    )
+        out.append(entry)
+    return out
+
+
+PRINT_KVTABLE_SCHEMA = vol.Schema(
+    {
+        vol.Optional("device_id"): _DEVICE_ID,
+        vol.Required(ATTR_ITEMS): _validate_kv_items,
+        vol.Optional(ATTR_STYLE, default="none"): _BORDER_STYLE,
+        vol.Optional(ATTR_TOTAL_WIDTH): vol.All(
+            vol.Coerce(int), vol.Range(min=3, max=MAX_BOX_WIDTH)
+        ),
+        vol.Optional(ATTR_LABEL_WIDTH): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=MAX_BOX_WIDTH)
+        ),
+        vol.Optional(ATTR_VALUE_ALIGN, default="right"): _ALIGN,
+        vol.Optional(ATTR_CUT): _CUT,
+        vol.Optional(ATTR_FEED): _FEED,
+    }
+)
+
+
+PREVIEW_BOX_SCHEMA = vol.Schema(
+    {
+        vol.Optional("device_id"): _DEVICE_ID,
+        vol.Required(ATTR_TEXT): vol.All(cv.string, vol.Length(max=MAX_TEXT_LENGTH)),
+        vol.Optional(ATTR_STYLE, default=DEFAULT_BORDER_STYLE): _BORDER_STYLE,
+        vol.Optional(ATTR_PADDING, default=0): vol.All(vol.Coerce(int), vol.Range(min=0, max=4)),
+        vol.Optional(ATTR_ALIGN, default="left"): _ALIGN,
+        vol.Optional(ATTR_TOTAL_WIDTH): vol.All(
+            vol.Coerce(int), vol.Range(min=3, max=MAX_BOX_WIDTH)
+        ),
+        vol.Optional(ATTR_OUTPUT_PATH): cv.string,
+    }
+)
+
+
+PREVIEW_TABLE_SCHEMA = vol.Schema(
+    {
+        vol.Optional("device_id"): _DEVICE_ID,
+        vol.Required(ATTR_ROWS): _validate_rows_shape,
+        vol.Optional(ATTR_STYLE, default=DEFAULT_BORDER_STYLE): _BORDER_STYLE,
+        vol.Optional(ATTR_COLUMN_WIDTHS): _validate_column_widths,
+        vol.Optional(ATTR_COLUMN_ALIGNS): _validate_column_aligns,
+        vol.Optional(ATTR_HEADER, default=False): cv.boolean,
+        vol.Optional(ATTR_ROW_SEPARATORS, default=False): cv.boolean,
+        vol.Optional(ATTR_TOTAL_WIDTH): vol.All(
+            vol.Coerce(int), vol.Range(min=3, max=MAX_BOX_WIDTH)
+        ),
+        vol.Optional(ATTR_OUTPUT_PATH): cv.string,
+    }
+)
+
+
+# Reuse the image-pipeline knobs so the rendered PNG flows through the
+# same dither / threshold / slice path as ``print_image``. The fragment
+# already carries ``rotation`` (0/90/180/270) — the text-side handler
+# applies it to the PIL canvas BEFORE binarisation, so the user-facing
+# meaning ("rotate the text") matches.
+PRINT_TEXT_IMAGE_SCHEMA = vol.Schema(
+    {
+        vol.Optional("device_id"): _DEVICE_ID,
+        vol.Required(ATTR_TEXT): vol.All(cv.string, vol.Length(max=MAX_TEXT_LENGTH)),
+        vol.Optional(ATTR_FONT_NAME, default=DEFAULT_FONT_NAME): vol.In(
+            sorted(BUILTIN_FONT_CHOICES)
+        ),
+        vol.Optional(ATTR_FONT_PATH): vol.All(
+            cv.string, vol.Length(min=1, max=MAX_FONT_PATH_LENGTH)
+        ),
+        vol.Optional(ATTR_FONT_SIZE, default=DEFAULT_FONT_SIZE): vol.All(
+            vol.Coerce(int), vol.Range(min=8, max=MAX_FONT_SIZE_PT)
+        ),
+        vol.Optional(ATTR_LINE_SPACING, default=DEFAULT_LINE_SPACING): vol.All(
+            vol.Coerce(float), vol.Range(min=1.0, max=3.0)
+        ),
+        # Text-canvas controls: applied to the PIL canvas before binarisation,
+        # so the printed orientation/alignment matches what the user typed.
+        # The image-side ``image_rotation`` is forced to 0 at dispatch.
+        vol.Optional(ATTR_ALIGN, default="left"): _ALIGN,
+        vol.Optional(ATTR_ROTATION, default=0): vol.All(vol.Coerce(int), vol.In(ROTATION_VALUES)),
+        vol.Optional(ATTR_CUT): _CUT,
+        vol.Optional(ATTR_FEED): _FEED,
+        # Pipeline knobs prefixed with ``image_`` so the UI fields line up
+        # one-to-one with ``print_message``'s ``image_*`` knobs.
+        # ``fallback_image`` is intentionally excluded because this service
+        # renders its own bytes (see :func:`_image_pipeline_knobs`).
+        **_image_pipeline_knobs("image_"),
+    }
+)
+
+
 PRINT_BARCODE_SCHEMA = vol.Schema(
     {
         vol.Optional("device_id"): _DEVICE_ID,
-        vol.Required(ATTR_CODE): vol.All(
-            cv.string, vol.Length(min=1, max=MAX_BARCODE_LENGTH)
-        ),
+        vol.Required(ATTR_CODE): vol.All(cv.string, vol.Length(min=1, max=MAX_BARCODE_LENGTH)),
         vol.Required(ATTR_BC): cv.string,
-        vol.Optional(ATTR_BARCODE_HEIGHT): vol.All(
-            vol.Coerce(int), vol.Range(min=1, max=255)
-        ),
-        vol.Optional(ATTR_BARCODE_WIDTH): vol.All(
-            vol.Coerce(int), vol.Range(min=2, max=6)
-        ),
+        vol.Optional(ATTR_BARCODE_HEIGHT): vol.All(vol.Coerce(int), vol.Range(min=1, max=255)),
+        vol.Optional(ATTR_BARCODE_WIDTH): vol.All(vol.Coerce(int), vol.Range(min=2, max=6)),
         vol.Optional(ATTR_POS): vol.In(["ABOVE", "BELOW", "BOTH", "OFF"]),
         vol.Optional(ATTR_FONT): vol.In(["A", "B"]),
         vol.Optional(ATTR_ALIGN_CT): cv.boolean,
@@ -377,9 +688,7 @@ PRINT_BARCODE_SCHEMA = vol.Schema(
 FEED_SCHEMA = vol.Schema(
     {
         vol.Optional("device_id"): _DEVICE_ID,
-        vol.Required(ATTR_LINES): vol.All(
-            vol.Coerce(int), vol.Range(min=1, max=MAX_FEED_LINES)
-        ),
+        vol.Required(ATTR_LINES): vol.All(vol.Coerce(int), vol.Range(min=1, max=MAX_FEED_LINES)),
     }
 )
 
@@ -396,9 +705,7 @@ BEEP_SCHEMA = vol.Schema(
     {
         vol.Optional("device_id"): _DEVICE_ID,
         vol.Optional(ATTR_TIMES): vol.All(vol.Coerce(int), vol.Range(min=1, max=10)),
-        vol.Optional(ATTR_DURATION): vol.All(
-            vol.Coerce(int), vol.Range(min=1, max=10)
-        ),
+        vol.Optional(ATTR_DURATION): vol.All(vol.Coerce(int), vol.Range(min=1, max=10)),
     }
 )
 
@@ -407,9 +714,7 @@ BEEP_SCHEMA = vol.Schema(
 # `cv.make_entity_service_schema` by the notify platform itself, so we
 # only export the inner dict here.
 PRINT_MESSAGE_FIELDS: dict[Any, Any] = {
-    vol.Required(ATTR_MESSAGE): vol.All(
-        cv.string, vol.Length(max=MAX_TEXT_LENGTH)
-    ),
+    vol.Required(ATTR_MESSAGE): vol.All(cv.string, vol.Length(max=MAX_TEXT_LENGTH)),
     vol.Optional(ATTR_TITLE): vol.All(cv.string, vol.Length(max=MAX_TEXT_LENGTH)),
     vol.Optional("align"): _ALIGN,
     vol.Optional("bold"): cv.boolean,
@@ -429,15 +734,22 @@ __all__ = [
     "CALIBRATION_PRINT_SCHEMA",
     "CUT_SCHEMA",
     "FEED_SCHEMA",
+    "PREVIEW_BOX_SCHEMA",
     "PREVIEW_IMAGE_SCHEMA",
+    "PREVIEW_TABLE_SCHEMA",
     "PRINT_BARCODE_SCHEMA",
+    "PRINT_BOX_SCHEMA",
     "PRINT_CAMERA_SNAPSHOT_SCHEMA",
     "PRINT_IMAGE_ENTITY_SCHEMA",
     "PRINT_IMAGE_PATH_SCHEMA",
     "PRINT_IMAGE_SCHEMA",
     "PRINT_IMAGE_URL_SCHEMA",
+    "PRINT_KVTABLE_SCHEMA",
     "PRINT_MESSAGE_FIELDS",
     "PRINT_QR_SCHEMA",
+    "PRINT_SEPARATOR_SCHEMA",
+    "PRINT_TABLE_SCHEMA",
+    "PRINT_TEXT_IMAGE_SCHEMA",
     "PRINT_TEXT_SCHEMA",
     "PRINT_TEXT_UTF8_SCHEMA",
 ]

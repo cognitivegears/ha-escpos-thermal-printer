@@ -405,5 +405,10 @@
       "title": "Printer profile is missing the pixel width",
       "description": "The selected printer profile ({profile}) does not expose `media.width.pixels`, so images are being scaled to a generic {fallback}px width. This is usually correct for 58 mm thermals but may print stretched or truncated on 80 mm printers.\n\n**To fix:** open the integration's options, pick the closest matching printer profile, or set `image_width` explicitly in your service calls. If your printer's profile name is correct, the python-escpos profile database may need updating."
     }
+  },
+  "exceptions": {
+    "no_target_found": {
+      "message": "No valid ESC/POS printer targets found. Please select a printer device."
+    }
   }
 }

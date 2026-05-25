@@ -19,4 +19,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Hassfest validation
-        uses: home-assistant/actions/hassfest@master
+        # CI-H2: pin to a SHA instead of `@master`. The HA actions repo
+        # does not publish versioned tags for the hassfest sub-action;
+        # update by re-pinning after reviewing
+        # https://github.com/home-assistant/actions/commits/master
+        uses: home-assistant/actions/hassfest@f6f29a7ee3fa0eccadf3620a7b9ee00ab54ec03b  # master as of 2026-05-24

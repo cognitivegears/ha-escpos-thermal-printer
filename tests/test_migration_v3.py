@@ -43,9 +43,7 @@ class TestMigrationV2ToV3:
             nonlocal updated_data
             updated_data = data
 
-        with patch.object(
-            hass.config_entries, "async_update_entry", side_effect=capture_update
-        ):
+        with patch.object(hass.config_entries, "async_update_entry", side_effect=capture_update):
             result = await async_migrate_entry(hass, mock_entry)
 
         assert result is True
@@ -75,9 +73,7 @@ class TestMigrationV2ToV3:
             nonlocal updated_data
             updated_data = data
 
-        with patch.object(
-            hass.config_entries, "async_update_entry", side_effect=capture_update
-        ):
+        with patch.object(hass.config_entries, "async_update_entry", side_effect=capture_update):
             result = await async_migrate_entry(hass, mock_entry)
 
         assert result is True
@@ -116,9 +112,7 @@ class TestMigrationV1ToV3:
                 mock_entry.version = 2
                 mock_entry.data = data
 
-        with patch.object(
-            hass.config_entries, "async_update_entry", side_effect=capture_update
-        ):
+        with patch.object(hass.config_entries, "async_update_entry", side_effect=capture_update):
             result = await async_migrate_entry(hass, mock_entry)
 
         assert result is True
@@ -144,9 +138,7 @@ class TestMigrationV3NoOp:
             "port": 9100,
         }
 
-        with patch.object(
-            hass.config_entries, "async_update_entry"
-        ) as mock_update:
+        with patch.object(hass.config_entries, "async_update_entry") as mock_update:
             result = await async_migrate_entry(hass, mock_entry)
 
         assert result is True
@@ -176,9 +168,7 @@ class TestMigrationDoesNotOverwrite:
             nonlocal updated_data
             updated_data = data
 
-        with patch.object(
-            hass.config_entries, "async_update_entry", side_effect=capture_update
-        ):
+        with patch.object(hass.config_entries, "async_update_entry", side_effect=capture_update):
             result = await async_migrate_entry(hass, mock_entry)
 
         assert result is True

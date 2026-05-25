@@ -7,6 +7,154 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-05-24
+
+### Breaking changes
+
+- **Preview-service `output_path` is now restricted to the system
+  tempdir.** `preview_image`, `preview_box`, and `preview_table`
+  previously accepted any path inside `allowlist_external_dirs`. After
+  security hardening (a non-admin HA user could otherwise call
+  `preview_image` with `output_path: /config/configuration.yaml` and
+  clobber it with rendered PNG bytes — CWE-862/CWE-552), user-supplied
+  `output_path` values outside the system temp directory are rejected
+  with `HomeAssistantError`. If your automation needs the file in
+  `/config/www/`, add a second step that copies the returned `path`.
+
+### Added
+
+- **Text-effects services** — seven new services for receipt-style
+  layouts that work within the 1-col-per-glyph thermal text mode:
+  - `escpos_printer.print_box` — wraps text in a printable border.
+    `style: auto` picks Unicode single-line `┌─┐` on CP437-capable
+    profiles and falls back to ASCII (`+-+`) elsewhere; explicit
+    `single` / `double` / `ascii` / `asterisk` / `hash` are honored
+    when the user wants a specific look.
+  - `escpos_printer.print_table` — multi-column rows with per-column
+    `column_aligns` (`left` / `center` / `right`), optional header
+    separator, and the same border-style picker as `print_box`.
+  - `escpos_printer.print_kvtable` — two-column label/value pairs
+    (subtotals, sensor readings, receipt totals) with auto-aligned
+    values on the right edge of the printable width.
+  - `escpos_printer.print_separator` — a single decorative rule
+    (line of repeated characters) at the current printable width.
+  - `escpos_printer.print_text_image` — renders text via a TTF/OTF
+    font (DejaVu trio bundled, custom fonts dropped into
+    `<config>/fonts/` or anywhere in `allowlist_external_dirs`),
+    rasterises to a 1-bit image, and prints. Supports 90/180/270°
+    rotation, font size, alignment, threshold dither — useful for
+    glyphs the printer's codepage doesn't carry (CJK, emoji,
+    decorative scripts).
+  - `escpos_printer.preview_box` / `escpos_printer.preview_table` —
+    render the same layouts to a `.txt` file in the system tempdir
+    (default `/tmp/escpos_preview_<entry>.txt`) without printing, so
+    users can tune column widths and border styles without burning
+    paper. Returns `{path, width, line_count, codepage}` so a
+    follow-up step can copy the file or chain a notification.
+- **Bundled DejaVu fonts** — `DejaVuSans.ttf`, `DejaVuSansMono.ttf`,
+  `DejaVuSerif.ttf` (release 2.37) ship with the integration for
+  `print_text_image` to work out of the box. Bitstream Vera license
+  text included at `custom_components/escpos_printer/fonts/LICENSE`
+  and `NOTICE` at the repo root.
+- **Auto-created `<config>/fonts/` directory** on integration setup.
+  Any TTF/OTF dropped in is trusted by `print_text_image.font_path`
+  without needing an `allowlist_external_dirs` entry — removes the
+  "I dropped a font in /config/fonts/ and got an allowlist error"
+  friction. Files anywhere else still go through the standard
+  allowlist check.
+- **Bundled HA blueprints** in `blueprints/` — eight ready-to-import
+  scripts and automations exercising the text-effects services:
+  - Scripts: `shopping_list`, `todo_list`, `weather_forecast`,
+    `receipt`, `recipe_card`.
+  - Automations: `daily_agenda`, `sensor_alert`, `todo_item`.
+  - `blueprints/README.md` documents import instructions, per-input
+    semantics, and troubleshooting.
+- **`scripts/validate_blueprints.py`** — YAML structural validator
+  that tolerates HA's custom `!input` tag, enforces that each
+  blueprint sits under a directory matching its
+  `blueprint.domain` (`script` or `automation`), and is wired into
+  pre-commit via the new `validate-blueprints` hook plus a CI test
+  in `tests/test_blueprints_yaml.py`.
+- **`wcwidth==0.2.13`** runtime dependency — `text_effects.width`
+  uses it for visual-column measurement so CJK / fullwidth / emoji
+  columns line up correctly under the printer's 1-col-per-glyph text
+  mode (a naive `len()` silently misaligns).
+- **`security.validate_font_path()`** — validates `print_text_image`
+  font paths for extension (`.ttf` / `.otf`), file size, symlink
+  resolution, and regular-file status, independent of where the path
+  lives.
+- **`security.validate_rows()`** — typed validator for `print_table`
+  rows that enforces consistent column counts, coerces cells to
+  strings, and bounds total cell count to protect against
+  paper-waste DoS.
+- **`security.open_local_font_no_follow()` / `open_local_image_no_follow()`**
+  — shared `O_NOFOLLOW`-based reader used by font and image
+  validators (refactored from the existing image-only path).
+
+### Changed
+
+- **Pre-commit `check-yaml` runs with `--unsafe`** to tolerate the
+  `!input` and other HA custom tags in `blueprints/`. The dedicated
+  `validate-blueprints` hook does the structural validation.
+
+### Security
+
+- **DNS rebinding defence for HTTP image fetches.** Each
+  `print_image` / `preview_image` HTTP fetch builds a per-request
+  `aiohttp` session pinned to the IP address validated by
+  `getaddrinfo` (via the new `image_sources._StaticResolver`). A
+  0-TTL hostile DNS server cannot swap public → private between
+  validation and connect. The previous httpx fast-path was removed
+  (httpx 0.28 has no resolver-pin hook). **CWE-918 / CWE-350.**
+- **Preview `output_path` restricted to system tempdir.** Closes a
+  privilege-escalation path where a non-admin HA user could call
+  `preview_image` / `preview_box` / `preview_table` with
+  `output_path: /config/configuration.yaml` and clobber it with
+  rendered bytes. See *Breaking changes*. **CWE-862 / CWE-552.**
+- **Preview file writes use `O_NOFOLLOW`.** A co-resident attacker
+  who plants a symlink between path-validation and image-save
+  cannot redirect the write into an arbitrary file under tempdir.
+  New `security.write_file_no_follow` primitive, symmetric to the
+  existing `open_local_*_no_follow` readers. **CWE-367 / CWE-59.**
+- **IDN hostname check IDNA-encodes first.** The previous
+  `"xn--" in hostname.lower()` substring test missed raw Unicode
+  hostnames (`例え.テスト`); the check now IDNA-encodes before the
+  substring test so raw-Unicode and pre-encoded inputs are both
+  caught. **CWE-918.**
+- **`control_handlers.py` error messages go through
+  `sanitize_log_message`.** `feed` / `cut` / `beep` previously
+  wrapped exceptions with raw `str(err)`, which routinely contains
+  USB serials, BT MACs, and filesystem paths from pyusb / pyserial
+  / python-escpos / aiohttp. All handlers now route through the
+  shared `_for_each_target` helper in
+  `services/_handler_utils.py`. **CWE-209 / CWE-532.**
+- **`asyncio.shield` cleanup on print_text_with_image cancel.** A
+  second cancellation mid-flush can no longer leave paper half-
+  printed.
+- **Font-path trust centralised in `security.py`.** The
+  `<config>/fonts/` narrowed-trust decision now lives in
+  `validate_font_path_with_fonts_dir()` next to the other
+  path-validation policy, instead of split between
+  `print_handlers.py` and `security.py`.
+- **DNS-rebinding hardening also applies to redirects.** Each
+  redirect hop in `_resolve_http_aiohttp` runs through the validator
+  again and gets a fresh DNS pin via a new `_StaticResolver`.
+- **Status-vs-print serialisation hardened** — network / USB /
+  Bluetooth `_status_check` skip when the per-adapter print lock
+  is held, eliminating a flap-during-print race on bandwidth-
+  constrained transports.
+- **Dismissed HA-pinned-package Dependabot security alerts** as
+  `tolerable_risk` (Pillow direct + uv.lock transitives: aiohttp,
+  cryptography, pyOpenSSL, PyJWT, orjson, requests, uv, pytest).
+  All are pinned by HA core / `pytest-homeassistant-custom-component`
+  and bumping ahead of HA breaks installs; dev/CI-only exposure;
+  end users install via `manifest.json`. They will auto-re-surface
+  if new advisories arrive against the HA-pinned versions.
+- **Added `pillow` and `respx` to the Dependabot version-update
+  ignore list** in `.github/dependabot.yml` (alongside the
+  existing `pytest` and `dbus-fast` entries) so version-bump PRs
+  stop being re-opened against the HA-driven pins.
+
 ## [0.6.0] - 2026-05-17
 
 ### Added

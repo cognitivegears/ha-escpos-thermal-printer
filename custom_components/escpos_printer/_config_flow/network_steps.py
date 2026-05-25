@@ -66,9 +66,7 @@ class NetworkFlowMixin:
             await self.async_set_unique_id(f"{host}:{port}")  # type: ignore[attr-defined]
             self._abort_if_unique_id_configured()  # type: ignore[attr-defined]
 
-            _LOGGER.debug(
-                "Attempting connection test to %s:%s (timeout=%s)", host, port, timeout
-            )
+            _LOGGER.debug("Attempting connection test to %s:%s (timeout=%s)", host, port, timeout)
             ok = await self.hass.async_add_executor_job(_can_connect, host, port, timeout)
             if ok:
                 _LOGGER.debug("Connection test succeeded for %s:%s", host, port)

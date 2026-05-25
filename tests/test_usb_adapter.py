@@ -146,6 +146,26 @@ class TestUsbAdapterStatusCheck:
         assert usb_adapter.get_status() is False
         assert "not found" in usb_adapter._last_error_reason.lower()
 
+    @pytest.mark.asyncio
+    async def test_status_check_skips_when_lock_held(self, usb_adapter, hass):
+        """T-M1 / P-M2: USB ``_status_check`` must not enumerate the bus
+        while a print holds the lock. ``usb.core.find`` on a busy bus can
+        occasionally trip USB-IP / virtual-hub configurations; the cost
+        of a stale status reading is strictly lower than the cost of
+        corrupting an active print.
+        """
+        prior_check = usb_adapter._last_check
+        prior_status = usb_adapter.get_status()
+
+        async with usb_adapter._lock:
+            # `usb.core.find` would mutate state if it ran; patch raises
+            # so a test failure is loud rather than silently green.
+            with patch("usb.core.find", side_effect=AssertionError("must not enumerate")):
+                await usb_adapter._status_check(hass)
+
+        assert usb_adapter._last_check is prior_check
+        assert usb_adapter.get_status() is prior_status
+
 
 class TestUsbAdapterStart:
     """Tests for USB adapter start method."""

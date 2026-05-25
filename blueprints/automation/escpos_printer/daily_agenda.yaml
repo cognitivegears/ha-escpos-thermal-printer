@@ -1,0 +1,104 @@
+blueprint:
+  name: ESC/POS — Daily Agenda
+  description: >
+    At a configurable time each day, pulls today's calendar events
+    from a Home Assistant calendar entity and prints them as a
+    label/value table (start time → event title).
+  domain: automation
+  source_url: https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/blueprints/automation/escpos_printer/daily_agenda.yaml
+  input:
+    printer:
+      name: Printer
+      description: ESC/POS printer device to print to.
+      selector:
+        device:
+          integration: escpos_printer
+    calendar_entity:
+      name: Calendar entity
+      description: Which calendar to read agenda items from.
+      selector:
+        entity:
+          domain: calendar
+    print_time:
+      name: Print time
+      description: Time of day to print the agenda.
+      default: "07:00:00"
+      selector:
+        time: {}
+    lookahead_hours:
+      name: Lookahead (hours)
+      description: How far forward to look when fetching events.
+      default: 24
+      selector:
+        number:
+          min: 1
+          max: 72
+          step: 1
+    max_title_length:
+      name: Event title truncation
+      description: Trim each event title to this many characters so the table fits a narrow printer.
+      default: 36
+      selector:
+        number:
+          min: 8
+          max: 80
+          step: 1
+    style:
+      name: Border style
+      default: auto
+      selector:
+        select:
+          options:
+            - auto
+            - single
+            - double
+            - ascii
+            - asterisk
+            - hash
+            - none
+# single — the agenda runs at a fixed time of day; if a previous fire is still
+# printing we drop new ones rather than re-print today's agenda mid-stream.
+mode: single
+trigger:
+  - platform: time
+    at: !input print_time
+action:
+  - service: calendar.get_events
+    target:
+      entity_id: !input calendar_entity
+    data:
+      duration:
+        hours: !input lookahead_hours
+    response_variable: cal_response
+  - variables:
+      max_title_length: !input max_title_length
+      events: >
+        {{ ((((cal_response | default({})).values() | list | first) or {}).get('events', [])) }}
+      kv_items: >
+        {% set ns = namespace(out=[]) %}
+        {% for ev in events %}
+          {% set start = (ev.start | as_datetime | as_local).strftime('%H:%M') %}
+          {% set summary = (ev.summary | default('') | string).replace('\n', ' ').replace('\r', ' ').replace('|', '/').replace('\t', ' ') | trim %}
+          {% set ns.out = ns.out + [[start, summary[:max_title_length]]] %}
+        {% endfor %}
+        {{ ns.out if ns.out | length > 0 else [['-', 'No events today']] }}
+  - service: escpos_printer.print_box
+    target:
+      device_id: !input printer
+    data:
+      text: "Agenda - {{ now().strftime('%a %b %d') }}"
+      style: !input style
+      align: center
+      padding: 1
+  - service: escpos_printer.print_kvtable
+    target:
+      device_id: !input printer
+    data:
+      items: "{{ kv_items }}"
+      value_align: left
+      label_width: 6
+  - service: escpos_printer.cut
+    target:
+      device_id: !input printer
+    data:
+      mode: full

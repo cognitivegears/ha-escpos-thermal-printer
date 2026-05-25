@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from ..security import (
+    MAX_BEEP_DURATION,
     MAX_BEEP_TIMES,
     MAX_FEED_LINES,
     sanitize_log_message,
@@ -90,7 +91,10 @@ class ControlOperationsMixin:
     async def beep(self, hass: HomeAssistant, *, times: int = 2, duration: int = 4) -> None:
         """Trigger the printer buzzer."""
         times_v = validate_numeric_input(times, 1, MAX_BEEP_TIMES, "times")
-        duration_v = validate_numeric_input(duration, 1, MAX_BEEP_TIMES, "duration")
+        # B-L2: ``duration`` and ``times`` are semantically distinct fields
+        # — bound via the dedicated ``MAX_BEEP_DURATION`` constant even
+        # though both happen to be 10 today.
+        duration_v = validate_numeric_input(duration, 1, MAX_BEEP_DURATION, "duration")
 
         def _beep_inner(printer: Any) -> None:
             try:

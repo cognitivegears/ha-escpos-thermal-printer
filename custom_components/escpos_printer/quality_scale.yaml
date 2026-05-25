@@ -52,7 +52,7 @@ rules:
   entity-device-class: done
   entity-disabled-by-default: todo
   entity-translations: todo
-  exception-translations: todo
+  exception-translations: done  # `no_target_found` wired up in strings.json + translations/en.json
   icon-translations: done
   reconfiguration-flow: todo  # only options-flow exists; no async_step_reconfigure. Blocks discovery-update-info.
   repair-issues: todo

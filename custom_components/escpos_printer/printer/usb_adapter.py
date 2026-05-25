@@ -38,6 +38,7 @@ class UsbPrinterAdapter(EscposPrinterAdapterBase):
         """Create and return a USB printer connection."""
         usb_class = _get_usb_printer()
         profile_obj = self._get_profile_obj()
+
         def _is_retryable(exc: Exception) -> bool:
             try:
                 import usb.core  # noqa: PLC0415
@@ -48,7 +49,9 @@ class UsbPrinterAdapter(EscposPrinterAdapterBase):
                 # usb library not available or unexpected error; fall back to string-based matching below
                 pass
             err = str(exc).lower()
-            return any(token in err for token in ("input/output error", "resource busy", "no device"))
+            return any(
+                token in err for token in ("input/output error", "resource busy", "no device")
+            )
 
         def _get_kernel_driver_active() -> bool | None:
             try:
@@ -108,7 +111,16 @@ class UsbPrinterAdapter(EscposPrinterAdapterBase):
         raise last_exc  # pragma: no cover
 
     async def _status_check(self, hass: HomeAssistant) -> None:
-        """Check USB device availability via device enumeration."""
+        """Check USB device availability via device enumeration.
+
+        P-M2: skip enumeration when a print is in flight. ``usb.core.find``
+        on a busy bus can occasionally trip up some USB-IP / virtual-hub
+        configurations; the cost of a stale status reading is strictly
+        lower than the cost of corrupting an active print.
+        """
+        if self._lock.locked():
+            return
+
         def _probe() -> tuple[bool, str | None, int | None]:
             start = time.perf_counter()
             try:

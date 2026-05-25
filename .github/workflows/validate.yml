@@ -14,16 +14,48 @@ concurrency:
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # CI-M1: test against the PHCC-pinned HA AND HA `master` so we
+        # get a 1-week heads-up before a HA release breaks us. `master`
+        # runs are non-blocking (continue-on-error) since HA's main
+        # branch is allowed to break without affecting PR mergeability.
+        ha-version: [pinned, master]
+        include:
+          - ha-version: master
+            continue-on-error: true
+    continue-on-error: ${{ matrix.continue-on-error == true }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          # gitleaks scans the PR's commit range, which requires the
+          # base commit to be present in history (default depth=1 only
+          # fetches the head SHA, causing `git rev-parse <base>^..<head>`
+          # to fail with "unknown revision"). 0 = full history.
+          fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
-          python-version: '3.13'
+          python-version: '3.14'
 
       - name: Install dev deps (matches pyproject pins)
         run: |
           python -m pip install --upgrade pip
           pip install -e .[dev]
+
+      - name: Override Home Assistant to master (canary)
+        if: matrix.ha-version == 'master'
+        run: |
+          # Upgrade both HA core *and* the test harness in lockstep —
+          # pytest-homeassistant-custom-component is tightly coupled to
+          # a specific HA core version (its fixtures load
+          # device_registry / set DEFAULT_TIME_ZONE the way that release
+          # expects). Upgrading only HA leaves the pinned plugin
+          # disagreeing with master about fixture setup, which surfaces
+          # as `KeyError: 'device_registry'` and timezone-fixture
+          # teardown failures rather than as real HA-master breakages.
+          pip install --upgrade git+https://github.com/home-assistant/core.git@dev
+          pip install --upgrade git+https://github.com/MatthewFlamm/pytest-homeassistant-custom-component.git@master
 
       - name: Check dependency sync (manifest vs pyproject)
         run: |
@@ -38,6 +70,14 @@ jobs:
 
       - name: Type check (mypy)
         run: mypy custom_components/
+
+      # CI-L1: mirror the pre-commit gitleaks hook in CI so drive-by PRs
+      # from forks (where the contributor may not have pre-commit
+      # installed) still get the secret-scan gate.
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run unit tests with coverage gate
         # Coverage floor: matches pyproject.toml [tool.coverage.report]
@@ -56,13 +96,21 @@ jobs:
           path: coverage.xml
           if-no-files-found: ignore
 
+      - name: Per-patch coverage gate (CI-H1)
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch origin ${{ github.base_ref }} --depth=1
+          diff-cover coverage.xml \
+            --compare-branch=origin/${{ github.base_ref }} \
+            --fail-under=90
+
   integration-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
-          python-version: '3.13'
+          python-version: '3.14'
 
       - name: Install dev deps
         run: |
@@ -73,12 +121,4 @@ jobs:
         # BT/network integration tests use TCP loopback against the
         # in-tree VirtualPrinter emulator — no real radio or external
         # services required.
-        #
-        # Two pre-existing tests are deselected because they suffer
-        # known test-ordering issues (skip when run alone, fail under
-        # full-suite load). They predate the Bluetooth feature; tracking
-        # for a separate fix.
-        run: |
-          pytest -m integration -v \
-            --deselect tests/integration_tests/scenarios/test_basic_functionality.py::test_service_parameter_variations \
-            --deselect tests/integration_tests/scenarios/test_error_handling.py::test_error_state_persistence
+        run: pytest -m integration -v

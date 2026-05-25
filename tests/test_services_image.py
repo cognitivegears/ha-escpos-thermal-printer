@@ -2,7 +2,9 @@ import base64
 import io
 from unittest.mock import MagicMock, patch
 
+from homeassistant.exceptions import HomeAssistantError
 from PIL import Image
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.escpos_printer.const import DOMAIN
@@ -104,8 +106,7 @@ async def test_print_image_url_service_dispatches(hass, tmp_path):  # type: igno
     with (
         patch("escpos.printer.Network", return_value=fake),
         patch(
-            "custom_components.escpos_printer.printer.image_operations"
-            ".resolve_image_bytes",
+            "custom_components.escpos_printer.printer.image_operations.resolve_image_bytes",
             return_value=(raw, "image/png"),
         ),
     ):
@@ -256,3 +257,32 @@ async def test_preview_image_writes_png_and_returns_path(hass, tmp_path):  # typ
     assert out_path.exists()
     saved = Image.open(out_path)
     assert saved.mode == "1"
+
+
+async def test_preview_image_rejects_output_path_outside_tempdir(hass, tmp_path):  # type: ignore[no-untyped-def]
+    """S-M5/T-H2: user-supplied output_path must be inside the system tempdir.
+
+    A non-admin HA user could otherwise call preview_image with
+    output_path=/config/configuration.yaml and clobber it with PNG bytes.
+    Mirrors the equivalent ``test_preview_box_rejects_output_path_outside_tempdir``.
+    """
+    img_path = tmp_path / "src.png"
+    Image.new("L", (40, 40), color=128).save(img_path)
+    # Allowlist the image source so reading it works; the output_path
+    # restriction is what must reject the write target regardless.
+    hass.config.allowlist_external_dirs = {str(tmp_path)}
+    await _setup(hass)
+
+    fake = MagicMock()
+    with patch("escpos.printer.Network", return_value=fake):
+        with pytest.raises(HomeAssistantError, match="temp directory"):
+            await hass.services.async_call(
+                DOMAIN,
+                "preview_image",
+                {
+                    "image": str(img_path),
+                    "output_path": "/etc/forbidden.png",
+                },
+                blocking=True,
+                return_response=True,
+            )

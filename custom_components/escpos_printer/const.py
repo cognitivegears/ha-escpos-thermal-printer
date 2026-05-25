@@ -58,28 +58,30 @@ DEFAULT_RFCOMM_CHANNEL = 1
 # Source: http://www.linux-usb.org/usb.ids
 # `manifest.json`'s `usb` block is generated from this set by
 # `scripts/sync_manifest_requirements.py` — keep this list authoritative.
-THERMAL_PRINTER_VIDS: frozenset[int] = frozenset({
-    0x0404,  # NCR Corp (7167/7197 Receipt Printers)
-    0x04B8,  # Seiko Epson Corp (TM-T88, TM-T20, TM-T70, TM-L100)
-    0x04C5,  # Fujitsu, Ltd (KD02906 Line Thermal Printer)
-    0x0519,  # Star Micronics Co., Ltd (TSP100, TSP600, TSP700)
-    0x06BC,  # Oki Data Corp (OKIPOS 411/412 POS Printer)
-    0x0828,  # Sato Corp (WS408 Label Printer)
-    0x08BD,  # Citizen Watch Co., Ltd (CLP-521 Label Printer)
-    0x0922,  # Dymo-CoStar Corp (LabelWriter series)
-    0x0A5F,  # Zebra Technologies (GK420d, ZD410, ZD500, ZM400)
-    0x0AA7,  # Wincor Nixdorf (TH210, TH220, TH320, TH420 POS Printers)
-    0x0B0B,  # Datamax-O'Neil (E-4304 Label Printer)
-    0x0DD4,  # Custom Engineering SPA (K80 80mm Thermal Printer)
-    0x0FE6,  # Generic POS Printers (USB Receipt Printer)
-    0x1203,  # TSC Auto ID Technology (TTP-245C)
-    0x1504,  # Bixolon CO LTD (SRP series)
-    0x154F,  # SNBC CO., Ltd (BTP series)
-    0x1D90,  # Citizen (CT-E351, PPU-700, CL-S631)
-    0x2730,  # Citizen (CT-S2000/4000/310, CLP-521/621/631, CL-S700)
-    0x2D84,  # Zhuhai Poskey Technology (DT-108B Thermal Label Printer)
-    0x0416,  # Winbond Electronics (some generic Chinese POS-58/80 printers)
-})
+THERMAL_PRINTER_VIDS: frozenset[int] = frozenset(
+    {
+        0x0404,  # NCR Corp (7167/7197 Receipt Printers)
+        0x04B8,  # Seiko Epson Corp (TM-T88, TM-T20, TM-T70, TM-L100)
+        0x04C5,  # Fujitsu, Ltd (KD02906 Line Thermal Printer)
+        0x0519,  # Star Micronics Co., Ltd (TSP100, TSP600, TSP700)
+        0x06BC,  # Oki Data Corp (OKIPOS 411/412 POS Printer)
+        0x0828,  # Sato Corp (WS408 Label Printer)
+        0x08BD,  # Citizen Watch Co., Ltd (CLP-521 Label Printer)
+        0x0922,  # Dymo-CoStar Corp (LabelWriter series)
+        0x0A5F,  # Zebra Technologies (GK420d, ZD410, ZD500, ZM400)
+        0x0AA7,  # Wincor Nixdorf (TH210, TH220, TH320, TH420 POS Printers)
+        0x0B0B,  # Datamax-O'Neil (E-4304 Label Printer)
+        0x0DD4,  # Custom Engineering SPA (K80 80mm Thermal Printer)
+        0x0FE6,  # Generic POS Printers (USB Receipt Printer)
+        0x1203,  # TSC Auto ID Technology (TTP-245C)
+        0x1504,  # Bixolon CO LTD (SRP series)
+        0x154F,  # SNBC CO., Ltd (BTP series)
+        0x1D90,  # Citizen (CT-E351, PPU-700, CL-S631)
+        0x2730,  # Citizen (CT-S2000/4000/310, CLP-521/621/631, CL-S700)
+        0x2D84,  # Zhuhai Poskey Technology (DT-108B Thermal Label Printer)
+        0x0416,  # Winbond Electronics (some generic Chinese POS-58/80 printers)
+    }
+)
 
 # Profile selection constants (also defined in capabilities.py, imported here for convenience)
 PROFILE_AUTO = ""  # Auto-detect (default) profile
@@ -119,6 +121,13 @@ SERVICE_FEED = "feed"
 SERVICE_CUT = "cut"
 SERVICE_PRINT_BARCODE = "print_barcode"
 SERVICE_BEEP = "beep"
+SERVICE_PRINT_BOX = "print_box"
+SERVICE_PRINT_TABLE = "print_table"
+SERVICE_PRINT_TEXT_IMAGE = "print_text_image"
+SERVICE_PRINT_SEPARATOR = "print_separator"
+SERVICE_PRINT_KVTABLE = "print_kvtable"
+SERVICE_PREVIEW_BOX = "preview_box"
+SERVICE_PREVIEW_TABLE = "preview_table"
 
 ATTR_TEXT = "text"
 ATTR_ALIGN = "align"
@@ -166,6 +175,66 @@ ATTR_INVERT = "invert"
 ATTR_MIRROR = "mirror"
 ATTR_AUTO_RESIZE = "auto_resize"
 ATTR_FALLBACK_IMAGE = "fallback_image"
+
+# Text-effects (box / table / text-image).
+ATTR_STYLE = "style"
+ATTR_PADDING = "padding"
+ATTR_ROWS = "rows"
+ATTR_COLUMN_WIDTHS = "column_widths"
+ATTR_COLUMN_ALIGNS = "column_aligns"
+ATTR_HEADER = "header"
+ATTR_ROW_SEPARATORS = "row_separators"
+# Total printed width (in columns) including borders. Shared between
+# print_box, print_table, and print_kvtable so all three services use one
+# consistent name for "the outer width of the rendered block."
+ATTR_TOTAL_WIDTH = "total_width"
+# ``ATTR_FONT`` already exists for the barcode "A"/"B" font selector;
+# the text-image service uses ``ATTR_FONT_NAME`` to avoid clashing.
+ATTR_FONT_NAME = "font"
+ATTR_FONT_PATH = "font_path"
+ATTR_FONT_SIZE = "font_size"
+ATTR_LINE_SPACING = "line_spacing"
+
+# print_separator
+ATTR_CHAR = "char"
+ATTR_REPEAT = "repeat"
+
+# print_kvtable
+ATTR_ITEMS = "items"
+ATTR_LABEL_WIDTH = "label_width"
+ATTR_VALUE_ALIGN = "value_align"
+
+# preview_box / preview_table
+ATTR_OUTPUT_PATH = "output_path"
+
+# Border-style choices for print_box / print_table. Mirrored in
+# ``services.yaml`` selectors and the voluptuous schemas. ``auto``
+# adapts to the printer codepage; ``none`` disables borders entirely.
+BORDER_STYLES: frozenset[str] = frozenset(
+    {"auto", "single", "double", "ascii", "asterisk", "hash", "none"}
+)
+DEFAULT_BORDER_STYLE = "auto"
+
+# Bundled font names exposed via the ``font`` selector of
+# ``print_text_image``. A-M3: kept literal here (importing
+# ``text_effects.font_render`` would create a circular import through
+# ``security``); parity with the renderer's ``_BUILTIN_FONT_FILES`` is
+# enforced by ``tests/text_effects/test_font_render.py``
+# (``test_builtin_font_choices_match_renderer``). The renderer now
+# *raises* on an unknown name (A-M3 — silent fallback removed) so any
+# drift fails loudly instead of silently swapping to the default mono.
+#
+# B-M3 (deferred): the string-choice sets (CONNECTION_TYPE_*,
+# BORDER_STYLES, DITHER_MODES, IMPL_MODES, BUILTIN_FONT_CHOICES) could
+# be `enum.StrEnum` for typed iteration + voluptuous-direct use. Defer
+# the multi-file refactor until a third drift incident makes the
+# payoff clear; the parity tests above + the schema-level `vol.In(...)`
+# already catch the typical "I added a value to one place but not the
+# other" mistake.
+BUILTIN_FONT_CHOICES: tuple[str, ...] = ("dejavu_mono", "dejavu_sans", "dejavu_serif")
+DEFAULT_FONT_NAME = "dejavu_mono"
+DEFAULT_FONT_SIZE = 16
+DEFAULT_LINE_SPACING = 1.1
 
 # Image v2 defaults.
 #

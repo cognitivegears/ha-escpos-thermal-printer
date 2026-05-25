@@ -13,9 +13,9 @@ class EscposCommandParser:
 
     # ESCPOS command constants
     ESC = 0x1B  # ESC character
-    GS = 0x1D   # GS character
-    LF = 0x0A   # Line feed
-    CR = 0x0D   # Carriage return
+    GS = 0x1D  # GS character
+    LF = 0x0A  # Line feed
+    CR = 0x0D  # Carriage return
 
     def __init__(self) -> None:
         """Initialize the command parser."""
@@ -23,29 +23,25 @@ class EscposCommandParser:
         self._current_encoding = "cp437"  # Default encoding
 
     def parse_command(self, data: bytes) -> dict[str, Any] | None:
-        """Parse ESCPOS command from raw data.
+        """Parse one ESCPOS command from raw data.
 
         When called with an empty bytes object, this still attempts to parse
-        from any data already accumulated in the internal buffer. This allows
-        callers to drain all pending commands by repeatedly invoking this
-        method with empty input after an initial read.
+        from any data already accumulated in the internal buffer. Callers
+        drain all pending commands by repeatedly invoking this method with
+        empty input after an initial read.
+
+        Returns at most one command per call; only the leading parseable
+        command is consumed from the buffer. (Previously this method also
+        pre-parsed and discarded later commands in the same read, dropping
+        anything after the first — that lost real text/feed bytes when
+        python-escpos batched multiple opcodes into one TCP packet.)
         """
         # Add data to buffer when provided; otherwise, continue parsing the
         # already-buffered bytes.
         if data:
             self._buffer.extend(data)
 
-        # Try to parse complete commands from buffer
-        commands = []
-        while self._buffer:
-            command = self._parse_single_command()
-            if command:
-                commands.append(command)
-            else:
-                # No complete command found, keep remaining data in buffer
-                break
-
-        return commands[0] if commands else None
+        return self._parse_single_command()
 
     def _parse_single_command(self) -> dict[str, Any] | None:
         """Parse a single command from the buffer."""
@@ -77,39 +73,81 @@ class EscposCommandParser:
 
         command_byte = self._buffer[1]
 
-        if command_byte == ord('@'):
+        if command_byte == ord("@"):
             # ESC @ - Initialize printer
             return self._parse_simple_command("initialize", 2)
-        elif command_byte == ord('!'):
+        elif command_byte == ord("!"):
             # ESC ! n - Select print mode
             return self._parse_print_mode_command()
-        elif command_byte == ord('-'):
+        elif command_byte == ord("-"):
             # ESC - n - Underline mode
             return self._parse_underline_command()
-        elif command_byte == ord('a'):
+        elif command_byte == ord("a"):
             # ESC a n - Select justification
             return self._parse_justification_command()
-        elif command_byte == ord('d'):
+        elif command_byte == ord("d"):
             # ESC d n - Print and feed n lines
             return self._parse_feed_command()
-        elif command_byte == ord('i'):
+        elif command_byte == ord("i"):
             # ESC i - Partial cut
             return self._parse_simple_command("cut_partial", 2)
-        elif command_byte == ord('m'):
+        elif command_byte == ord("m"):
             # ESC m - Full cut
             return self._parse_simple_command("cut_full", 2)
-        elif command_byte == ord('t'):
+        elif command_byte == ord("t"):
             # ESC t n - Select character code table
             return self._parse_codepage_command()
+        elif command_byte == ord("E"):
+            # ESC E n - Turn emphasized (bold) on/off
+            return self._parse_simple_command("bold", 3)
+        elif command_byte == ord("G"):
+            # ESC G n - Turn double-strike on/off
+            return self._parse_simple_command("double_strike", 3)
+        elif command_byte == ord("R"):
+            # ESC R n - Select international character set
+            return self._parse_simple_command("intl_charset", 3)
+        elif command_byte == ord("M"):
+            # ESC M n - Select character font
+            return self._parse_simple_command("font_select", 3)
+        elif command_byte == ord("3"):
+            # ESC 3 n - Set line spacing
+            return self._parse_simple_command("line_spacing", 3)
+        elif command_byte == ord("2"):
+            # ESC 2 - Restore default line spacing
+            return self._parse_simple_command("default_line_spacing", 2)
+        elif command_byte == ord("p"):
+            # ESC p m t1 t2 - Generate pulse (drawer kick)
+            return self._parse_simple_command("drawer_kick", 5)
+        elif command_byte == ord("("):
+            # ESC ( m pL pH ... - Function set; treat the leading pL/pH
+            # length pair as defining payload bytes so we consume the
+            # whole thing instead of leaving stray parameter bytes that
+            # look like text.
+            return self._parse_esc_paren_command()
         else:
-            # Unknown ESC command, consume ESC and command byte
-            raw_data = bytes(self._buffer[:2])
-            self._buffer = self._buffer[2:]
-            return {
-                'type': 'unknown',
-                'raw_data': raw_data,
-                'parameters': {}
-            }
+            # Unknown ESC command. Most ESC commands are 3 bytes (ESC +
+            # opcode + 1 param). Consume the conservative 3 so the
+            # parameter byte doesn't masquerade as standalone text.
+            if len(self._buffer) < 3:
+                return None
+            raw_data = bytes(self._buffer[:3])
+            self._buffer = self._buffer[3:]
+            return {"type": "unknown", "raw_data": raw_data, "parameters": {}}
+
+    def _parse_esc_paren_command(self) -> dict[str, Any] | None:
+        """Parse ESC ( m pL pH ... — variable-length function set."""
+        # ESC ( m pL pH d1..dN where N = pL + pH*256
+        if len(self._buffer) < 5:
+            return None
+        pL = self._buffer[3]
+        pH = self._buffer[4]
+        data_length = pL + (pH * 256)
+        total_length = 5 + data_length
+        if len(self._buffer) < total_length:
+            return None
+        raw_data = bytes(self._buffer[:total_length])
+        self._buffer = self._buffer[total_length:]
+        return {"type": "esc_function_set", "raw_data": raw_data, "parameters": {}}
 
     def _parse_gs_command(self) -> dict[str, Any] | None:
         """Parse GS-prefixed commands."""
@@ -118,36 +156,32 @@ class EscposCommandParser:
 
         command_byte = self._buffer[1]
 
-        if command_byte == ord('V'):
+        if command_byte == ord("V"):
             # GS V m - Cut paper
             return self._parse_cut_command()
-        elif command_byte == ord('k'):
+        elif command_byte == ord("k"):
             # GS k m d1...dk - Print barcode
             return self._parse_barcode_command()
-        elif command_byte == ord('('):
+        elif command_byte == ord("("):
             # GS ( L pL pH m d1...dk - Image command
             return self._parse_image_command()
-        elif command_byte == ord('H'):
+        elif command_byte == ord("H"):
             # GS H n - Select print position of HRI characters
             return self._parse_hri_position_command()
-        elif command_byte == ord('f'):
+        elif command_byte == ord("f"):
             # GS f n - Select font for HRI characters
             return self._parse_hri_font_command()
-        elif command_byte == ord('w'):
+        elif command_byte == ord("w"):
             # GS w n - Set barcode width
             return self._parse_barcode_width_command()
-        elif command_byte == ord('h'):
+        elif command_byte == ord("h"):
             # GS h n - Set barcode height
             return self._parse_barcode_height_command()
         else:
             # Unknown GS command, consume GS and command byte
             raw_data = bytes(self._buffer[:2])
             self._buffer = self._buffer[2:]
-            return {
-                'type': 'unknown',
-                'raw_data': raw_data,
-                'parameters': {}
-            }
+            return {"type": "unknown", "raw_data": raw_data, "parameters": {}}
 
     def _parse_simple_command(self, command_type: str, length: int) -> dict[str, Any] | None:
         """Parse a simple command with fixed length."""
@@ -157,11 +191,7 @@ class EscposCommandParser:
         raw_data = bytes(self._buffer[:length])
         self._buffer = self._buffer[length:]
 
-        return {
-            'type': command_type,
-            'raw_data': raw_data,
-            'parameters': {}
-        }
+        return {"type": command_type, "raw_data": raw_data, "parameters": {}}
 
     def _parse_print_mode_command(self) -> dict[str, Any] | None:
         """Parse ESC ! n - Select print mode."""
@@ -174,17 +204,13 @@ class EscposCommandParser:
 
         # Parse print mode bits
         parameters = {
-            'bold': bool(n & 0x08),
-            'double_height': bool(n & 0x10),
-            'double_width': bool(n & 0x20),
-            'underline': bool(n & 0x80)
+            "bold": bool(n & 0x08),
+            "double_height": bool(n & 0x10),
+            "double_width": bool(n & 0x20),
+            "underline": bool(n & 0x80),
         }
 
-        return {
-            'type': 'print_mode',
-            'raw_data': raw_data,
-            'parameters': parameters
-        }
+        return {"type": "print_mode", "raw_data": raw_data, "parameters": parameters}
 
     def _parse_underline_command(self) -> dict[str, Any] | None:
         """Parse ESC - n - Underline mode."""
@@ -195,12 +221,12 @@ class EscposCommandParser:
         raw_data = bytes(self._buffer[:3])
         self._buffer = self._buffer[3:]
 
-        underline_modes = {0: 'none', 1: 'single', 2: 'double'}
+        underline_modes = {0: "none", 1: "single", 2: "double"}
 
         return {
-            'type': 'underline',
-            'raw_data': raw_data,
-            'parameters': {'mode': underline_modes.get(n, 'none')}
+            "type": "underline",
+            "raw_data": raw_data,
+            "parameters": {"mode": underline_modes.get(n, "none")},
         }
 
     def _parse_justification_command(self) -> dict[str, Any] | None:
@@ -212,12 +238,12 @@ class EscposCommandParser:
         raw_data = bytes(self._buffer[:3])
         self._buffer = self._buffer[3:]
 
-        alignments = {0: 'left', 1: 'center', 2: 'right'}
+        alignments = {0: "left", 1: "center", 2: "right"}
 
         return {
-            'type': 'alignment',
-            'raw_data': raw_data,
-            'parameters': {'alignment': alignments.get(n, 'left')}
+            "type": "alignment",
+            "raw_data": raw_data,
+            "parameters": {"alignment": alignments.get(n, "left")},
         }
 
     def _parse_feed_command(self) -> dict[str, Any] | None:
@@ -229,11 +255,7 @@ class EscposCommandParser:
         raw_data = bytes(self._buffer[:3])
         self._buffer = self._buffer[3:]
 
-        return {
-            'type': 'feed',
-            'raw_data': raw_data,
-            'parameters': {'lines': n}
-        }
+        return {"type": "feed", "raw_data": raw_data, "parameters": {"lines": n}}
 
     def _parse_codepage_command(self) -> dict[str, Any] | None:
         """Parse ESC t n - Select character code table."""
@@ -246,18 +268,25 @@ class EscposCommandParser:
 
         # Map codepage numbers to encoding names
         codepages = {
-            0: 'cp437', 1: 'cp932', 2: 'cp850', 3: 'cp860',
-            4: 'cp863', 5: 'cp865', 16: 'cp1252', 17: 'cp866',
-            18: 'cp852', 19: 'cp858'
+            0: "cp437",
+            1: "cp932",
+            2: "cp850",
+            3: "cp860",
+            4: "cp863",
+            5: "cp865",
+            16: "cp1252",
+            17: "cp866",
+            18: "cp852",
+            19: "cp858",
         }
 
-        encoding = codepages.get(n, 'cp437')
+        encoding = codepages.get(n, "cp437")
         self._current_encoding = encoding
 
         return {
-            'type': 'codepage',
-            'raw_data': raw_data,
-            'parameters': {'codepage': n, 'encoding': encoding}
+            "type": "codepage",
+            "raw_data": raw_data,
+            "parameters": {"codepage": n, "encoding": encoding},
         }
 
     def _parse_cut_command(self) -> dict[str, Any] | None:
@@ -269,12 +298,12 @@ class EscposCommandParser:
         raw_data = bytes(self._buffer[:3])
         self._buffer = self._buffer[3:]
 
-        cut_modes = {65: 'partial', 66: 'full'}
+        cut_modes = {65: "partial", 66: "full"}
 
         return {
-            'type': 'cut',
-            'raw_data': raw_data,
-            'parameters': {'mode': cut_modes.get(m, 'full')}
+            "type": "cut",
+            "raw_data": raw_data,
+            "parameters": {"mode": cut_modes.get(m, "full")},
         }
 
     def _parse_barcode_command(self) -> dict[str, Any] | None:
@@ -289,17 +318,17 @@ class EscposCommandParser:
         if len(self._buffer) < total_length:
             return None
 
-        barcode_data = bytes(self._buffer[4:4+k])
+        barcode_data = bytes(self._buffer[4 : 4 + k])
         raw_data = bytes(self._buffer[:total_length])
         self._buffer = self._buffer[total_length:]
 
         return {
-            'type': 'barcode',
-            'raw_data': raw_data,
-            'parameters': {
-                'barcode_type': m,
-                'data': barcode_data.decode(self._current_encoding, errors='ignore')
-            }
+            "type": "barcode",
+            "raw_data": raw_data,
+            "parameters": {
+                "barcode_type": m,
+                "data": barcode_data.decode(self._current_encoding, errors="ignore"),
+            },
         }
 
     def _parse_image_command(self) -> dict[str, Any] | None:
@@ -318,18 +347,14 @@ class EscposCommandParser:
         if len(self._buffer) < total_length:
             return None
 
-        image_data = bytes(self._buffer[5:5+data_length])
+        image_data = bytes(self._buffer[5 : 5 + data_length])
         raw_data = bytes(self._buffer[:total_length])
         self._buffer = self._buffer[total_length:]
 
         return {
-            'type': 'image',
-            'raw_data': raw_data,
-            'parameters': {
-                'function': m,
-                'data_length': data_length,
-                'image_data': image_data
-            }
+            "type": "image",
+            "raw_data": raw_data,
+            "parameters": {"function": m, "data_length": data_length, "image_data": image_data},
         }
 
     def _parse_hri_position_command(self) -> dict[str, Any] | None:
@@ -341,12 +366,12 @@ class EscposCommandParser:
         raw_data = bytes(self._buffer[:3])
         self._buffer = self._buffer[3:]
 
-        positions = {0: 'not_printed', 1: 'above', 2: 'below', 3: 'both'}
+        positions = {0: "not_printed", 1: "above", 2: "below", 3: "both"}
 
         return {
-            'type': 'hri_position',
-            'raw_data': raw_data,
-            'parameters': {'position': positions.get(n, 'below')}
+            "type": "hri_position",
+            "raw_data": raw_data,
+            "parameters": {"position": positions.get(n, "below")},
         }
 
     def _parse_hri_font_command(self) -> dict[str, Any] | None:
@@ -358,13 +383,9 @@ class EscposCommandParser:
         raw_data = bytes(self._buffer[:3])
         self._buffer = self._buffer[3:]
 
-        fonts = {0: 'A', 1: 'B'}
+        fonts = {0: "A", 1: "B"}
 
-        return {
-            'type': 'hri_font',
-            'raw_data': raw_data,
-            'parameters': {'font': fonts.get(n, 'A')}
-        }
+        return {"type": "hri_font", "raw_data": raw_data, "parameters": {"font": fonts.get(n, "A")}}
 
     def _parse_barcode_width_command(self) -> dict[str, Any] | None:
         """Parse GS w n - Set barcode width."""
@@ -376,9 +397,9 @@ class EscposCommandParser:
         self._buffer = self._buffer[3:]
 
         return {
-            'type': 'barcode_width',
-            'raw_data': raw_data,
-            'parameters': {'width': max(2, min(6, n))}
+            "type": "barcode_width",
+            "raw_data": raw_data,
+            "parameters": {"width": max(2, min(6, n))},
         }
 
     def _parse_barcode_height_command(self) -> dict[str, Any] | None:
@@ -391,9 +412,9 @@ class EscposCommandParser:
         self._buffer = self._buffer[3:]
 
         return {
-            'type': 'barcode_height',
-            'raw_data': raw_data,
-            'parameters': {'height': max(1, min(255, n))}
+            "type": "barcode_height",
+            "raw_data": raw_data,
+            "parameters": {"height": max(1, min(255, n))},
         }
 
     def _parse_text_data(self) -> dict[str, Any] | None:
@@ -416,13 +437,9 @@ class EscposCommandParser:
         try:
             text = text_data.decode(self._current_encoding)
         except UnicodeDecodeError:
-            text = text_data.decode('latin-1')  # Fallback encoding
+            text = text_data.decode("latin-1")  # Fallback encoding
 
-        return {
-            'type': 'text',
-            'raw_data': text_data,
-            'parameters': {'text': text}
-        }
+        return {"type": "text", "raw_data": text_data, "parameters": {"text": text}}
 
     def clear_buffer(self) -> None:
         """Clear the internal buffer."""

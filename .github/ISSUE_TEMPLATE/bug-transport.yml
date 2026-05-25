@@ -1,0 +1,77 @@
+name: Transport / connectivity bug
+description: Printer is unreachable, drops connection mid-print, or status flaps. Network / USB / Bluetooth.
+title: "[transport] "
+labels: ["bug", "transport"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report! The transport layer touches three
+        independent backends (TCP network, pyusb, bluez/RFCOMM), each
+        with its own failure modes. Please fill in everything you can —
+        we can't reproduce a "printer not reachable" report without
+        knowing which transport, what the diagnostics say, and what
+        the printer was doing.
+
+        **Please scrub** any internal IPs / BT MACs / USB serials
+        before submitting if you'd rather not publish them.
+
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant version
+      placeholder: "2026.5.0"
+    validations:
+      required: true
+
+  - type: input
+    id: integration_version
+    attributes:
+      label: Integration version
+      placeholder: "0.7.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: transport
+    attributes:
+      label: Transport
+      options:
+        - Network (TCP port 9100)
+        - USB
+        - Bluetooth Classic / RFCOMM
+    validations:
+      required: true
+
+  - type: input
+    id: printer_model
+    attributes:
+      label: Printer model
+      description: Make + model + (if known) python-escpos profile name
+      placeholder: "Epson TM-T20, profile TM-T20"
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics dump
+      description: Download via Settings → Devices & Services → ESC/POS Printer → ⋮ → Download diagnostics. Paste the JSON here (or attach the file). Scrub host / MAC / serial if needed.
+      render: json
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines
+      description: Enable debug logging via configuration.yaml (`logger.logs.custom_components.escpos_printer: debug`), reproduce, and paste the matching log block here.
+      render: text
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: What you tried, what happened, what you expected. Include the service call YAML if relevant.
+    validations:
+      required: true

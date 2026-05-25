@@ -1,0 +1,85 @@
+blueprint:
+  name: ESC/POS — Sensor Alert
+  description: >
+    When a Home Assistant sensor (or binary_sensor) reaches a target
+    state, print a bordered alert card with the sensor name, its
+    current value, and a timestamp. Good for door-left-open warnings,
+    water-leak detectors, temperature thresholds.
+  domain: automation
+  source_url: https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/blueprints/automation/escpos_printer/sensor_alert.yaml
+  input:
+    printer:
+      name: Printer
+      description: ESC/POS printer device to print to.
+      selector:
+        device:
+          integration: escpos_printer
+    sensor:
+      name: Sensor
+      description: Entity to watch.
+      selector:
+        entity: {}
+    target_state:
+      name: Target state
+      description: >
+        State value that triggers the alert (e.g. "on" for a
+        binary_sensor, or a specific value like "open").
+      default: "on"
+      selector:
+        text: {}
+    alert_title:
+      name: Alert title
+      default: ALERT
+      selector:
+        text: {}
+    style:
+      name: Border style
+      default: auto
+      selector:
+        select:
+          options:
+            - auto
+            - single
+            - double
+            - ascii
+            - asterisk
+            - hash
+            - none
+# queued — repeated transitions into the alert state should each print rather
+# than dropping the second one (defeats the purpose of an alert).
+mode: queued
+max_exceeded: silent
+trigger:
+  - platform: state
+    entity_id: !input sensor
+    to: !input target_state
+variables:
+  sensor_entity: !input sensor
+action:
+  - service: escpos_printer.print_box
+    target:
+      device_id: !input printer
+    data:
+      text: !input alert_title
+      style: !input style
+      align: center
+      padding: 1
+  - service: escpos_printer.print_kvtable
+    target:
+      device_id: !input printer
+    data:
+      items:
+        - ["Sensor", "{{ state_attr(sensor_entity, 'friendly_name') or sensor_entity }}"]
+        - ["State",  "{{ states(sensor_entity) }}"]
+        - ["Time",   "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"]
+      value_align: left
+  - service: escpos_printer.print_separator
+    target:
+      device_id: !input printer
+    data:
+      char: "="
+  - service: escpos_printer.cut
+    target:
+      device_id: !input printer
+    data:
+      mode: full

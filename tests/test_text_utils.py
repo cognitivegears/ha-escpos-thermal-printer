@@ -349,7 +349,7 @@ class TestTranscodingIntegration:
 
     def test_notification_text(self) -> None:
         """Test notification text with smart quotes."""
-        text = '\u201cDoor opened\u201d at 3:00\u202fPM'
+        text = "\u201cDoor opened\u201d at 3:00\u202fPM"
         result = transcode_to_codepage(text, "CP437")
         assert "Door opened" in result
         assert "PM" in result
@@ -443,21 +443,13 @@ class TestCP437BoxDrawing:
 
     def test_simple_box_art(self) -> None:
         """Simple box art should be preserved."""
-        box = (
-            "\u250c\u2500\u2500\u2500\u2510\n"
-            "\u2502 Hi \u2502\n"
-            "\u2514\u2500\u2500\u2500\u2518"
-        )
+        box = "\u250c\u2500\u2500\u2500\u2510\n\u2502 Hi \u2502\n\u2514\u2500\u2500\u2500\u2518"
         result = transcode_to_codepage(box, "CP437")
         assert result == box
 
     def test_double_box_art(self) -> None:
         """Double-line box art should be preserved."""
-        box = (
-            "\u2554\u2550\u2550\u2550\u2557\n"
-            "\u2551 Hi \u2551\n"
-            "\u255a\u2550\u2550\u2550\u255d"
-        )
+        box = "\u2554\u2550\u2550\u2550\u2557\n\u2551 Hi \u2551\n\u255a\u2550\u2550\u2550\u255d"
         result = transcode_to_codepage(box, "CP437")
         assert result == box
 

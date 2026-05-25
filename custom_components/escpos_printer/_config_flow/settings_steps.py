@@ -44,15 +44,19 @@ def _make_entry_title(data: dict[str, Any], user_data: dict[str, Any]) -> str:
     """Build a config entry title from the merged data, by connection type."""
     connection_type = data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
     if connection_type == CONNECTION_TYPE_USB:
-        return str(user_data.get(
-            "_printer_name",
-            f"USB Printer {data.get(CONF_VENDOR_ID, 0):04X}:{data.get(CONF_PRODUCT_ID, 0):04X}",
-        ))
+        return str(
+            user_data.get(
+                "_printer_name",
+                f"USB Printer {data.get(CONF_VENDOR_ID, 0):04X}:{data.get(CONF_PRODUCT_ID, 0):04X}",
+            )
+        )
     if connection_type == CONNECTION_TYPE_BLUETOOTH:
-        return str(user_data.get(
-            "_printer_name",
-            f"Bluetooth Printer {data.get(CONF_BT_MAC, '')}",
-        ))
+        return str(
+            user_data.get(
+                "_printer_name",
+                f"Bluetooth Printer {data.get(CONF_BT_MAC, '')}",
+            )
+        )
     return f"{data[CONF_HOST]}:{data[CONF_PORT]}"
 
 
@@ -89,9 +93,7 @@ class SettingsFlowMixin:
             _LOGGER.debug("Custom profile entered: %s", custom_profile)
 
             # Validate the profile exists in escpos-printer-db
-            is_valid = await self.hass.async_add_executor_job(
-                is_valid_profile, custom_profile
-            )
+            is_valid = await self.hass.async_add_executor_job(is_valid_profile, custom_profile)
             if not custom_profile or not is_valid:
                 _LOGGER.warning("Invalid profile name: %s", custom_profile)
                 errors["base"] = "invalid_profile"
@@ -134,11 +136,11 @@ class SettingsFlowMixin:
                 self._user_data[CONF_DEFAULT_ALIGN] = user_input.get(
                     CONF_DEFAULT_ALIGN, DEFAULT_ALIGN
                 )
-                self._user_data[CONF_DEFAULT_CUT] = user_input.get(
-                    CONF_DEFAULT_CUT, DEFAULT_CUT
-                )
+                self._user_data[CONF_DEFAULT_CUT] = user_input.get(CONF_DEFAULT_CUT, DEFAULT_CUT)
                 self._user_data[CONF_LINE_WIDTH] = (
-                    int(line_width) if line_width and line_width != OPTION_CUSTOM else DEFAULT_LINE_WIDTH
+                    int(line_width)
+                    if line_width and line_width != OPTION_CUSTOM
+                    else DEFAULT_LINE_WIDTH
                 )
                 return await self.async_step_custom_codepage()
 
@@ -149,9 +151,7 @@ class SettingsFlowMixin:
                 self._user_data[CONF_DEFAULT_ALIGN] = user_input.get(
                     CONF_DEFAULT_ALIGN, DEFAULT_ALIGN
                 )
-                self._user_data[CONF_DEFAULT_CUT] = user_input.get(
-                    CONF_DEFAULT_CUT, DEFAULT_CUT
-                )
+                self._user_data[CONF_DEFAULT_CUT] = user_input.get(CONF_DEFAULT_CUT, DEFAULT_CUT)
                 return await self.async_step_custom_line_width()
 
             # Merge with data from previous steps and create entry
@@ -181,17 +181,13 @@ class SettingsFlowMixin:
         profile = self._user_data.get(CONF_PROFILE, PROFILE_AUTO)
 
         # Get codepages for selected profile
-        codepage_list = await self.hass.async_add_executor_job(
-            get_profile_codepages, profile
-        )
+        codepage_list = await self.hass.async_add_executor_job(get_profile_codepages, profile)
         codepage_choices: dict[str, str] = {"": "(Default - Auto)"}
         codepage_choices.update({cp: cp for cp in codepage_list})
         codepage_choices[OPTION_CUSTOM] = "Custom (enter codepage)..."
 
         # Get line widths for selected profile
-        width_list = await self.hass.async_add_executor_job(
-            get_profile_line_widths, profile
-        )
+        width_list = await self.hass.async_add_executor_job(get_profile_line_widths, profile)
         width_choices: dict[str | int, str] = {}
         for w in width_list:
             width_choices[w] = f"{w} columns"
@@ -204,9 +200,7 @@ class SettingsFlowMixin:
         data_schema = vol.Schema(
             {
                 vol.Optional(CONF_CODEPAGE, default=""): vol.In(codepage_choices),
-                vol.Optional(CONF_LINE_WIDTH, default=DEFAULT_LINE_WIDTH): vol.In(
-                    width_choices
-                ),
+                vol.Optional(CONF_LINE_WIDTH, default=DEFAULT_LINE_WIDTH): vol.In(width_choices),
                 vol.Optional(CONF_DEFAULT_ALIGN, default=DEFAULT_ALIGN): vol.In(
                     ["left", "center", "right"]
                 ),
@@ -290,17 +284,13 @@ class SettingsFlowMixin:
             custom_width = user_input.get("custom_line_width")
             _LOGGER.debug("Custom line width entered: %s", custom_width)
 
-            # Validate line width is a positive number within reasonable bounds
-            try:
-                width_int = int(custom_width)  # type: ignore[arg-type]
-                if width_int < 1 or width_int > 255:
-                    _LOGGER.warning("Invalid line width (out of range): %s", custom_width)
-                    errors["base"] = "invalid_line_width"
-            except (ValueError, TypeError):
-                _LOGGER.warning("Invalid line width (not a number): %s", custom_width)
-                errors["base"] = "invalid_line_width"
+            from .network_helpers import validate_custom_line_width  # noqa: PLC0415
 
-            if not errors:
+            width_int, err_code = validate_custom_line_width(custom_width)
+            if err_code:
+                errors["base"] = err_code
+
+            if not errors and width_int is not None:
                 # Create entry
                 data = {
                     **self._user_data,

@@ -12,6 +12,7 @@ from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 
 from .const import (
     CONF_CONNECTION_TYPE,
+    CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
     CONNECTION_TYPE_USB,
     DOMAIN,
@@ -26,7 +27,9 @@ _LOGGER = logging.getLogger(__name__)
 PARALLEL_UPDATES = 0
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry, async_add_entities) -> None:  # type: ignore[no-untyped-def]
+async def async_setup_entry(  # type: ignore[no-untyped-def]
+    hass: HomeAssistant, entry: EscposConfigEntry, async_add_entities
+) -> None:
     adapter = entry.runtime_data.adapter
     entity = EscposOnlineSensor(hass, entry, adapter)
     async_add_entities([entity])
@@ -52,7 +55,15 @@ class EscposOnlineSensor(BinarySensorEntity):
     @property
     def device_info(self) -> DeviceInfo:
         connection_type = self._entry.data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
-        model = "USB Printer" if connection_type == CONNECTION_TYPE_USB else "Network Printer"
+        # B-L7: three-way branch matches notify.py / sensor.py. Pre-fix
+        # this picked "Network Printer" for Bluetooth entries because
+        # the Bluetooth transport landed after binary_sensor was written.
+        if connection_type == CONNECTION_TYPE_USB:
+            model = "USB Printer"
+        elif connection_type == CONNECTION_TYPE_BLUETOOTH:
+            model = "Bluetooth Printer"
+        else:
+            model = "Network Printer"
 
         return DeviceInfo(
             identifiers={(DOMAIN, self._entry.entry_id)},

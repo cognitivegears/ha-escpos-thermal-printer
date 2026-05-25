@@ -29,7 +29,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.13'
+          python-version: '3.14'
 
       - name: Cache pip dependencies
         uses: actions/cache@v5
@@ -49,13 +49,16 @@ jobs:
       - name: Bandit - Python security linting
         run: |
           # Two passes: SARIF for the Security tab, exit-code gate for CI.
-          # `-lll` fails the build on HIGH severity only; MEDIUM/LOW findings
-          # appear in the SARIF report uploaded below but do not block.
+          # CI-M5: `-ll` (MEDIUM-and-above) gate instead of the previous
+          # `-lll` (HIGH-only). MEDIUM findings now block the build rather
+          # than silently accumulating in the Security tab. Project-specific
+          # false positives go in `[tool.bandit] skips` in `pyproject.toml`
+          # so the skip rationale is reviewable.
           # `-c pyproject.toml` picks up [tool.bandit] skips that mirror the
           # ruff S101/S110 ignores. `scripts/` is included because it runs
           # with elevated privileges in dependabot-auto-sync.yml.
           bandit -c pyproject.toml -r custom_components/escpos_printer scripts -f sarif -o bandit.sarif || true
-          bandit -c pyproject.toml -r custom_components/escpos_printer scripts -lll
+          bandit -c pyproject.toml -r custom_components/escpos_printer scripts -ll
 
       - name: Install Cosign
         # Required by the Opengrep install script's --verify-signatures flag,
@@ -73,14 +76,47 @@ jobs:
         # can't be tracked by Dependabot's pip ecosystem. Bump OPENGREP_VERSION
         # below by hand when a new release ships:
         #   https://github.com/opengrep/opengrep/releases
+        #
+        # We use `gh release download` rather than piping upstream's
+        # install.sh through bash, because install.sh validates the
+        # requested version via an unauthenticated GitHub API call
+        # (api.github.com/repos/opengrep/opengrep/releases) that gets
+        # rate-limited on shared runner IPs and fails with "Failed to
+        # fetch available versions from GitHub". `gh` uses GITHUB_TOKEN
+        # for the 5000/hr authenticated quota.
         env:
           OPENGREP_VERSION: v1.21.0
+          GH_TOKEN: ${{ github.token }}
         run: |
-          curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh \
-            | bash -s -- -v "${OPENGREP_VERSION}" --verify-signatures
-          # The install script puts the binary under ~/.opengrep/cli/latest/
-          # on Linux runners (no ~/.local/bin symlink is created), so add
-          # that directory to PATH for subsequent steps.
+          set -euo pipefail
+          case "$(uname -s)-$(uname -m)" in
+            Linux-x86_64|Linux-amd64) DIST="opengrep_manylinux_x86" ;;
+            Linux-aarch64|Linux-arm64) DIST="opengrep_manylinux_aarch64" ;;
+            Darwin-x86_64|Darwin-amd64) DIST="opengrep_osx_x86" ;;
+            Darwin-aarch64|Darwin-arm64) DIST="opengrep_osx_arm64" ;;
+            *) echo "Unsupported runner $(uname -s)-$(uname -m)" >&2; exit 1 ;;
+          esac
+          INST="${HOME}/.opengrep/cli/${OPENGREP_VERSION}"
+          mkdir -p "${INST}"
+          gh release download "${OPENGREP_VERSION}" \
+            --repo opengrep/opengrep \
+            --pattern "${DIST}" \
+            --pattern "${DIST}.cert" \
+            --pattern "${DIST}.sig" \
+            --dir "${INST}"
+          mv "${INST}/${DIST}"      "${INST}/opengrep"
+          mv "${INST}/${DIST}.cert" "${INST}/opengrep.cert"
+          mv "${INST}/${DIST}.sig"  "${INST}/opengrep.sig"
+          chmod +x "${INST}/opengrep"
+          # Verify the sigstore signature with the cosign installed above.
+          # Identity / issuer regex mirrors install.sh.
+          cosign verify-blob \
+            --cert "${INST}/opengrep.cert" \
+            --signature "${INST}/opengrep.sig" \
+            --certificate-identity-regexp "https://github.com/opengrep/opengrep.+" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "${INST}/opengrep"
+          ln -sfn "${INST}" "${HOME}/.opengrep/cli/latest"
           echo "${HOME}/.opengrep/cli/latest" >> "${GITHUB_PATH}"
 
       - name: Opengrep - Project-specific security rules
@@ -121,14 +157,42 @@ jobs:
         run: |
           PIP_AUDIT_ARGS=(
             --skip-editable
-            # Pillow 12.0.0 — pinned by homeassistant==2026.2.3.
-            # Fixed in 12.1.1 (CVE-2026-25990) / 12.2.0 (others).
-            --ignore-vuln CVE-2026-25990
+            # Pillow 12.1.1 — pinned by homeassistant==2026.3.4.
+            # These CVEs are fixed in Pillow 12.2.0; HA 2026.5+ ships 12.2.0.
             --ignore-vuln CVE-2026-40192
             --ignore-vuln CVE-2026-42308
             --ignore-vuln CVE-2026-42309
             --ignore-vuln CVE-2026-42310
             --ignore-vuln CVE-2026-42311
+            # aiohttp 3.13.3 — pinned by homeassistant==2026.3.4.
+            # All fixed in 3.13.4; clears when HA bumps the pin.
+            --ignore-vuln CVE-2026-22815
+            --ignore-vuln CVE-2026-34513
+            --ignore-vuln CVE-2026-34514
+            --ignore-vuln CVE-2026-34515
+            --ignore-vuln CVE-2026-34516
+            --ignore-vuln CVE-2026-34517
+            --ignore-vuln CVE-2026-34518
+            --ignore-vuln CVE-2026-34519
+            --ignore-vuln CVE-2026-34520
+            --ignore-vuln CVE-2026-34525
+            # cryptography 46.0.5 — pinned by homeassistant==2026.3.4.
+            # Fixed in 46.0.6 / 46.0.7.
+            --ignore-vuln PYSEC-2026-35
+            --ignore-vuln PYSEC-2026-36
+            # PyJWT 2.10.1 — pinned by homeassistant==2026.3.4.
+            # Fixed in 2.12.0.
+            --ignore-vuln PYSEC-2025-183
+            --ignore-vuln PYSEC-2026-120
+            # pytest 9.0.0 — pinned by pytest-homeassistant-custom-component.
+            # Fixed in 9.0.3; clears when the HA test harness bumps.
+            --ignore-vuln CVE-2025-71176
+            # requests 2.32.5 — pinned by homeassistant==2026.3.4.
+            # Fixed in 2.33.0.
+            --ignore-vuln CVE-2026-25645
+            # uv 0.10.6 — pinned by homeassistant==2026.3.4 (dev tooling).
+            # Fixed in 0.11.6.
+            --ignore-vuln GHSA-pjjw-68hj-v9mw
           )
           pip-audit "${PIP_AUDIT_ARGS[@]}" --format json --output pip-audit-report.json || true
           pip-audit "${PIP_AUDIT_ARGS[@]}"

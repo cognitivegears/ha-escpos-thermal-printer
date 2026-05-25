@@ -62,9 +62,15 @@ URL validation enforces:
 
 Max download size is 10 MB; the body is streamed and the read aborts
 mid-stream when the cap is hit. `Content-Length` is checked before
-reading. Fetches use HA's pooled httpx client (no per-request TLS
-handshake cost) and fall back to HA's pooled aiohttp session only on
-`ImportError` (not on HTTP errors).
+reading. Each fetch builds a **per-request `aiohttp` session pinned via
+`_StaticResolver`** to the IP address(es) validated by `getaddrinfo` —
+defeating DNS rebinding: a hostile 0-TTL DNS server cannot swap public
+→ private between validation and connect. Redirects are followed
+manually (max 5); each hop is re-validated and gets a fresh DNS pin.
+
+The integration previously had an httpx fast-path that fell back to
+aiohttp on `ImportError`. That was removed (httpx 0.28 has no
+resolver-pin hook) — aiohttp is now the only path.
 
 ### Camera entity
 
@@ -292,7 +298,7 @@ The generic `print_image` service is still fully supported — it's the right ch
 service: escpos_printer.preview_image
 data:
   image: camera.living_room
-  output_path: /config/www/last_preview.png
+  output_path: /tmp/last_preview.png
   dither: floyd-steinberg
   autocontrast: true
 ```
@@ -303,7 +309,6 @@ The service returns `{path, width, height, slice_count}` so you can chain a noti
 - service: escpos_printer.preview_image
   data:
     image: camera.living_room
-    output_path: /config/www/preview.png
   response_variable: preview
 - service: notify.persistent_notification
   data:
@@ -311,6 +316,14 @@ The service returns `{path, width, height, slice_count}` so you can chain a noti
 ```
 
 If `output_path` is omitted, the preview lands at `/tmp/escpos_preview_<entry>.png`.
+
+> **Tempdir-only restriction** — user-supplied `output_path` must be inside
+> the system temp directory (typically `/tmp`). A non-admin Home Assistant
+> user could otherwise call `preview_image` with
+> `output_path: /config/configuration.yaml` and clobber it with rendered
+> PNG bytes. To stage the preview into `/config/www/` for a Lovelace card,
+> add a follow-up step using `shell_command:` to copy the returned `path`,
+> or consume the response directly in a notification.
 
 ## Calibration print
 

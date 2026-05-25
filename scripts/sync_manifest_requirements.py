@@ -26,10 +26,17 @@ UVLOCK = ROOT / "uv.lock"
 # Packages for which we intentionally keep a version range in the HA manifest
 # to avoid conflicts with Home Assistant's own pins.
 MANIFEST_OVERRIDES: dict[str, str] = {
-    # HA 2026.2 ships Pillow 12.0.0; later HA versions are expected to bump
+    # HA 2026.3 ships Pillow 12.1.1; later HA versions are expected to bump
     # within the 12.x line. Range matches HA core's expected Pillow range so
     # pip's resolver doesn't fight with HA's bundled wheel.
-    "pillow": ">=12.0.0,<13.0.0",
+    "pillow": ">=12.1.1,<13.0.0",
+    # dbus-fast varies across HA versions within our supported floor:
+    # HA 2026.3/2026.4 ship 3.1.2, HA 2026.5 ships 4.0.4, HA master is on
+    # 5.0.3. Range covers the supported HA window so pip's resolver
+    # doesn't fight with HA bluetooth's manifest pin at install time.
+    # pyproject.toml keeps `dbus-fast==3.1.2` for dev/CI reproducibility
+    # against the locked HA test wheel.
+    "dbus-fast": ">=3.1.2,<6",
 }
 
 
@@ -87,14 +94,18 @@ def build_manifest_requirements() -> list[str]:
         if not version:
             version = locked.get(name.lower())
         if not version:
-            raise SystemExit(f"Cannot determine exact version for {name}. Pin it in pyproject or lock with uv.")
+            raise SystemExit(
+                f"Cannot determine exact version for {name}. Pin it in pyproject or lock with uv."
+            )
         out.append(f"{name}=={version}")
     return out
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Sync manifest requirements with pinned versions")
-    parser.add_argument("--check", action="store_true", help="Only check for drift; non-zero exit on mismatch")
+    parser.add_argument(
+        "--check", action="store_true", help="Only check for drift; non-zero exit on mismatch"
+    )
     args = parser.parse_args()
 
     desired = build_manifest_requirements()
@@ -117,7 +128,7 @@ def main() -> int:
                 want = desired_set[k].specifier
                 have = current_set[k].specifier
                 # If desired has exact '==' pins, they must be allowed by current
-                eqs = [s.strip()[2:] for s in str(want).split(',') if s.strip().startswith('==')]
+                eqs = [s.strip()[2:] for s in str(want).split(",") if s.strip().startswith("==")]
                 if eqs:
                     problems.extend(
                         f"{k}: manifest does not allow pinned version {v}"

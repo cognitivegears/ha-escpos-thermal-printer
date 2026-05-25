@@ -1,0 +1,125 @@
+blueprint:
+  name: ESC/POS — TODO List
+  description: >
+    Generic printer for any Home Assistant todo entity. Picks up the
+    entity's friendly name as the title (override with the title input),
+    can optionally include completed items, and can number entries.
+    Pair with the Shopping List blueprint for a curated grocery
+    preset, or use this one for chores / packing list / project tasks.
+  domain: script
+  source_url: https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/blueprints/script/escpos_printer/todo_list.yaml
+  input:
+    printer:
+      name: Printer
+      description: ESC/POS printer device to print to.
+      selector:
+        device:
+          integration: escpos_printer
+    todo_entity:
+      name: Todo entity
+      description: Which todo list to print.
+      selector:
+        entity:
+          domain: todo
+    title:
+      name: List title
+      description: >
+        Heading printed at the top. Leave blank to use the entity's
+        friendly name.
+      default: ""
+      selector:
+        text: {}
+    include_completed:
+      name: Include completed items
+      description: When true, also print items already checked off (marked with ✓).
+      default: false
+      selector:
+        boolean: {}
+    numbered:
+      name: Numbered list
+      description: When true, prepend each row with its position (1., 2., ...).
+      default: false
+      selector:
+        boolean: {}
+    style:
+      name: Border style
+      description: Border-glyph family for the items table.
+      default: auto
+      selector:
+        select:
+          options:
+            - auto
+            - single
+            - double
+            - ascii
+            - asterisk
+            - hash
+            - none
+# queued — multiple invocations should print in order rather than dropping.
+mode: queued
+max_exceeded: silent
+sequence:
+  - variables:
+      todo_entity_id: !input todo_entity
+      include_completed: !input include_completed
+      numbered: !input numbered
+      requested_title: !input title
+      effective_title: >
+        {% if requested_title and requested_title|length > 0 %}
+          {{ requested_title }}
+        {% else %}
+          {{ state_attr(todo_entity_id, 'friendly_name') or 'TODO' }}
+        {% endif %}
+  - service: todo.get_items
+    target:
+      entity_id: !input todo_entity
+    data:
+      status: "{{ 'needs_action,completed' if include_completed else 'needs_action' }}"
+    response_variable: todo_response
+  - variables:
+      raw_items: >
+        {{ (((todo_response | default({})).values() | list | first) or {}).get('items', []) }}
+      decorated: >
+        {% set ns = namespace(rows=[]) %}
+        {% for item in raw_items %}
+          {% set prefix = (loop.index ~ '. ') if numbered else '' %}
+          {% set check = '✓ ' if item.status == 'completed' else '' %}
+          {% set summary = (item.summary | default('') | string).replace('\n', ' ').replace('\r', ' ').replace('|', '/').replace('\t', ' ') | trim %}
+          {% set ns.rows = ns.rows + [[prefix ~ check ~ summary]] %}
+        {% endfor %}
+        {{ ns.rows }}
+  - service: escpos_printer.print_box
+    target:
+      device_id: !input printer
+    data:
+      text: "{{ effective_title | trim }}"
+      style: !input style
+      align: center
+      padding: 1
+  - if:
+      - condition: template
+        value_template: "{{ raw_items | length > 0 }}"
+    then:
+      - service: escpos_printer.print_table
+        target:
+          device_id: !input printer
+        data:
+          rows: "{{ decorated }}"
+          style: !input style
+          header: false
+    else:
+      - service: escpos_printer.print_box
+        target:
+          device_id: !input printer
+        data:
+          text: "(list is empty)"
+          style: !input style
+          align: center
+  - service: escpos_printer.print_separator
+    target:
+      device_id: !input printer
+  - service: escpos_printer.cut
+    target:
+      device_id: !input printer
+    data:
+      mode: full

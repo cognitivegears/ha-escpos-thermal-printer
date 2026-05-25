@@ -57,40 +57,25 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class EscposOptionsFlowHandler(config_entries.OptionsFlow):
-    """Options flow handler for ESC/POS Thermal Printer."""
+    """Options flow handler for ESC/POS Thermal Printer.
 
-    _config_entry_compat: Any  # For HA 2024.8-2024.10 compatibility
+    Modern HA (>= 2024.11; this project pins >= 2026.3) injects
+    ``config_entry`` via the base class. B-M1: the 2024.8-2024.10
+    compatibility shim that previously stored a parallel
+    ``_config_entry_compat`` via ``object.__setattr__`` has been removed
+    now that the supported HA floor moved past the breaking point.
+    """
 
-    def __init__(self, config_entry: Any) -> None:
+    def __init__(self) -> None:
         """Initialize the options flow handler.
 
-        Args:
-            config_entry: Config entry to be configured (required for HA 2024.8-2024.10 compatibility)
+        Takes no arguments — modern HA framework injects ``config_entry``
+        onto the instance via the ``OptionsFlow`` base class.
         """
-        # Store config_entry for HA 2024.8-2024.10 compatibility
-        # HA 2024.11+ provides this automatically via base class property, but older versions require explicit storage
-        # Use object.__setattr__ to bypass the read-only property in newer HA versions
-        object.__setattr__(self, "_config_entry_compat", config_entry)
         self._pending_data: dict[str, Any] = {}
         super().__init__()
 
-    @property
-    def config_entry(self) -> Any:
-        """Get config entry.
-
-        Returns the config entry from the base class if available (HA 2024.11+),
-        otherwise returns our stored copy (HA 2024.8-2024.10).
-        """
-        # Try to get from base class first (HA 2024.11+)
-        try:
-            return super().config_entry
-        except AttributeError:
-            # Fall back to our stored copy (HA 2024.8-2024.10)
-            return self._config_entry_compat
-
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle the options flow initialization.
 
         Args:
@@ -112,9 +97,9 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlow):
             line_width = user_input.get(CONF_LINE_WIDTH)
 
             # Handle profile change - reset dependent options
-            old_profile = self.config_entry.options.get(
-                CONF_PROFILE
-            ) or self.config_entry.data.get(CONF_PROFILE, PROFILE_AUTO)
+            old_profile = self.config_entry.options.get(CONF_PROFILE) or self.config_entry.data.get(
+                CONF_PROFILE, PROFILE_AUTO
+            )
 
             if profile not in (old_profile, PROFILE_CUSTOM):
                 _LOGGER.info(
@@ -144,9 +129,9 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlow):
             return self.async_create_entry(title="Options", data=user_input)
 
         # Get current values
-        current_profile = self.config_entry.options.get(
-            CONF_PROFILE
-        ) or self.config_entry.data.get(CONF_PROFILE, PROFILE_AUTO)
+        current_profile = self.config_entry.options.get(CONF_PROFILE) or self.config_entry.data.get(
+            CONF_PROFILE, PROFILE_AUTO
+        )
         current_codepage = self.config_entry.options.get(
             CONF_CODEPAGE
         ) or self.config_entry.data.get(CONF_CODEPAGE, "")
@@ -187,15 +172,13 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlow):
             width_choices[current_line_width] = f"{current_line_width} columns (current)"
 
         # Get cut modes for current profile
-        cut_modes = await self.hass.async_add_executor_job(
-            get_profile_cut_modes, current_profile
-        )
+        cut_modes = await self.hass.async_add_executor_job(get_profile_cut_modes, current_profile)
         cut_choices = {m: m.title() for m in cut_modes}
 
         # Ensure current cut mode is in choices
-        current_cut = self.config_entry.options.get(
-            CONF_DEFAULT_CUT
-        ) or self.config_entry.data.get(CONF_DEFAULT_CUT, DEFAULT_CUT)
+        current_cut = self.config_entry.options.get(CONF_DEFAULT_CUT) or self.config_entry.data.get(
+            CONF_DEFAULT_CUT, DEFAULT_CUT
+        )
         if current_cut not in cut_choices:
             cut_choices[current_cut] = f"{current_cut.title()} (current)"
 
@@ -224,12 +207,8 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlow):
                             CONF_TIMEOUT, self.config_entry.data.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)
                         ),
                     ): vol.Coerce(float),
-                    vol.Optional(CONF_PROFILE, default=current_profile): vol.In(
-                        profile_choices
-                    ),
-                    vol.Optional(CONF_CODEPAGE, default=current_codepage): vol.In(
-                        codepage_choices
-                    ),
+                    vol.Optional(CONF_PROFILE, default=current_profile): vol.In(profile_choices),
+                    vol.Optional(CONF_CODEPAGE, default=current_codepage): vol.In(codepage_choices),
                     vol.Optional(CONF_LINE_WIDTH, default=current_line_width): vol.In(
                         width_choices
                     ),
@@ -241,9 +220,9 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlow):
                         ),
                     ): vol.In(["left", "center", "right"]),
                     vol.Optional(CONF_DEFAULT_CUT, default=current_cut): vol.In(cut_choices),
-                    vol.Optional(
-                        CONF_RELIABILITY_PROFILE, default=current_reliability
-                    ): vol.In(reliability_choices),
+                    vol.Optional(CONF_RELIABILITY_PROFILE, default=current_reliability): vol.In(
+                        reliability_choices
+                    ),
                     vol.Optional(
                         CONF_STATUS_INTERVAL,
                         default=self.config_entry.options.get(CONF_STATUS_INTERVAL, 0),
@@ -259,12 +238,8 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlow):
                             CONF_TIMEOUT, self.config_entry.data.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)
                         ),
                     ): vol.Coerce(float),
-                    vol.Optional(CONF_PROFILE, default=current_profile): vol.In(
-                        profile_choices
-                    ),
-                    vol.Optional(CONF_CODEPAGE, default=current_codepage): vol.In(
-                        codepage_choices
-                    ),
+                    vol.Optional(CONF_PROFILE, default=current_profile): vol.In(profile_choices),
+                    vol.Optional(CONF_CODEPAGE, default=current_codepage): vol.In(codepage_choices),
                     vol.Optional(CONF_LINE_WIDTH, default=current_line_width): vol.In(
                         width_choices
                     ),
@@ -276,9 +251,9 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlow):
                         ),
                     ): vol.In(["left", "center", "right"]),
                     vol.Optional(CONF_DEFAULT_CUT, default=current_cut): vol.In(cut_choices),
-                    vol.Optional(
-                        CONF_RELIABILITY_PROFILE, default=current_reliability
-                    ): vol.In(reliability_choices),
+                    vol.Optional(CONF_RELIABILITY_PROFILE, default=current_reliability): vol.In(
+                        reliability_choices
+                    ),
                     vol.Optional(
                         CONF_KEEPALIVE,
                         default=self.config_entry.options.get(CONF_KEEPALIVE, False),
@@ -311,9 +286,7 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlow):
             _LOGGER.debug("Options: Custom profile entered: %s", custom_profile)
 
             # Validate the profile exists in escpos-printer-db
-            is_valid = await self.hass.async_add_executor_job(
-                is_valid_profile, custom_profile
-            )
+            is_valid = await self.hass.async_add_executor_job(is_valid_profile, custom_profile)
             if not custom_profile or not is_valid:
                 _LOGGER.warning("Invalid profile name: %s", custom_profile)
                 errors["base"] = "invalid_profile"
@@ -409,17 +382,13 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlow):
             custom_width = user_input.get("custom_line_width")
             _LOGGER.debug("Options: Custom line width entered: %s", custom_width)
 
-            # Validate line width is a positive number within reasonable bounds
-            try:
-                width_int = int(custom_width)  # type: ignore[arg-type]
-                if width_int < 1 or width_int > 255:
-                    _LOGGER.warning("Invalid line width (out of range): %s", custom_width)
-                    errors["base"] = "invalid_line_width"
-            except (ValueError, TypeError):
-                _LOGGER.warning("Invalid line width (not a number): %s", custom_width)
-                errors["base"] = "invalid_line_width"
+            from .network_helpers import validate_custom_line_width  # noqa: PLC0415
 
-            if not errors:
+            width_int, err_code = validate_custom_line_width(custom_width)
+            if err_code:
+                errors["base"] = err_code
+
+            if not errors and width_int is not None:
                 data = dict(self._pending_data)
                 data[CONF_LINE_WIDTH] = width_int
 

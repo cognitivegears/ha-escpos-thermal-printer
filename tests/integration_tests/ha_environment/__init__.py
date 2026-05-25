@@ -7,9 +7,4 @@ from .ha_test_environment import (
     StateChangeSimulator,
 )
 
-__all__ = [
-    'AutomationTester',
-    'HATestEnvironment',
-    'NotificationTester',
-    'StateChangeSimulator'
-]
+__all__ = ["AutomationTester", "HATestEnvironment", "NotificationTester", "StateChangeSimulator"]

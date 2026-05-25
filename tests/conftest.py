@@ -17,9 +17,7 @@ def auto_enable_custom_integrations(enable_custom_integrations: Any) -> None:
 
 
 @pytest.fixture(autouse=True)
-def fake_escpos_module(
-    request: Any, monkeypatch: pytest.MonkeyPatch
-) -> Generator[None]:
+def fake_escpos_module(request: Any, monkeypatch: pytest.MonkeyPatch) -> Generator[None]:
     # Do not stub escpos for integration tests; use real network path
     if request.node.get_closest_marker("integration"):
         yield
@@ -32,28 +30,62 @@ def fake_escpos_module(
     # change instead of three — and no risk of one fake silently lacking a
     # method that another exposes.
     class _FakeEscposCommon:
-        def set(self, *_: Any, **__: Any) -> None: pass
-        def text(self, *_: Any, **__: Any) -> None: pass
-        def qr(self, *_: Any, **__: Any) -> None: pass
-        def image(self, *_: Any, **__: Any) -> None: pass
-        def control(self, *_: Any, **__: Any) -> None: pass
-        def cut(self, *_: Any, **__: Any) -> None: pass
-        def close(self) -> None: pass
-        def _set_codepage(self, *_: Any, **__: Any) -> None: pass
-        def _raw(self, *_: Any, **__: Any) -> None: pass
-        def barcode(self, *_: Any, **__: Any) -> None: pass
-        def buzzer(self, *_: Any, **__: Any) -> None: pass
-        def beep(self, *_: Any, **__: Any) -> None: pass
-        def ln(self, *_: Any, **__: Any) -> None: pass
-        def charcode(self, *_: Any, **__: Any) -> None: pass
+        def set(self, *_: Any, **__: Any) -> None:
+            pass
+
+        def text(self, *_: Any, **__: Any) -> None:
+            pass
+
+        def qr(self, *_: Any, **__: Any) -> None:
+            pass
+
+        def image(self, *_: Any, **__: Any) -> None:
+            pass
+
+        def control(self, *_: Any, **__: Any) -> None:
+            pass
+
+        def cut(self, *_: Any, **__: Any) -> None:
+            pass
+
+        def close(self) -> None:
+            pass
+
+        def _set_codepage(self, *_: Any, **__: Any) -> None:
+            pass
+
+        def _raw(self, *_: Any, **__: Any) -> None:
+            pass
+
+        def barcode(self, *_: Any, **__: Any) -> None:
+            pass
+
+        def buzzer(self, *_: Any, **__: Any) -> None:
+            pass
+
+        def beep(self, *_: Any, **__: Any) -> None:
+            pass
+
+        def ln(self, *_: Any, **__: Any) -> None:
+            pass
+
+        def charcode(self, *_: Any, **__: Any) -> None:
+            pass
 
     class _FakeNetwork(_FakeEscposCommon):
-        def __init__(self, *_: Any, **__: Any) -> None: pass
+        def __init__(self, *_: Any, **__: Any) -> None:
+            pass
 
     class _FakeUsb(_FakeEscposCommon):
         def __init__(
-            self, id_vendor: int = 0, id_product: int = 0, timeout: int = 0,
-            in_ep: int = 0x82, out_ep: int = 0x01, profile: Any = None, **__: Any,
+            self,
+            id_vendor: int = 0,
+            id_product: int = 0,
+            timeout: int = 0,
+            in_ep: int = 0x82,
+            out_ep: int = 0x01,
+            profile: Any = None,
+            **__: Any,
         ) -> None:
             self.idVendor = id_vendor  # Match real USB API
             self.idProduct = id_product  # Match real USB API
@@ -94,9 +126,7 @@ def fake_escpos_module(
 
 
 @pytest.fixture(autouse=True)
-def fake_usb_module(
-    request: Any, monkeypatch: pytest.MonkeyPatch
-) -> Generator[None]:
+def fake_usb_module(request: Any, monkeypatch: pytest.MonkeyPatch) -> Generator[None]:
     """Provide a fake usb module for unit tests."""
     if request.node.get_closest_marker("integration"):
         yield
@@ -106,7 +136,12 @@ def fake_usb_module(
     usb_core = types.ModuleType("usb.core")
     usb_util = types.ModuleType("usb.util")
 
-    def _fake_find(id_vendor: int | None = None, id_product: int | None = None, find_all: bool = False, **kwargs: Any) -> Any:
+    def _fake_find(
+        id_vendor: int | None = None,
+        id_product: int | None = None,
+        find_all: bool = False,
+        **kwargs: Any,
+    ) -> Any:
         if find_all:
             return []  # Return empty list for unit tests
         return None
@@ -199,8 +234,10 @@ def stub_http_component_for_unit_tests(monkeypatch: Any, request: Any) -> None:
     if request.node.get_closest_marker("integration"):
         return
     mod = types.ModuleType("homeassistant.components.http")
+
     async def _ok(*args: Any, **kwargs: Any) -> bool:
         return True
+
     # Provide the setup entrypoints expected by HA
     mod.async_setup = _ok  # type: ignore[attr-defined]
     mod.async_setup_entry = _ok  # type: ignore[attr-defined]
@@ -323,11 +360,7 @@ def restricted_user_context():  # type: ignore[no-untyped-def]
 
         user = await hass.auth.async_create_user("restricted")
         # Build an entities policy that denies the named entity_ids.
-        policy = {
-            "entities": {
-                "entity_ids": dict.fromkeys(denied_entity_ids, False)
-            }
-        }
+        policy = {"entities": {"entity_ids": dict.fromkeys(denied_entity_ids, False)}}
         user.permissions = PolicyPermissions(policy, None)
         user.is_admin = False
         return Context(user_id=user.id)
@@ -335,9 +368,7 @@ def restricted_user_context():  # type: ignore[no-untyped-def]
     return _build
 
 
-def _slow_aiter(
-    chunks: list[bytes], delay_s: float
-):
+def _slow_aiter(chunks: list[bytes], delay_s: float):
     async def _iter() -> AsyncIterator[bytes]:
         import asyncio
 
@@ -412,11 +443,13 @@ def _fake_aiohttp_response(
 
 @pytest.fixture
 def mock_pooled_aiohttp(monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-untyped-def]
-    """Return a helper that installs a fake ``async_get_clientsession``.
+    """Return a helper that installs a fake aiohttp session for image fetches.
 
-    The fake session's ``.get(url)`` returns whatever the test passes in.
-    Used by SSRF / fallback-bug / slow-loris regression tests so we
-    don't need a real HTTP server (Phase 3 T-C1, T-H5, T-M3).
+    Image fetches now run through a per-request session pinned to the
+    validated address set (S-H1 DNS-rebinding fix), so the fixture
+    monkeypatches ``image_sources._build_pinned_session`` instead of
+    the old pooled-client hook. Used by SSRF / slow-loris regression
+    tests so we don't need a real HTTP server.
     """
 
     def _install(response_factory):  # type: ignore[no-untyped-def]
@@ -426,11 +459,14 @@ def mock_pooled_aiohttp(monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-unt
             return response_factory()
 
         session.get = _get
-        from homeassistant.helpers import aiohttp_client
+        session.__aenter__ = AsyncMock(return_value=session)
+        session.__aexit__ = AsyncMock(return_value=None)
+        from custom_components.escpos_printer import image_sources
 
-        monkeypatch.setattr(
-            aiohttp_client, "async_get_clientsession", lambda _hass: session
-        )
+        def _fake_build(_hostname: str, _addrs: list[str]):  # type: ignore[no-untyped-def]
+            return session
+
+        monkeypatch.setattr(image_sources, "_build_pinned_session", _fake_build)
         return session
 
     return _install

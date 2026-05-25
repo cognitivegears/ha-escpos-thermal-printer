@@ -12,6 +12,7 @@ from typing import Any
 @dataclass
 class PrintJob:
     """Represents a single print job with its metadata."""
+
     timestamp: datetime
     content_type: str
     data: Any
@@ -24,16 +25,17 @@ class PrintJob:
     def as_dict(self) -> dict[str, Any]:
         """Convert print job to dictionary for serialization."""
         return {
-            'timestamp': self.timestamp.isoformat(),
-            'content_type': self.content_type,
-            'data': self.data,
-            'parameters': self.parameters
+            "timestamp": self.timestamp.isoformat(),
+            "content_type": self.content_type,
+            "data": self.data,
+            "parameters": self.parameters,
         }
 
 
 @dataclass
 class Command:
     """Represents a parsed ESCPOS command."""
+
     timestamp: datetime
     command_type: str
     raw_data: bytes
@@ -42,10 +44,10 @@ class Command:
     def as_dict(self) -> dict[str, Any]:
         """Convert command to dictionary for serialization."""
         return {
-            'timestamp': self.timestamp.isoformat(),
-            'command_type': self.command_type,
-            'raw_data': self.raw_data.hex(),
-            'parameters': self.parameters
+            "timestamp": self.timestamp.isoformat(),
+            "command_type": self.command_type,
+            "raw_data": self.raw_data.hex(),
+            "parameters": self.parameters,
         }
 
 
@@ -62,6 +64,24 @@ class PrinterState:
         self._lock = asyncio.Lock()
         # Timestamp (loop time) of the last received text command
         self._last_text_time: float | None = None
+        # Mirror-vs-network dedup: the HA test environment "mirrors" each
+        # service call directly into the state, AND the integration writes
+        # real network bytes to the virtual printer; both arrive on the
+        # loop. After a mirror text is appended we set an absorb-deadline:
+        # any network text arriving before the deadline is silently merged
+        # into the prior mirror entry (no new log row). The deadline is
+        # short enough not to swallow the *next* mirror's network bytes
+        # (service calls are blocking=True so they're at least a TCP round
+        # trip apart) and long enough to absorb fragmented reads of the
+        # same logical call's payload.
+        self._absorb_network_text_until: float = 0.0
+
+    # How long after a mirror text is appended to absorb (drop) any
+    # arriving network text bytes for that same logical service call. A
+    # 200ms window is well under the inter-call gap (each call is
+    # blocking=True so at minimum a TCP round trip apart) but far above
+    # the executor + parse latency for a single call's payload.
+    _MIRROR_ABSORB_WINDOW = 0.2
 
     async def update_state(self, command: Command) -> None:
         """Update printer state based on received command."""
@@ -72,13 +92,32 @@ class PrinterState:
                 recent_text = (
                     self._last_text_time is not None and (now - self._last_text_time) < 0.005
                 )
-                force_new = bool(command.parameters.get("__force_new__")) if isinstance(command.parameters, dict) else False
-                # If this is a mirrored reflection and we very recently recorded a text op,
-                # drop this duplicate to avoid double-counting (mirror + network).
-                if isinstance(command.parameters, dict) and command.parameters.get("__mirrored__") and recent_text and self.command_log and self.command_log[-1].command_type == "text":
+                force_new = (
+                    bool(command.parameters.get("__force_new__"))
+                    if isinstance(command.parameters, dict)
+                    else False
+                )
+                is_mirror = (
+                    isinstance(command.parameters, dict)
+                    and bool(command.parameters.get("__mirrored__"))
+                )
+                # Mirror-then-network dedup: if a mirror text was recently
+                # appended for this same logical call, silently absorb the
+                # network bytes into the prior text entry rather than
+                # appending another row.
+                if (not is_mirror) and now < self._absorb_network_text_until:
+                    if self.command_log and self.command_log[-1].command_type == "text":
+                        self.command_log[-1].raw_data += command.raw_data
+                        if self.print_history and self.print_history[-1].content_type == "text":
+                            self.print_history[-1].data += command.raw_data
                     self._last_text_time = now
                     return
-                if recent_text and (not force_new) and self.command_log and self.command_log[-1].command_type == "text":
+                if (
+                    recent_text
+                    and (not force_new)
+                    and self.command_log
+                    and self.command_log[-1].command_type == "text"
+                ):
                     # Merge into previous text command
                     self.command_log[-1].raw_data += command.raw_data
                     # Also extend the most recent text print job if present
@@ -91,6 +130,9 @@ class PrinterState:
                     # Record a text print job (even for empty payloads) so tests can assert events
                     await self._add_print_job("text", command.raw_data, command.parameters)
                 self._last_text_time = now
+                if is_mirror:
+                    # Open an absorb window for the matching network bytes.
+                    self._absorb_network_text_until = now + self._MIRROR_ABSORB_WINDOW
                 return
 
             # Default logging path for non-text commands
@@ -119,11 +161,11 @@ class PrinterState:
         """Get current printer status."""
         async with self._lock:
             return {
-                'online': self.online,
-                'paper_status': self.paper_status,
-                'buffer_size': len(self.buffer),
-                'print_history_count': len(self.print_history),
-                'command_log_count': len(self.command_log)
+                "online": self.online,
+                "paper_status": self.paper_status,
+                "buffer_size": len(self.buffer),
+                "print_history_count": len(self.print_history),
+                "command_log_count": len(self.command_log),
             }
 
     async def clear_buffer(self) -> None:
@@ -131,13 +173,12 @@ class PrinterState:
         async with self._lock:
             self.buffer.clear()
 
-    async def _add_print_job(self, content_type: str, data: bytes, parameters: dict[str, Any]) -> None:
+    async def _add_print_job(
+        self, content_type: str, data: bytes, parameters: dict[str, Any]
+    ) -> None:
         """Add a new print job to history."""
         job = PrintJob(
-            timestamp=datetime.now(),
-            content_type=content_type,
-            data=data,
-            parameters=parameters
+            timestamp=datetime.now(), content_type=content_type, data=data, parameters=parameters
         )
         self.print_history.append(job)
 
@@ -171,10 +212,14 @@ class PrinterState:
             self.print_history.clear()
             self.command_log.clear()
             self.buffer.clear()
-            # Reset text timing to prevent stale state affecting future commands
+            # Reset text timing/absorb window to prevent stale state
+            # from a prior test affecting future commands.
             self._last_text_time = None
+            self._absorb_network_text_until = 0.0
 
-    async def update_state_sync(self, command_type: str, data: bytes, parameters: dict[str, Any]) -> None:
+    async def update_state_sync(
+        self, command_type: str, data: bytes, parameters: dict[str, Any]
+    ) -> None:
         """Compatibility wrapper used by tests to update state.
 
         Implemented as an async method so tests can `await` it directly.
@@ -186,10 +231,7 @@ class PrinterState:
         if command_type == "text":
             params["__force_new__"] = True
         command = Command(
-            timestamp=datetime.now(),
-            command_type=command_type,
-            raw_data=data,
-            parameters=params
+            timestamp=datetime.now(), command_type=command_type, raw_data=data, parameters=params
         )
         # Ensure each sync invocation starts a new logical block for text
         if command_type == "text":
@@ -201,5 +243,7 @@ class PrinterState:
 
     def start_new_text_block(self) -> None:
         """Force the next text command to start a new logical block."""
-        # Set last text time far in the past so the next text does not merge
+        # Set last text time far in the past so the next text does not merge.
+        # Leave the mirror/network timestamps intact so cross-channel dedup
+        # still works for late-arriving network bytes from the prior call.
         self._last_text_time = None

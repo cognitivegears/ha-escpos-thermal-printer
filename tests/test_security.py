@@ -122,9 +122,22 @@ class TestImageURLValidation:
         with pytest.raises(HomeAssistantError, match="credentials"):
             validate_image_url(url)
 
-    def test_validate_image_url_rejects_idn(self):  # type: ignore[no-untyped-def]
+    @pytest.mark.parametrize(
+        "url",
+        [
+            # Pre-encoded (xn-- form) — the original test case.
+            "https://xn--paypa-yfa.com/x.png",
+            # Raw-Unicode hostnames (T-H3) — S-M6 fix added the
+            # IDNA-encode-then-check branch so these are caught too.
+            # The previous `"xn--" in hostname.lower()` substring test
+            # missed these because urlparse does not IDNA-encode.
+            "https://例え.テスト/x.png",
+            "https://пример.рф/x.png",
+        ],
+    )
+    def test_validate_image_url_rejects_idn(self, url):  # type: ignore[no-untyped-def]
         with pytest.raises(HomeAssistantError, match="IDN"):
-            validate_image_url("https://xn--paypa-yfa.com/x.png")
+            validate_image_url(url)
 
     @pytest.mark.parametrize(
         "url",
@@ -214,11 +227,11 @@ class TestEntityIdDomainValidation:
     @pytest.mark.parametrize(
         "value",
         [
-            "switch.front",          # wrong domain
-            "camera.",               # missing object id
-            "camera",                # missing dot
-            "camera.Front-Door",     # uppercase + dash
-            "camera." + "a" * 65,    # exceeds length cap (S-M6)
+            "switch.front",  # wrong domain
+            "camera.",  # missing object id
+            "camera",  # missing dot
+            "camera.Front-Door",  # uppercase + dash
+            "camera." + "a" * 65,  # exceeds length cap (S-M6)
         ],
     )
     def test_rejects_invalid(self, value):  # type: ignore[no-untyped-def]
@@ -361,6 +374,210 @@ class TestSecurityConstants:
         assert MAX_FEED_LINES == 50
         assert MAX_BEEP_TIMES == 10
 
+    def test_text_effects_max_constants(self):  # type: ignore[no-untyped-def]
+        """T-M3: pin the text-effects bounds added in the 0.7 branch.
+
+        These caps protect against paper-waste / executor-pool DoS via
+        large legal-shape inputs. Locking the numeric values here gives
+        regression evidence when someone "just bumps the constant".
+        """
+        from custom_components.escpos_printer.security import (
+            MAX_BOX_WIDTH,
+            MAX_FONT_SIZE_BYTES,
+            MAX_RENDER_HEIGHT_PX,
+            MAX_RENDER_PIXELS,
+            MAX_SEPARATOR_REPEAT,
+            MAX_TABLE_CELL_LENGTH,
+            MAX_TABLE_COLS,
+            MAX_TABLE_ROWS,
+        )
+
+        assert MAX_BOX_WIDTH == 200
+        assert MAX_TABLE_ROWS == 200
+        assert MAX_TABLE_COLS == 12
+        assert MAX_TABLE_CELL_LENGTH == 1000
+        assert MAX_SEPARATOR_REPEAT == 10
+        assert MAX_RENDER_PIXELS == 5_000_000
+        assert MAX_RENDER_HEIGHT_PX == 8192
+        assert MAX_FONT_SIZE_BYTES == 16 * 1024 * 1024
+
     def test_extension_set(self):  # type: ignore[no-untyped-def]
         assert ".png" in VALID_IMAGE_EXTENSIONS
         assert ".svg" not in VALID_IMAGE_EXTENSIONS
+
+
+# ---------------------------------------------------------------------------
+# Text-effects validators: validate_font_path / validate_rows.
+# ---------------------------------------------------------------------------
+
+
+class TestFontPathValidation:
+    def test_validate_font_path_accepts_bundled_font(self):  # type: ignore[no-untyped-def]
+        from pathlib import Path
+
+        from custom_components.escpos_printer.security import validate_font_path
+
+        bundled = (
+            Path(__file__).resolve().parents[1]
+            / "custom_components"
+            / "escpos_printer"
+            / "fonts"
+            / "DejaVuSansMono.ttf"
+        )
+        resolved = validate_font_path(str(bundled))
+        assert resolved.exists()
+        assert resolved.suffix.lower() == ".ttf"
+
+    def test_validate_font_path_rejects_bad_extension(self, tmp_path):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import validate_font_path
+
+        bad = tmp_path / "not-a-font.png"
+        bad.write_bytes(b"\x89PNG fake")
+        with pytest.raises(HomeAssistantError, match="not allowed"):
+            validate_font_path(str(bad))
+
+    def test_validate_font_path_rejects_nonexistent(self):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import validate_font_path
+
+        with pytest.raises(HomeAssistantError, match="does not exist"):
+            validate_font_path("/nonexistent/path/does-not-exist.ttf")
+
+    def test_validate_font_path_rejects_non_string(self):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import validate_font_path
+
+        with pytest.raises(HomeAssistantError, match="must be a string"):
+            validate_font_path(42)  # type: ignore[arg-type]
+
+    def test_validate_font_path_rejects_oversize_file(self, tmp_path):  # type: ignore[no-untyped-def]
+        """A font file larger than MAX_FONT_SIZE_BYTES is rejected up-front.
+
+        Phase 2 S-M3: defends against an attacker-supplied multi-GB
+        ``font_path`` that would otherwise pin FreeType's parser in
+        seconds of allocation work.
+        """
+        from custom_components.escpos_printer.security import (
+            MAX_FONT_SIZE_BYTES,
+            validate_font_path,
+        )
+
+        big = tmp_path / "huge.ttf"
+        with open(big, "wb") as fh:
+            fh.seek(MAX_FONT_SIZE_BYTES + 1)
+            fh.write(b"\0")
+        with pytest.raises(HomeAssistantError, match="too large"):
+            validate_font_path(str(big))
+
+    def test_validate_font_path_rejects_symlinked_input(self, tmp_path):  # type: ignore[no-untyped-def]
+        """A user-supplied symlink to a font is rejected even if the target is valid.
+
+        Defeats the "drop a symlink in /config/fonts/ pointing at
+        attacker-writable bytes" trick — the validator inspects the raw
+        path before ``Path.resolve`` follows the link.
+        """
+        from custom_components.escpos_printer.security import validate_font_path
+
+        target = tmp_path / "real.ttf"
+        target.write_bytes(b"OTTO")  # any bytes; we only test the symlink check
+        link = tmp_path / "via-link.ttf"
+        link.symlink_to(target)
+        with pytest.raises(HomeAssistantError, match="symlink"):
+            validate_font_path(str(link))
+
+    def test_open_local_font_no_follow_rejects_symlink_swap(self, tmp_path):  # type: ignore[no-untyped-def]
+        """``open_local_font_no_follow`` refuses to open a path that became a symlink.
+
+        Regression for the TOCTOU between ``validate_font_path`` and
+        ``ImageFont.truetype``: even if a path was a regular file at
+        validate time, the open MUST fail (rather than silently follow)
+        if it has since been replaced by a symlink.
+        """
+        from custom_components.escpos_printer.security import open_local_font_no_follow
+
+        decoy = tmp_path / "decoy.bin"
+        decoy.write_bytes(b"PWN!")
+        link_at_validated_path = tmp_path / "font.ttf"
+        link_at_validated_path.symlink_to(decoy)
+        with pytest.raises(OSError):
+            open_local_font_no_follow(link_at_validated_path)
+
+
+class TestWriteFileNoFollow:
+    """Regression tests for ``security.write_file_no_follow`` (S-M2, T-H1).
+
+    Preview-service file writes go through this primitive so a co-resident
+    attacker cannot plant a symlink under tempdir between path-validation
+    and write to redirect the output into an arbitrary file (the symmetric
+    defense to the read-side ``open_local_font_no_follow``).
+    """
+
+    def test_write_file_no_follow_rejects_symlink_leaf(self, tmp_path):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import write_file_no_follow
+
+        decoy = tmp_path / "decoy.txt"
+        decoy.write_text("untouched")
+        link = tmp_path / "out.txt"
+        link.symlink_to(decoy)
+        with pytest.raises(OSError):  # ELOOP from O_NOFOLLOW
+            write_file_no_follow(str(link), b"PWN!")
+        # The decoy must be unmodified — proves the write was blocked.
+        assert decoy.read_text() == "untouched"
+
+    def test_write_file_no_follow_writes_regular_file(self, tmp_path):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import write_file_no_follow
+
+        out = tmp_path / "out.bin"
+        write_file_no_follow(str(out), b"abc")
+        assert out.read_bytes() == b"abc"
+        # Owner-only mode (0o600) so a co-resident attacker cannot read
+        # an in-flight preview, only the HA process owner.
+        assert oct(out.stat().st_mode)[-3:] == "600"
+
+    def test_write_file_no_follow_truncates_existing(self, tmp_path):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import write_file_no_follow
+
+        out = tmp_path / "existing.bin"
+        out.write_bytes(b"longer existing content")
+        write_file_no_follow(str(out), b"abc")
+        # O_TRUNC must replace the file, not append.
+        assert out.read_bytes() == b"abc"
+
+
+class TestValidateRows:
+    def test_rejects_non_list(self):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import validate_rows
+
+        with pytest.raises(HomeAssistantError, match="list of rows"):
+            validate_rows("not a list")
+
+    def test_rejects_empty_rows(self):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import validate_rows
+
+        with pytest.raises(HomeAssistantError, match="at least one row"):
+            validate_rows([])
+
+    def test_rejects_too_many_rows(self):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import MAX_TABLE_ROWS, validate_rows
+
+        oversize = [["a"]] * (MAX_TABLE_ROWS + 1)
+        with pytest.raises(HomeAssistantError, match="exceeds maximum"):
+            validate_rows(oversize)
+
+    def test_rejects_too_many_columns(self):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import MAX_TABLE_COLS, validate_rows
+
+        oversize_row = ["x"] * (MAX_TABLE_COLS + 1)
+        with pytest.raises(HomeAssistantError, match="row width"):
+            validate_rows([oversize_row])
+
+    def test_coerces_non_string_cells(self):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import validate_rows
+
+        out = validate_rows([[1, 2.5, None, "x"]])
+        assert out == [["1", "2.5", "", "x"]]
+
+    def test_strips_control_characters_from_cells(self):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import validate_rows
+
+        out = validate_rows([["a\x00b\x07c"]])
+        # validate_text_input strips C0 control characters except CR/LF/HT.
+        assert out == [["abc"]]

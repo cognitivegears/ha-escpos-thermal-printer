@@ -26,6 +26,7 @@ individually or broadcast to all
 
 - Print text with formatting (bold, underline, alignment, font sizes)
 - Print QR codes, barcodes, and images — from URLs, files, camera/image entities, or base64 ([guide](docs/images.md))
+- Text effects — boxes, multi-column tables, and custom-font / rotated text ([guide](docs/text-effects.md))
 - Paper feed and cut control
 - Buzzer/beeper support
 - UTF-8 text with automatic character conversion
@@ -36,9 +37,9 @@ individually or broadcast to all
 
 ### Requirements
 
-- **Home Assistant 2026.2 or later** (older HA versions don't ship the
-  `dbus-fast` 4.x APIs the Bluetooth flow needs; 0.4.x of this
-  integration still works on HA 2024.8+ if you're stuck there)
+- **Home Assistant 2026.3 or later** (the integration tracks HA core's
+  bundled Pillow / dbus-fast pins; 0.4.x of this integration still works
+  on HA 2024.8+ if you're stuck there)
 - Thermal printer with ESC/POS support (most receipt printers)
 - **Network printers:** Accessible on your network (typically port 9100)
 - **USB printers:** Connected directly to your Home Assistant host (requires libusb)
@@ -105,6 +106,49 @@ data:
 
 Omit `target` to broadcast to all configured printers.
 
+### Print a Bordered Header
+
+```yaml
+service: escpos_printer.print_box
+data:
+  text: DAILY REPORT
+  style: auto         # → single-line ┌─┐ on CP437; ASCII otherwise
+  padding: 1
+  align: center
+  feed: 1
+```
+
+### Print a Receipt-Style Table
+
+```yaml
+service: escpos_printer.print_table
+data:
+  rows:
+    - ["Item", "Qty", "Price"]
+    - ["Coffee", "2", "$6.00"]
+    - ["Bagel",  "1", "$3.50"]
+  style: single
+  header: true
+  column_aligns: ["left", "center", "right"]
+```
+
+### Print Receipt Totals (Label/Value Pairs)
+
+```yaml
+service: escpos_printer.print_kvtable
+data:
+  items:
+    - ["Subtotal", "$10.00"]
+    - ["Tax",      "$0.80"]
+    - ["Total",    "$10.80"]
+```
+
+See the [Text effects guide](docs/text-effects.md) for the full
+reference (boxes, tables, kv-tables, separators, custom-font /
+rotated text via `print_text_image`, and the previewing workflow).
+For ready-to-import scripts and automations see the
+[Blueprints directory](blueprints/README.md).
+
 ## Available Services
 
 | Service | Description |
@@ -115,6 +159,19 @@ Omit `target` to broadcast to all configured printers.
 | `escpos_printer.print_qr` | Print QR codes |
 | `escpos_printer.print_barcode` | Print barcodes (EAN13, CODE128, etc.) |
 | `escpos_printer.print_image` | Print images from URL, file, camera/image entity, or base64 — see [Images guide](docs/images.md) |
+| `escpos_printer.print_image_url` | Focused convenience service for HTTP(S) URLs (UI gets a URL field) — see [Images guide](docs/images.md) |
+| `escpos_printer.print_image_path` | Focused convenience service for local file paths — see [Images guide](docs/images.md) |
+| `escpos_printer.print_camera_snapshot` | Print a live snapshot from a `camera.<id>` entity (UI gets an entity picker) |
+| `escpos_printer.print_image_entity` | Print the current frame from an `image.<id>` entity |
+| `escpos_printer.print_box` | Wrap text in a printable border (cp437 / ASCII / asterisk / hash) — see [Text effects guide](docs/text-effects.md) |
+| `escpos_printer.print_table` | Print multi-column rows (receipts, logs) — see [Text effects guide](docs/text-effects.md) |
+| `escpos_printer.print_kvtable` | Print two-column label/value pairs (receipt totals, sensor readings) — see [Text effects guide](docs/text-effects.md) |
+| `escpos_printer.print_separator` | Print a single decorative rule (line of repeated characters) |
+| `escpos_printer.print_text_image` | Render text with a TTF/OTF font and optional 90/180/270° rotation — see [Text effects guide](docs/text-effects.md) |
+| `escpos_printer.preview_image` | Run the image pipeline and write the resulting 1-bit PNG to disk (no paper) — see [Images guide](docs/images.md) |
+| `escpos_printer.preview_box` | Render a `print_box` layout to a `.txt` file (no paper) |
+| `escpos_printer.preview_table` | Render a `print_table` layout to a `.txt` file (no paper) |
+| `escpos_printer.calibration_print` | Print a ruler + threshold sweep strip so you can pick dither/threshold without burning a roll |
 | `escpos_printer.feed` | Feed paper |
 | `escpos_printer.cut` | Cut paper |
 | `escpos_printer.beep` | Sound the buzzer |
@@ -135,6 +192,23 @@ Cheap thermal printers (Netum, MUNBYN, POS-58 generics, Phomemo Classic line, et
 
 See [docs/bluetooth.md](docs/bluetooth.md) for the full pairing walkthrough, container deployment notes, the `socat` host-bridge fallback, and security considerations.
 
+## Blueprints
+
+The [`blueprints/`](blueprints/) directory ships eight ready-to-import Home Assistant scripts and automations that exercise the text-effects services. They cover the common day-to-day workflows so you don't need to write YAML from scratch.
+
+| Blueprint | Type | Use case |
+|-----------|------|----------|
+| [Shopping List](blueprints/script/escpos_printer/shopping_list.yaml) | Script | Print a `todo` entity as a bordered grocery list. |
+| [TODO List](blueprints/script/escpos_printer/todo_list.yaml) | Script | Generic todo printer — any list, optional completed items, optional numbering. |
+| [Daily Agenda](blueprints/automation/escpos_printer/daily_agenda.yaml) | Automation | Print today's calendar events at a fixed time each day. |
+| [Weather Forecast](blueprints/script/escpos_printer/weather_forecast.yaml) | Script | Print an N-day forecast table. |
+| [Receipt](blueprints/script/escpos_printer/receipt.yaml) | Script | Itemised receipt with subtotal / tax / total. |
+| [Recipe Card](blueprints/script/escpos_printer/recipe_card.yaml) | Script | Kitchen card — name, servings, ingredients, numbered steps. |
+| [Sensor Alert](blueprints/automation/escpos_printer/sensor_alert.yaml) | Automation | Print a bordered alert when a sensor reaches a target state. |
+| [TODO Item](blueprints/automation/escpos_printer/todo_item.yaml) | Automation | Print a card per item added to a `todo` entity (fridge-printer style). |
+
+See [`blueprints/README.md`](blueprints/README.md) for import instructions, per-blueprint inputs, and troubleshooting notes.
+
 ## Documentation
 
 | Document | Description |
@@ -146,6 +220,7 @@ See [docs/bluetooth.md](docs/bluetooth.md) for the full pairing walkthrough, con
 | [Bluetooth printers](docs/bluetooth.md) | Pairing, RFCOMM, container caveats |
 | [Services](docs/services.md) | Service parameter reference |
 | [Images](docs/images.md) | Image printing — sources, processing, reliability, recipes |
+| [Text effects](docs/text-effects.md) | Boxes, multi-column tables, and custom-font / rotated text |
 | [Automations](docs/automations.md) | Automation examples |
 | [Notifications](docs/notifications.md) | Notify entity and `print_message` service |
 | [Multi-printer targeting](docs/multi-printer.md) | `target:` blocks, area / entity / device targeting |

@@ -37,8 +37,11 @@ async def test_status_check_success_updates_diagnostics(hass):  # type: ignore[n
 
     # Patch socket.create_connection in the adapter module to simulate success.
     class _FakeConn:
-        def __enter__(self): return self
-        def __exit__(self, *_args): return False
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
 
     with patch(
         "custom_components.escpos_printer.printer.network_adapter.socket.create_connection",
@@ -64,8 +67,11 @@ async def test_status_check_failure_marks_offline_and_notifies(hass):  # type: i
 
     # First, force a successful probe so status flips True -> later probes can flip back.
     class _FakeConn:
-        def __enter__(self): return self
-        def __exit__(self, *_args): return False
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
 
     with patch(
         "custom_components.escpos_printer.printer.network_adapter.socket.create_connection",
@@ -100,8 +106,11 @@ async def test_status_listener_unsubscribe(hass):  # type: ignore[no-untyped-def
     unsub()
 
     class _FakeConn:
-        def __enter__(self): return self
-        def __exit__(self, *_args): return False
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
 
     with patch(
         "custom_components.escpos_printer.printer.network_adapter.socket.create_connection",
@@ -165,3 +174,27 @@ async def test_get_connection_info(hass):  # type: ignore[no-untyped-def]
     info = adapter.get_connection_info()
     assert "1.2.3.4" in info
     assert "9100" in info
+
+
+async def test_network_status_check_skips_when_lock_held(hass):  # type: ignore[no-untyped-def]
+    """T-M1 / P-M2: network adapter must not probe while a print holds the lock.
+
+    Opening a second TCP connection mid-print can flap bandwidth-
+    constrained transports (Bluetooth/USB-IP via TCP gateway). The
+    sensor stays at its last-known value rather than corrupting an
+    active job.
+    """
+    entry = await _setup_entry(hass)
+    adapter = entry.runtime_data.adapter
+
+    prior_check = adapter._last_check  # type: ignore[attr-defined]
+    prior_status = adapter.get_status()
+
+    async with adapter._lock:  # type: ignore[attr-defined]
+        # If the lock-skip is dropped, this would attempt a real socket
+        # connect and either succeed (mutating _last_check) or fail
+        # (mutating _last_error). Either mutation fails the assertion.
+        await adapter._status_check(hass)  # type: ignore[attr-defined]
+
+    assert adapter._last_check is prior_check  # type: ignore[attr-defined]
+    assert adapter.get_status() is prior_status

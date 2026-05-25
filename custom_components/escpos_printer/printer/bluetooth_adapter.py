@@ -118,8 +118,7 @@ class BluetoothPrinterAdapter(EscposPrinterAdapterBase):
         """
         if self._lock.locked():
             _LOGGER.debug(
-                "Skipping Bluetooth status probe for %s ch=%s — "
-                "print operation in flight",
+                "Skipping Bluetooth status probe for %s ch=%s — print operation in flight",
                 self._mac_redacted,
                 self._bt_config.rfcomm_channel,
             )

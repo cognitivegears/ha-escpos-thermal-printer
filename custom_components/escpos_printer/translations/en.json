@@ -397,5 +397,10 @@
         "feed": {"name": "Feed lines", "description": "Lines to feed after printing."}
       }
     }
+  },
+  "exceptions": {
+    "no_target_found": {
+      "message": "No valid ESC/POS printer targets found. Please select a printer device."
+    }
   }
 }

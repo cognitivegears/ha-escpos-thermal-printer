@@ -44,6 +44,7 @@ async def test_barcode_passes_force_software(monkeypatch: Any) -> None:
             inst = FakePrinterAcceptFS()
             created.append(inst)
             return inst
+
         return _factory
 
     from custom_components.escpos_printer.printer import network_adapter as printer_mod
@@ -81,6 +82,7 @@ async def test_barcode_retries_without_force_software(monkeypatch: Any) -> None:
             inst = FakePrinterRejectFS()
             created.append(inst)
             return inst
+
         return _factory
 
     from custom_components.escpos_printer.printer import network_adapter as printer_mod

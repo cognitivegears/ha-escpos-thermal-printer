@@ -166,11 +166,13 @@ class TestUsbStep:
             patch.object(flow, "async_set_unique_id", return_value=None),
             patch.object(flow, "_abort_if_unique_id_configured"),
         ):
-            result = await flow.async_step_usb_select({
-                "usb_device": "04B8:0202#0",  # New format with index suffix
-                "timeout": 4.0,
-                "profile": "",
-            })
+            result = await flow.async_step_usb_select(
+                {
+                    "usb_device": "04B8:0202#0",  # New format with index suffix
+                    "timeout": 4.0,
+                    "profile": "",
+                }
+            )
 
         assert result["type"] == "form"
         assert result["step_id"] == "codepage"
@@ -195,11 +197,13 @@ class TestUsbStep:
             patch.object(flow, "async_set_unique_id", return_value=None),
             patch.object(flow, "_abort_if_unique_id_configured"),
         ):
-            result = await flow.async_step_usb_select({
-                "usb_device": "04B8:0202#0",  # New format with index suffix
-                "timeout": 4.0,
-                "profile": "",
-            })
+            result = await flow.async_step_usb_select(
+                {
+                    "usb_device": "04B8:0202#0",  # New format with index suffix
+                    "timeout": 4.0,
+                    "profile": "",
+                }
+            )
 
         assert result["type"] == "form"
         assert result["errors"]["base"] == "cannot_connect_usb"
@@ -231,14 +235,16 @@ class TestUsbManualStep:
         flow.hass = hass
         flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB}
 
-        result = await flow.async_step_usb_manual({
-            CONF_VENDOR_ID: 0,
-            CONF_PRODUCT_ID: 0,
-            CONF_IN_EP: DEFAULT_IN_EP,
-            CONF_OUT_EP: DEFAULT_OUT_EP,
-            "timeout": 4.0,
-            "profile": "",
-        })
+        result = await flow.async_step_usb_manual(
+            {
+                CONF_VENDOR_ID: 0,
+                CONF_PRODUCT_ID: 0,
+                CONF_IN_EP: DEFAULT_IN_EP,
+                CONF_OUT_EP: DEFAULT_OUT_EP,
+                "timeout": 4.0,
+                "profile": "",
+            }
+        )
 
         assert result["type"] == "form"
         assert result["errors"]["base"] == "invalid_usb_device"
@@ -258,14 +264,16 @@ class TestUsbManualStep:
             patch.object(flow, "async_set_unique_id", return_value=None),
             patch.object(flow, "_abort_if_unique_id_configured"),
         ):
-            result = await flow.async_step_usb_manual({
-                CONF_VENDOR_ID: 0x04B8,
-                CONF_PRODUCT_ID: 0x0202,
-                CONF_IN_EP: DEFAULT_IN_EP,
-                CONF_OUT_EP: DEFAULT_OUT_EP,
-                "timeout": 4.0,
-                "profile": "",
-            })
+            result = await flow.async_step_usb_manual(
+                {
+                    CONF_VENDOR_ID: 0x04B8,
+                    CONF_PRODUCT_ID: 0x0202,
+                    CONF_IN_EP: DEFAULT_IN_EP,
+                    CONF_OUT_EP: DEFAULT_OUT_EP,
+                    "timeout": 4.0,
+                    "profile": "",
+                }
+            )
 
         assert result["type"] == "form"
         assert result["step_id"] == "codepage"
@@ -343,11 +351,13 @@ class TestUsbUniqueId:
             patch.object(flow, "async_set_unique_id", side_effect=capture_unique_id),
             patch.object(flow, "_abort_if_unique_id_configured"),
         ):
-            await flow.async_step_usb_select({
-                "usb_device": "04B8:0202#0",  # New format with index suffix
-                "timeout": 4.0,
-                "profile": "",
-            })
+            await flow.async_step_usb_select(
+                {
+                    "usb_device": "04B8:0202#0",  # New format with index suffix
+                    "timeout": 4.0,
+                    "profile": "",
+                }
+            )
 
         # Without serial number, no unique_id should be set (allows duplicates)
         assert len(unique_id_calls) == 0
@@ -359,15 +369,17 @@ class TestUsbUniqueId:
         flow.hass = hass
         flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB}
         # Mock printer with serial number - use serial in _choice_key
-        flow._discovered_printers = [{
-            "vendor_id": 0x04B8,
-            "product_id": 0x0202,
-            "manufacturer": "Epson",
-            "product": "TM-T88V",
-            "serial_number": "ABC123",
-            "label": "Epson TM-T88V (04B8:0202)",
-            "_choice_key": "04B8:0202:ABC123",  # Serial in key
-        }]
+        flow._discovered_printers = [
+            {
+                "vendor_id": 0x04B8,
+                "product_id": 0x0202,
+                "manufacturer": "Epson",
+                "product": "TM-T88V",
+                "serial_number": "ABC123",
+                "label": "Epson TM-T88V (04B8:0202)",
+                "_choice_key": "04B8:0202:ABC123",  # Serial in key
+            }
+        ]
 
         unique_id_set = None
 
@@ -383,11 +395,13 @@ class TestUsbUniqueId:
             patch.object(flow, "async_set_unique_id", side_effect=capture_unique_id),
             patch.object(flow, "_abort_if_unique_id_configured"),
         ):
-            await flow.async_step_usb_select({
-                "usb_device": "04B8:0202:ABC123",  # Serial in key
-                "timeout": 4.0,
-                "profile": "",
-            })
+            await flow.async_step_usb_select(
+                {
+                    "usb_device": "04B8:0202:ABC123",  # Serial in key
+                    "timeout": 4.0,
+                    "profile": "",
+                }
+            )
 
         # With serial number, unique_id includes it
         assert unique_id_set == "usb:04b8:0202:ABC123"
@@ -412,14 +426,16 @@ class TestUsbUniqueId:
             patch.object(flow, "async_set_unique_id", side_effect=capture_unique_id),
             patch.object(flow, "_abort_if_unique_id_configured"),
         ):
-            await flow.async_step_usb_manual({
-                CONF_VENDOR_ID: 0x04B8,
-                CONF_PRODUCT_ID: 0x0202,
-                CONF_IN_EP: DEFAULT_IN_EP,
-                CONF_OUT_EP: DEFAULT_OUT_EP,
-                "timeout": 4.0,
-                "profile": "",
-            })
+            await flow.async_step_usb_manual(
+                {
+                    CONF_VENDOR_ID: 0x04B8,
+                    CONF_PRODUCT_ID: 0x0202,
+                    CONF_IN_EP: DEFAULT_IN_EP,
+                    CONF_OUT_EP: DEFAULT_OUT_EP,
+                    "timeout": 4.0,
+                    "profile": "",
+                }
+            )
 
         # Manual entry should not set unique_id
         assert len(unique_id_calls) == 0
@@ -438,11 +454,13 @@ class TestUsbYamlImport:
             patch.object(flow, "async_set_unique_id", return_value=None),
             patch.object(flow, "_abort_if_unique_id_configured"),
         ):
-            result = await flow.async_step_import({
-                CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
-                CONF_VENDOR_ID: 0x04B8,
-                CONF_PRODUCT_ID: 0x0202,
-            })
+            result = await flow.async_step_import(
+                {
+                    CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+                    CONF_VENDOR_ID: 0x04B8,
+                    CONF_PRODUCT_ID: 0x0202,
+                }
+            )
 
         assert result["type"] == "create_entry"
         assert result["title"] == "USB Printer 04B8:0202"
@@ -462,13 +480,15 @@ class TestUsbYamlImport:
             patch.object(flow, "async_set_unique_id", return_value=None),
             patch.object(flow, "_abort_if_unique_id_configured"),
         ):
-            result = await flow.async_step_import({
-                CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
-                CONF_VENDOR_ID: 0x0519,
-                CONF_PRODUCT_ID: 0x0001,
-                CONF_IN_EP: 0x81,
-                CONF_OUT_EP: 0x02,
-            })
+            result = await flow.async_step_import(
+                {
+                    CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+                    CONF_VENDOR_ID: 0x0519,
+                    CONF_PRODUCT_ID: 0x0001,
+                    CONF_IN_EP: 0x81,
+                    CONF_OUT_EP: 0x02,
+                }
+            )
 
         assert result["type"] == "create_entry"
         assert result["data"][CONF_IN_EP] == 0x81
@@ -484,11 +504,13 @@ class TestUsbYamlImport:
             patch.object(flow, "async_set_unique_id", return_value=None),
             patch.object(flow, "_abort_if_unique_id_configured"),
         ):
-            result = await flow.async_step_import({
-                CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
-                CONF_VENDOR_ID: "0x04B8",
-                CONF_PRODUCT_ID: "0x0202",
-            })
+            result = await flow.async_step_import(
+                {
+                    CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+                    CONF_VENDOR_ID: "0x04B8",
+                    CONF_PRODUCT_ID: "0x0202",
+                }
+            )
 
         assert result["type"] == "create_entry"
         assert result["data"][CONF_VENDOR_ID] == 0x04B8
@@ -504,11 +526,13 @@ class TestUsbYamlImport:
             patch.object(flow, "async_set_unique_id", return_value=None),
             patch.object(flow, "_abort_if_unique_id_configured"),
         ):
-            result = await flow.async_step_import({
-                CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
-                CONF_VENDOR_ID: "1208",  # 0x04B8 in decimal
-                CONF_PRODUCT_ID: "514",   # 0x0202 in decimal
-            })
+            result = await flow.async_step_import(
+                {
+                    CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+                    CONF_VENDOR_ID: "1208",  # 0x04B8 in decimal
+                    CONF_PRODUCT_ID: "514",  # 0x0202 in decimal
+                }
+            )
 
         assert result["type"] == "create_entry"
         assert result["data"][CONF_VENDOR_ID] == 1208
@@ -520,11 +544,13 @@ class TestUsbYamlImport:
         flow = EscposConfigFlow()
         flow.hass = hass
 
-        result = await flow.async_step_import({
-            CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
-            CONF_VENDOR_ID: "not_a_number",
-            CONF_PRODUCT_ID: "0x0202",
-        })
+        result = await flow.async_step_import(
+            {
+                CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+                CONF_VENDOR_ID: "not_a_number",
+                CONF_PRODUCT_ID: "0x0202",
+            }
+        )
 
         assert result["type"] == "abort"
         assert result["reason"] == "invalid_usb_device"
@@ -535,10 +561,12 @@ class TestUsbYamlImport:
         flow = EscposConfigFlow()
         flow.hass = hass
 
-        result = await flow.async_step_import({
-            CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
-            CONF_PRODUCT_ID: 0x0202,
-        })
+        result = await flow.async_step_import(
+            {
+                CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+                CONF_PRODUCT_ID: 0x0202,
+            }
+        )
 
         assert result["type"] == "abort"
         assert result["reason"] == "invalid_usb_device"
@@ -549,10 +577,12 @@ class TestUsbYamlImport:
         flow = EscposConfigFlow()
         flow.hass = hass
 
-        result = await flow.async_step_import({
-            CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
-            CONF_VENDOR_ID: 0x04B8,
-        })
+        result = await flow.async_step_import(
+            {
+                CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+                CONF_VENDOR_ID: 0x04B8,
+            }
+        )
 
         assert result["type"] == "abort"
         assert result["reason"] == "invalid_usb_device"
@@ -571,10 +601,12 @@ class TestUsbYamlImport:
             patch.object(flow, "async_set_unique_id", return_value=None),
             patch.object(flow, "_abort_if_unique_id_configured"),
         ):
-            result = await flow.async_step_import({
-                "host": "192.168.1.100",
-                "port": 9100,
-            })
+            result = await flow.async_step_import(
+                {
+                    "host": "192.168.1.100",
+                    "port": 9100,
+                }
+            )
 
         # Should route to network step and show codepage form on success
         assert result["type"] == "form"
@@ -712,11 +744,13 @@ class TestMultipleIdenticalPrinters:
             patch.object(flow, "_abort_if_unique_id_configured"),
         ):
             # Select the SECOND printer using index suffix
-            result = await flow.async_step_usb_select({
-                "usb_device": "04B8:0202#1",
-                "timeout": 4.0,
-                "profile": "",
-            })
+            result = await flow.async_step_usb_select(
+                {
+                    "usb_device": "04B8:0202#1",
+                    "timeout": 4.0,
+                    "profile": "",
+                }
+            )
 
         assert result["type"] == "form"
         assert result["step_id"] == "codepage"
@@ -941,13 +975,15 @@ class TestBrowseAllUsbDevices:
             patch.object(flow, "async_set_unique_id", return_value=None),
             patch.object(flow, "_abort_if_unique_id_configured"),
         ):
-            result = await flow.async_step_usb_all_devices({
-                "usb_device": "1234:5678#0",
-                CONF_IN_EP: DEFAULT_IN_EP,
-                CONF_OUT_EP: DEFAULT_OUT_EP,
-                "timeout": 4.0,
-                "profile": "",
-            })
+            result = await flow.async_step_usb_all_devices(
+                {
+                    "usb_device": "1234:5678#0",
+                    CONF_IN_EP: DEFAULT_IN_EP,
+                    CONF_OUT_EP: DEFAULT_OUT_EP,
+                    "timeout": 4.0,
+                    "profile": "",
+                }
+            )
 
         assert result["type"] == "form"
         assert result["step_id"] == "codepage"
@@ -1013,13 +1049,15 @@ class TestBrowseAllUsbDevices:
                 return_value=(False, "permission_denied", 13),
             ),
         ):
-            result = await flow.async_step_usb_all_devices({
-                "usb_device": "1234:5678#0",
-                CONF_IN_EP: DEFAULT_IN_EP,
-                CONF_OUT_EP: DEFAULT_OUT_EP,
-                "timeout": 4.0,
-                "profile": "",
-            })
+            result = await flow.async_step_usb_all_devices(
+                {
+                    "usb_device": "1234:5678#0",
+                    CONF_IN_EP: DEFAULT_IN_EP,
+                    CONF_OUT_EP: DEFAULT_OUT_EP,
+                    "timeout": 4.0,
+                    "profile": "",
+                }
+            )
 
         assert result["type"] == "form"
         assert result["errors"]["base"] == "usb_permission_denied"
@@ -1113,11 +1151,13 @@ class TestUsbYamlImportEdgeCases:
             patch.object(flow, "async_set_unique_id", return_value=None),
             patch.object(flow, "_abort_if_unique_id_configured"),
         ):
-            result = await flow.async_step_import({
-                CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
-                CONF_VENDOR_ID: "04b8",  # Hex without prefix
-                CONF_PRODUCT_ID: "0202",  # This will be parsed as decimal since no hex letters
-            })
+            result = await flow.async_step_import(
+                {
+                    CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+                    CONF_VENDOR_ID: "04b8",  # Hex without prefix
+                    CONF_PRODUCT_ID: "0202",  # This will be parsed as decimal since no hex letters
+                }
+            )
 
         assert result["type"] == "create_entry"
         assert result["data"][CONF_VENDOR_ID] == 0x04B8
@@ -1134,11 +1174,13 @@ class TestUsbYamlImportEdgeCases:
             patch.object(flow, "async_set_unique_id", return_value=None),
             patch.object(flow, "_abort_if_unique_id_configured"),
         ):
-            result = await flow.async_step_import({
-                CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
-                CONF_VENDOR_ID: "ABCD",
-                CONF_PRODUCT_ID: "EF01",
-            })
+            result = await flow.async_step_import(
+                {
+                    CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+                    CONF_VENDOR_ID: "ABCD",
+                    CONF_PRODUCT_ID: "EF01",
+                }
+            )
 
         assert result["type"] == "create_entry"
         assert result["data"][CONF_VENDOR_ID] == 0xABCD
@@ -1154,11 +1196,13 @@ class TestUsbYamlImportEdgeCases:
             patch.object(flow, "async_set_unique_id", return_value=None),
             patch.object(flow, "_abort_if_unique_id_configured"),
         ):
-            result = await flow.async_step_import({
-                CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
-                CONF_VENDOR_ID: "0x04B8",  # Hex with prefix
-                CONF_PRODUCT_ID: "514",     # Decimal
-            })
+            result = await flow.async_step_import(
+                {
+                    CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+                    CONF_VENDOR_ID: "0x04B8",  # Hex with prefix
+                    CONF_PRODUCT_ID: "514",  # Decimal
+                }
+            )
 
         assert result["type"] == "create_entry"
         assert result["data"][CONF_VENDOR_ID] == 0x04B8
@@ -1174,11 +1218,13 @@ class TestUsbYamlImportEdgeCases:
             patch.object(flow, "async_set_unique_id", return_value=None),
             patch.object(flow, "_abort_if_unique_id_configured"),
         ):
-            result = await flow.async_step_import({
-                CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
-                CONF_VENDOR_ID: "  0x04B8  ",
-                CONF_PRODUCT_ID: " 514 ",
-            })
+            result = await flow.async_step_import(
+                {
+                    CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+                    CONF_VENDOR_ID: "  0x04B8  ",
+                    CONF_PRODUCT_ID: " 514 ",
+                }
+            )
 
         assert result["type"] == "create_entry"
         assert result["data"][CONF_VENDOR_ID] == 0x04B8
@@ -1190,11 +1236,13 @@ class TestUsbYamlImportEdgeCases:
         flow = EscposConfigFlow()
         flow.hass = hass
 
-        result = await flow.async_step_import({
-            CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
-            CONF_VENDOR_ID: "",
-            CONF_PRODUCT_ID: "0x0202",
-        })
+        result = await flow.async_step_import(
+            {
+                CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+                CONF_VENDOR_ID: "",
+                CONF_PRODUCT_ID: "0x0202",
+            }
+        )
 
         assert result["type"] == "abort"
         assert result["reason"] == "invalid_usb_device"
@@ -1209,11 +1257,13 @@ class TestUsbYamlImportEdgeCases:
             patch.object(flow, "async_set_unique_id", return_value=None),
             patch.object(flow, "_abort_if_unique_id_configured"),
         ):
-            result = await flow.async_step_import({
-                CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
-                CONF_VENDOR_ID: "0x04b8",
-                CONF_PRODUCT_ID: "0x0202",
-            })
+            result = await flow.async_step_import(
+                {
+                    CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+                    CONF_VENDOR_ID: "0x04b8",
+                    CONF_PRODUCT_ID: "0x0202",
+                }
+            )
 
         assert result["type"] == "create_entry"
         assert result["data"][CONF_VENDOR_ID] == 0x04B8

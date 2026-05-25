@@ -25,12 +25,32 @@ async def test_print_image_url_download_error(hass, caplog):  # type: ignore[no-
     await _setup_entry(hass)
 
     fake = MagicMock()
-    # Mock ClientSession.get to raise
-    async def _raise(*args, **kwargs):  # type: ignore[no-untyped-def]
+
+    # S-H1: the production fetch builds its own session via
+    # ``_build_pinned_session``. Stub the session-factory directly so
+    # ``session.get(...)`` raises a ClientError without going through a
+    # real socket (or leaving an un-awaited AsyncMock coroutine behind).
+    session = MagicMock()
+    session.__aenter__ = AsyncMock(return_value=session)
+    session.__aexit__ = AsyncMock(return_value=None)
+
+    def _get(*_args, **_kwargs):  # type: ignore[no-untyped-def]
         raise aiohttp.ClientError("download failed")
 
-    with patch("escpos.printer.Network", return_value=fake), \
-        patch("aiohttp.ClientSession.get", new=AsyncMock(side_effect=_raise)):
+    session.get = _get
+    from custom_components.escpos_printer import image_sources
+
+    def _fake_build(_hostname: str, _addrs: list[str]):  # type: ignore[no-untyped-def]
+        return session
+
+    with (
+        patch("escpos.printer.Network", return_value=fake),
+        patch.object(image_sources, "_build_pinned_session", _fake_build),
+        patch(
+            "custom_components.escpos_printer.security._resolve_hostname_sync",
+            return_value=["93.184.216.34"],
+        ),
+    ):
         with pytest.raises(Exception):
             await hass.services.async_call(
                 DOMAIN,

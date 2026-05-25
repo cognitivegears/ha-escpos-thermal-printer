@@ -20,9 +20,11 @@ and helpers, not on the vendored ``python-escpos`` adapter layer.
 from __future__ import annotations
 
 from collections.abc import Mapping
+import ipaddress
 import logging
+import socket
 from typing import TYPE_CHECKING, Any, Literal
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import aiohttp
 from homeassistant.auth.permissions.const import POLICY_READ
@@ -101,9 +103,7 @@ def _classify(source: str) -> tuple[SourceKind, str]:
     lower = stripped.lower()
     if lower.startswith("data:"):
         if not lower.startswith("data:image/"):
-            raise HomeAssistantError(
-                "Only data:image/<subtype>;base64,... data URIs are supported"
-            )
+            raise HomeAssistantError("Only data:image/<subtype>;base64,... data URIs are supported")
         return "data", stripped
     if lower.startswith("camera."):
         return "camera", stripped
@@ -124,7 +124,10 @@ def render_template(hass: HomeAssistant, value: Any) -> str:
     """
     if isinstance(value, Template):
         if value.hass is None:
-            value.hass = hass
+            # HA core 2025.10 made Template.hass non-Optional; mypy
+            # against HA master flags this branch as unreachable, but
+            # it is still reachable on older pinned HA versions.
+            value.hass = hass  # type: ignore[unreachable, unused-ignore]
         rendered: Any = value.async_render(parse_result=False)
         return str(rendered)
     if not isinstance(value, str):
@@ -164,9 +167,7 @@ async def resolve_image_bytes(
             _LOGGER.debug("Resolving base64 data URI image (len=%d)", len(value))
             return validate_base64_image(value), SOURCE_DATA_URI
         case "camera":
-            return await _resolve_camera(
-                hass, value, context=context, auto_resize=auto_resize
-            )
+            return await _resolve_camera(hass, value, context=context, auto_resize=auto_resize)
         case "image":
             return await _resolve_image_entity(
                 hass, value, context=context, auto_resize=auto_resize
@@ -191,9 +192,7 @@ async def _check_user_can_read_entity(
     if user is None or user.is_admin:
         return
     if not user.permissions.check_entity(entity_id, POLICY_READ):
-        raise Unauthorized(
-            context=context, entity_id=entity_id, permission=POLICY_READ
-        )
+        raise Unauthorized(context=context, entity_id=entity_id, permission=POLICY_READ)
 
 
 async def _resolve_camera(
@@ -215,15 +214,12 @@ async def _resolve_camera(
 
     _LOGGER.debug("Fetching camera snapshot: %s", entity_id)
     try:
-        image = await async_get_image(
-            hass, entity_id, timeout=_ENTITY_FETCH_TIMEOUT_SECONDS
-        )
+        image = await async_get_image(hass, entity_id, timeout=_ENTITY_FETCH_TIMEOUT_SECONDS)
     except (HomeAssistantError, Unauthorized):
         raise
     except Exception as exc:
         raise HomeAssistantError(
-            f"Failed to fetch camera image '{entity_id}': "
-            f"{sanitize_log_message(str(exc))}"
+            f"Failed to fetch camera image '{entity_id}': {sanitize_log_message(str(exc))}"
         ) from exc
     _check_size(len(image.content), auto_resize=auto_resize)
     return image.content, image.content_type
@@ -248,23 +244,18 @@ async def _resolve_image_entity(
 
     _LOGGER.debug("Fetching image entity: %s", entity_id)
     try:
-        image = await async_get_image(
-            hass, entity_id, timeout=_ENTITY_FETCH_TIMEOUT_SECONDS
-        )
+        image = await async_get_image(hass, entity_id, timeout=_ENTITY_FETCH_TIMEOUT_SECONDS)
     except (HomeAssistantError, Unauthorized):
         raise
     except Exception as exc:
         raise HomeAssistantError(
-            f"Failed to fetch image entity '{entity_id}': "
-            f"{sanitize_log_message(str(exc))}"
+            f"Failed to fetch image entity '{entity_id}': {sanitize_log_message(str(exc))}"
         ) from exc
     _check_size(len(image.content), auto_resize=auto_resize)
     return image.content, image.content_type
 
 
-async def _stream_to_buffer(
-    aiter: Any, max_bytes: int
-) -> bytearray:
+async def _stream_to_buffer(aiter: Any, max_bytes: int) -> bytearray:
     """Consume an async byte iterator into a bytearray, aborting on overflow."""
     buf = bytearray()
     async for chunk in aiter:
@@ -293,108 +284,143 @@ def _check_content_length(headers: Mapping[str, str], max_bytes: int) -> None:
         )
 
 
-async def _resolve_http_httpx(
-    hass: HomeAssistant, url: str, *, max_bytes: int
-) -> tuple[bytes, str | None]:
-    """Fetch via HA's pooled httpx client, walking redirects manually."""
-    from homeassistant.helpers.httpx_client import (  # noqa: PLC0415
-        get_async_client,
-    )
-    import httpx  # noqa: PLC0415
+class _StaticResolver(aiohttp.abc.AbstractResolver):
+    """``aiohttp`` resolver pinned to a pre-validated set of IP addresses.
 
-    client = get_async_client(hass)
-    current = url
-    for _ in range(_MAX_REDIRECTS + 1):
-        validated, _addrs = await validate_image_url_and_resolve(hass, current)
-        try:
-            async with client.stream(
-                "GET",
-                validated,
-                timeout=httpx.Timeout(
-                    _HTTP_TOTAL_TIMEOUT,
-                    connect=_HTTP_CONNECT_TIMEOUT,
-                    read=_HTTP_READ_TIMEOUT,
-                ),
-                follow_redirects=False,
-            ) as response:
-                if response.is_redirect:
-                    location = response.headers.get("location")
-                    if not location:
-                        raise HomeAssistantError(
-                            "HTTP redirect without Location header"
-                        )
-                    current = urljoin(current, location)
-                    continue
-                response.raise_for_status()
-                _check_content_length(response.headers, max_bytes)
-                buf = await _stream_to_buffer(
-                    response.aiter_bytes(), max_bytes
-                )
-                content_type = response.headers.get("content-type")
-                return bytes(buf), content_type
-        except HomeAssistantError:
-            raise
-        except httpx.HTTPError as exc:
-            raise HomeAssistantError(
-                f"Failed to download image: {sanitize_log_message(str(exc))}"
-            ) from exc
-    raise HomeAssistantError(
-        f"Too many redirects fetching image (>{_MAX_REDIRECTS})"
-    )
+    Defeats DNS rebinding (S-H1, CWE-918/CWE-350): the URL validator
+    resolves the hostname and returns the address set so the caller can
+    pin the connection. Without this pin, ``aiohttp.TCPConnector`` would
+    re-resolve DNS, letting a 0-TTL hostile resolver return public IPs
+    on validation and private IPs at fetch time.
+
+    The resolver only knows one hostname (the one passed in). Any other
+    lookup raises so a redirect to an unrelated host is rejected at the
+    transport layer rather than silently following.
+    """
+
+    def __init__(self, hostname: str, addresses: list[str]) -> None:
+        self._hostname = hostname.lower()
+        # Pre-bucket by socket family so the resolve() filter is O(1).
+        self._addrs_by_family: dict[int, list[str]] = {
+            socket.AF_INET: [],
+            socket.AF_INET6: [],
+        }
+        for addr in addresses:
+            try:
+                ip = ipaddress.ip_address(addr)
+            except ValueError:
+                continue
+            family = socket.AF_INET if ip.version == 4 else socket.AF_INET6
+            self._addrs_by_family[family].append(addr)
+
+    async def resolve(  # type: ignore[override]
+        self,
+        host: str,
+        port: int = 0,
+        family: int = socket.AF_INET,
+    ) -> list[dict[str, Any]]:
+        if host.lower() != self._hostname:
+            raise OSError(
+                f"DNS pin: hostname '{host}' was not pre-validated (expected '{self._hostname}')"
+            )
+        addrs = self._addrs_by_family.get(family, [])
+        if not addrs:
+            raise OSError(f"DNS pin: no pre-validated addresses for family {family}")
+        return [
+            {
+                "hostname": host,
+                "host": addr,
+                "port": port,
+                "family": family,
+                "proto": 0,
+                "flags": 0,
+            }
+            for addr in addrs
+        ]
+
+    async def close(self) -> None:
+        return None
+
+
+def _build_pinned_session(hostname: str, addresses: list[str]) -> aiohttp.ClientSession:
+    """Return a fresh aiohttp session pinned to ``addresses`` for ``hostname``.
+
+    Extracted so tests can monkeypatch in a mocked session without
+    needing to construct a real TCPConnector or run a real HTTP
+    listener. Production callers always build a new session because
+    each redirect hop validates a new hostname and needs a fresh pin.
+    """
+    resolver = _StaticResolver(hostname, addresses)
+    connector = aiohttp.TCPConnector(resolver=resolver, force_close=True)
+    return aiohttp.ClientSession(connector=connector)
 
 
 async def _resolve_http_aiohttp(
     hass: HomeAssistant, url: str, *, max_bytes: int
 ) -> tuple[bytes, str | None]:
-    """Fallback for environments without httpx; uses HA's pooled aiohttp session."""
-    from homeassistant.helpers.aiohttp_client import (  # noqa: PLC0415
-        async_get_clientsession,
-    )
+    """Fetch via a per-request aiohttp session pinned to validated IPs.
 
-    session = async_get_clientsession(hass)
+    S-H1: each request gets its own ``TCPConnector`` with a
+    :class:`_StaticResolver` keyed to the pre-validated address set.
+    Redirects are walked manually so each hop runs through
+    :func:`validate_image_url_and_resolve` and gets a fresh resolver
+    pin — a redirect to ``evil.example/``-resolves-to-127.0.0.1 is
+    rejected at the validator, never reaches the connector.
+    """
     current = url
     for _ in range(_MAX_REDIRECTS + 1):
-        validated, _addrs = await validate_image_url_and_resolve(hass, current)
+        validated, addrs = await validate_image_url_and_resolve(hass, current)
+        parsed = urlparse(validated)
+        hostname = parsed.hostname
+        if hostname is None:  # pragma: no cover — validator enforces it
+            raise HomeAssistantError("URL must include a valid hostname")
         try:
-            async with session.get(
-                validated,
-                timeout=aiohttp.ClientTimeout(
-                    total=_HTTP_TOTAL_TIMEOUT,
-                    connect=_HTTP_CONNECT_TIMEOUT,
-                    sock_read=_HTTP_READ_TIMEOUT,
-                ),
-                allow_redirects=False,
-            ) as response:
-                if response.status in (301, 302, 303, 307, 308):
-                    location = response.headers.get("Location")
-                    if not location:
-                        raise HomeAssistantError(
-                            "HTTP redirect without Location header"
-                        )
-                    current = urljoin(current, location)
-                    continue
-                response.raise_for_status()
-                _check_content_length(response.headers, max_bytes)
-                buf = await _stream_to_buffer(
-                    response.content.iter_chunked(65536), max_bytes
-                )
-                content_type = response.headers.get("Content-Type")
-                return bytes(buf), content_type
+            async with (
+                _build_pinned_session(hostname, addrs) as session,
+                session.get(
+                    validated,
+                    timeout=aiohttp.ClientTimeout(
+                        total=_HTTP_TOTAL_TIMEOUT,
+                        connect=_HTTP_CONNECT_TIMEOUT,
+                        sock_read=_HTTP_READ_TIMEOUT,
+                    ),
+                    allow_redirects=False,
+                ) as response,
+            ):
+                    if response.status in (301, 302, 303, 307, 308):
+                        location = response.headers.get("Location")
+                        if not location:
+                            raise HomeAssistantError("HTTP redirect without Location header")
+                        current = urljoin(current, location)
+                        continue
+                    response.raise_for_status()
+                    _check_content_length(response.headers, max_bytes)
+                    buf = await _stream_to_buffer(
+                        response.content.iter_chunked(65536), max_bytes
+                    )
+                    content_type = response.headers.get("Content-Type")
+                    return bytes(buf), content_type
         except HomeAssistantError:
             raise
         except aiohttp.ClientError as exc:
             raise HomeAssistantError(
                 f"Failed to download image: {sanitize_log_message(str(exc))}"
             ) from exc
-    raise HomeAssistantError(
-        f"Too many redirects fetching image (>{_MAX_REDIRECTS})"
-    )
+    raise HomeAssistantError(f"Too many redirects fetching image (>{_MAX_REDIRECTS})")
 
 
 async def _resolve_http(
     hass: HomeAssistant, url: str, *, auto_resize: bool = False
 ) -> tuple[bytes, str | None]:
-    """Fetch an HTTP/HTTPS image. Validates URL + IPs and streams the body."""
+    """Fetch an HTTP/HTTPS image. Validates URL + IPs and streams the body.
+
+    DNS-rebinding-safe (S-H1): the URL is resolved once via
+    :func:`validate_image_url_and_resolve`, and the resulting address
+    set is pinned via :class:`_StaticResolver` for the actual fetch.
+    Always uses aiohttp (HA bundles it) — the old httpx fast-path was
+    dropped because httpx 0.28 has no equivalent resolver hook, and
+    the pooled-client win is small for image fetches.
+    """
     # Cheap pre-flight: reject obvious junk before resolving DNS.
     validate_image_url(url)
     _LOGGER.debug(
@@ -402,11 +428,7 @@ async def _resolve_http(
         sanitize_log_message(url),
     )
     max_bytes = _MAX_BYTES_AUTO_RESIZE if auto_resize else _MAX_BYTES
-    try:
-        import httpx  # noqa: F401, PLC0415
-    except ImportError:
-        return await _resolve_http_aiohttp(hass, url, max_bytes=max_bytes)
-    return await _resolve_http_httpx(hass, url, max_bytes=max_bytes)
+    return await _resolve_http_aiohttp(hass, url, max_bytes=max_bytes)
 
 
 async def _resolve_local(
@@ -442,14 +464,8 @@ def _check_size(num_bytes: int, *, auto_resize: bool = False) -> None:
     max_bytes = _MAX_BYTES_AUTO_RESIZE if auto_resize else _MAX_BYTES
     if num_bytes > max_bytes:
         mb = max_bytes // (1024 * 1024)
-        hint = (
-            ""
-            if auto_resize
-            else " — enable auto_resize to allow up to 4x this cap"
-        )
-        raise HomeAssistantError(
-            f"Image too large ({num_bytes} bytes; max {mb}MB){hint}"
-        )
+        hint = "" if auto_resize else " — enable auto_resize to allow up to 4x this cap"
+        raise HomeAssistantError(f"Image too large ({num_bytes} bytes; max {mb}MB){hint}")
 
 
 # ---------------------------------------------------------------------------
@@ -479,6 +495,28 @@ _IMAGE_KWARG_KEYS: tuple[str, ...] = (
 )
 
 
+# Keys that exist only in the image fragment — safe for the notify form
+# to accept unprefixed as a fallback. ATTR_ALIGN / ATTR_HIGH_DENSITY are
+# deliberately excluded because they clash with text-side fields on the
+# notify entity.
+_NOTIFY_UNPREFIXED_FALLBACK_KEYS: frozenset[str] = frozenset(
+    {
+        ATTR_ROTATION,
+        ATTR_DITHER,
+        ATTR_THRESHOLD,
+        ATTR_IMPL,
+        ATTR_CENTER,
+        ATTR_AUTOCONTRAST,
+        ATTR_INVERT,
+        ATTR_MIRROR,
+        ATTR_AUTO_RESIZE,
+        ATTR_FALLBACK_IMAGE,
+        ATTR_FRAGMENT_HEIGHT,
+        ATTR_CHUNK_DELAY_MS,
+    }
+)
+
+
 def extract_image_kwargs(
     data: Mapping[str, Any],
     printer_defaults: Mapping[str, Any],
@@ -493,44 +531,33 @@ def extract_image_kwargs(
     in ``data`` are included — missing keys fall through to the
     adapter's signature defaults.
 
-    For the notify form, an unprefixed key wins over the prefixed
-    variant ONLY if the unprefixed key is unique to the image options
-    (e.g. ``dither``, ``threshold``, ``rotation``). This collapses the
-    historic ``image_dither`` / ``dither`` confusion without breaking
-    existing callers.
+    Selection precedence for each image option:
+    1. The prefixed key (``image_dither`` on notify; ``dither`` on
+       the service form).
+    2. *Notify form only:* the unprefixed key (``dither``) as a
+       fallback, for keys unique to the image fragment. This collapses
+       the historic ``image_dither`` / ``dither`` confusion without
+       breaking existing callers (M6: ordering and intent now explicit).
     """
+
     def k(name: str) -> str:
         if not prefix or name in (ATTR_IMAGE, ATTR_IMAGE_WIDTH):
             return name
         return f"{prefix}{name}"
 
-    # Keys that are unique to the image fragment — safe to also accept
-    # unprefixed even when the prefix is "image_". (We deliberately
-    # exclude ATTR_ALIGN / ATTR_HIGH_DENSITY here because they clash
-    # with text-side fields on the notify entity.)
-    image_only_unprefixed = {
-        ATTR_ROTATION,
-        ATTR_DITHER,
-        ATTR_THRESHOLD,
-        ATTR_IMPL,
-        ATTR_CENTER,
-        ATTR_AUTOCONTRAST,
-        ATTR_INVERT,
-        ATTR_MIRROR,
-        ATTR_AUTO_RESIZE,
-        ATTR_FALLBACK_IMAGE,
-        ATTR_FRAGMENT_HEIGHT,
-        ATTR_CHUNK_DELAY_MS,
-    }
-
     out: dict[str, Any] = {ATTR_IMAGE: data.get(ATTR_IMAGE)}
     out[ATTR_ALIGN] = data.get(k(ATTR_ALIGN)) or printer_defaults.get("align")
+
+    notify_form = bool(prefix)
     for key in _IMAGE_KWARG_KEYS:
+        target = _IMAGE_KWARG_RENAME.get(key, key)
         prefixed = k(key)
         if prefixed in data:
-            out[_IMAGE_KWARG_RENAME.get(key, key)] = data[prefixed]
-        elif prefix and key in image_only_unprefixed and key in data:
-            out[_IMAGE_KWARG_RENAME.get(key, key)] = data[key]
+            out[target] = data[prefixed]
+        elif notify_form and key in _NOTIFY_UNPREFIXED_FALLBACK_KEYS and key in data:
+            # Notify form: accept bare ``dither``/``threshold``/etc. as
+            # fallback when ``image_dither`` was not supplied.
+            out[target] = data[key]
     return out
 
 

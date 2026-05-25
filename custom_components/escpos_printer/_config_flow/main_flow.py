@@ -48,9 +48,7 @@ class EscposConfigFlow(
         self._show_all_bt_devices: bool = False
         self._pending_bt: dict[str, Any] = {}
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle step 1: Connection type selection.
 
         Args:
@@ -85,11 +83,16 @@ class EscposConfigFlow(
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> config_entries.OptionsFlow:
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> config_entries.OptionsFlow:
         """Create options flow handler.
 
         Args:
-            config_entry: Config entry to be configured
+            config_entry: Config entry to be configured (HA framework
+                injects this onto the returned handler via the base
+                ``OptionsFlow`` class; not passed explicitly since the
+                B-M1 cleanup removed the legacy HA 2024.x shim).
 
         Returns:
             Options flow handler instance
@@ -97,4 +100,5 @@ class EscposConfigFlow(
         # Import here to avoid circular imports
         from .options_flow import EscposOptionsFlowHandler  # noqa: PLC0415
 
-        return EscposOptionsFlowHandler(config_entry)
+        _ = config_entry  # framework binds it on the returned handler
+        return EscposOptionsFlowHandler()

@@ -1,0 +1,21 @@
+ha-escpos-thermal-printer
+=========================
+
+This integration bundles third-party font files used by the
+``print_text_image`` service to render Unicode text to images for
+printing on thermal printers that do not support the requested glyphs
+natively.
+
+DejaVu Fonts
+------------
+
+Files: ``custom_components/escpos_printer/fonts/DejaVuSansMono.ttf``
+       ``custom_components/escpos_printer/fonts/DejaVuSans.ttf``
+       ``custom_components/escpos_printer/fonts/DejaVuSerif.ttf``
+
+Origin: https://github.com/dejavu-fonts/dejavu-fonts (release 2.37)
+
+License: The DejaVu changes are public domain. The base fonts are
+released under the Bitstream Vera Fonts Copyright (a permissive
+license). The full license text is at
+``custom_components/escpos_printer/fonts/LICENSE``.

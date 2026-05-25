@@ -105,7 +105,7 @@ Every image service accepts the same option set. Rarely-used reliability knobs a
 | center | boolean | Horizontally center the image on the paper. Default `false`. |
 | high_density | boolean | High-density printing mode. Default `true`. |
 | cut | string | `none`, `partial`, `full`. Defaults to the printer's configured cut mode. |
-| feed | int | Lines to feed after printing (0–50). Defaults vary per service (0 for generic, 1 for URL/path/image-entity, 2 for camera snapshot). |
+| feed | int | Lines to feed after printing (0–50). Default depends on the service: `print_image` = `0`; `print_image_url` / `print_image_path` / `print_image_entity` = `1`; `print_camera_snapshot` = `2`; `calibration_print` = `2`. The focused services pick friendlier defaults than `print_image` because their typical use-case prints once and you want a paper buffer for tearing off cleanly. |
 | impl | string | **advanced.** `bitImageRaster`, `graphics`, or `bitImageColumn`. Leave unset to honor the printer's Reliability profile. |
 | fragment_height | int | **advanced.** Rows per chunk when sending the image (range 16–1024). Leave unset to honor the printer's Reliability profile. |
 | chunk_delay_ms | int | **advanced.** Sleep between chunks in ms (range 0–5000). Leave unset to honor the printer's Reliability profile (0 ms on Network/USB, 50 ms on Bluetooth). |
@@ -114,6 +114,108 @@ Every image service accepts the same option set. Rarely-used reliability knobs a
 `preview_image` additionally accepts `output_path` (where to save the PNG; defaults to `/tmp/escpos_preview_<entry>.png`) and omits the printer-communication knobs (`high_density`, `impl`, `fragment_height`, `chunk_delay_ms`, `center`, `cut`, `feed`) because they have no effect on the file written to disk.
 
 Tips: pick `dither: threshold` for crisp logos/text, `dither: floyd-steinberg` + `autocontrast: true` for photos. If your printer freezes or dumps characters on tall images, lower `fragment_height` or raise `chunk_delay_ms`.
+
+## Text-effects services
+
+For boxes, multi-column tables, and custom-font / rotated text, see
+the [Text effects guide](text-effects.md) for the full reference,
+border-style table, bundled-font notes, and worked examples. Short
+summaries below.
+
+### escpos_printer.print_box
+
+Wrap text in a printable border (cp437 single/double, ASCII, asterisk, hash, or no border).
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| text | string | Text to wrap (required) |
+| style | string | `auto` (default), `single`, `double`, `ascii`, `asterisk`, `hash`, `none` |
+| padding | int | Blank rows above/below content (0–4) |
+| align | string | `left`, `center`, `right` |
+| total_width | int | Total printed width incl. borders (3–200); defaults to printer line width |
+| cut | string | `none`, `partial`, `full` |
+| feed | int | Lines to feed (0–50) |
+
+### escpos_printer.print_table
+
+Multi-column rows with optional borders, header, and inner separators.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| rows | list of lists of strings | The grid (required, up to 200×12) |
+| style | string | Same options as `print_box` |
+| column_widths | list of ints | Per-column widths in characters |
+| column_aligns | list of strings | Per-column alignment (`left`/`center`/`right`) |
+| header | boolean | Treat first row as header (rule below it) |
+| row_separators | boolean | Insert a horizontal rule between every body row |
+| total_width | int | Total printed width (3–200); defaults to printer line width |
+| cut | string | `none`, `partial`, `full` |
+| feed | int | Lines to feed (0–50) |
+
+### escpos_printer.print_text_image
+
+Render text to a bitmap with a TTF/OTF font, optionally rotated, then print through the image pipeline. Useful for headers, banners, sideways labels, and non-codepage glyphs.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| text | string | Text to render (required) |
+| font | string | Bundled font: `dejavu_mono` (default), `dejavu_sans`, `dejavu_serif` |
+| font_path | string | Optional `.ttf` / `.otf` path. Drop files in `/config/fonts/` (auto-trusted), or use a path under `allowlist_external_dirs`. Overrides `font`. |
+| font_size | int | Point size 8–96 (default 16) |
+| line_spacing | number | Line-height multiplier 1.0–3.0 (default 1.1) |
+| align | string | `left`, `center`, `right` (text canvas alignment) |
+| rotation | int | `0`, `90`, `180`, `270` (clockwise; applied to canvas before binarisation) |
+| cut | string | `none`, `partial`, `full` |
+| feed | int | Lines to feed (0–50) |
+| `image_*` knobs (advanced) | — | `image_width`, `image_dither`, `image_threshold`, `image_impl`, `image_center`, `image_autocontrast`, `image_invert`, `image_mirror`, `image_high_density`, `image_fragment_height`, `image_chunk_delay_ms` — same names and defaults as `print_message`'s image-pipeline knobs |
+
+### escpos_printer.print_separator
+
+Print a single decorative rule by repeating one character to fill the line width.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| char | string | Single printable ASCII character to repeat (default `-`) |
+| width | int | Repeat count (1–200); defaults to the printer's line width |
+| repeat | int | Number of consecutive lines (1–10, default 1). Use `2` for a double rule. |
+| cut | string | `none`, `partial`, `full` |
+| feed | int | Lines to feed (0–50) |
+
+### escpos_printer.print_kvtable
+
+Two-column label/value table for receipt totals, sensor readings, ingredient lists.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| items | list of `[label, value]` pairs | The grid (required, up to 200 rows) |
+| style | string | Same options as `print_table`; default `none` (borderless) |
+| total_width | int | Total printed width (3–200); defaults to printer line width |
+| label_width | int | Characters reserved for the label column; auto-sized from the longest label up to ~60% of `total_width` |
+| value_align | string | `left`, `center`, `right` (default `right`) |
+| cut | string | `none`, `partial`, `full` |
+| feed | int | Lines to feed (0–50) |
+
+### escpos_printer.preview_box
+
+Render a `print_box` layout to a `.txt` file *without* printing. Returns the output path and rendered size so automations can chain a notification or inspect the layout. Has `supports_response: only` — call with `return_response: true`.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| text, style, padding, align, total_width | — | Same fields as `print_box`. `cut` and `feed` are deliberately omitted — a text file has no paper. |
+| output_path | string | Where to save the rendered text. **Must be inside the system temp directory (typically `/tmp`)** — non-admin HA users could otherwise overwrite arbitrary files in `allowlist_external_dirs`. Defaults to `/tmp/escpos_preview_box_<entry>.txt`. To persist the preview elsewhere, copy the returned `path` in a follow-up automation step. |
+
+Response shape: `{path, width, line_count, codepage}`.
+
+### escpos_printer.preview_table
+
+Render a `print_table` layout to a `.txt` file *without* printing. Same contract as `preview_box`.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| rows, style, column_widths, column_aligns, header, row_separators, total_width | — | Same fields as `print_table`. `cut` and `feed` are deliberately omitted — a text file has no paper. |
+| output_path | string | Where to save the rendered text. **Must be inside the system temp directory (typically `/tmp`)** — non-admin HA users could otherwise overwrite arbitrary files in `allowlist_external_dirs`. Defaults to `/tmp/escpos_preview_table_<entry>.txt`. To persist the preview elsewhere, copy the returned `path` in a follow-up automation step. |
+
+Response shape: `{path, width, line_count, codepage}`.
 
 ## escpos_printer.feed
 

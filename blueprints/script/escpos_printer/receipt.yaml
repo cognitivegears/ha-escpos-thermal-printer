@@ -1,0 +1,122 @@
+blueprint:
+  name: ESC/POS — Receipt
+  description: >
+    Print a styled receipt with a large header, itemised line table,
+    and subtotal/tax/total summary. Use this for shopkeeper-style
+    receipts, donation slips, or any "list + totals" workflow.
+  domain: script
+  source_url: https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/blueprints/script/escpos_printer/receipt.yaml
+  input:
+    printer:
+      name: Printer
+      description: ESC/POS printer device to print to.
+      selector:
+        device:
+          integration: escpos_printer
+    title:
+      name: Title
+      description: Large header at the top of the receipt.
+      default: RECEIPT
+      selector:
+        text: {}
+    items:
+      name: Items
+      description: >
+        List of objects with "name" and "price" keys. Example —
+        [{"name": "Coffee", "price": 3.50}, {"name": "Bagel", "price": 2.00}].
+        Prices are numbers (the currency symbol is added below).
+      default: []
+      selector:
+        object: {}
+    currency:
+      name: Currency symbol
+      default: "$"
+      selector:
+        text: {}
+    tax_rate:
+      name: Tax rate (percent)
+      description: Tax applied to subtotal. Set 0 for no tax.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 50
+          step: 0.01
+          unit_of_measurement: "%"
+# queued — multiple receipt prints should queue rather than drop concurrent invocations.
+mode: queued
+max_exceeded: silent
+sequence:
+  - variables:
+      items_input: !input items
+      currency: !input currency
+      tax_rate: !input tax_rate
+      subtotal: >
+        {{ items_input | map(attribute='price') | map('float', 0) | sum | round(2) }}
+      tax_amount: >
+        {{ (subtotal * tax_rate / 100) | round(2) }}
+      total: "{{ (subtotal + tax_amount) | round(2) }}"
+      line_items: >
+        {% set ns = namespace(out=[]) %}
+        {% for it in items_input %}
+          {% set name = (it.name | default('') | string).replace('\n', ' ').replace('\r', ' ').replace('|', '/').replace('\t', ' ') | trim %}
+          {% set ns.out = ns.out + [[name, currency ~ ('%.2f' | format(it.price | float(0)))]] %}
+        {% endfor %}
+        {{ ns.out }}
+      totals_items: >
+        {% set ns = namespace(out=[]) %}
+        {% set ns.out = ns.out + [['Subtotal', currency ~ ('%.2f' | format(subtotal))]] %}
+        {% if tax_rate > 0 %}
+          {% set ns.out = ns.out + [['Tax (' ~ tax_rate ~ '%)', currency ~ ('%.2f' | format(tax_amount))]] %}
+        {% endif %}
+        {% set ns.out = ns.out + [['TOTAL', currency ~ ('%.2f' | format(total))]] %}
+        {{ ns.out }}
+  - service: escpos_printer.print_text_image
+    target:
+      device_id: !input printer
+    data:
+      text: !input title
+      font: dejavu_serif
+      font_size: 32
+      align: center
+      feed: 1
+  - service: escpos_printer.print_separator
+    target:
+      device_id: !input printer
+  - if:
+      - condition: template
+        value_template: "{{ items_input | length > 0 }}"
+    then:
+      - service: escpos_printer.print_kvtable
+        target:
+          device_id: !input printer
+        data:
+          items: "{{ line_items }}"
+          value_align: right
+    else:
+      - service: escpos_printer.print_text
+        target:
+          device_id: !input printer
+        data:
+          text: "(no items)"
+          align: center
+  - service: escpos_printer.print_separator
+    target:
+      device_id: !input printer
+  - service: escpos_printer.print_kvtable
+    target:
+      device_id: !input printer
+    data:
+      items: "{{ totals_items }}"
+      value_align: right
+  - service: escpos_printer.print_separator
+    target:
+      device_id: !input printer
+    data:
+      char: "="
+      repeat: 2
+  - service: escpos_printer.cut
+    target:
+      device_id: !input printer
+    data:
+      mode: full

@@ -101,9 +101,7 @@ class TestConnectionTypeStep:
             "_list_paired_bluetooth_devices",
             return_value=mock_paired_devices,
         ):
-            result = await flow.async_step_user(
-                {CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH}
-            )
+            result = await flow.async_step_user({CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH})
 
         assert result["type"] == "form"
         assert result["step_id"] == "bluetooth_select"
@@ -206,9 +204,7 @@ class TestBluetoothSelectStep:
         assert flow._user_data[CONF_RFCOMM_CHANNEL] == 1
 
     @pytest.mark.asyncio
-    async def test_select_connection_failure_surfaces_error(
-        self, hass, mock_paired_devices
-    ):
+    async def test_select_connection_failure_surfaces_error(self, hass, mock_paired_devices):
         flow = EscposConfigFlow()
         flow.hass = hass
         flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH}
@@ -423,9 +419,7 @@ class TestBluetoothChannelHidden:
         assert "rfcomm_channel" not in schema_keys
 
     @pytest.mark.asyncio
-    async def test_channel_field_visible_with_advanced_options(
-        self, hass, mock_paired_devices
-    ):
+    async def test_channel_field_visible_with_advanced_options(self, hass, mock_paired_devices):
         flow = EscposConfigFlow()
         flow.hass = hass
         flow.context = {"source": "user", "show_advanced_options": True}
@@ -447,9 +441,7 @@ class TestBluetoothChannelRetry:
     """A channel_refused failure routes to the channel-retry step."""
 
     @pytest.mark.asyncio
-    async def test_channel_refused_routes_to_retry_step(
-        self, hass, mock_paired_devices
-    ):
+    async def test_channel_refused_routes_to_retry_step(self, hass, mock_paired_devices):
         flow = EscposConfigFlow()
         flow.hass = hass
         flow.context = {"source": "user", "show_advanced_options": False}
@@ -498,9 +490,7 @@ class TestBluetoothChannelRetry:
             patch.object(flow, "async_set_unique_id", return_value=None),
             patch.object(flow, "_abort_if_unique_id_configured"),
         ):
-            result = await flow.async_step_bluetooth_channel_retry(
-                {"rfcomm_channel": 2}
-            )
+            result = await flow.async_step_bluetooth_channel_retry({"rfcomm_channel": 2})
 
         assert result["type"] == "form"
         assert result["step_id"] == "codepage"

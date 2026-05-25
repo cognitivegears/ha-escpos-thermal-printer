@@ -59,9 +59,7 @@ def _register_heif_opener() -> tuple[str, ...]:
     try:
         from pillow_heif import register_heif_opener  # noqa: PLC0415
     except ImportError:
-        _LOGGER.debug(
-            "pillow-heif not installed; HEIC/AVIF source images will be rejected"
-        )
+        _LOGGER.debug("pillow-heif not installed; HEIC/AVIF source images will be rejected")
         return ()
     register_heif_opener()
     return ("HEIF", "AVIF")
@@ -135,15 +133,11 @@ def process_image(img: Image.Image, opts: ImageProcessOptions) -> Image.Image:
             FALLBACK_PROFILE_WIDTH,
         )
         if img.width > ceiling * 4 or img.height > ceiling * 4:
-            img.thumbnail(
-                (ceiling * 4, ceiling * 4), Image.Resampling.LANCZOS
-            )
+            img.thumbnail((ceiling * 4, ceiling * 4), Image.Resampling.LANCZOS)
 
     # Flatten alpha onto white — thermal prints black on white paper, so
     # transparent regions should read as white (not black).
-    if img.mode in ("RGBA", "LA", "PA") or (
-        img.mode == "P" and "transparency" in img.info
-    ):
+    if img.mode in ("RGBA", "LA", "PA") or (img.mode == "P" and "transparency" in img.info):
         rgba = img.convert("RGBA")
         background = Image.new("RGB", rgba.size, (255, 255, 255))
         background.paste(rgba, mask=rgba.split()[-1])
@@ -166,9 +160,7 @@ def process_image(img: Image.Image, opts: ImageProcessOptions) -> Image.Image:
         new_size = (target_width, max(1, int(img.height * ratio)))
         old_w, old_h = img.width, img.height
         img = img.resize(new_size, Image.Resampling.LANCZOS)
-        _LOGGER.debug(
-            "Resized image from %dx%d to %dx%d", old_w, old_h, new_size[0], new_size[1]
-        )
+        _LOGGER.debug("Resized image from %dx%d to %dx%d", old_w, old_h, new_size[0], new_size[1])
 
     if opts.autocontrast:
         img = ImageOps.autocontrast(img)
@@ -198,9 +190,7 @@ def process_image(img: Image.Image, opts: ImageProcessOptions) -> Image.Image:
     raise ValueError(f"Unknown dither mode: {opts.dither!r}")
 
 
-def process_image_from_bytes(
-    raw: bytes, opts: ImageProcessOptions
-) -> Image.Image:
+def process_image_from_bytes(raw: bytes, opts: ImageProcessOptions) -> Image.Image:
     """Decode ``raw`` and run :func:`process_image` on the result.
 
     Uses ``Image.open(..., formats=)`` to constrain the decoder allow-list.
