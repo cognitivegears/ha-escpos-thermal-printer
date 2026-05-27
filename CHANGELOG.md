@@ -122,6 +122,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   template scope, so a malicious fork could exfiltrate secrets via
   the QR payload (humans don't read QRs; their phones do).
 
+### Fixed
+
+- **`blueprints/automation/escpos_printer/trash_reminder.yaml`** —
+  inlined `now() + timedelta(...)` into the `target_day_name` /
+  `target_label` templates. HA's `render_complex` evaluates each
+  `variables:` entry with `parse_result=True`, which stringifies any
+  datetime stored in an intermediate variable; the next template's
+  `target_date.strftime(...)` then crashed with
+  `'str object' has no attribute 'strftime'`. Computing the date inline
+  keeps the datetime native to the expression. Caught by
+  `tests/test_blueprints_template_safety.py` once the new blueprint
+  gained a sandbox render case.
+
 ### Changed
 
 - **`blueprints/script/escpos_printer/recipe_card.yaml` and

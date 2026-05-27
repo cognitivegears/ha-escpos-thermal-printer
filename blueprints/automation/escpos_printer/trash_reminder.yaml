@@ -112,9 +112,14 @@ variables:
     friday: !input friday
     saturday: !input saturday
     sunday: !input sunday
-  target_date: "{{ now() + timedelta(days=offset_days | int) }}"
-  target_day_name: "{{ target_date.strftime('%A').lower() }}"
-  target_label: "{{ target_date.strftime('%a %b %d') }}"
+  # ``now() + timedelta(...)`` is computed inline rather than stored in
+  # an intermediate variable: HA's ``render_complex`` evaluates each
+  # ``variables:`` entry with ``parse_result=True``, which stringifies
+  # the datetime — a later ``target_date.strftime(...)`` then fails with
+  # "'str object' has no attribute 'strftime'". Computing inline keeps
+  # the datetime native to the expression.
+  target_day_name: "{{ (now() + timedelta(days=offset_days | int)).strftime('%A').lower() }}"
+  target_label: "{{ (now() + timedelta(days=offset_days | int)).strftime('%a %b %d') }}"
   bins_for_target: >
     {{ (bins_map[target_day_name] | default('') | string)
        .replace('\n', ' ').replace('\r', ' ').replace('|', '/').replace('\t', ' ') | trim }}

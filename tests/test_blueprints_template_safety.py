@@ -172,6 +172,11 @@ def _trigger_namespace(prior_items: list[dict[str, str]]):
     )
 
 
+def _repeat_namespace(item: Any):
+    """Build a mock ``repeat`` object with the fields HA exposes inside a ``repeat:`` loop."""
+    return types.SimpleNamespace(item=item, index=1, first=True, last=True)
+
+
 # Per-blueprint test cases. Each entry supplies values for every `!input`
 # referenced by the file, plus mock context variables for any
 # ``response_variable`` the script consumes and any ``trigger`` it reads.
@@ -257,11 +262,101 @@ BLUEPRINT_CASES: dict[str, dict[str, Any]] = {
         "inputs": {
             "printer": "device_id",
             "todo_entity": "todo.test",
-            "box_style": "double",
+            "style": "double",
             "max_items_per_trigger": 5,
             "cut_per_item": True,
         },
         "context": {"trigger": _trigger_namespace([{"summary": "old"}])},
+    },
+    "blueprints/automation/escpos_printer/doorbell_snapshot.yaml": {
+        "inputs": {
+            "printer": "device_id",
+            "trigger_entity": "binary_sensor.doorbell",
+            "target_state": "on",
+            "camera_entity": "camera.front_door",
+            "title": "VISITOR",
+            "rotation": "0",
+            "dither": "floyd-steinberg",
+            "style": "double",
+        },
+        "context": {},
+    },
+    "blueprints/automation/escpos_printer/morning_briefing.yaml": {
+        "inputs": {
+            "printer": "device_id",
+            "print_time": "07:00:00",
+            "title": "Good morning",
+            "weather_entity": "weather.test",
+            "forecast_days": 3,
+            "max_condition_length": 10,
+            "calendar_entity": "calendar.test",
+            "lookahead_hours": 18,
+            "max_title_length": 32,
+            "footer": "Have a great day",
+            "style": "double",
+        },
+        "context": {
+            "forecast_response": _FORECAST_RESPONSE,
+            "cal_response": _CAL_RESPONSE,
+        },
+    },
+    "blueprints/automation/escpos_printer/todo_ticket.yaml": {
+        "inputs": {
+            "printer": "device_id",
+            "todo_entity": "todo.test",
+            "header_text": "NEW TASK",
+            "print_qr": True,
+            "url_template": "https://app.todoist.com/app/task/{{ uid }}",
+            "qr_size": 5,
+            "print_description": True,
+            "max_description_length": 280,
+            "max_items_per_trigger": 5,
+            "cut_per_item": True,
+            "style": "double",
+        },
+        "context": {
+            "trigger": _trigger_namespace(
+                [{"uid": "old-uid", "summary": "Old task"}]
+            ),
+            "repeat": _repeat_namespace(
+                {
+                    "uid": "new-uid",
+                    "summary": "New task",
+                    "due": "2026-05-26T10:00:00+00:00",
+                    "description": "A description",
+                }
+            ),
+        },
+    },
+    "blueprints/automation/escpos_printer/trash_reminder.yaml": {
+        "inputs": {
+            "printer": "device_id",
+            "print_time": "19:00:00",
+            "offset_days": 1,
+            "title": "Tomorrow's Bins",
+            "monday": "Trash",
+            "tuesday": "Recycling",
+            "wednesday": "",
+            "thursday": "",
+            "friday": "",
+            "saturday": "",
+            "sunday": "",
+            "style": "double",
+        },
+        "context": {},
+    },
+    "blueprints/script/escpos_printer/guest_wifi_qr.yaml": {
+        "inputs": {
+            "printer": "device_id",
+            "ssid": "GuestNet",
+            "password": "s3cret;pass",
+            "security": "WPA",
+            "hidden": False,
+            "title": "Guest Wi-Fi",
+            "qr_size": 7,
+            "show_password": True,
+        },
+        "context": {},
     },
 }
 
