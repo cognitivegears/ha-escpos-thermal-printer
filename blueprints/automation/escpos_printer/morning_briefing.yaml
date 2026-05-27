@@ -1,0 +1,255 @@
+blueprint:
+  name: ESC/POS — Morning Briefing
+  description: >
+    A single morning slip combining weather, today's calendar, and a
+    footer line (sun times, current temperature, or a custom one-liner).
+    Fires at a configured time of day and prints once.
+
+    Each section is optional — leave the weather or calendar entity
+    unset and that section is skipped. If both are unset you'll get
+    just the header + footer (still useful as a date stamp).
+  domain: automation
+  source_url: https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/blueprints/automation/escpos_printer/morning_briefing.yaml
+  input:
+    printer:
+      name: Printer
+      description: ESC/POS printer device to print to.
+      selector:
+        device:
+          integration: escpos_printer
+    print_time:
+      name: Print time
+      description: Time of day to print the briefing.
+      default: "07:00:00"
+      selector:
+        time: {}
+    title:
+      name: Title
+      description: Header text above the briefing.
+      default: Good morning
+      selector:
+        text: {}
+    weather_entity:
+      name: Weather entity (optional)
+      description: Weather provider for the forecast section. Leave unset to skip.
+      default: ""
+      selector:
+        entity:
+          domain: weather
+    forecast_days:
+      name: Forecast days
+      description: Days of forecast to include when a weather entity is set.
+      default: 3
+      selector:
+        number:
+          min: 1
+          max: 7
+          step: 1
+          mode: slider
+    max_condition_length:
+      name: Condition truncation
+      description: Trim the condition string so the table fits a narrow printer.
+      default: 10
+      selector:
+        number:
+          min: 4
+          max: 40
+          step: 1
+    calendar_entity:
+      name: Calendar entity (optional)
+      description: Calendar to fetch today's agenda from. Leave unset to skip.
+      default: ""
+      selector:
+        entity:
+          domain: calendar
+    lookahead_hours:
+      name: Calendar lookahead (hours)
+      description: How far forward to read events. 18h captures today + early-evening items.
+      default: 18
+      selector:
+        number:
+          min: 1
+          max: 48
+          step: 1
+    max_title_length:
+      name: Event title truncation
+      description: Trim each event title so the agenda table fits a narrow printer.
+      default: 32
+      selector:
+        number:
+          min: 8
+          max: 80
+          step: 1
+    footer:
+      name: Footer
+      description: >
+        Optional one-line footer rendered as a Jinja template. Leave
+        blank to skip. Example —
+        "Sunrise {{ state_attr('sun.sun', 'next_rising') | as_timestamp | timestamp_custom('%H:%M', true) }}".
+      default: ""
+      selector:
+        text:
+          multiline: true
+    style:
+      name: Border style
+      default: auto
+      selector:
+        select:
+          options:
+            - auto
+            - single
+            - double
+            - ascii
+            - asterisk
+            - hash
+            - none
+# single — the briefing runs at a fixed time of day; if a previous fire is still
+# printing we drop new ones rather than re-print mid-stream.
+mode: single
+trigger:
+  - platform: time
+    at: !input print_time
+variables:
+  weather_entity_id: !input weather_entity
+  calendar_entity_id: !input calendar_entity
+  footer_input: !input footer
+  has_weather: "{{ (weather_entity_id | default('') | string) | length > 0 }}"
+  has_calendar: "{{ (calendar_entity_id | default('') | string) | length > 0 }}"
+  has_footer: "{{ (footer_input | default('') | string) | trim | length > 0 }}"
+action:
+  # Text-mode date header (double-width / double-height / bold). Works
+  # on image-less printers; ``print_text_utf8`` keeps locale-aware date
+  # strings (e.g. accented month names) intact when transcoded.
+  - service: escpos_printer.print_text_utf8
+    target:
+      device_id: !input printer
+    data:
+      text: "{{ now().strftime('%A, %b %d') }}"
+      align: center
+      bold: true
+      width: double
+      height: double
+      feed: 1
+  - service: escpos_printer.print_box
+    target:
+      device_id: !input printer
+    data:
+      text: !input title
+      style: !input style
+      align: center
+      padding: 1
+  - if:
+      - condition: template
+        value_template: "{{ has_weather }}"
+    then:
+      - service: weather.get_forecasts
+        target:
+          entity_id: !input weather_entity
+        data:
+          type: daily
+        response_variable: forecast_response
+      - variables:
+          forecast_days: !input forecast_days
+          max_condition_length: !input max_condition_length
+          forecast: >
+            {{ ((((forecast_response | default({})).values() | list | first) or {}).forecast | default([]))[:forecast_days] }}
+          forecast_header: [["Day", "Hi", "Lo", "Cond"]]
+          forecast_rows: >
+            {% set ns = namespace(out=forecast_header) %}
+            {% for f in forecast %}
+              {% set day = (f.datetime | as_datetime).strftime('%a') %}
+              {# Some providers (accuweather, met.no fallback) emit null
+                 for temperature / condition when data is missing — mirror
+                 the templow defensive pattern across all fields. #}
+              {% set hi = (f.temperature | round(0) | string) if f.temperature is defined and f.temperature is not none else '-' %}
+              {% set lo = (f.templow | round(0) | string) if f.templow is defined and f.templow is not none else '-' %}
+              {% set cond = (f.condition | string)[:max_condition_length] if f.condition is defined and f.condition is not none else '-' %}
+              {% set ns.out = ns.out + [[day, hi, lo, cond]] %}
+            {% endfor %}
+            {{ ns.out if forecast | length > 0 else (forecast_header + [['-', '-', '-', 'No data']]) }}
+      - service: escpos_printer.print_text
+        target:
+          device_id: !input printer
+        data:
+          text: "Weather"
+          align: center
+      - service: escpos_printer.print_table
+        target:
+          device_id: !input printer
+        data:
+          rows: "{{ forecast_rows }}"
+          style: !input style
+          header: true
+          column_aligns: ["left", "right", "right", "left"]
+  - if:
+      - condition: template
+        value_template: "{{ has_calendar }}"
+    then:
+      - service: calendar.get_events
+        target:
+          entity_id: !input calendar_entity
+        data:
+          duration:
+            hours: !input lookahead_hours
+        response_variable: cal_response
+      - variables:
+          max_title_length: !input max_title_length
+          events: >
+            {{ ((((cal_response | default({})).values() | list | first) or {}).get('events', [])) }}
+          kv_items: >
+            {% set ns = namespace(out=[]) %}
+            {% for ev in events %}
+              {# All-day events return start as a mapping ({date: "..."}),
+                 timed events return a string. `as_datetime` on a mapping
+                 raises and aborts the whole automation — branch on shape
+                 and surface 'all-day' as the label. #}
+              {% set start_raw = ev.start %}
+              {% if start_raw is mapping %}
+                {% set start = 'all-day' %}
+              {% else %}
+                {% set start = (start_raw | as_datetime | as_local).strftime('%H:%M') %}
+              {% endif %}
+              {% set summary = (ev.summary | default('') | string).replace('\n', ' ').replace('\r', ' ').replace('|', '/').replace('\t', ' ') | trim %}
+              {% set ns.out = ns.out + [[start, summary[:max_title_length]]] %}
+            {% endfor %}
+            {{ ns.out if ns.out | length > 0 else [['-', 'No events today']] }}
+      - service: escpos_printer.print_text
+        target:
+          device_id: !input printer
+        data:
+          text: "Agenda"
+          align: center
+      - service: escpos_printer.print_kvtable
+        target:
+          device_id: !input printer
+        data:
+          items: "{{ kv_items }}"
+          value_align: left
+          # 7 cols fits both "HH:MM" timed events and "all-day" labels.
+          label_width: 7
+  - if:
+      - condition: template
+        value_template: "{{ has_footer }}"
+    then:
+      - service: escpos_printer.print_separator
+        target:
+          device_id: !input printer
+      # UTF-8 transcoding: the footer is a user-supplied template that often
+      # renders weather/sun glyphs, degree signs, etc. ``print_text`` (raw)
+      # would corrupt anything beyond plain ASCII.
+      - service: escpos_printer.print_text_utf8
+        target:
+          device_id: !input printer
+        data:
+          text: !input footer
+          align: center
+  - service: escpos_printer.print_separator
+    target:
+      device_id: !input printer
+    data:
+      char: "="
+  - service: escpos_printer.cut
+    target:
+      device_id: !input printer
+    data:
+      mode: full

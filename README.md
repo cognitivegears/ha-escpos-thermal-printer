@@ -14,12 +14,16 @@ start printing in minutes.
 
 - **Automate physical output** - Print door access logs, temperature alerts,
 todo lists, daily reports, or shopping lists automatically
+
 - **Works with cheap hardware** - Any $30+ thermal printer (network, USB, or bluetooth)
 that supports ESC/POS will work
+
 - **Network, USB, and bluetooth support** - Connect via TCP/IP, plug directly via
 USB, or print wirelessly
+
 - **Multiple printers** - Set up as many printers as you need and target them
 individually or broadcast to all
+
 - **No cloud required** - Direct connection to your printers, everything stays local
 
 ## Features

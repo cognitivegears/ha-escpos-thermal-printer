@@ -26,7 +26,7 @@ blueprint:
       selector:
         entity:
           domain: todo
-    box_style:
+    style:
       name: Border style
       default: auto
       selector:
@@ -87,7 +87,7 @@ action:
               data:
                 text: >
                   + {{ (repeat.item | string).replace('\n', ' ').replace('\r', ' ').replace('|', '/').replace('\t', ' ') | trim }}
-                style: !input box_style
+                style: !input style
                 align: left
                 padding: 0
             - service: escpos_printer.print_separator

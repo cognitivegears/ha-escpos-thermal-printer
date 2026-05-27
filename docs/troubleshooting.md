@@ -12,6 +12,7 @@ telnet <PRINTER_IP> 9100   # blank screen = reachable; Ctrl+] then `quit` to exi
 ```
 
 Common causes:
+
 - Wrong IP (print a network status page from the printer itself)
 - Printer in sleep mode
 - Firewall blocking port 9100
@@ -60,11 +61,14 @@ Try a different cable / port. Verify the printer is powered on.
 libusb's generic I/O error — usually USB autosuspend or another driver holds the device.
 
 Fixes:
+
 - Replug the printer.
 - Disable USB autosuspend:
+
   ```bash
   echo -1 > /sys/bus/usb/devices/usb*/power/autosuspend
   ```
+
 - Stop other apps holding the device (CUPS, lp drivers).
 
 ### "USB backend missing"

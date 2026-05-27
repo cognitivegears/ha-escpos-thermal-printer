@@ -95,6 +95,7 @@ async def test_with_virtual_printer():
 ```
 
 **Key Features:**
+
 - ESCPOS command parsing (text, QR, barcode, images, etc.)
 - Printer state management (online/offline, paper status)
 - Error simulation (offline, timeout, paper out, etc.)
@@ -136,6 +137,7 @@ async def test_with_ha_environment(hass):
 ```
 
 **Key Features:**
+
 - Isolated HA instance setup
 - State change simulation
 - Automation testing framework
@@ -168,6 +170,7 @@ async def test_with_fixtures(printer_with_ha, temp_image_file):
 ```
 
 **Available Fixtures:**
+
 - `virtual_printer`: Standalone virtual printer server
 - `ha_test_environment`: HA test environment
 - `printer_with_ha`: Combined printer and HA environment
@@ -446,12 +449,14 @@ async def test_concurrent_operations(printer_with_ha):
 ### Debugging Tips
 
 1. **Enable Debug Logging**:
+
    ```python
    import logging
    logging.getLogger('tests.integration_tests').setLevel(logging.DEBUG)
    ```
 
 2. **Inspect Command History**:
+
    ```python
    commands = await printer.get_command_log()
    for cmd in commands:
@@ -459,6 +464,7 @@ async def test_concurrent_operations(printer_with_ha):
    ```
 
 3. **Check Service Calls**:
+
    ```python
    service_calls = ha_env.get_service_calls()
    for call in service_calls:

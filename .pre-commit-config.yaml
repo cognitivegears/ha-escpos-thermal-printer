@@ -18,7 +18,17 @@ repos:
         entry: python scripts/validate_blueprints.py blueprints
         language: python
         additional_dependencies: [pyyaml]
-        files: ^blueprints/.*\.yaml$
+        files: ^blueprints/.*\.(yaml|yml)$
+        pass_filenames: false
+      - id: extract-markdown-bash
+        name: Lint and smoke-test bash blocks in blueprint markdown
+        entry: python scripts/extract_markdown_bash.py blueprints
+        language: python
+        # Stdlib only. ``shellcheck`` is invoked via PATH; the script
+        # soft-warns (not errors) if missing, so this hook stays green
+        # on hosts without it. Smoke-exec runs the SIGPIPE-class
+        # password-generator pipeline 10× to catch regressions.
+        files: ^blueprints/.*\.md$
         pass_filenames: false
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -47,3 +57,24 @@ repos:
     rev: v8.21.2
     hooks:
       - id: gitleaks
+
+  # Markdown linting on every tracked .md file. Config at
+  # .pymarkdown.json disables MD013 (line-length, incompatible with
+  # prose-style one-paragraph-per-line markdown), MD036 (bold-as-
+  # pseudo-heading; this repo uses **Inputs:** / **Notes:** as
+  # in-paragraph labels intentionally), and narrows MD024 to
+  # siblings_only (CHANGELOG has ### Added under every ## [version]).
+  # NOTE: `scan` only — do NOT add the `fix` action. pymarkdown's
+  # autofix mangles fenced code blocks indented inside list items and
+  # rewrites `+` prose conjunctions to `-` list markers; fix
+  # findings by hand using `scripts/md_fix.py` (safe targeted fixer).
+  - repo: https://github.com/jackdewinter/pymarkdown
+    rev: v0.9.37
+    hooks:
+      - id: pymarkdown
+        args: [--config, .pymarkdown.json, scan]
+        # Lint every markdown file the repo ships. Exclude build /
+        # cache directories and the in-flight .full-review/ snapshots
+        # (those are review artefacts, not user-facing docs).
+        files: \.md$
+        exclude: ^(dist/|\.full-review/|\.pytest_cache/|node_modules/|\.venv/)

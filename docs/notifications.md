@@ -3,6 +3,7 @@
 Each configured printer gets a `notify.*` entity. You can target it like any other notify service.
 
 Entity-name examples:
+
 - Network: `notify.esc_pos_printer_192_168_1_100_9100`
 - USB: `notify.esc_pos_printer_usb_04b8_0e03`
 - Bluetooth: `notify.esc_pos_printer_aa_bb_cc_dd_ee_ff`

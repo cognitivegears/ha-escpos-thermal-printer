@@ -1615,6 +1615,7 @@ The integration edge case tests require significant enhancements to the Home Ass
 5. **Automation Testing**: Tools for testing complex automations and triggers
 
 These tests will verify that the ESCPOS integration:
+
 - Properly interacts with other Home Assistant components
 - Handles complex template rendering in print content
 - Manages its lifecycle appropriately (startup, shutdown, reload)

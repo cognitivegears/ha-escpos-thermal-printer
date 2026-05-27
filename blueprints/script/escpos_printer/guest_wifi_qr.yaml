@@ -1,0 +1,166 @@
+blueprint:
+  name: ESC/POS — Guest Wi-Fi QR
+  description: >
+    Print a scannable Wi-Fi QR code plus the credentials in
+    human-readable form. Scanning the QR with a modern phone offers
+    "Join network" with one tap; the printed SSID / password is the
+    fallback for devices without a QR scanner.
+
+    The encoded payload follows the ZXing "WIFI" URI scheme —
+    "WIFI:T:<auth>;S:<ssid>;P:<password>;H:<hidden>;;" — which is the
+    de-facto standard supported by iOS Camera (15+), Google Camera,
+    Android system scanner, Windows Camera, and macOS. There is no
+    IETF / IEEE standard for this format, but every consumer QR
+    scanner implements ZXing's. Reserved characters (\, ;, ,, :, ")
+    in the SSID / password are backslash-escaped per spec.
+
+    The "ssid" and "password" inputs accept Jinja templates, so you
+    can pull credentials from HA entities instead of hardcoding —
+    e.g. "{{ states('input_text.guest_wifi_password') }}", or a REST
+    sensor scraping your router. See blueprints/README.md for the
+    UniFi recipe.
+  domain: script
+  source_url: https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/blueprints/script/escpos_printer/guest_wifi_qr.yaml
+  input:
+    printer:
+      name: Printer
+      description: ESC/POS printer device to print to.
+      selector:
+        device:
+          integration: escpos_printer
+    ssid:
+      name: SSID
+      description: Network name to join.
+      selector:
+        text: {}
+    password:
+      name: Password
+      description: >
+        Pre-shared key for WPA / WEP networks. Leave blank only for
+        open networks (and pick "nopass" for "Security"). A blank
+        password combined with "WPA" / "WEP" produces a technically
+        valid QR that won't authenticate — phones will scan it and
+        then immediately fail to join.
+      default: ""
+      selector:
+        text: {}
+    security:
+      name: Security
+      description: Authentication type for the network.
+      default: WPA
+      selector:
+        select:
+          options:
+            - WPA
+            - WEP
+            - nopass
+    hidden:
+      name: Hidden network
+      description: Mark the network as hidden (broadcasts disabled).
+      default: false
+      selector:
+        boolean: {}
+    title:
+      name: Title
+      description: Header text above the QR.
+      default: Guest Wi-Fi
+      selector:
+        text: {}
+    qr_size:
+      name: QR size
+      description: ESC/POS QR module size (1-16). 6-8 works well for phones at arm's length.
+      default: 7
+      selector:
+        number:
+          min: 1
+          max: 16
+          step: 1
+          mode: slider
+    show_password:
+      name: Print password as text
+      description: >
+        Also print the credentials in plain text below the QR. Turn off
+        for a more secure share — anyone seeing the printout could only
+        join by scanning.
+      default: true
+      selector:
+        boolean: {}
+# queued — multiple manual fires should each print rather than drop the second.
+mode: queued
+max_exceeded: silent
+sequence:
+  - variables:
+      ssid_input: !input ssid
+      password_input: !input password
+      security_input: !input security
+      hidden_input: !input hidden
+      show_password: !input show_password
+      # WIFI URI escaping: ;,:\" are reserved. Replace with the spec's backslash escape.
+      ssid_escaped: >
+        {{ (ssid_input | string)
+           | replace('\\', '\\\\') | replace(';', '\\;')
+           | replace(',', '\\,') | replace(':', '\\:')
+           | replace('"', '\\"') }}
+      password_escaped: >
+        {{ (password_input | string)
+           | replace('\\', '\\\\') | replace(';', '\\;')
+           | replace(',', '\\,') | replace(':', '\\:')
+           | replace('"', '\\"') }}
+      wifi_uri: >-
+        WIFI:T:{{ security_input }};S:{{ ssid_escaped }};{% if security_input != 'nopass' and password_input | length > 0 %}P:{{ password_escaped }};{% endif %}{% if hidden_input %}H:true;{% endif %};
+      credentials_table: >
+        {% set ns = namespace(out=[]) %}
+        {% set ns.out = ns.out + [['SSID', ssid_input]] %}
+        {% if security_input != 'nopass' and password_input | length > 0 %}
+          {% set ns.out = ns.out + [['Password', password_input]] %}
+        {% endif %}
+        {% set ns.out = ns.out + [['Security', security_input]] %}
+        {{ ns.out }}
+  # Text-mode header (double-width / double-height / bold). Keeps the
+  # blueprint usable on image-less printers; ``print_text_utf8``
+  # transcodes UTF-8 titles (apostrophes, accents) to the codepage.
+  - service: escpos_printer.print_text_utf8
+    target:
+      device_id: !input printer
+    data:
+      text: !input title
+      align: center
+      bold: true
+      width: double
+      height: double
+      feed: 1
+  - service: escpos_printer.print_qr
+    target:
+      device_id: !input printer
+    data:
+      data: "{{ wifi_uri }}"
+      size: !input qr_size
+      ec: "M"
+      align: center
+      feed: 1
+  - if:
+      - condition: template
+        value_template: "{{ show_password }}"
+    then:
+      - service: escpos_printer.print_kvtable
+        target:
+          device_id: !input printer
+        data:
+          items: "{{ credentials_table }}"
+          value_align: left
+  - service: escpos_printer.print_text
+    target:
+      device_id: !input printer
+    data:
+      text: "Scan to join, or enter the credentials manually."
+      align: center
+  - service: escpos_printer.print_separator
+    target:
+      device_id: !input printer
+    data:
+      char: "="
+  - service: escpos_printer.cut
+    target:
+      device_id: !input printer
+    data:
+      mode: full

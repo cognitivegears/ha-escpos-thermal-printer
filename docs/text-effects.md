@@ -96,7 +96,7 @@ data:
   feed: 1
 ```
 
-```
+```text
 ┌──────────────────────────────────────────────┐
 │                                              │
 │                 DAILY REPORT                 │
@@ -114,7 +114,7 @@ data:
   total_width: 32
 ```
 
-```
+```text
 +------------------------------+
 |Sensor alert: garage door has |
 |been open for 30 minutes.     |
@@ -173,7 +173,7 @@ data:
   feed: 2
 ```
 
-```
+```text
 ┌────────────────────────────┬─────┬─────────┐
 │Item                        │ Qty │    Price│
 ├────────────────────────────┼─────┼─────────┤
@@ -198,7 +198,7 @@ data:
   column_aligns: ["left", "right"]
 ```
 
-```
+```text
 Coffee x2                                  $6.00
 Bagel                                      $3.50
 Croissant                                  $4.25
@@ -424,7 +424,7 @@ data:
 
 Result on a 48-column printer:
 
-```
+```text
 Subtotal                                 $10.00
 Tax                                       $0.80
 Total                                    $10.80
@@ -483,7 +483,7 @@ response_variable: preview
 
 The file (`/tmp/preview.txt`) contains exactly what would print:
 
-```
+```text
 ┌────────────────┬──────┬───────┐
 │Item            │ Qty  │ Price │
 ├────────────────┼──────┼───────┤
@@ -593,7 +593,7 @@ gridlines drift.
 The **first time** `print_box`, `print_table`, or `print_kvtable`
 sees wide-width characters in the input it logs a one-shot warning:
 
-```
+```text
 Box content contains wide-width characters (CJK / fullwidth /
 emoji); the borders may misalign because textwrap wraps by
 code-point count, not display columns. Use print_text_image for

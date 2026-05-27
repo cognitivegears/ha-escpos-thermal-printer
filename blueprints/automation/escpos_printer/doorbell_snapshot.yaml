@@ -1,0 +1,135 @@
+blueprint:
+  name: ESC/POS — Doorbell Snapshot
+  description: >
+    When a doorbell, motion sensor, or arrival button transitions to a
+    target state, print a captioned camera snapshot — title, the live
+    frame from a camera entity, and a timestamp footer. Mount the
+    printer on the fridge and you have a tangible visitor log.
+
+    Use the printer device's "Reliability profile" + the snapshot
+    options (rotation, dither) to tune for your camera; floyd-steinberg
+    dithering works well for live RGB frames.
+  domain: automation
+  source_url: https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/blueprints/automation/escpos_printer/doorbell_snapshot.yaml
+  input:
+    printer:
+      name: Printer
+      description: ESC/POS printer device to print to.
+      selector:
+        device:
+          integration: escpos_printer
+    trigger_entity:
+      name: Trigger entity
+      description: >
+        Entity that fires the print — a doorbell button, motion sensor,
+        or any state-changing entity (binary_sensor, event, input_boolean).
+      selector:
+        entity: {}
+    target_state:
+      name: Target state
+      description: >
+        State value that triggers the snapshot. "on" matches most
+        binary_sensors and motion detectors; for event entities you may
+        want the event type instead.
+      default: "on"
+      selector:
+        text: {}
+    camera_entity:
+      name: Camera
+      description: Camera entity to snapshot when triggered.
+      selector:
+        entity:
+          domain: camera
+    title:
+      name: Title
+      description: Large header printed above the snapshot.
+      default: VISITOR
+      selector:
+        text: {}
+    rotation:
+      name: Snapshot rotation
+      description: Rotate the camera frame before printing (degrees, clockwise).
+      default: "0"
+      selector:
+        select:
+          options:
+            - "0"
+            - "90"
+            - "180"
+            - "270"
+    dither:
+      name: Dither mode
+      description: >
+        How to convert the colour frame to 1-bit B&W. floyd-steinberg
+        works best for photos; threshold gives crisper edges on
+        cartoon-style overlays.
+      default: floyd-steinberg
+      selector:
+        select:
+          options:
+            - floyd-steinberg
+            - none
+            - threshold
+    style:
+      name: Title border style
+      default: auto
+      selector:
+        select:
+          options:
+            - auto
+            - single
+            - double
+            - ascii
+            - asterisk
+            - hash
+            - none
+# queued — successive triggers (repeated motion, mashed doorbell) should each
+# print rather than drop. The camera-snapshot service serialises per printer.
+mode: queued
+max_exceeded: silent
+trigger:
+  - platform: state
+    entity_id: !input trigger_entity
+    to: !input target_state
+variables:
+  trigger_entity_id: !input trigger_entity
+action:
+  - service: escpos_printer.print_box
+    target:
+      device_id: !input printer
+    data:
+      text: !input title
+      style: !input style
+      align: center
+      padding: 1
+  # ``continue_on_error: true`` — if the camera entity is unavailable
+  # (offline, mid-reboot, network blip) we still want the title + "From"
+  # / "Time" footer on paper so the visitor log isn't silently empty.
+  - service: escpos_printer.print_camera_snapshot
+    target:
+      device_id: !input printer
+    data:
+      camera_entity: !input camera_entity
+      rotation: !input rotation
+      dither: !input dither
+      align: center
+      feed: 1
+    continue_on_error: true
+  - service: escpos_printer.print_kvtable
+    target:
+      device_id: !input printer
+    data:
+      items:
+        - ["From", "{{ state_attr(trigger_entity_id, 'friendly_name') or trigger_entity_id }}"]
+        - ["Time", "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"]
+      value_align: left
+  - service: escpos_printer.print_separator
+    target:
+      device_id: !input printer
+    data:
+      char: "="
+  - service: escpos_printer.cut
+    target:
+      device_id: !input printer
+    data:
+      mode: full

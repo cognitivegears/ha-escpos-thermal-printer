@@ -120,7 +120,8 @@ docker compose down
 The Docker setup mounts `custom_components/` into the container. Changes to your code are reflected after restarting Home Assistant.
 
 Once running:
-1. Open http://localhost:8123
+
+1. Open <http://localhost:8123>
 2. Complete the onboarding wizard
 3. Go to **Settings** > **Devices & services** > **Add Integration**
 4. Search for "ESC/POS Thermal Printer"

@@ -1,0 +1,156 @@
+blueprint:
+  name: ESC/POS — Trash & Recycling Reminder
+  description: >
+    Prints a reminder slip listing which bins go out on the target
+    day. Configure the bins for each weekday — empty days are skipped
+    (no print). Bin descriptions can be a single bin ("Trash") or
+    several ("Trash + Yard Waste").
+
+    Driven by a daily time trigger that looks at the target weekday
+    (controlled by "Day offset"). With the defaults (offset = 1,
+    print_time = 19:00), set "Tuesday: Recycling" and the slip fires
+    on Monday evening. With offset = 0 + an early print_time, you get
+    a morning-of reminder instead.
+  domain: automation
+  source_url: https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/blueprints/automation/escpos_printer/trash_reminder.yaml
+  input:
+    printer:
+      name: Printer
+      description: ESC/POS printer device to print to.
+      selector:
+        device:
+          integration: escpos_printer
+    print_time:
+      name: Print time
+      description: Time of day to print the reminder.
+      default: "19:00:00"
+      selector:
+        time: {}
+    offset_days:
+      name: Day offset
+      description: >
+        Which day's bins to look up. 1 = tomorrow (default — the
+        classic "night before pickup" pattern at 19:00). 0 = today (for
+        a morning-of reminder at, say, 06:30).
+      default: 1
+      selector:
+        number:
+          min: 0
+          max: 7
+          step: 1
+          mode: slider
+    title:
+      name: Title
+      description: >
+        Header text for the reminder. The default suits offset=1; for
+        offset=0 a title like "Today's Bins" reads more naturally.
+      default: Tomorrow's Bins
+      selector:
+        text: {}
+    monday:
+      name: Monday pickup
+      description: Bins picked up on Monday — leave blank if none.
+      default: ""
+      selector:
+        text: {}
+    tuesday:
+      name: Tuesday pickup
+      default: ""
+      selector:
+        text: {}
+    wednesday:
+      name: Wednesday pickup
+      default: ""
+      selector:
+        text: {}
+    thursday:
+      name: Thursday pickup
+      default: ""
+      selector:
+        text: {}
+    friday:
+      name: Friday pickup
+      default: ""
+      selector:
+        text: {}
+    saturday:
+      name: Saturday pickup
+      default: ""
+      selector:
+        text: {}
+    sunday:
+      name: Sunday pickup
+      default: ""
+      selector:
+        text: {}
+    style:
+      name: Border style
+      default: auto
+      selector:
+        select:
+          options:
+            - auto
+            - single
+            - double
+            - ascii
+            - asterisk
+            - hash
+            - none
+# single — the reminder runs at a fixed time of day; if a previous fire is still
+# printing we drop new ones rather than re-print the reminder mid-stream.
+mode: single
+trigger:
+  - platform: time
+    at: !input print_time
+variables:
+  offset_days: !input offset_days
+  bins_map:
+    monday: !input monday
+    tuesday: !input tuesday
+    wednesday: !input wednesday
+    thursday: !input thursday
+    friday: !input friday
+    saturday: !input saturday
+    sunday: !input sunday
+  # ``now() + timedelta(...)`` is computed inline rather than stored in
+  # an intermediate variable: HA's ``render_complex`` evaluates each
+  # ``variables:`` entry with ``parse_result=True``, which stringifies
+  # the datetime — a later ``target_date.strftime(...)`` then fails with
+  # "'str object' has no attribute 'strftime'". Computing inline keeps
+  # the datetime native to the expression.
+  target_day_name: "{{ (now() + timedelta(days=offset_days | int)).strftime('%A').lower() }}"
+  target_label: "{{ (now() + timedelta(days=offset_days | int)).strftime('%a %b %d') }}"
+  bins_for_target: >
+    {{ (bins_map[target_day_name] | default('') | string)
+       .replace('\n', ' ').replace('\r', ' ').replace('|', '/').replace('\t', ' ') | trim }}
+action:
+  - if:
+      - condition: template
+        value_template: "{{ bins_for_target | length > 0 }}"
+    then:
+      - service: escpos_printer.print_box
+        target:
+          device_id: !input printer
+        data:
+          text: !input title
+          style: !input style
+          align: center
+          padding: 1
+      - service: escpos_printer.print_kvtable
+        target:
+          device_id: !input printer
+        data:
+          items:
+            - ["When", "{{ target_label }}"]
+            - ["Bins", "{{ bins_for_target }}"]
+          value_align: left
+      - service: escpos_printer.print_separator
+        target:
+          device_id: !input printer
+        data:
+          char: "="
+      - service: escpos_printer.cut
+        target:
+          device_id: !input printer
+        data:
+          mode: full

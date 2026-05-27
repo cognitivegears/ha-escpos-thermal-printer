@@ -1,6 +1,6 @@
 [project]
 name = "ha-escpos-thermal-printer"
-version = "0.7.0"
+version = "0.7.1"
 description = "Network thermal printer integration for Home Assistant using ESC/POS protocol"
 readme = "README.md"
 requires-python = ">=3.14.2"
@@ -220,6 +220,17 @@ ignore = [
 "custom_components/escpos_printer/text_effects/font_render.py" = ["PLR0912", "PLR0915"]
 "custom_components/escpos_printer/printer/base_adapter.py" = [
     "BLE001", "PLR0915",
+]
+# Repo tooling under scripts/ — sub-process helpers that invoke shellcheck /
+# bash / pre-commit via PATH. S603/S607 (subprocess call / partial executable
+# path) are explicit design choices for these utility scripts; suppressing
+# at the file level avoids per-call ``# noqa`` clutter.
+"scripts/*" = [
+    "S603",    # subprocess call: input is hard-coded list, not untrusted
+    "S607",    # partial executable path: PATH lookup is intentional
+    "T201",    # print statements ok for CLI tools
+    "PLR0915", # CLI helpers can have many statements
+    "PLR0912", # CLI helpers can have many branches
 ]
 
 [tool.ruff.lint.isort]

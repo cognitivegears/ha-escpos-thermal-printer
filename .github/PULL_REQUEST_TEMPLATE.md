@@ -22,8 +22,8 @@ review time. Delete sections that don't apply.
 - [ ] **`CHANGELOG.md`** has an entry under `[Unreleased]` describing the
   change. Security-relevant fixes go under `### Security`; user-visible
   behaviour changes go under `### Changed` or `### Breaking changes`.
-- [ ] If a service surface changed, `services.yaml` + `docs/services.md`
-  + the relevant `docs/*.md` were updated in lockstep.
+- [ ] If a service surface changed, `services.yaml` + `docs/services.md` +
+  the relevant `docs/*.md` were updated in lockstep.
 - [ ] If a dependency changed, `manifest.json` and `pyproject.toml`
   are in sync (`python scripts/check_requirements_sync.py`).
 - [ ] If any inline docstring became inaccurate, it was updated.

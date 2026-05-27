@@ -7,6 +7,210 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-05-26
+
+### Breaking changes
+
+- **`blueprints/automation/escpos_printer/todo_item.yaml`** input
+  renamed from `box_style` → `style` to match the convention used by
+  every other blueprint in the pack (the 5 new ones, plus the 8
+  pre-existing). Existing scripts created from this blueprint will need
+  to be re-saved (HA will show the input as unset on the next edit and
+  default it to `auto`). The single-input change is otherwise
+  semantically identical — same border-style options, same default.
+
+### Added
+
+- **`blueprints/automation/escpos_printer/doorbell_snapshot.yaml`** —
+  on doorbell button / motion / state-trigger entity firing, prints a
+  titled camera snapshot (via `print_camera_snapshot`) with a "From /
+  Time" footer. Configurable rotation, dither mode, and border style.
+  The snapshot service call carries `continue_on_error: true` so a
+  camera that's offline or mid-reboot still produces the title +
+  timestamp slip rather than silently skipping the whole automation.
+- **`blueprints/automation/escpos_printer/morning_briefing.yaml`** —
+  single morning slip combining a date header, optional weather
+  forecast table, optional today's calendar agenda, and a templated
+  one-line footer. Each section is independently optional — leave the
+  matching entity blank to skip. Defensive against null `temperature` /
+  `condition` from providers (accuweather, met.no fallback) and against
+  all-day calendar events (which return `start` as `{date: "..."}`
+  rather than a string — caught both crashes during pre-merge review).
+- **`blueprints/automation/escpos_printer/trash_reminder.yaml`** —
+  fires daily at a configured time and looks at the target weekday
+  (`offset_days` default 1 = tomorrow's bins; set to 0 with an earlier
+  `print_time` for a morning-of reminder). Seven per-weekday text
+  inputs hold bin descriptions; empty days silently skip so the
+  reminder only prints on the actual pickup days.
+- **`blueprints/automation/escpos_printer/todo_ticket.yaml`** —
+  upgraded counterpart to `todo_item`. Per new task, prints a
+  job-ticket slip with a bold double-width title (pure text mode —
+  works on image-less printers), a Due / List / Added KV table,
+  optional description, and a QR code linking back to the source task.
+  `url_template` is a Jinja template with `uid` / `summary` / `due` /
+  `description` in scope (default targets Todoist's web URL); QR
+  auto-skips when `uid` is empty so the blueprint is safe across mixed
+  back-ends (local lists, Google Tasks). Header text ("NEW TASK") is
+  configurable via the `header_text` input. New-item detection diffs
+  on `uid` first (with summary fallback) so two tasks with the same
+  title don't dedup and renames don't look like add+drop.
+- **`blueprints/script/escpos_printer/guest_wifi_qr.yaml`** — prints
+  a scannable Wi-Fi QR encoding the standard
+  `WIFI:T:<auth>;S:<ssid>;P:<pass>;H:<hidden>;;` URI (supported by iOS
+  / Android / most laptop camera apps), with proper backslash-escaping
+  of reserved characters in SSID and password, plus optional plaintext
+  fallback for devices without a QR scanner.
+- **`blueprints/UNIFI_GUEST_WIFI.md`** — opinionated, ~10-minute
+  recipe pairing the Guest Wi-Fi QR blueprint with the **official HA
+  UniFi integration**. One shell script (`unifi_wifi.sh` with `read` /
+  `rotate` actions) that pulls credentials directly from HA's existing
+  UniFi config entry (`.storage/core.config_entries`) via `jq` — no
+  `.env` dotfiles, no separate `input_text` helpers, no `secrets.yaml`
+  edit, no duplicate secret storage. The script handles UniFi OS
+  cookie auth + CSRF token extraction; rotation generates a 16-char
+  password from a visually-readable alphabet (57-char set, ~93 bits)
+  and PUTs the partial-document update. Rotation password generation
+  uses scoped `set +o pipefail` to dodge `tr | head` SIGPIPE plus a
+  length-postcondition assertion. HA wiring is one `command_line:`
+  sensor (hourly poll), one `shell_command:`, one HA script (rotate →
+  refresh sensor → wait for the sensor to reflect the rotated value →
+  print), one monthly automation, two Lovelace buttons (Print current
+  / Rotate now). 5-step setup with a verification checklist and a
+  top-5 gotcha list. Linked from `blueprints/README.md` under
+  "Integration recipes." Security-model section covers where
+  credentials live, argv visibility window, tempfile cleanup, password
+  strength + alphabet inconsistency, printed-paper exposure, recorder
+  DB retention, and the on-LAN MITM threat model for `--insecure`.
+- **`blueprints/README.md`** — table rows, import badges, and
+  per-blueprint notes for the five new entries (including
+  back-end-specific URL patterns for the TODO Ticket blueprint, an
+  emoji-rendering caveat for text-mode summaries, and a TODO Item /
+  TODO Ticket decision rule). Slimmed from 336 → 147 lines after
+  splitting two long sections into their own files (see below); now
+  acts as the catalogue index with brief per-blueprint notes and
+  pointers to the deeper guides.
+- **`blueprints/AUTHORING.md`** (new) — the full blueprint-authoring
+  guide split out of the README. Covers the drop-in workflow for
+  private blueprints, key HA concepts (`!input` substitution,
+  `mode:` placement, selectors, Jinja rendering at call time),
+  minimal script + automation shapes, a three-tier
+  **"Validating your blueprint"** section (HA's on-import check /
+  generic `yamllint` / this repo's strict `validate_blueprints.py`
+  service-call lint plus the markdown-bash extractor), publishing
+  via raw GitHub URL, the repo-specific conventions for contributors
+  (file location, sanitiser chain, `print_text_utf8` vs
+  `print_text`, the validator + extractor + markdown-lint
+  pipeline), modifying existing blueprints, and resources. Closes
+  the discoverability gap where the only authoring guidance lived
+  in `CLAUDE.md`.
+- **`blueprints/GUEST_WIFI_QR.md`** (new) — Guest Wi-Fi QR setup
+  guide split out of the README's per-blueprint notes (which had
+  grown to ~65 lines of effectively-a-tutorial under what should be
+  a 3-line note). Covers the 2-minute Quick start, helper-backed
+  credentials, automated rotation pointer, and ZXing WIFI URI
+  format details. `UNIFI_GUEST_WIFI.md`'s "Don't need automation?"
+  callout now points here rather than at the README. The Guest Wi-Fi QR section now leads
+  with a "Quick start (works on any router — about 2 minutes)" 6-step
+  walk-through that gets a non-technical user from blueprint import
+  to a printed scan-ready slip without touching YAML or shell
+  scripts. Beneath it: a "store credentials in helpers" step for
+  users who want to edit creds without editing the script, and an
+  "Automating rotation" section that covers UniFi (link to deep
+  doc), other API-capable routers, and the manual-rotate-with-
+  reminder fallback for ISP modems / consumer APs with no API.
+  Format / ZXing details moved to the bottom so they don't
+  intimidate first-time users. Includes a security note about the
+  TODO Ticket `url_template` input — it's rendered with HA's full
+  template scope, so a malicious fork could exfiltrate secrets via
+  the QR payload (humans don't read QRs; their phones do).
+
+### Fixed
+
+- **`blueprints/automation/escpos_printer/trash_reminder.yaml`** —
+  inlined `now() + timedelta(...)` into the `target_day_name` /
+  `target_label` templates. HA's `render_complex` evaluates each
+  `variables:` entry with `parse_result=True`, which stringifies any
+  datetime stored in an intermediate variable; the next template's
+  `target_date.strftime(...)` then crashed with
+  `'str object' has no attribute 'strftime'`. Computing the date inline
+  keeps the datetime native to the expression. Caught by
+  `tests/test_blueprints_template_safety.py` once the new blueprint
+  gained a sandbox render case.
+
+### Changed
+
+- **`blueprints/script/escpos_printer/recipe_card.yaml` and
+  `receipt.yaml`** — both bundled scripts swapped their large serif
+  header from `print_text_image` (raster) to `print_text_utf8`
+  (double-width / double-height / bold, text-mode). The
+  image-rendered headers looked nicer but failed silently on the
+  many ESC/POS printers that don't implement the raster image
+  command family (notably several Bluetooth POS-58 units and
+  budget USB models). Text-mode headers print on every supported
+  printer and still transcode UTF-8 (accents, smart quotes) via the
+  codepage. Users who specifically want the typographic header can
+  re-add `print_text_image` in a fork — it's a one-line change in
+  each blueprint.
+- **`blueprints/script/escpos_printer/recipe_card.yaml` and
+  `blueprints/automation/escpos_printer/todo_ticket.yaml`** — text
+  sanitiser chain now strips `\r` (left over from Windows `\r\n` line
+  endings after splitting on `\n`) in ingredient/step rows and in
+  task descriptions. Previously, pasted-from-Windows content rendered
+  with stray carriage returns. `\n` is still preserved inside
+  multi-paragraph task descriptions (`print_text_utf8` wraps them
+  correctly).
+
+### Added (CI / tooling)
+
+- **`scripts/extract_markdown_bash.py`** — extracts fenced ```bash```
+  blocks from `blueprints/*.md`, writes them to tempfiles, runs
+  `shellcheck`, and (for blocks that include the password-generator
+  pipeline) executes the pipeline 10 times under `set -euo pipefail`
+  to assert `rc=0` and `len=16`. Catches the SIGPIPE-class bug that
+  shipped in the rotation script during this branch's pre-merge
+  review.
+- **`scripts/validate_blueprints.py`** extended with a service-call
+  lint that cross-references every `service: escpos_printer.<name>`
+  call against `custom_components/escpos_printer/services.yaml`,
+  asserts each `<name>` is registered, and validates field names in
+  each `data:` block against the service's voluptuous schema. Catches
+  service-name typos and field-name drift across the 13 bundled
+  blueprints.
+- **`tests/test_blueprints_yaml.py`** gained two regression tests for
+  the new service-call lint: typo'd service name (`print_text_utf`
+  missing `8`) must be flagged; unknown data field on a valid service
+  must be flagged. **`tests/test_markdown_bash.py`** added with three
+  cases: bundled markdown lints cleanly; a fixture re-introducing the
+  SIGPIPE pattern must trip the warning; a fixture with the scoped
+  pipefail + length assertion must pass.
+- **`pymarkdown`** wired in via pre-commit (config at
+  `.pymarkdown.json`) — disables MD013 (line length, incompatible with
+  prose-style markdown), MD036 (bold-as-pseudo-heading is intentional
+  for `**Inputs:**` / `**Notes:**` in-paragraph labels), narrows MD024
+  to siblings-only (so the CHANGELOG's repeated `### Added` headings
+  under different `## [version]` parents are allowed), and disables
+  MD041 (first-line top-level-heading false positive for
+  callout-prefixed docs). Hook scope: **every `.md` file** the repo
+  tracks (excluding `dist/`, `.full-review/`, build / cache dirs).
+  All 31 existing markdown files now lint clean.
+- **`scripts/md_fix.py`** — safe targeted fixer for MD022 / MD031 /
+  MD032 / MD040 (the four "missing blank lines" / "missing language
+  tag" rules that account for >95% of findings on existing docs).
+  Required because `pymarkdown fix` has two demonstrated bugs against
+  this repo's prose: (1) rewrites `+` conjunctions in continuation
+  lines to `-` list markers, breaking sentence meaning (caught in
+  `CLAUDE.md` / `.github/PULL_REQUEST_TEMPLATE.md`); (2) outdents
+  fenced code blocks indented inside list items, breaking the list
+  structure (caught in `docs/troubleshooting.md` /
+  `tests/integration_tests/README.md`). `md_fix.py` is fence-aware
+  (never touches code-block interior), never alters list-marker
+  characters, never adjusts indentation. Reduces a 74-finding
+  scan-result over the full doc set to 3 findings in one pass.
+- **`.pre-commit-config.yaml`** — the `validate-blueprints` hook's
+  file scope widened to `.yaml|.yml`; new `extract-markdown-bash` hook
+  fires on `blueprints/*.md` changes; new `pymarkdown` hook fires on
+  any tracked markdown file.
+
 ## [0.7.0] - 2026-05-24
 
 ### Breaking changes

@@ -72,8 +72,8 @@ docker compose down  # to stop
   `_image_option_fragment()` across the six image services).
   `print_handlers.py` + `control_handlers.py` implement service bodies,
   all routed through the `_for_each_target` helper in
-  `_handler_utils.py` for consistent per-target loop + error wrapping
-  + sanitised exception messages. `target_resolution.py` resolves
+  `_handler_utils.py` for consistent per-target loop + error wrapping +
+  sanitised exception messages. `target_resolution.py` resolves
   `device_id` selectors to config entries.
 
 - **`image_sources.py`** — HA-aware fetcher. Resolves any
