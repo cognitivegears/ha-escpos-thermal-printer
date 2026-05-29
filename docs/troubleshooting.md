@@ -168,6 +168,69 @@ sudo rfcomm connect 0 AA:BB:CC:DD:EE:FF 1  # manual RFCOMM probe
 - **Image doesn't print** — use PNG or JPEG; for URLs verify reachable from HA host; for local files use absolute paths starting with `/config/`.
 - **Image prints solid black** — image is too dark or has alpha issues. Use white background, increase contrast, convert to 1-bit B&W.
 
+### SVG rendering fails on bare-metal Home Assistant Core
+
+If you see an error like `Failed to rasterise SVG (ImportError): No
+module named 'cairosvg'` or `cannot load library 'libcairo.so.2'`, the
+host is missing the `libcairo` system library that the SVG renderer
+links against. The official HA Container / Supervised / OS images
+already ship it; bare-metal HA Core (running in a Python venv on a
+host you manage) needs the package installed manually:
+
+```bash
+# Debian / Ubuntu
+sudo apt-get install -y libcairo2
+
+# Alpine
+sudo apk add cairo
+
+# Fedora / RHEL
+sudo dnf install cairo
+```
+
+Restart Home Assistant after installing. Raster (PNG / JPEG / etc.)
+printing works regardless; only the SVG path needs `libcairo`. See
+[Installation → System library requirements](installation.md#system-library-requirements).
+
+### SVG renders blank where an `<image>` should appear
+
+External resource fetches inside SVGs are blocked for security
+(`unsafe=False` makes cairosvg refuse `http://`, `https://`, and
+`file://` references). Inline the referenced image as a `data:` URI
+in your SVG, or pre-render the SVG to PNG before sending.
+
+### `SVG too large` / `SVG has too many elements` / `SVG has too many <use>` errors
+
+The SVG path enforces tighter limits than raster images because SVG
+is an XML attack surface: payload ≤ 1 MB, ≤ 5 000 elements total,
+≤ 256 `<use>` elements. Receipt graphics fit comfortably within these
+caps; if a real logo trips them, re-export from Inkscape with "plain
+SVG" (smaller) or pre-render to PNG.
+
+### Emergency kill-switch: disabling SVG entirely
+
+If a cairosvg or libcairo security advisory drops between integration
+releases, set the environment variable **`ESCPOS_DISABLE_SVG=1`** in
+your Home Assistant environment and restart HA. Every SVG print will
+then fail fast with `SVG rendering is disabled (ESCPOS_DISABLE_SVG is
+set)` before defusedxml or cairosvg are touched. Raster (PNG / JPEG /
+WebP / HEIC) printing is unaffected.
+
+Where to set it:
+
+- **Home Assistant OS / Supervised:** *Settings → Add-ons → SSH
+  add-on (or System → Hardware terminal)* — `ESCPOS_DISABLE_SVG`
+  is not a UI option; the cleanest path is to add it to the supervisor
+  environment via a `customize.yaml` add-on patch. Easier: pin a known-
+  good integration version until the advisory is resolved.
+- **Home Assistant Container (Docker):** add
+  `-e ESCPOS_DISABLE_SVG=1` to your `docker run` / Compose file.
+- **Bare-metal Core (Python venv):** export it before starting HA,
+  or add it to your systemd unit's `Environment=` line.
+
+Truthy values: `1`, `true`, `yes`, `on` (case-insensitive). Anything
+else — including the empty string — leaves SVG enabled.
+
 ## Paper and cutting
 
 - **Paper doesn't cut** — verify the printer has an auto-cutter. Try `partial` instead of `full`.

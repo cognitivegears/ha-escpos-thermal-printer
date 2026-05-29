@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **SVG image support** — `print_image`, `print_image_url`,
+  `print_image_path`, and `preview_image` now accept SVG sources from
+  HTTP/HTTPS URLs, local files under `allowlist_external_dirs`, and
+  `data:image/svg+xml;base64,…` data URIs. The SVG is rasterised to
+  PNG at the printer's column width and flows through the existing
+  PIL pipeline (grayscale → resize → dither), so every existing
+  option (`dither`, `threshold`, `rotation`, `mirror`, …) applies.
+  Payload cap is 1 MB. `camera.` / `image.` entities are
+  raster-only (HA's image / camera platforms never emit SVG).
+  Requires `libcairo` at runtime — already present in the official
+  Home Assistant Container / Supervised / OS images; bare-metal
+  Core needs `libcairo2` / `cairo` installed at the OS level (see
+  `docs/installation.md#system-library-requirements`).
+
+### Security
+
+- **SVG safety model.** The document is parsed with `defusedxml`
+  before cairosvg ever sees it — XXE, billion-laughs, and external-
+  entity expansion are refused at the XML parser. Element count is
+  capped at 5 000 and `<use>` elements at 256 to defeat path-blowup
+  and recursive amplification (cf. CVE-2026-31899). cairosvg is
+  invoked with `unsafe=False`, which auto-installs its `safe_fetch`
+  policy: `<image href="…">`, `<use href="…">`, and CSS
+  `@import url(…)` references to non-`data:` URLs are silently
+  replaced with an empty SVG, keeping the render fully offline.
+  Both `output_width` and `output_height` (capped at
+  `MAX_PROCESSED_HEIGHT = 8192`) are pinned so an SVG declaring a
+  pathological aspect ratio cannot trick cairo into an unbounded
+  surface allocation. Per-fetch raw-bytes cap tightens to 1 MB when
+  the source is `.svg` or `image/svg+xml`, so a hostile SVG cannot
+  consume the full 10 MB raster cap before validation runs. New
+  `ESCPOS_DISABLE_SVG=1` environment variable is an emergency
+  kill-switch (refuses every SVG print before defusedxml or cairosvg
+  is touched) for a hypothetical cairosvg / libcairo CVE between
+  releases — see `docs/troubleshooting.md#emergency-kill-switch-disabling-svg-entirely`.
+
 ## [0.7.1] - 2026-05-26
 
 ### Breaking changes

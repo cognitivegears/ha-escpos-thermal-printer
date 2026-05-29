@@ -38,6 +38,13 @@ jobs:
         with:
           python-version: '3.14'
 
+      # CI-CRIT-1: cairosvg dlopens libcairo at import time. Without
+      # this step, ``TestRealCairosvgBinding`` (the regression guard
+      # for the cairosvg-API-mismatch class of bug — see review
+      # finding P0) silently skips and provides zero CI value.
+      - name: Install libcairo (required for SVG rasterisation tests)
+        run: sudo apt-get update && sudo apt-get install -y libcairo2
+
       - name: Install dev deps (matches pyproject pins)
         run: |
           python -m pip install --upgrade pip
@@ -82,8 +89,15 @@ jobs:
       - name: Run unit tests with coverage gate
         # Coverage floor: matches pyproject.toml [tool.coverage.report]
         # fail_under (80). Long-term target is silver-tier 95%.
+        # CI-HIGH-1: ``-ra`` surfaces every skipped / xfailed test in
+        # the summary so a regression-critical test that newly skips
+        # (e.g. ``TestRealCairosvgBinding`` losing its libcairo dep)
+        # is visible in CI logs even though the job exits 0.
+        env:
+          CI: "true"
         run: |
-          pytest --cov=custom_components/escpos_printer \
+          pytest -ra \
+                 --cov=custom_components/escpos_printer \
                  --cov-report=term \
                  --cov-report=xml \
                  --cov-fail-under=80
@@ -111,6 +125,12 @@ jobs:
       - uses: actions/setup-python@v6.2.0
         with:
           python-version: '3.14'
+
+      # Match lint-and-test: libcairo lets the SVG-side tests run
+      # under the integration marker too when they grow integration
+      # variants.
+      - name: Install libcairo
+        run: sudo apt-get update && sudo apt-get install -y libcairo2
 
       - name: Install dev deps
         run: |

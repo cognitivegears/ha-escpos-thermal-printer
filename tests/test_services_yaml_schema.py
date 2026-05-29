@@ -237,14 +237,21 @@ def test_print_image_path_schema_rejects_non_path():
             PRINT_IMAGE_PATH_SCHEMA({"path": bad})
 
 
-def test_print_image_path_schema_auto_resize_default_is_true():
-    """The UI form pre-fills ``auto_resize: true`` for the path service; the schema must agree."""
+def test_print_image_path_schema_auto_resize_default_is_false():
+    """Local files are almost always already-sized; auto_resize defaults to false.
+
+    The 40 MB / thumbnail path that helps phone-JPEG and camera-snapshot
+    callers adds latency without a payoff for local files. services.yaml
+    pre-fills ``auto_resize: false`` for the path service; the schema must
+    agree so a programmatic call without the key produces the same shape
+    as the UI form.
+    """
     from custom_components.escpos_printer.services.schemas import (
         PRINT_IMAGE_PATH_SCHEMA,
     )
 
     out = PRINT_IMAGE_PATH_SCHEMA({"path": "/config/www/logo.png"})
-    assert out["auto_resize"] is True
+    assert out["auto_resize"] is False
 
 
 def test_print_camera_snapshot_schema_defaults_match_ui():

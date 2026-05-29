@@ -13,6 +13,35 @@
 2. Restart Home Assistant
 3. Add the integration from **Settings → Devices & services**
 
+## System library requirements
+
+The integration depends on **`libcairo`** at runtime for SVG image
+rendering (via `cairosvg`). Home Assistant's official distributions
+already ship it — no extra step is required for these:
+
+- **Home Assistant OS** (HAOS) — already installed
+- **Home Assistant Container** (the official `homeassistant/home-assistant` Docker image) — already installed
+- **Home Assistant Supervised** — already installed
+
+**Bare-metal Home Assistant Core** (Python venv on a host you manage)
+needs `libcairo` installed at the OS level:
+
+```bash
+# Debian / Ubuntu
+sudo apt-get install -y libcairo2
+
+# Alpine
+sudo apk add cairo
+
+# Fedora / RHEL
+sudo dnf install cairo
+```
+
+Without `libcairo`, raster image printing still works — only SVG
+rendering will fail with `SVG support requires cairosvg` or a
+`libcairo` dlopen error on the first SVG print. See
+[Troubleshooting](troubleshooting.md#svg-rendering-fails-on-bare-metal-home-assistant-core).
+
 ## Adding your first printer
 
 After install, **Settings** → **Devices & services** → **Add Integration** → **ESC/POS Thermal Printer**. Pick your connection type:

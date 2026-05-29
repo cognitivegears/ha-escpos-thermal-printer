@@ -279,8 +279,6 @@ class TestBase64ImageValidation:
         [
             ("hello", "data:image"),
             ("data:text/plain;base64,aGk=", "data:image"),
-            # S-L2 regression: svg+xml subtype must be rejected.
-            ("data:image/svg+xml;base64,aGk=", "data:image"),
             # `!!!` doesn't match the base64 alphabet — the regex rejects
             # it before decode (giving the data-URI shape error).
             ("data:image/png;base64,!!!", "data:image"),
@@ -289,6 +287,14 @@ class TestBase64ImageValidation:
     def test_rejects_invalid(self, uri, match):  # type: ignore[no-untyped-def]
         with pytest.raises(HomeAssistantError, match=match):
             validate_base64_image(uri)
+
+    def test_accepts_svg_xml_data_uri(self):  # type: ignore[no-untyped-def]
+        # SVG support landed alongside cairosvg + defusedxml. The base64
+        # path now accepts svg+xml; downstream ``validate_svg_bytes``
+        # is the actual XML-attack gate.
+        svg = b'<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>'
+        uri = "data:image/svg+xml;base64," + base64.b64encode(svg).decode()
+        assert validate_base64_image(uri) == svg
 
     def test_rejects_oversized_input_pre_decode(self):  # type: ignore[no-untyped-def]
         # T-H1: a 200 MB base64 string must be rejected before decoding.
@@ -403,7 +409,9 @@ class TestSecurityConstants:
 
     def test_extension_set(self):  # type: ignore[no-untyped-def]
         assert ".png" in VALID_IMAGE_EXTENSIONS
-        assert ".svg" not in VALID_IMAGE_EXTENSIONS
+        # SVG is now an accepted source extension; rasterisation happens
+        # downstream after defusedxml validation (see svg_renderer.py).
+        assert ".svg" in VALID_IMAGE_EXTENSIONS
 
 
 # ---------------------------------------------------------------------------

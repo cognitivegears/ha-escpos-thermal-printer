@@ -24,7 +24,7 @@ from PIL import Image, ImageOps
 import PIL.Image
 
 from ..const import DEFAULT_DITHER, DEFAULT_THRESHOLD
-from ..security import MAX_IMAGE_PIXELS, MAX_PROCESSED_HEIGHT
+from ..security import MAX_IMAGE_PIXELS, MAX_PROCESSED_HEIGHT, is_svg_bytes
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -196,7 +196,22 @@ def process_image_from_bytes(raw: bytes, opts: ImageProcessOptions) -> Image.Ima
     Uses ``Image.open(..., formats=)`` to constrain the decoder allow-list.
     The returned image is always a freshly-constructed 1-bit image (step 8
     in :func:`process_image`), so it is safe to close ``src`` afterward.
+
+    SVG documents are detected by sniffing the first bytes and rasterised
+    to PNG via :func:`printer.svg_renderer.rasterise_svg_to_png` (which
+    validates the XML with defusedxml first) before the normal PIL path
+    runs. The output_width is pinned to the printer's target column
+    width so the rasterised PNG arrives at the resolution we'll actually
+    print at, sidestepping cairosvg's default 96-DPI assumption.
     """
+    if is_svg_bytes(raw):
+        # Lazy import keeps cairosvg/libcairo out of the unit-test path
+        # for non-SVG inputs.
+        from .svg_renderer import rasterise_svg_to_png  # noqa: PLC0415
+
+        target_width = opts.width or opts.profile_width or FALLBACK_PROFILE_WIDTH
+        raw = rasterise_svg_to_png(raw, output_width=target_width)
+
     with Image.open(io.BytesIO(raw), formats=_DECODER_ALLOWLIST) as src:
         src.load()
         return process_image(src, opts)

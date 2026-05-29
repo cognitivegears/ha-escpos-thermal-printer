@@ -52,6 +52,7 @@ from .const import (
 )
 from .security import (
     MAX_IMAGE_SIZE_MB,
+    MAX_SVG_SIZE_BYTES,
     _validate_local_path_sync,
     open_local_image_no_follow,
     sanitize_log_message,
@@ -268,6 +269,20 @@ async def _stream_to_buffer(aiter: Any, max_bytes: int) -> bytearray:
     return buf
 
 
+def _is_svg_content_type(content_type: str | None) -> bool:
+    """Return True if ``content_type`` declares an SVG payload.
+
+    Matches ``image/svg+xml`` as RFC-registered, plus the
+    occasionally-emitted ``image/svg`` and ``application/svg+xml``.
+    Strips a charset parameter (``image/svg+xml; charset=utf-8``) and
+    lowercases before comparison.
+    """
+    if not content_type:
+        return False
+    primary = content_type.split(";", 1)[0].strip().lower()
+    return primary in {"image/svg+xml", "image/svg", "application/svg+xml"}
+
+
 def _check_content_length(headers: Mapping[str, str], max_bytes: int) -> None:
     raw = headers.get("content-length") or headers.get("Content-Length")
     if raw is None:
@@ -394,12 +409,21 @@ async def _resolve_http_aiohttp(
                         current = urljoin(current, location)
                         continue
                     response.raise_for_status()
-                    _check_content_length(response.headers, max_bytes)
-                    buf = await _stream_to_buffer(
-                        response.content.iter_chunked(65536), max_bytes
+                    # F-MED-1: when the server advertises SVG, lower the
+                    # per-stream cap to MAX_SVG_SIZE_BYTES so an
+                    # attacker SVG cannot consume the full raster cap
+                    # before validate_svg_bytes runs downstream.
+                    content_type = response.headers.get("Content-Type", "")
+                    effective_cap = (
+                        min(max_bytes, MAX_SVG_SIZE_BYTES)
+                        if _is_svg_content_type(content_type) or current.lower().endswith(".svg")
+                        else max_bytes
                     )
-                    content_type = response.headers.get("Content-Type")
-                    return bytes(buf), content_type
+                    _check_content_length(response.headers, effective_cap)
+                    buf = await _stream_to_buffer(
+                        response.content.iter_chunked(65536), effective_cap
+                    )
+                    return bytes(buf), content_type or None
         except HomeAssistantError:
             raise
         except aiohttp.ClientError as exc:
@@ -442,17 +466,25 @@ async def _resolve_local(
     final target is outside ``allowlist_external_dirs`` or fails any
     other check. The file is then opened with ``O_NOFOLLOW`` to defeat
     a TOCTOU symlink swap between validation and open.
+
+    F-MED-1: when the file extension is ``.svg``, the per-read cap is
+    tightened to ``MAX_SVG_SIZE_BYTES`` so an attacker SVG cannot
+    consume the full raster cap before ``validate_svg_bytes`` runs.
     """
-    max_bytes = _MAX_BYTES_AUTO_RESIZE if auto_resize else _MAX_BYTES
+    raster_cap = _MAX_BYTES_AUTO_RESIZE if auto_resize else _MAX_BYTES
+    svg_cap = min(raster_cap, MAX_SVG_SIZE_BYTES)
 
     def _validate_and_read() -> bytes:
-        resolved = _validate_local_path_sync(path, max_bytes=max_bytes)
+        # Validate against the looser raster cap first; the resolved
+        # path tells us whether to also enforce the SVG cap on read.
+        resolved = _validate_local_path_sync(path, max_bytes=raster_cap)
         is_allowed = hass.config.is_allowed_path
         if not is_allowed(str(resolved)):
             raise HomeAssistantError(
                 "Image path is outside Home Assistant's allowlist_external_dirs"
             )
-        return open_local_image_no_follow(resolved, max_bytes=max_bytes)
+        effective_cap = svg_cap if resolved.suffix.lower() == ".svg" else raster_cap
+        return open_local_image_no_follow(resolved, max_bytes=effective_cap)
 
     raw = await hass.async_add_executor_job(_validate_and_read)
     _check_size(len(raw), auto_resize=auto_resize)

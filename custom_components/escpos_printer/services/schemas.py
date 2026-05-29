@@ -384,7 +384,11 @@ PRINT_IMAGE_PATH_SCHEMA = vol.Schema(
         vol.Required("path"): vol.All(
             _local_path_only, vol.Length(min=1, max=MAX_IMAGE_PATH_LENGTH)
         ),
-        **_IMAGE_OPTION_FRAGMENT_URL,
+        # Local files are almost always already-sized; the 40 MB / thumbnail
+        # path that helps phone-JPEG / camera-snapshot callers adds latency
+        # without a payoff here. Keep the plain (auto_resize=False) fragment
+        # so the default matches services.yaml.
+        **_IMAGE_OPTION_FRAGMENT_PLAIN,
         vol.Optional(ATTR_CUT): _CUT,
         vol.Optional(ATTR_FEED): _FEED,
     }

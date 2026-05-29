@@ -88,8 +88,37 @@ MAX_IMAGE_PATH_LENGTH = 1024
 # decode — Pillow's ``formats=`` parameter in the actual decode step is
 # the real gate, so listing them here without the opener is a no-op.
 VALID_IMAGE_EXTENSIONS = frozenset(
-    {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp", ".heic", ".heif", ".avif"}
+    {
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".bmp",
+        ".tiff",
+        ".webp",
+        ".heic",
+        ".heif",
+        ".avif",
+        ".svg",
+    }
 )
+
+# SVG payload cap. SVG is an XML attack surface so we keep this much
+# tighter than the raster-image cap — legitimate vector graphics for
+# receipt printing fit comfortably in <1 MB; anything larger is almost
+# certainly a billion-laughs / quadratic-blowup attempt.
+MAX_SVG_SIZE_BYTES = 1024 * 1024
+
+# Element-count and ``<use>``-count caps for parsed SVGs. The byte cap
+# alone does not stop a 1 MB SVG packed with ~42 000 zero-length paths
+# (measured: ~5 s render + ~127 MB RSS on Apple Silicon, 4-8x worse on
+# a Pi 4). The element count caps the path-blowup amplification at a
+# linear cost; the ``<use>`` count is defence-in-depth against
+# CVE-2026-31899-style recursive references (cairosvg 2.9.0 caps the
+# internal budget at 100 000 - still well above what a receipt graphic
+# could legitimately need).
+MAX_SVG_ELEMENTS = 5000
+MAX_SVG_USE_ELEMENTS = 256
 
 # Text-effects bounds. ``MAX_BOX_WIDTH`` is generous (covers 80-column
 # wide-receipt printers) and ``MAX_TABLE_*`` keeps a single service call
@@ -134,12 +163,13 @@ assert MAX_RENDER_HEIGHT_PX <= MAX_PROCESSED_HEIGHT, (
     "canvas that passes here cannot stall the slice pipeline."
 )
 
-# Permitted data-URI subtypes. Pinned so a future regression can't
-# accidentally enable SVG (no Pillow renderer; cairo-based fallbacks are
-# an XML attack surface). HEIC/HEIF/AVIF added so iOS / drone-style
-# camera proxies can paste snapshots inline.
+# Permitted data-URI subtypes. SVG is intentionally accepted via a
+# separate, narrower path (``validate_svg_bytes`` runs defusedxml before
+# cairosvg sees the document) — the raster subtypes here are decoded by
+# Pillow with a pinned format allowlist. HEIC/HEIF/AVIF added so iOS /
+# drone-style camera proxies can paste snapshots inline.
 _DATA_URI_RE = re.compile(
-    r"^data:image/(?P<subtype>png|jpe?g|gif|bmp|tiff|webp|heic|heif|avif);base64,"
+    r"^data:image/(?P<subtype>png|jpe?g|gif|bmp|tiff|webp|heic|heif|avif|svg\+xml);base64,"
     r"(?P<data>[A-Za-z0-9+/=\s]+)$"
 )
 
@@ -682,6 +712,121 @@ def validate_base64_image(value: str) -> bytes:
     if len(raw) > MAX_IMAGE_SIZE_MB * 1024 * 1024:
         raise HomeAssistantError(f"Image too large (max {MAX_IMAGE_SIZE_MB}MB)")
     return raw
+
+
+# ---------------------------------------------------------------------------
+# SVG sniffing + safe validation.
+# ---------------------------------------------------------------------------
+
+
+_SVG_DECL_RE = re.compile(rb"^<\?xml[^>]*\?>\s*", re.DOTALL)
+# The DOCTYPE grammar is:
+#   "<!DOCTYPE" Name (ExternalID)? ("[" intSubset "]")? ">"
+# An internal subset can itself contain ``>`` characters (e.g. inside
+# ``<!ENTITY name SYSTEM "...">`` declarations), so we must match the
+# bracketed body with ``[^\]]*`` rather than excluding ``>`` here. The
+# pre-``[`` part is constrained to ``[^\[>]*`` to stop at either the
+# subset opener or the closing ``>``.
+_SVG_DOCTYPE_RE = re.compile(
+    rb"^<!DOCTYPE[^\[>]*(?:\[[^\]]*\][^>]*)?>\s*",
+    re.DOTALL,
+)
+_SVG_COMMENT_RE = re.compile(rb"^<!--.*?-->\s*", re.DOTALL)
+
+
+def is_svg_bytes(raw: object) -> bool:
+    """Return True if ``raw`` looks like an SVG document.
+
+    Looks at the first ~512 bytes after stripping a UTF-8 BOM and any
+    leading whitespace, then consumes an optional XML declaration, a
+    DOCTYPE, and any leading comments. The remaining bytes must begin
+    with ``<svg`` (case-insensitive) for the input to be treated as an
+    SVG — generic XML payloads (XHTML, RSS, RDF, SOAP, …) are correctly
+    routed through the raster path so users see a meaningful Pillow
+    error rather than a misleading "Invalid or unsafe SVG" wrapper.
+
+    The argument is typed as :class:`object` because this is a
+    trust-boundary sniff — callers funnel attacker-controlled payloads
+    here and we'd rather return ``False`` than raise on a non-bytes
+    value.
+    """
+    if not isinstance(raw, (bytes, bytearray)):
+        return False
+    head = bytes(raw[:512]).lstrip(b"\xef\xbb\xbf").lstrip()
+    # Consume one XML declaration + at most one DOCTYPE + any number of
+    # leading comments. Real SVGs never need more nesting than this at
+    # the document head; anything weirder is not worth the false-positive
+    # surface area.
+    head = _SVG_DECL_RE.sub(b"", head, count=1).lstrip()
+    head = _SVG_DOCTYPE_RE.sub(b"", head, count=1).lstrip()
+    while True:
+        new_head = _SVG_COMMENT_RE.sub(b"", head, count=1).lstrip()
+        if new_head == head:
+            break
+        head = new_head
+    if not head[:4]:
+        return False
+    return head[:4].lower().startswith(b"<svg")
+
+
+def validate_svg_bytes(raw: bytes) -> bytes:
+    """Validate ``raw`` is a safe-to-render SVG document.
+
+    - Caps payload size at ``MAX_SVG_SIZE_BYTES``.
+    - Parses with :mod:`defusedxml` to neutralise XXE, billion-laughs,
+      external-DTD, and external-entity expansion before the cairosvg
+      renderer ever sees the document.
+    - Confirms the root element is ``<svg>`` (in either no-namespace or
+      the SVG namespace).
+    - Bounds the total element count and ``<use>``-element count to
+      cap cairosvg's render cost (a 1 MB SVG can otherwise pack tens
+      of thousands of zero-length paths into one document).
+
+    Returns the original bytes on success. Blocking — keep it on the
+    executor thread that already runs the image pipeline.
+    """
+    if not isinstance(raw, (bytes, bytearray)):
+        raise HomeAssistantError("SVG input must be bytes")
+    if len(raw) > MAX_SVG_SIZE_BYTES:
+        kb = MAX_SVG_SIZE_BYTES // 1024
+        raise HomeAssistantError(f"SVG too large ({len(raw)} bytes; max {kb}KB)")
+
+    try:
+        from defusedxml.ElementTree import fromstring as _safe_fromstring  # noqa: PLC0415
+    except ImportError as exc:  # pragma: no cover - defusedxml is a pinned runtime dep
+        raise HomeAssistantError("SVG support requires defusedxml") from exc
+
+    try:
+        root = _safe_fromstring(bytes(raw))
+    except Exception as exc:
+        raise HomeAssistantError(
+            f"Invalid or unsafe SVG: {sanitize_log_message(str(exc))}"
+        ) from exc
+
+    tag = root.tag.rsplit("}", 1)[-1] if "}" in root.tag else root.tag
+    if tag.lower() != "svg":
+        raise HomeAssistantError(f"SVG root element must be <svg>, got <{tag}>")
+
+    # Single tree walk — counts both totals and ``<use>`` elements in
+    # one pass. The namespaced form is the one defusedxml produces from
+    # a normal SVG; the bare form covers SVGs authored without xmlns.
+    _use_tags = ("use", "{http://www.w3.org/2000/svg}use")
+    use_count = 0
+    for element_index, elem in enumerate(root.iter(), start=1):
+        if elem.tag in _use_tags:
+            use_count += 1
+        if element_index > MAX_SVG_ELEMENTS:
+            raise HomeAssistantError(
+                f"SVG has too many elements (>{MAX_SVG_ELEMENTS}); "
+                "simplify paths or pre-render to PNG"
+            )
+        if use_count > MAX_SVG_USE_ELEMENTS:
+            raise HomeAssistantError(
+                f"SVG has too many <use> elements (>{MAX_SVG_USE_ELEMENTS}); "
+                "this pattern can amplify into runaway render cost"
+            )
+
+    return bytes(raw)
 
 
 # ---------------------------------------------------------------------------

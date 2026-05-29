@@ -132,11 +132,12 @@ data:
   image: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAA..."
 ```
 
-Supported subtypes: `png`, `jpeg`, `jpg`, `gif`, `bmp`, `tiff`, `webp`
-(SVG is **not** accepted; Pillow doesn't ship an SVG decoder and the
-XML attack surface isn't worth it). The 10 MB cap applies to the
-**decoded** bytes; the base64 string itself is also length-capped
-before regex/decoding so a 200 MB string can't OOM the process.
+Supported subtypes: `png`, `jpeg`, `jpg`, `gif`, `bmp`, `tiff`, `webp`,
+`svg+xml`. The 10 MB cap applies to the **decoded** bytes (1 MB for
+SVG); the base64 string itself is also length-capped before
+regex/decoding so a 200 MB string can't OOM the process. See
+[SVG handling](#svg-handling) below for the safety model that gates
+the SVG path.
 
 ### Jinja template
 
@@ -174,7 +175,7 @@ Every option in one place.
 | `autocontrast`   | `false`            | Stretch the input's dynamic range before B&W conversion. Boost for photos.                                             |
 | `invert`         | `false`            | Swap black and white. Useful for white-on-black source art or dark-mode logos.                                         |
 | `mirror`         | `false`            | Flip horizontally. Useful for receipt-window displays read through the back of the paper.                              |
-| `auto_resize`    | `false`            | Accept source images up to 40 MB and downscale before processing. Enable for iPhone HEIC / high-res cameras.           |
+| `auto_resize`    | `false`            | Accept **raster** source images up to 40 MB and downscale before processing. Enable for iPhone HEIC / high-res cameras. SVG sources stay capped at 1 MB regardless — the XML attack surface is too sensitive to raise. |
 | `fallback_image` | unset              | Optional second source to try if the primary fails (camera unavailable, URL down, file missing).                       |
 | `high_density`   | `true`             | Print in high vertical + horizontal density. Disable for stretched, faster output.                                     |
 | `fragment_height`| reliability profile | Pixels per chunk when sending the image (issue #45). Smaller → safer, larger → faster. Step must be a multiple of 16. |
@@ -196,9 +197,73 @@ Pick one in the integration's **Options** flow. Each profile sets sensible defau
 
 ### Supported formats
 
-PNG, JPEG, GIF, BMP, TIFF, WebP out of the box. **HEIC / HEIF / AVIF** are unlocked when `pillow-heif` is installed (`pip install pillow-heif` in the HA container). iPhone-fed camera proxies emit HEIC natively — installing `pillow-heif` removes the "image too large / wrong format" friction.
+PNG, JPEG, GIF, BMP, TIFF, WebP, **SVG** out of the box. **HEIC / HEIF / AVIF** are unlocked when `pillow-heif` is installed (`pip install pillow-heif` in the HA container). iPhone-fed camera proxies emit HEIC natively — installing `pillow-heif` removes the "image too large / wrong format" friction.
 
-SVG is **not** supported (no sandboxed renderer ships with the integration; XML parsing is an attack surface).
+### SVG handling
+
+SVG is rasterised to PNG at the printer's target column width before
+the existing dither / threshold pipeline runs. The flow is:
+
+1. **Sniff** — first ~512 bytes are checked for an `<svg>` / `<?xml>`
+   / comment prefix. Anything else takes the standard raster path.
+2. **Parse with `defusedxml`** — the document is parsed in a mode that
+   rejects `<!ENTITY>` declarations and external-entity references.
+   XXE, billion-laughs, and parameter-entity attacks are refused here
+   before the renderer ever sees the document.
+3. **Bound the parsed tree** — the parsed document must have at most
+   5 000 elements total and at most 256 `<use>` elements. Receipt
+   graphics fit comfortably; pathologically-packed SVGs (the path-
+   blowup amplification class) are rejected with a clear message.
+4. **Rasterise with `cairosvg`** — the SVG is rendered at the column
+   width derived from `image_width` (or the printer's profile) so the
+   1-bit dither runs against the same pixel grid that will hit the
+   paper. Both `output_width` and `output_height` (capped at the
+   integration's `MAX_PROCESSED_HEIGHT = 8192`) are pinned, so an SVG
+   declaring a huge `height` cannot trick cairo into allocating an
+   unbounded surface. `unsafe=False` is set so cairosvg auto-installs
+   its `safe_fetch` policy: every embedded `<image href="…">` /
+   `<use href="…">` / CSS `@import url(…)` reference to a non-`data:`
+   URL is replaced with an empty SVG, keeping the render fully
+   offline.
+5. **Run the existing PIL pipeline** — grayscale → resize → dither.
+
+#### SVG caps (defence-in-depth)
+
+| Cap                            | Limit                | Source                                  | What it stops                                                  |
+|--------------------------------|----------------------|-----------------------------------------|----------------------------------------------------------------|
+| Payload size                   | 1 MB                 | `MAX_SVG_SIZE_BYTES` (`security.py`)    | XML parser DoS; cap is enforced *before* `defusedxml` parses.  |
+| HTTP / local fetch cap         | 1 MB for `.svg`/`image/svg+xml` | `image_sources._resolve_http` / `_resolve_local` | RAM spike before validation even runs (a hostile SVG over 10 MB raster cap). |
+| Element count                  | 5 000                | `MAX_SVG_ELEMENTS` (`security.py`)      | Path-blowup amplification (42 k zero-length paths in 1 MB).    |
+| `<use>` element count          | 256                  | `MAX_SVG_USE_ELEMENTS` (`security.py`)  | CVE-2026-31899-style recursive `<use>` amplification.          |
+| Rasterised output width        | `image_width` (≤ 2048) | `output_width=` kwarg                  | Image scaled past printer column width.                        |
+| Rasterised output height       | 8192 px              | `MAX_PROCESSED_HEIGHT` (`security.py`)  | Aspect-ratio decompression bomb (96-byte SVG → 14B-pixel surface). |
+| Slice count for the rasterised PNG | 64               | `MAX_SLICES` (`security.py`)            | Receipt-printer paper-waste DoS once the SVG becomes a tall PNG. |
+
+#### Embedded resources
+
+External resource references inside an SVG — `<image href="…">`,
+`<use href="…">`, CSS `@import url(…)` — are blocked at the cairosvg
+layer (`unsafe=False` auto-installs `safe_fetch`, which returns an
+empty 1×1 SVG for any non-`data:` URL). Two consequences worth
+calling out:
+
+- **Silent suppression**, not a hard error. A logo that references
+  `<image href="https://cdn.example/icon.png">` will rasterise with
+  that region blank rather than failing. If you want loud rejection,
+  flatten the SVG in your editor (Inkscape: *File → Clean Up
+  Document* + *File → Vacuum Defs*) so no remote references remain.
+- **`data:` URIs are honoured.** Embedding a raster image as
+  `<image href="data:image/png;base64,…">` works and is the
+  recommended way to ship a self-contained SVG.
+
+#### Runtime requirement
+
+`libcairo` must be present at runtime. The official Home Assistant
+Container, Supervised, and OS images already ship it; bare-metal
+Core installs need it added — see
+[Installation → System library requirements](installation.md#system-library-requirements).
+`camera.` / `image.` entities still only emit raster bytes; there is
+no SVG path for those sources.
 
 ### Recipe: crisp logo print
 
@@ -211,6 +276,39 @@ data:
   threshold: 140
   center: true
   feed: 1
+  cut: full
+```
+
+### Recipe: vector logo from SVG
+
+SVG sources go through the same options as raster — pick `image_width`
+to match your printer column width, then tune `dither` / `threshold`
+against the rasterised output. The renderer pins both output
+dimensions so the SVG's declared `width` / `height` don't matter for
+the final print; the `viewBox` controls aspect.
+
+```yaml
+service: escpos_printer.print_image
+data:
+  image: /config/www/logo.svg
+  image_width: 384       # printer column width (58 mm); 576 for 80 mm
+  dither: threshold      # crisp edges on vector art
+  threshold: 140
+  center: true
+  feed: 1
+  cut: full
+```
+
+Or pass the SVG inline as a data URI (great for templated graphics):
+
+```yaml
+service: escpos_printer.print_image
+data:
+  image: >-
+    data:image/svg+xml;base64,
+    PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+
+    PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSJibGFjayIvPjwvc3ZnPg==
+  image_width: 384
   cut: full
 ```
 
@@ -423,6 +521,12 @@ data:
 | Symptom                                                | Likely cause / fix                                                                                                                                       |
 |--------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `Image too large (max 10MB)`                           | Pre-resize the image before sending, or convert to a more efficient format (PNG → JPEG for photos).                                                      |
+| `SVG too large (... bytes; max 1024KB)`                | The SVG cap is 1 MB (XML attack surface). Simplify paths / drop embedded raster data / convert to PNG before sending.                                    |
+| `SVG has too many elements (>5000)`                    | Reduce path / group count, or pre-render to PNG. The cap protects against path-blowup amplification (1 MB of zero-length paths can otherwise lock cairo for tens of seconds). |
+| `SVG has too many <use> elements (>256)`               | `<use>`-recursion can amplify into runaway render cost (cf. CVE-2026-31899). Flatten the `<use>` references in your source tool or pre-render to PNG.    |
+| `Invalid or unsafe SVG: ...`                           | The SVG contains an `<!ENTITY>` declaration or malformed XML. Re-export from the source app (Illustrator / Inkscape "plain SVG"); these never need entities. |
+| Embedded `<image href="https://…">` renders as blank   | External resource fetches are refused at the cairosvg layer (`safe_fetch`). Inline the referenced image as a `data:` URI in the SVG, or pre-render to PNG.   |
+| `SVG support requires cairosvg` / `libcairo` errors    | The renderer needs `libcairo` at runtime. The HA Container / Supervised / OS images already include it; for bare-metal Core install `libcairo2` / `cairo`. |
 | `Image file does not exist or is not a regular file`   | Path typo, or HA can't see the file. Confirm the file exists *inside the HA container/VM*, not just on your laptop.                                      |
 | `Only data:image/...;base64,...` error                 | Your base64 string is missing the `data:image/<subtype>;base64,` prefix. Wrap it like that.                                                              |
 | `Failed to fetch camera image`                         | The camera entity is unavailable or slow. Snapshot timeout is 10 s; check the camera state in Developer Tools.                                           |

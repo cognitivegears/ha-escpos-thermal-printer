@@ -76,14 +76,16 @@ Supported types: `EAN13`, `EAN8`, `UPC-A`, `UPC-E`, `CODE39`, `CODE93`, `CODE128
 
 The integration ships six image-printing services. They all share the same image-processing options (rotation, mirror, threshold, dither, etc.) and route through the same backend pipeline — the only difference is the source field and which UI selector is used.
 
+Accepted formats: **PNG, JPEG, GIF, BMP, TIFF, WebP, SVG** out of the box; **HEIC / HEIF / AVIF** when `pillow-heif` is installed. SVG documents are validated with `defusedxml` (XXE / billion-laughs safe) and rasterised by `cairosvg` at the printer's column width before the existing dither pipeline runs — see the [Images guide](images.md#svg-handling) for the safety model.
+
 | Service | Source field | When to use |
 |---------|--------------|-------------|
-| `escpos_printer.print_image` | `image` (template) | Generic / power-user. Accepts any source form — URL, file path, `camera.<id>`, `image.<id>`, base64 data URI, or a Jinja template producing any of those. **Existing automations using a literal URL or path keep working unchanged.** |
-| `escpos_printer.print_image_url` | `url` (text) | Print from an HTTP(S) URL. SSRF-aware — private, loopback, and link-local addresses are refused. |
-| `escpos_printer.print_image_path` | `path` (text) | Print a local file. The path must lie inside `allowlist_external_dirs` (typically `/config` or `/media`). |
-| `escpos_printer.print_camera_snapshot` | `camera_entity` (camera entity picker) | Print a live snapshot from a camera entity. |
-| `escpos_printer.print_image_entity` | `image_entity` (image entity picker) | Print the current frame from an HA `image` entity (weather radar, ML overlay, generated chart). |
-| `escpos_printer.preview_image` | `image` (template) | Run the image pipeline and write the 1-bit PNG to disk **without** printing. Returns `{path, width, height, slice_count}`. |
+| `escpos_printer.print_image` | `image` (template) | Generic / power-user. Accepts any source form — URL, file path, `camera.<id>`, `image.<id>`, base64 data URI (raster or `image/svg+xml`), or a Jinja template producing any of those. **Existing automations using a literal URL or path keep working unchanged.** |
+| `escpos_printer.print_image_url` | `url` (text) | Print from an HTTP(S) URL. SSRF-aware — private, loopback, and link-local addresses are refused. SVG sources are detected by `Content-Type` and capped at 1 MB. |
+| `escpos_printer.print_image_path` | `path` (text) | Print a local file. The path must lie inside `allowlist_external_dirs` (typically `/config` or `/media`). `.svg` files are accepted and capped at 1 MB. |
+| `escpos_printer.print_camera_snapshot` | `camera_entity` (camera entity picker) | Print a live snapshot from a camera entity. Returns raster bytes only — camera entities never emit SVG. |
+| `escpos_printer.print_image_entity` | `image_entity` (image entity picker) | Print the current frame from an HA `image` entity (weather radar, ML overlay, generated chart). Returns raster bytes only. |
+| `escpos_printer.preview_image` | `image` (template) | Run the image pipeline and write the 1-bit PNG to disk **without** printing. SVG sources are rasterised first; the preview reflects what would print. Returns `{path, width, height, slice_count}`. |
 
 > See the [Images guide](images.md) for end-to-end examples, source-form security notes, and tuning recipes.
 

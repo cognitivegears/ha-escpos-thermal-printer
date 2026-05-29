@@ -21,6 +21,19 @@ dependencies = [
   # CJK / fullwidth / emoji columns line up under the 1-col-per-glyph
   # text mode (instead of silently misaligning via len()).
   "wcwidth==0.7.0",
+  # SVG support: cairosvg rasterizes SVG to PNG (then handed to the
+  # existing PIL pipeline); defusedxml parses the SVG XML first to
+  # neutralise XXE / billion-laughs / external-entity expansion before
+  # cairo ever sees the document. cairosvg requires libcairo at runtime
+  # (present in HA OS, Supervised, and the official Docker images).
+  # cairocffi is the libcairo binding — pinning it explicitly (rather
+  # than letting it float as a transitive of cairosvg) makes the
+  # `libcairo` ABI dependency visible in manifest.json so HACS installs
+  # get a deterministic binding version and Dependabot security alerts
+  # surface cairocffi CVEs directly.
+  "cairosvg==2.9.0",
+  "cairocffi==1.7.1",
+  "defusedxml==0.7.1",
 ]
 
 [build-system]
@@ -269,6 +282,11 @@ module = [
     "pytest_homeassistant_custom_component.*",
     "usb.*",
     "wcwidth.*",
+    # cairosvg and defusedxml ship no PEP-561 stubs; the renderer
+    # consumes them through narrow internal seams (single function
+    # call) so adding type stubs would gain little.
+    "cairosvg.*",
+    "defusedxml.*",
 ]
 ignore_missing_imports = true
 

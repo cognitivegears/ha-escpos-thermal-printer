@@ -89,3 +89,64 @@ rules:
         - "custom_components/escpos_printer/notify.py"
         - "custom_components/escpos_printer/image_sources.py"
         - "custom_components/escpos_printer/services/print_handlers.py"
+
+  # ---- SVG-safety rules (Phase 4 F-CI-HIGH-3) ----
+  # The SVG path was added in the add-svg-support PR. The defenses
+  # depend on (a) cairosvg being called with ``unsafe=False`` so its
+  # internal ``safe_fetch`` is auto-installed, (b) defusedxml being
+  # the only parser touching attacker-controlled bytes, and (c) the
+  # ``forbid_dtd`` default staying at False because tightening it
+  # breaks standards-compliant Inkscape exports. Each rule guards
+  # one of those invariants.
+
+  - id: cairosvg-must-use-unsafe-false
+    patterns:
+      - pattern: cairosvg.svg2png(...)
+      - pattern-not: cairosvg.svg2png(..., unsafe=False, ...)
+    message: >
+      `cairosvg.svg2png` must be called with `unsafe=False` — that flag
+      is what makes cairosvg auto-install `safe_fetch` and refuse external
+      resource references (`<image href="http://…">` etc.). Without it,
+      a hostile SVG can trigger arbitrary network reads from inside
+      the renderer. See svg_renderer.py and `cairosvg/parser.py:397-398`
+      for the auto-install logic.
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - "custom_components/escpos_printer/"
+
+  - id: no-stdlib-xml-parsing-of-untrusted-bytes
+    pattern-either:
+      - pattern: xml.etree.ElementTree.fromstring(...)
+      - pattern: xml.etree.ElementTree.parse(...)
+      - pattern: xml.sax.parseString(...)
+      - pattern: xml.dom.minidom.parseString(...)
+    message: >
+      Use `defusedxml` (which already runs the XXE / billion-laughs /
+      external-DTD gates) rather than the stdlib `xml.*` parsers on
+      attacker-controlled bytes. See `validate_svg_bytes` for the
+      established pattern.
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - "custom_components/escpos_printer/"
+
+  - id: defusedxml-forbid-dtd-must-stay-default
+    pattern-either:
+      - pattern: defusedxml.ElementTree.fromstring(..., forbid_dtd=True, ...)
+      - pattern: fromstring(..., forbid_dtd=True, ...)
+    message: >
+      `forbid_dtd=True` rejects standards-compliant Inkscape SVG exports
+      (`<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" ...>`). The
+      default (`forbid_dtd=False`) is intentional and load-bearing; XXE
+      and billion-laughs are already blocked by the
+      `forbid_entities=True` / `forbid_external=True` defaults.
+      Re-enabling `forbid_dtd=True` is a regression — see Phase 4
+      verification in `.full-review/04-best-practices.md`.
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - "custom_components/escpos_printer/"

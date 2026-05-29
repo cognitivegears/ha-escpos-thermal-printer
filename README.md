@@ -29,7 +29,7 @@ individually or broadcast to all
 ## Features
 
 - Print text with formatting (bold, underline, alignment, font sizes)
-- Print QR codes, barcodes, and images — from URLs, files, camera/image entities, or base64 ([guide](docs/images.md))
+- Print QR codes, barcodes, and images — PNG / JPEG / WebP / HEIC raster *and* SVG vector graphics, from URLs, files, camera/image entities, or base64 ([guide](docs/images.md))
 - Text effects — boxes, multi-column tables, and custom-font / rotated text ([guide](docs/text-effects.md))
 - Paper feed and cut control
 - Buzzer/beeper support
@@ -94,6 +94,22 @@ data:
   align: center
   cut: partial
 ```
+
+### Print an SVG Logo
+
+```yaml
+service: escpos_printer.print_image_path
+data:
+  path: /config/www/logo.svg
+  image_width: 384       # 58 mm printer column width; 576 for 80 mm
+  dither: threshold      # crisp edges on vector art
+  center: true
+  cut: full
+```
+
+Vector graphics rasterise at the printer's column width, so the same
+SVG looks crisp on every paper size. See the [Images guide](docs/images.md#svg-handling)
+for the safety model, caps, and a `data:` URI variant for templated graphics.
 
 ### Target a Specific Printer
 
@@ -162,9 +178,9 @@ For ready-to-import scripts and automations see the
 | `escpos_printer.print_message` | Print formatted message via notify entity (supports all text formatting + UTF-8) |
 | `escpos_printer.print_qr` | Print QR codes |
 | `escpos_printer.print_barcode` | Print barcodes (EAN13, CODE128, etc.) |
-| `escpos_printer.print_image` | Print images from URL, file, camera/image entity, or base64 — see [Images guide](docs/images.md) |
-| `escpos_printer.print_image_url` | Focused convenience service for HTTP(S) URLs (UI gets a URL field) — see [Images guide](docs/images.md) |
-| `escpos_printer.print_image_path` | Focused convenience service for local file paths — see [Images guide](docs/images.md) |
+| `escpos_printer.print_image` | Print images — raster (PNG / JPEG / WebP / HEIC) **or SVG** — from URL, file, camera/image entity, or base64. See [Images guide](docs/images.md). |
+| `escpos_printer.print_image_url` | Focused convenience service for HTTP(S) URLs (UI gets a URL field). Accepts raster and SVG. |
+| `escpos_printer.print_image_path` | Focused convenience service for local file paths. Accepts raster and SVG. |
 | `escpos_printer.print_camera_snapshot` | Print a live snapshot from a `camera.<id>` entity (UI gets an entity picker) |
 | `escpos_printer.print_image_entity` | Print the current frame from an `image.<id>` entity |
 | `escpos_printer.print_box` | Wrap text in a printable border (cp437 / ASCII / asterisk / hash) — see [Text effects guide](docs/text-effects.md) |

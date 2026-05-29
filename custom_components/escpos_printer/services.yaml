@@ -275,10 +275,13 @@ print_image:
   name: Print Image (template / mixed source)
   description: >
     Print an image from a URL, file path, camera.<id>, image.<id>, base64
-    data URI — or a Jinja template producing any of those. Existing
-    automations using a literal URL or path keep working unchanged. For
-    a friendlier UI, prefer the focused services (Print Image from URL,
-    from Path, Camera Snapshot, Image Entity) — see docs/images.md.
+    data URI — or a Jinja template producing any of those. Raster
+    (PNG / JPEG / WebP / HEIC / …) and SVG sources are both accepted;
+    SVG is rasterised at the printer column width before the dither
+    pipeline runs. Existing automations using a literal URL or path
+    keep working unchanged. For a friendlier UI, prefer the focused
+    services (Print Image from URL, from Path, Camera Snapshot, Image
+    Entity) — see docs/images.md.
   fields:
     device_id:
       name: Device
@@ -292,7 +295,10 @@ print_image:
       description: >
         URL (http/https), local file path, camera.<entity>, image.<entity>,
         data:image/...;base64,..., or a Jinja template producing any of
-        these. A literal string (e.g. "/config/www/logo.png") works the
+        these. Raster formats (PNG / JPEG / WebP / HEIC, etc.) and SVG
+        are both accepted; raster is capped at 10 MB (40 MB with
+        auto_resize) and SVG at 1 MB. A literal string (e.g.
+        "/config/www/logo.png" or "/config/www/logo.svg") works the
         same as it did before — the template editor accepts plain text.
       required: true
       example: /config/www/logo.png
@@ -366,9 +372,10 @@ print_image:
     auto_resize:
       name: Auto-Resize Large Sources
       description: >
-        Allow source images up to 40 MB and downscale before processing.
+        Allow raster source images up to 40 MB and downscale before processing.
         Enable when printing phone snapshots, high-resolution cameras, or any
-        source that would otherwise hit the 10 MB cap.
+        source that would otherwise hit the 10 MB cap. SVG sources remain
+        capped at 1 MB regardless of this setting (XML attack surface).
       default: false
       selector:
         boolean: {}
@@ -467,8 +474,9 @@ print_image:
 print_image_url:
   name: Print Image from URL
   description: >
-    Print an image fetched from an HTTP(S) URL. SSRF-aware — private,
-    loopback, and link-local addresses are refused.
+    Print an image fetched from an HTTP(S) URL. Accepts raster
+    (PNG / JPEG / WebP / HEIC / …) and SVG sources. SSRF-aware —
+    private, loopback, and link-local addresses are refused.
   fields:
     device_id:
       name: Device
@@ -479,7 +487,11 @@ print_image_url:
           integration: escpos_printer
     url:
       name: URL
-      description: HTTP(S) URL of the image (10 MB max, 40 MB with auto_resize).
+      description: >
+        HTTP(S) URL of the image. 10 MB max (40 MB with auto_resize) for
+        raster sources; SVG sources are capped at 1 MB and detected
+        either by the `image/svg+xml` Content-Type header or the
+        `.svg` URL suffix.
       required: true
       example: "https://example.com/receipt.png"
       selector:
@@ -552,9 +564,10 @@ print_image_url:
     auto_resize:
       name: Auto-Resize Large Sources
       description: >
-        Allow source images up to 40 MB and downscale before processing.
+        Allow raster source images up to 40 MB and downscale before processing.
         Enable when printing phone snapshots, high-resolution cameras, or any
-        source that would otherwise hit the 10 MB cap.
+        source that would otherwise hit the 10 MB cap. SVG sources remain
+        capped at 1 MB regardless of this setting (XML attack surface).
       default: true
       selector:
         boolean: {}
@@ -653,10 +666,12 @@ print_image_url:
 print_image_path:
   name: Print Image from Path
   description: >
-    Print an image from a local file path. The path must lie inside one
-    of Home Assistant's allowlist_external_dirs (typically /config or
-    /media — add directories under homeassistant -> allowlist_external_dirs
-    in configuration.yaml if needed).
+    Print an image from a local file path. Accepts raster
+    (PNG / JPEG / WebP / HEIC / …) and SVG files. The path must lie
+    inside one of Home Assistant's allowlist_external_dirs (typically
+    /config or /media — add directories under
+    homeassistant -> allowlist_external_dirs in configuration.yaml if
+    needed).
   fields:
     device_id:
       name: Device
@@ -667,7 +682,11 @@ print_image_path:
           integration: escpos_printer
     path:
       name: Path
-      description: Local file path to the image (must be inside allowlist_external_dirs, e.g. /config or /media).
+      description: >
+        Local file path to the image (must be inside
+        allowlist_external_dirs, e.g. /config or /media). `.svg` files
+        are accepted; they are size-capped at 1 MB regardless of the
+        per-source raster cap.
       required: true
       example: /config/www/logo.png
       selector:
@@ -740,10 +759,11 @@ print_image_path:
     auto_resize:
       name: Auto-Resize Large Sources
       description: >
-        Allow source images up to 40 MB and downscale before processing.
+        Allow raster source images up to 40 MB and downscale before processing.
         Enable when printing phone snapshots, high-resolution cameras, or any
-        source that would otherwise hit the 10 MB cap.
-      default: true
+        source that would otherwise hit the 10 MB cap. SVG sources remain
+        capped at 1 MB regardless of this setting (XML attack surface).
+      default: false
       selector:
         boolean: {}
     align:
@@ -842,7 +862,9 @@ print_camera_snapshot:
   name: Print Camera Snapshot
   description: >
     Print a live snapshot from a camera entity. Convenience wrapper around
-    print_image with a camera-entity selector for a friendlier UI.
+    print_image with a camera-entity selector for a friendlier UI. Camera
+    entities emit raster bytes only — SVG sources are not supported here
+    (use print_image_url / print_image_path for SVG).
   fields:
     device_id:
       name: Device
@@ -927,9 +949,10 @@ print_camera_snapshot:
     auto_resize:
       name: Auto-Resize Large Sources
       description: >
-        Allow source images up to 40 MB and downscale before processing.
+        Allow raster source images up to 40 MB and downscale before processing.
         Enable when printing phone snapshots, high-resolution cameras, or any
-        source that would otherwise hit the 10 MB cap.
+        source that would otherwise hit the 10 MB cap. SVG sources remain
+        capped at 1 MB regardless of this setting (XML attack surface).
       default: true
       selector:
         boolean: {}
@@ -1029,7 +1052,9 @@ print_image_entity:
   name: Print Image Entity
   description: >
     Print the current frame from an HA image entity (weather radar, ML
-    overlay, generated chart, etc).
+    overlay, generated chart, etc). Image entities emit raster bytes
+    only — SVG sources are not supported here (use print_image_url /
+    print_image_path for SVG).
   fields:
     device_id:
       name: Device
@@ -1114,9 +1139,10 @@ print_image_entity:
     auto_resize:
       name: Auto-Resize Large Sources
       description: >
-        Allow source images up to 40 MB and downscale before processing.
+        Allow raster source images up to 40 MB and downscale before processing.
         Enable when printing phone snapshots, high-resolution cameras, or any
-        source that would otherwise hit the 10 MB cap.
+        source that would otherwise hit the 10 MB cap. SVG sources remain
+        capped at 1 MB regardless of this setting (XML attack surface).
       default: false
       selector:
         boolean: {}
@@ -1233,7 +1259,9 @@ preview_image:
       name: Image
       description: >
         Same source forms as print_image — URL, file path, camera.<id>,
-        image.<id>, base64 data URI, or a Jinja template.
+        image.<id>, base64 data URI (raster or SVG), or a Jinja
+        template. SVG sources are rasterised first; the preview PNG
+        reflects what would actually print.
       required: true
       example: /config/www/logo.png
       selector:
@@ -1315,9 +1343,10 @@ preview_image:
     auto_resize:
       name: Auto-Resize Large Sources
       description: >
-        Allow source images up to 40 MB and downscale before processing.
+        Allow raster source images up to 40 MB and downscale before processing.
         Enable when printing phone snapshots, high-resolution cameras, or any
-        source that would otherwise hit the 10 MB cap.
+        source that would otherwise hit the 10 MB cap. SVG sources remain
+        capped at 1 MB regardless of this setting (XML attack surface).
       default: false
       selector:
         boolean: {}
@@ -1687,9 +1716,10 @@ print_message:
     image:
       name: Image
       description: >
-        Optional image printed after the message. Accepts the same source
-        forms as print_image (URL, file path, camera.<id>, image.<id>,
-        base64 data URI, or template). See docs/images.md.
+        Optional image printed after the message. Accepts the same
+        source forms as print_image — raster (PNG / JPEG / WebP /
+        HEIC / …) or SVG — from a URL, file path, camera.<id>,
+        image.<id>, base64 data URI, or template. See docs/images.md.
       selector:
         template: {}
     image_width:
@@ -1771,7 +1801,8 @@ print_message:
     image_auto_resize:
       name: Image Auto-Resize
       description: >
-        Allow source images up to 40 MB and downscale before processing.
+        Allow raster source images up to 40 MB and downscale before processing.
+        SVG sources remain capped at 1 MB regardless of this setting.
       default: false
       selector:
         boolean: {}

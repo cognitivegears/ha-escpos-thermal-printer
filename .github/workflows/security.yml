@@ -154,6 +154,23 @@ jobs:
         # dev/CI environment — end users install via manifest.json, which
         # tracks HA's own range — and auto-clear when HA bumps the pin. The
         # ignore list should be revisited after each HA bump.
+        #
+        # SVG-cairo CVE policy (cairosvg / cairocffi / tinycss2 / cssselect2
+        # / webencodings): treat advisories the same way as HA-pinned
+        # packages. The cairosvg ABI couples to the libcairo runtime that
+        # HA OS / Container / Supervised installs, so a CVE in cairocffi
+        # that requires bumping past the libcairo on those images cannot
+        # be fixed in-place. When an advisory lands:
+        #   1. Read it. If the fix is libcairo-side only, dismiss the
+        #      Dependabot security alert as `tolerable_risk` with a note
+        #      pointing at the HA libcairo version.
+        #   2. If the fix is a cairosvg version bump that stays within
+        #      HA's libcairo ABI window, bump cairosvg in pyproject.toml +
+        #      manifest.json and re-run `uv lock --upgrade`.
+        #   3. Add an --ignore-vuln entry below with the advisory ID and
+        #      a one-line rationale only if the fix has to wait.
+        # The TestRealCairosvgBinding CI test (validate.yml) catches
+        # kwarg-surface regressions when the bump is applied.
         run: |
           PIP_AUDIT_ARGS=(
             --skip-editable

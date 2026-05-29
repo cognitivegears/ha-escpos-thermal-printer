@@ -51,3 +51,16 @@ updates:
       # harness install. Let the HA test harness drive the version; revisit
       # if upstream loosens the pin.
       - dependency-name: "respx"
+      # cairosvg's ABI couples to the libcairo runtime installed on the
+      # HA host (HA Container / OS / Supervised all ship a specific
+      # libcairo). Auto-merging a cairosvg major bump can silently break
+      # against the deployed libcairo. CVE-2026-31899 was fixed in 2.9.0;
+      # the TestRealCairosvgBinding test in CI catches kwarg-surface
+      # regressions when libcairo is installed (see validate.yml). Bump
+      # manually when reviewing what changed in cairosvg between releases.
+      - dependency-name: "cairosvg"
+      # defusedxml's ``forbid_dtd`` / ``forbid_external`` / ``forbid_entities``
+      # defaults are load-bearing for the SVG XML threat model. A future
+      # defusedxml release that changes a default would silently weaken
+      # the gates. Bump manually after reading the changelog.
+      - dependency-name: "defusedxml"
