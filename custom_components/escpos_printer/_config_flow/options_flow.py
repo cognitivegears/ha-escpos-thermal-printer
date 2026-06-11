@@ -167,18 +167,22 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
         if current_codepage and current_codepage not in codepage_choices:
             codepage_choices[current_codepage] = f"{current_codepage} (current)"
 
-        # Get line widths for current profile
+        # Get line widths for current profile. String keys are required because
+        # the HA frontend submits all dropdown values as strings; integer keys
+        # cause vol.In to fail ("42" not in {42, 56, ...}).
         width_list = await self.hass.async_add_executor_job(
             get_profile_line_widths, current_profile
         )
-        width_choices: dict[str | int, str] = {}
+        width_choices: dict[str, str] = {}
         for w in width_list:
-            width_choices[w] = f"{w} columns"
+            width_choices[str(w)] = f"{w} columns"
         width_choices[OPTION_CUSTOM] = "Custom (enter columns)..."
 
-        # Ensure current line width is in choices (backward compatibility)
-        if current_line_width and current_line_width not in width_choices:
-            width_choices[current_line_width] = f"{current_line_width} columns (current)"
+        # Ensure current line width is in choices (backward compatibility).
+        # Normalise to str so the lookup works regardless of stored type.
+        current_line_width_str = str(current_line_width)
+        if current_line_width_str not in width_choices:
+            width_choices[current_line_width_str] = f"{current_line_width} columns (current)"
 
         # Get cut modes for current profile
         cut_modes = await self.hass.async_add_executor_job(get_profile_cut_modes, current_profile)
@@ -218,7 +222,7 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
                     ): vol.Coerce(float),
                     vol.Optional(CONF_PROFILE, default=current_profile): vol.In(profile_choices),
                     vol.Optional(CONF_CODEPAGE, default=current_codepage): vol.In(codepage_choices),
-                    vol.Optional(CONF_LINE_WIDTH, default=current_line_width): vol.In(
+                    vol.Optional(CONF_LINE_WIDTH, default=current_line_width_str): vol.In(
                         width_choices
                     ),
                     vol.Optional(
@@ -255,7 +259,7 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
                     ): vol.Coerce(float),
                     vol.Optional(CONF_PROFILE, default=current_profile): vol.In(profile_choices),
                     vol.Optional(CONF_CODEPAGE, default=current_codepage): vol.In(codepage_choices),
-                    vol.Optional(CONF_LINE_WIDTH, default=current_line_width): vol.In(
+                    vol.Optional(CONF_LINE_WIDTH, default=current_line_width_str): vol.In(
                         width_choices
                     ),
                     vol.Optional(

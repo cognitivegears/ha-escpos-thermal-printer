@@ -191,11 +191,12 @@ class SettingsFlowMixin:
         codepage_choices.update({cp: cp for cp in codepage_list})
         codepage_choices[OPTION_CUSTOM] = "Custom (enter codepage)..."
 
-        # Get line widths for selected profile
+        # Get line widths for selected profile. String keys are required because
+        # the HA frontend submits all dropdown values as strings.
         width_list = await self.hass.async_add_executor_job(get_profile_line_widths, profile)
-        width_choices: dict[str | int, str] = {}
+        width_choices: dict[str, str] = {}
         for w in width_list:
-            width_choices[w] = f"{w} columns"
+            width_choices[str(w)] = f"{w} columns"
         width_choices[OPTION_CUSTOM] = "Custom (enter columns)..."
 
         # Get cut modes for selected profile
@@ -205,7 +206,7 @@ class SettingsFlowMixin:
         data_schema = vol.Schema(
             {
                 vol.Optional(CONF_CODEPAGE, default=""): vol.In(codepage_choices),
-                vol.Optional(CONF_LINE_WIDTH, default=DEFAULT_LINE_WIDTH): vol.In(width_choices),
+                vol.Optional(CONF_LINE_WIDTH, default=str(DEFAULT_LINE_WIDTH)): vol.In(width_choices),
                 vol.Optional(CONF_DEFAULT_ALIGN, default=DEFAULT_ALIGN): vol.In(
                     ["left", "center", "right"]
                 ),
