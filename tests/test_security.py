@@ -581,3 +581,55 @@ class TestValidateRows:
         out = validate_rows([["a\x00b\x07c"]])
         # validate_text_input strips C0 control characters except CR/LF/HT.
         assert out == [["abc"]]
+
+
+class TestIsAllowedAddress:
+    """The opt-in ``allow_local`` relaxation of the SSRF address filter.
+
+    Strict mode (``allow_local=False``) is the historical "public only"
+    behavior. Permissive mode allows private/LAN/loopback while keeping
+    the genuinely dangerous ranges (cloud-metadata link-local, multicast,
+    reserved, unspecified) blocked.
+    """
+
+    @pytest.mark.parametrize(
+        "addr",
+        ["93.184.216.34", "8.8.8.8", "2606:2800:220:1:248:1893:25c8:1946"],
+    )
+    def test_public_allowed_in_both_modes(self, addr):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import _is_allowed_address
+
+        assert _is_allowed_address(addr, allow_local=False) is True
+        assert _is_allowed_address(addr, allow_local=True) is True
+
+    @pytest.mark.parametrize(
+        "addr",
+        ["10.0.0.5", "192.168.1.50", "172.16.0.1", "127.0.0.1", "::1", "fc00::1"],
+    )
+    def test_private_loopback_only_with_allow_local(self, addr):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import _is_allowed_address
+
+        assert _is_allowed_address(addr, allow_local=False) is False
+        assert _is_allowed_address(addr, allow_local=True) is True
+
+    @pytest.mark.parametrize(
+        "addr",
+        [
+            "169.254.169.254",  # cloud metadata — the whole point of keeping it blocked
+            "169.254.1.1",
+            "fe80::1",  # IPv6 link-local
+            "224.0.0.1",  # multicast
+            "0.0.0.0",  # unspecified
+            "240.0.0.1",  # reserved
+        ],
+    )
+    def test_dangerous_ranges_blocked_even_with_allow_local(self, addr):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import _is_allowed_address
+
+        assert _is_allowed_address(addr, allow_local=False) is False
+        assert _is_allowed_address(addr, allow_local=True) is False
+
+    def test_unparseable_address_rejected(self):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import _is_allowed_address
+
+        assert _is_allowed_address("not-an-ip", allow_local=True) is False

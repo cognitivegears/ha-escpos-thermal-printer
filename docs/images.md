@@ -52,13 +52,37 @@ URL validation enforces:
 - Scheme `http` or `https` only; default ports (80/443) only; no
   embedded credentials (`https://user:pass@host/` is rejected); no
   IDN/punycode hostnames.
-- Hostname is resolved via `getaddrinfo`; the request is **refused if
-  any resolved address is private, loopback, link-local, reserved,
-  multicast, or unspecified**. That includes `127.0.0.1`, `::1`,
-  RFC1918 ranges (`10.x`, `192.168.x`, `172.16.x`), and
+- Hostname is resolved via `getaddrinfo`; by default the request is
+  **refused if any resolved address is private, loopback, link-local,
+  reserved, multicast, or unspecified**. That includes `127.0.0.1`,
+  `::1`, RFC1918 ranges (`10.x`, `192.168.x`, `172.16.x`), and
   `169.254.169.254` (cloud metadata).
 - Redirects are followed manually (max 5); every redirect target is
   re-validated against the rules above.
+
+> **Note (default port).** The port restriction means a URL like
+> `http://192.168.1.10:8123/...` is rejected even with the option below
+> — only ports 80/443 are allowed. Fetching authenticated Home Assistant
+> `/api/...` endpoints also won't work because the fetch sends no auth
+> token; only **unauthenticated** endpoints (e.g. Frigate notification
+> thumbnails) succeed.
+
+#### Allowing local / LAN URLs
+
+The private-address block is on by default so the integration can't be
+used as an SSRF proxy. If you need to print from a **local** image URL —
+a LAN camera, an NVR/Frigate proxy, a NAS, or your own Home Assistant
+instance — enable **Settings → Devices & Services → ESC/POS printer →
+Configure → "Allow local image URLs"**. With it on, private/RFC1918 and
+loopback addresses are accepted. The genuinely dangerous ranges stay
+blocked **even when enabled**: link-local/cloud-metadata
+(`169.254.0.0/16`, `fe80::/10`), multicast, reserved (`240.0.0.0/4`),
+and unspecified. The toggle is per-printer.
+
+If the source is a Home-Assistant-managed camera or image, prefer the
+[camera entity](#camera-entity) / [image entity](#image-entity) sources
+instead — they enforce per-user entity permissions and don't need this
+option.
 
 Max download size is 10 MB; the body is streamed and the read aborts
 mid-stream when the cap is hit. `Content-Length` is checked before
@@ -434,4 +458,5 @@ data:
 | Photo prints almost all black or all white             | Turn on `autocontrast: true`. If still extreme, try `dither: threshold` with a value near the image's average brightness.                                |
 | Image is sideways (phone photos)                       | EXIF orientation should auto-correct. If your image lacks EXIF, use `rotation: 90` / `180` / `270`.                                                      |
 | `Failed to download image: ...`                        | URL is wrong, requires auth, or your HA host can't reach it. Test the URL with `curl` from the host first.                                               |
+| `Image URL resolves to a non-public address`           | The URL points at a private/LAN/loopback address. Enable ["Allow local image URLs"](#allowing-local--lan-urls) in the printer options, or use a camera/image entity source. |
 | Image command works in `print_image` but not `notify`  | Notify uses `image_*`-prefixed parameter names (e.g. `image_dither`, not `dither`). See [Notify entity integration](#notify-entity-integration).         |

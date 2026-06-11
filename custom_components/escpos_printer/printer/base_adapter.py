@@ -104,6 +104,11 @@ class EscposPrinterAdapterBase(
         """Return the printer configuration."""
         return self._config
 
+    @property
+    def allow_local_image_urls(self) -> bool:
+        """Whether image URLs may resolve to private/LAN/loopback addresses."""
+        return self._config.allow_local_image_urls
+
     @abstractmethod
     def _connect(self) -> Any:
         """Create and return a printer connection."""
@@ -288,7 +293,7 @@ class EscposPrinterAdapterBase(
                 data = printer.profile.profile_data["media"]["width"]["pixels"]
                 if isinstance(data, (int, float)):
                     width = int(data)
-            except (AttributeError, KeyError, TypeError, ValueError):
+            except AttributeError, KeyError, TypeError, ValueError:
                 width = None
         self._cached_profile_width = width
         self._profile_width_lookup_done = True
@@ -409,7 +414,7 @@ class EscposPrinterAdapterBase(
                     await _print_text_under_lock(self, hass, printer, **text_kwargs)
                     await _print_prepared_under_lock(hass, printer, prepared)
                     await self._apply_cut_and_feed(hass, printer, cut, feed)
-                except (asyncio.CancelledError, Exception):
+                except asyncio.CancelledError, Exception:
                     # S-M3: shield the cleanup so a second cancellation
                     # mid-flush doesn't leave paper half-printed. The
                     # suppress() catches Exception only — CancelledError
@@ -425,9 +430,7 @@ class EscposPrinterAdapterBase(
                     with contextlib.suppress(Exception):
                         await asyncio.shield(
                             asyncio.ensure_future(
-                                self._apply_cut_and_feed(
-                                    hass, printer, cut or "full", feed or 1
-                                )
+                                self._apply_cut_and_feed(hass, printer, cut or "full", feed or 1)
                             )
                         )
                     raise

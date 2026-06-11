@@ -33,6 +33,27 @@ async def test_setup_assigns_runtime_data(hass):  # type: ignore[no-untyped-def]
     assert entry.runtime_data.adapter is not None
     assert "align" in entry.runtime_data.defaults
     assert "cut" in entry.runtime_data.defaults
+    # Secure-by-default: the SSRF opt-in is off unless the option is set.
+    assert entry.runtime_data.adapter.allow_local_image_urls is False
+
+
+async def test_setup_propagates_allow_local_image_urls_option(hass):  # type: ignore[no-untyped-def]
+    """The allow-local option must reach the adapter so the resolver relaxes."""
+    from custom_components.escpos_printer.const import CONF_ALLOW_LOCAL_IMAGE_URLS
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="1.2.3.4:9100",
+        data={CONF_HOST: "1.2.3.4", CONF_PORT: 9100},
+        options={CONF_ALLOW_LOCAL_IMAGE_URLS: True},
+        unique_id="1.2.3.4:9100",
+    )
+    entry.add_to_hass(hass)
+    with patch("escpos.printer.Network"):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    assert entry.runtime_data.adapter.allow_local_image_urls is True
 
 
 async def test_setup_registers_global_services_once(hass):  # type: ignore[no-untyped-def]

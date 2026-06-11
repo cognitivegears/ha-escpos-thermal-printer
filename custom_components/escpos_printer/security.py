@@ -314,6 +314,42 @@ def _is_public_address(addr: str) -> bool:
     )
 
 
+def _is_allowed_address(addr: str, *, allow_local: bool) -> bool:
+    """Return True if ``addr`` may be fetched.
+
+    Globally routable addresses are always allowed. When ``allow_local`` is
+    set (opt-in per-printer option) private/RFC1918 (and IPv6 ULA) and
+    loopback addresses are *also* allowed so URLs pointing at LAN cameras,
+    NVRs, NAS shares, or the Home Assistant instance itself work.
+
+    The genuinely dangerous ranges stay blocked **even with ``allow_local``**:
+
+    - link-local (``169.254.0.0/16`` / ``fe80::/10``) — this is the cloud
+      metadata endpoint (``169.254.169.254``); SSRF here leaks IAM creds.
+    - multicast / unspecified (``0.0.0.0`` / ``::``).
+    - reserved/future-use ranges (e.g. ``240.0.0.0/4``) that aren't a real
+      LAN. Note ``::1`` is flagged *both* loopback and reserved by Python,
+      so loopback is granted before the reserved exclusion is applied.
+
+    With ``allow_local=False`` this is exactly :func:`_is_public_address`, so
+    the historical strict behavior is preserved by construction.
+    """
+    if _is_public_address(addr):
+        return True
+    if not allow_local:
+        return False
+    try:
+        ip = ipaddress.ip_address(addr)
+    except ValueError:
+        return False
+    # Permissive (LAN) mode — still refuse the always-dangerous ranges.
+    if ip.is_link_local or ip.is_multicast or ip.is_unspecified:
+        return False
+    if ip.is_loopback:
+        return True
+    return ip.is_private and not ip.is_reserved
+
+
 def _resolve_hostname_sync(hostname: str, port: int | None) -> list[str]:
     """Resolve ``hostname`` to a list of IP literals; raise on failure."""
     try:
@@ -326,12 +362,19 @@ def _resolve_hostname_sync(hostname: str, port: int | None) -> list[str]:
     return addrs
 
 
-async def validate_image_url_and_resolve(hass: HomeAssistant, url: str) -> tuple[str, list[str]]:
-    """Validate ``url`` and resolve its hostname, rejecting private targets.
+async def validate_image_url_and_resolve(
+    hass: HomeAssistant, url: str, *, allow_local: bool = False
+) -> tuple[str, list[str]]:
+    """Validate ``url`` and resolve its hostname, rejecting unsafe targets.
 
     Returns ``(validated_url, resolved_addresses)``. The caller should pin
     one of the resolved addresses for the actual fetch (defeats DNS
     rebinding); see ``image_sources._resolve_http``.
+
+    By default only globally routable addresses are accepted. ``allow_local``
+    (the per-printer opt-in) additionally accepts private/LAN/loopback
+    targets while still rejecting link-local/metadata, multicast, reserved,
+    and unspecified addresses — see :func:`_is_allowed_address`.
     """
     validated = validate_image_url(url)
     parsed = urlparse(validated)
@@ -339,11 +382,20 @@ async def validate_image_url_and_resolve(hass: HomeAssistant, url: str) -> tuple
     if hostname is None:  # pragma: no cover — validate_image_url enforces it
         raise HomeAssistantError("URL must include a valid hostname")
     addrs = await hass.async_add_executor_job(_resolve_hostname_sync, hostname, parsed.port)
-    bad = [a for a in addrs if not _is_public_address(a)]
+    bad = [a for a in addrs if not _is_allowed_address(a, allow_local=allow_local)]
     if bad:
+        if allow_local:
+            # Already in the permissive mode and still blocked → it's one of
+            # the always-unsafe ranges, so don't dangle a non-existent knob.
+            raise HomeAssistantError(
+                "Image URL resolves to a blocked address (link-local/metadata, "
+                "multicast, reserved, or unspecified)"
+            )
         raise HomeAssistantError(
             "Image URL resolves to a non-public address "
-            "(private, loopback, link-local, reserved, or multicast)"
+            "(private, loopback, link-local, reserved, or multicast). "
+            "Enable 'Allow local image URLs' in the printer options to permit "
+            "private/LAN addresses."
         )
     return validated, addrs
 
@@ -493,8 +545,7 @@ def validate_font_path_with_fonts_dir(raw_path: str, hass: HomeAssistant) -> Pat
             f"(and not under <config>/fonts/)"
         ) from exc
     raise HomeAssistantError(
-        f"Font path '{resolved}' is outside allowlist_external_dirs "
-        f"(and not under <config>/fonts/)"
+        f"Font path '{resolved}' is outside allowlist_external_dirs (and not under <config>/fonts/)"
     )
 
 
@@ -869,7 +920,6 @@ def validate_rfcomm_channel(channel: int) -> int:
     if not 1 <= value <= 30:
         raise HomeAssistantError("RFCOMM channel must be between 1 and 30")
     return value
-
 
     # B-L1: ``secure_service_call`` was a never-implemented pass-through
     # decorator from an earlier iteration. The cross-cutting validation

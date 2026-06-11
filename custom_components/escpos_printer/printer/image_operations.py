@@ -131,6 +131,7 @@ async def prepare_image_for_print(
         mirror=mirror,
         auto_resize=auto_resize,
     )
+    allow_local = bool(getattr(host, "allow_local_image_urls", False))
     try:
         raw, _content_type = await _resolve_with_retry(
             hass,
@@ -138,6 +139,7 @@ async def prepare_image_for_print(
             context=context,
             auto_resize=auto_resize,
             fallback=fallback_image,
+            allow_local=allow_local,
         )
         img_obj = await _process_bytes(hass, raw, process_opts)
         raw_len = len(raw)
@@ -179,6 +181,7 @@ async def _try_fallback(
     *,
     context: Context | None,
     auto_resize: bool,
+    allow_local: bool = False,
 ) -> tuple[bytes, str | None]:
     """Run ``fallback`` if set; raise the primary error on any failure.
 
@@ -190,7 +193,7 @@ async def _try_fallback(
         _LOGGER.debug("Primary image resolve failed (%s); trying fallback", type(primary).__name__)
         try:
             return await resolve_image_bytes(
-                hass, fallback, context=context, auto_resize=auto_resize
+                hass, fallback, context=context, auto_resize=auto_resize, allow_local=allow_local
             )
         except HomeAssistantError:
             raise primary from None
@@ -204,6 +207,7 @@ async def _resolve_with_retry(
     context: Context | None,
     auto_resize: bool,
     fallback: str | None,
+    allow_local: bool = False,
 ) -> tuple[bytes, str | None]:
     """Resolve ``image``; retry once on transient camera/http failure.
 
@@ -218,7 +222,9 @@ async def _resolve_with_retry(
     the fallback (if any).
     """
     try:
-        return await resolve_image_bytes(hass, image, context=context, auto_resize=auto_resize)
+        return await resolve_image_bytes(
+            hass, image, context=context, auto_resize=auto_resize, allow_local=allow_local
+        )
     except HomeAssistantError as primary:
         kind, _ = classify_source(image)
         retryable = kind in ("camera", "http") and not _is_timeout_cause(primary)
@@ -230,10 +236,15 @@ async def _resolve_with_retry(
             await asyncio.sleep(0.5)
             with contextlib.suppress(HomeAssistantError):
                 return await resolve_image_bytes(
-                    hass, image, context=context, auto_resize=auto_resize
+                    hass, image, context=context, auto_resize=auto_resize, allow_local=allow_local
                 )
         return await _try_fallback(
-            hass, fallback, primary, context=context, auto_resize=auto_resize
+            hass,
+            fallback,
+            primary,
+            context=context,
+            auto_resize=auto_resize,
+            allow_local=allow_local,
         )
 
 

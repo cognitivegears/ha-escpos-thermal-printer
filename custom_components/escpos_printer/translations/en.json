@@ -230,7 +230,8 @@
           "default_align": "Default alignment",
           "default_cut": "Default cut mode",
           "keepalive": "Keep persistent connection",
-          "status_interval": "Status check interval (seconds)"
+          "status_interval": "Status check interval (seconds)",
+          "allow_local_image_urls": "Allow local image URLs"
         },
         "data_description": {
           "timeout": "Connection timeout in seconds.",
@@ -240,7 +241,8 @@
           "default_align": "Default text alignment for printing.",
           "default_cut": "Default paper cut mode after printing.",
           "keepalive": "Keep the connection open between print jobs (network printers only).",
-          "status_interval": "How often to check printer status (0 to disable)."
+          "status_interval": "How often to check printer status (0 to disable).",
+          "allow_local_image_urls": "Permit print_image_url (and the other image services) to fetch URLs that resolve to private/LAN/loopback addresses, e.g. a local camera or your Home Assistant instance. Off by default. Cloud-metadata/link-local addresses stay blocked even when enabled."
         }
       },
       "custom_profile": {

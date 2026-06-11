@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **"Allow local image URLs" printer option** (issue #95). Image URL
+  fetches (`print_image_url` and the other image services) still reject
+  private/LAN/loopback targets by default — an SSRF guard — but you can
+  now opt in per-printer (**Configure → "Allow local image URLs"**) to
+  print from a LAN camera, an NVR/Frigate proxy, a NAS, or your own
+  Home Assistant instance. The dangerous ranges stay blocked even when
+  enabled: link-local/cloud-metadata (`169.254.0.0/16`, `fe80::/10`),
+  multicast, reserved (`240.0.0.0/4`), and unspecified. The default-port
+  restriction (80/443 only) also still applies, and the fetch sends no
+  auth token — so only unauthenticated endpoints work. The strict-mode
+  rejection message now points at the new toggle. See
+  [docs/images.md](docs/images.md#allowing-local--lan-urls).
+
 ### Fixed
 
 - **HTTP/HTTPS image-URL printing failed for every URL** with

@@ -6,6 +6,7 @@ from homeassistant.const import CONF_HOST, CONF_PORT
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.escpos_printer.const import (
+    CONF_ALLOW_LOCAL_IMAGE_URLS,
     CONF_CODEPAGE,
     CONF_CONNECTION_TYPE,
     CONF_DEFAULT_ALIGN,
@@ -52,6 +53,40 @@ async def test_options_flow_update(hass):  # type: ignore[no-untyped-def]
     assert result2["type"] == "create_entry"
     assert result2["data"][CONF_TIMEOUT] == 5.5
     assert result2["data"][CONF_DEFAULT_ALIGN] == "center"
+
+
+async def test_options_flow_allow_local_image_urls_roundtrips(hass):  # type: ignore[no-untyped-def]
+    """The allow-local-image-URLs toggle defaults off and persists when set."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="1.2.3.4:9100",
+        data={
+            CONF_HOST: "1.2.3.4",
+            CONF_PORT: 9100,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK,
+        },
+        unique_id="1.2.3.4:9100",
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] == "form"
+    # Default must be off (secure-by-default).
+    schema_defaults = {
+        str(key.schema): key.default() for key in result["data_schema"].schema if key.default
+    }
+    assert schema_defaults.get(CONF_ALLOW_LOCAL_IMAGE_URLS) is False
+
+    result2 = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            CONF_TIMEOUT: 4.0,
+            CONF_ALLOW_LOCAL_IMAGE_URLS: True,
+        },
+    )
+    assert result2["type"] == "create_entry"
+    assert result2["data"][CONF_ALLOW_LOCAL_IMAGE_URLS] is True
 
 
 async def test_duplicate_unique_id_aborts(hass):  # type: ignore[no-untyped-def]
