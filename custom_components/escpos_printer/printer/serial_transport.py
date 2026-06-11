@@ -27,7 +27,20 @@ class SerialTransport(Protocol):
 
 
 class _SerialTransportImpl:
-    """Concrete byte-sink wrapping a connected ``serialx`` serial port."""
+    """Concrete byte-sink wrapping a connected ``serialx`` serial port.
+
+    All ``write()`` calls are coalesced into an internal buffer and sent to
+    the port in a single ``_flush()`` call when ``close()`` is invoked.
+    This avoids the rapid-fire burst of tiny writes that python-escpos
+    generates (one per ESC/POS attribute: bold, align, text, cut …), which
+    can overrun the receive buffer on resource-constrained serial proxies
+    such as an ESP32 running the ESPHome serial-proxy component.
+
+    ``write_chunk_size`` controls how the coalesced payload is split during
+    flush; ``write_chunk_delay_s`` adds a pause between consecutive chunks.
+    Both default to 0, meaning the buffered payload is sent as a single
+    ``port.write()`` call.
+    """
 
     def __init__(
         self,
@@ -38,16 +51,22 @@ class _SerialTransportImpl:
         self._port: Any = port
         self._write_chunk_size = write_chunk_size
         self._write_chunk_delay_s = write_chunk_delay_s
+        self._buffer = bytearray()
 
     def write(self, data: bytes) -> None:
-        if not data:
+        if data:
+            self._buffer.extend(data)
+
+    def _flush(self) -> None:
+        if not self._buffer:
             return
+        data = bytes(self._buffer)
+        self._buffer.clear()
         if self._write_chunk_size <= 0 or len(data) <= self._write_chunk_size:
             self._port.write(data)
             return
-        # Split into chunks with an inter-chunk delay to avoid overrunning
-        # receive buffers on resource-constrained serial proxies (e.g. ESP32
-        # running ESPHome). Runs on an executor thread so time.sleep is safe.
+        # Send in chunks with inter-chunk delays. Runs on an executor thread
+        # so time.sleep is safe.
         for i in range(0, len(data), self._write_chunk_size):
             chunk = data[i : i + self._write_chunk_size]
             self._port.write(chunk)
@@ -55,6 +74,8 @@ class _SerialTransportImpl:
                 time.sleep(self._write_chunk_delay_s)
 
     def close(self) -> None:
+        with contextlib.suppress(Exception):
+            self._flush()
         with contextlib.suppress(Exception):
             self._port.close()
 
@@ -73,10 +94,11 @@ def open_serial_transport(
     argument is passed through for direct serial connections; URL-based
     backends (e.g. ESPHome serial proxy) silently ignore it.
 
-    ``write_chunk_size`` limits the number of bytes sent per write call.
-    ``write_chunk_delay_ms`` adds a pause between consecutive chunks.
-    Both default to 0 (disabled), preserving the original send-all-at-once
-    behaviour for direct serial connections.
+    All writes are buffered and flushed as a single payload when the
+    transport is closed, coalescing the many small ``_raw()`` calls that
+    python-escpos makes into one burst.  ``write_chunk_size`` splits that
+    payload into smaller chunks; ``write_chunk_delay_ms`` adds a pause
+    between consecutive chunks.  Both default to 0 (no chunking).
 
     Raises ``OSError`` on failure; the caller maps errno to user-facing error
     keys.

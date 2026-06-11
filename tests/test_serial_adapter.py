@@ -1,6 +1,6 @@
 """Tests for serial printer adapter."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -340,3 +340,69 @@ class TestCreatePrinterAdapterSerial:
         config = BluetoothPrinterConfig(mac="AA:BB:CC:DD:EE:FF")
         adapter = create_printer_adapter(config)
         assert isinstance(adapter, BluetoothPrinterAdapter)
+
+
+class TestSerialTransportImpl:
+    """Tests for _SerialTransportImpl write coalescing and flush-on-close."""
+
+    def _make_transport(self, write_chunk_size=0, write_chunk_delay_s=0.0):
+        from custom_components.escpos_printer.printer.serial_transport import (
+            _SerialTransportImpl,
+        )
+
+        port = MagicMock()
+        transport = _SerialTransportImpl(
+            port,
+            write_chunk_size=write_chunk_size,
+            write_chunk_delay_s=write_chunk_delay_s,
+        )
+        return transport, port
+
+    def test_write_buffers_without_touching_port(self):
+        transport, port = self._make_transport()
+        transport.write(b"hello")
+        transport.write(b" world")
+        port.write.assert_not_called()
+
+    def test_close_flushes_coalesced_buffer(self):
+        transport, port = self._make_transport()
+        transport.write(b"hello")
+        transport.write(b" world")
+        transport.close()
+        port.write.assert_called_once_with(b"hello world")
+
+    def test_close_with_empty_buffer_does_not_write(self):
+        transport, port = self._make_transport()
+        transport.close()
+        port.write.assert_not_called()
+
+    def test_flush_splits_into_chunks(self):
+        transport, port = self._make_transport(write_chunk_size=4)
+        transport.write(b"0123456789")  # 10 bytes → chunks of 4, 4, 2
+        transport.close()
+        assert port.write.call_args_list == [
+            call(b"0123"),
+            call(b"4567"),
+            call(b"89"),
+        ]
+
+    def test_flush_with_chunk_delay(self):
+        transport, port = self._make_transport(write_chunk_size=4, write_chunk_delay_s=0.001)
+        transport.write(b"01234567")  # 8 bytes → 2 chunks of 4
+        with patch("custom_components.escpos_printer.printer.serial_transport.time.sleep") as mock_sleep:
+            transport.close()
+        assert port.write.call_count == 2
+        mock_sleep.assert_called_once_with(0.001)
+
+    def test_close_suppresses_flush_error(self):
+        transport, port = self._make_transport()
+        port.write.side_effect = OSError("port gone")
+        transport.write(b"data")
+        transport.close()  # must not raise
+
+    def test_close_closes_port_even_after_flush_error(self):
+        transport, port = self._make_transport()
+        port.write.side_effect = OSError("port gone")
+        transport.write(b"data")
+        transport.close()
+        port.close.assert_called_once()
