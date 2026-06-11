@@ -51,3 +51,8 @@ updates:
       # harness install. Let the HA test harness drive the version; revisit
       # if upstream loosens the pin.
       - dependency-name: "respx"
+      # serialx is pinned by the ESPHome integration manifest. Bumping it
+      # independently creates an unsatisfiable conflict when HA has ESPHome
+      # installed. Let HA/ESPHome drive the version; check the ESPHome
+      # integration manifest when upgrading HA and update to match.
+      - dependency-name: "serialx"

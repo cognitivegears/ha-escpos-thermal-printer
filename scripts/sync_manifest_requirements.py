@@ -46,6 +46,12 @@ MANIFEST_OVERRIDES: dict[str, str] = {
     # pyproject.toml keeps `dbus-fast==3.1.2` for dev/CI reproducibility
     # against the locked HA test wheel.
     "dbus-fast": ">=3.1.2,<6",
+    # serialx is shipped by the ESPHome integration manifest; HA installs
+    # exactly the version ESPHome pins (currently 1.8.0). An exact pin in
+    # manifest.json creates an unsatisfiable conflict when ESPHome's version
+    # differs. Range accepts whatever version HA has already installed.
+    # pyproject.toml keeps `serialx==1.8.0` for dev/CI reproducibility.
+    "serialx": ">=1.8.0",
 }
 
 
