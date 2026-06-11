@@ -333,6 +333,22 @@ def _is_public_address(addr: str) -> bool:
     )
 
 
+# Cloud-metadata endpoints that must never be fetched, even in permissive
+# (``allow_local``) mode. The IPv4 service (and its IPv6 *link-local* form)
+# is already caught by the link-local check, but the AWS IMDSv6 endpoint
+# ``fd00:ec2::254`` is an IPv6 *Unique-Local* address (``fc00::/7``) — Python
+# flags it ``is_private`` but not ``is_link_local``, so without this explicit
+# denylist it would slip through the permissive ULA grant on a dual-stack EC2
+# host. Home IPv6 LANs legitimately use ULA, so we block the specific
+# endpoints rather than the whole ULA range.
+_ALWAYS_BLOCKED_HOSTS: frozenset[ipaddress.IPv4Address | ipaddress.IPv6Address] = frozenset(
+    {
+        ipaddress.ip_address("169.254.169.254"),  # IMDSv4 (also caught by link-local)
+        ipaddress.ip_address("fd00:ec2::254"),  # AWS IMDSv6 (ULA — not otherwise caught)
+    }
+)
+
+
 def _is_allowed_address(addr: str, *, allow_local: bool) -> bool:
     """Return True if ``addr`` may be fetched.
 
@@ -345,6 +361,9 @@ def _is_allowed_address(addr: str, *, allow_local: bool) -> bool:
 
     - link-local (``169.254.0.0/16`` / ``fe80::/10``) — this is the cloud
       metadata endpoint (``169.254.169.254``); SSRF here leaks IAM creds.
+    - the IPv6 cloud-metadata endpoints in :data:`_ALWAYS_BLOCKED_HOSTS`
+      (AWS IMDSv6 ``fd00:ec2::254`` is a ULA that the private grant would
+      otherwise permit).
     - multicast / unspecified (``0.0.0.0`` / ``::``).
     - reserved/future-use ranges (e.g. ``240.0.0.0/4``) that aren't a real
       LAN. Note ``::1`` is flagged *both* loopback and reserved by Python,
@@ -361,8 +380,14 @@ def _is_allowed_address(addr: str, *, allow_local: bool) -> bool:
         ip = ipaddress.ip_address(addr)
     except ValueError:
         return False
-    # Permissive (LAN) mode — still refuse the always-dangerous ranges.
-    if ip.is_link_local or ip.is_multicast or ip.is_unspecified:
+    # Permissive (LAN) mode — still refuse the always-dangerous ranges
+    # (specific cloud-metadata hosts + link-local/multicast/unspecified).
+    if (
+        ip in _ALWAYS_BLOCKED_HOSTS
+        or ip.is_link_local
+        or ip.is_multicast
+        or ip.is_unspecified
+    ):
         return False
     if ip.is_loopback:
         return True

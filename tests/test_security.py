@@ -641,9 +641,10 @@ class TestIsAllowedAddress:
     @pytest.mark.parametrize(
         "addr",
         [
-            "169.254.169.254",  # cloud metadata — the whole point of keeping it blocked
+            "169.254.169.254",  # IMDSv4 cloud metadata — the whole point of keeping it blocked
             "169.254.1.1",
             "fe80::1",  # IPv6 link-local
+            "fd00:ec2::254",  # AWS IMDSv6 — a ULA that the private grant would otherwise allow
             "224.0.0.1",  # multicast
             "0.0.0.0",  # unspecified
             "240.0.0.1",  # reserved
@@ -654,6 +655,18 @@ class TestIsAllowedAddress:
 
         assert _is_allowed_address(addr, allow_local=False) is False
         assert _is_allowed_address(addr, allow_local=True) is False
+
+    @pytest.mark.parametrize(
+        "addr",
+        ["fd12:3456:789a::1", "fdce:1234::abcd", "fc00::1"],
+    )
+    def test_legitimate_ula_still_allowed_with_opt_in(self, addr):  # type: ignore[no-untyped-def]
+        # The IMDSv6 block must be the *specific* metadata host, not the whole
+        # ULA range — home IPv6 LANs legitimately use fc00::/7.
+        from custom_components.escpos_printer.security import _is_allowed_address
+
+        assert _is_allowed_address(addr, allow_local=False) is False
+        assert _is_allowed_address(addr, allow_local=True) is True
 
     def test_unparseable_address_rejected(self):  # type: ignore[no-untyped-def]
         from custom_components.escpos_printer.security import _is_allowed_address
