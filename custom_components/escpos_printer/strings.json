@@ -194,16 +194,34 @@
         }
       },
       "serial": {
-        "title": "Configure serial printer",
-        "description": "Enter the serial port path or URL for your ESC/POS printer.",
+        "title": "Select serial port",
+        "description": "Choose a discovered serial port. Select **Enter manually** to type a path or URL (e.g. esphome://, rfc2217://, socket://).",
         "data": {
-          "serial_port": "Port or URL",
+          "serial_port": "Serial port"
+        },
+        "data_description": {
+          "serial_port": "Select your printer's serial port from the list of detected devices."
+        }
+      },
+      "serial_manual": {
+        "title": "Enter serial port or URL",
+        "description": "Type the serial port path or URL for your ESC/POS printer.",
+        "data": {
+          "serial_port": "Port or URL"
+        },
+        "data_description": {
+          "serial_port": "Serial port path (e.g. /dev/ttyUSB0, /dev/ttyACM0, COM3) or URL (e.g. esphome://192.168.1.100:6638, rfc2217://host:2217, socket://host:9100)."
+        }
+      },
+      "serial_config": {
+        "title": "Configure serial printer",
+        "description": "Configure connection settings for **{port}**.",
+        "data": {
           "baudrate": "Baud rate",
           "timeout": "Timeout (seconds)",
           "profile": "Printer profile"
         },
         "data_description": {
-          "serial_port": "Serial port path (e.g. /dev/ttyUSB0, /dev/ttyACM0, COM3) or URL (e.g. esphome://192.168.1.100:6638, rfc2217://host:2217, socket://host:9100).",
           "baudrate": "Baud rate for direct serial connections. Ignored for URL-based connections such as ESPHome serial proxies.",
           "timeout": "Connection timeout in seconds.",
           "profile": "Select your printer model or Auto-detect. Choose 'Custom' to enter a profile name manually."

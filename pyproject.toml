@@ -277,6 +277,7 @@ module = [
     "pytest_homeassistant_custom_component.*",
     "usb.*",
     "wcwidth.*",
+    "serial.*",
 ]
 ignore_missing_imports = true
 
