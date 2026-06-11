@@ -1,7 +1,7 @@
 """Printer adapter package for ESC/POS thermal printers.
 
 This package provides adapters for communicating with ESC/POS thermal printers
-over network (TCP/IP), USB, and Bluetooth Classic / RFCOMM connections.
+over network (TCP/IP), USB, Bluetooth Classic / RFCOMM, and serial connections.
 """
 
 from __future__ import annotations
@@ -14,10 +14,12 @@ from .config import (
     NetworkPrinterConfig,
     PrinterConfig,
     PrinterConfigTypes,
+    SerialPrinterConfig,
     UsbPrinterConfig,
 )
 from .factory import create_printer_adapter
 from .network_adapter import NetworkPrinterAdapter
+from .serial_adapter import SerialPrinterAdapter
 from .usb_adapter import UsbPrinterAdapter
 
 # Legacy alias for backward compatibility
@@ -33,6 +35,8 @@ __all__ = [
     "NetworkPrinterConfig",
     "PrinterConfig",
     "PrinterConfigTypes",
+    "SerialPrinterAdapter",
+    "SerialPrinterConfig",
     "UsbPrinterAdapter",
     "UsbPrinterConfig",
     "create_printer_adapter",

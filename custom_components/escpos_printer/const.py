@@ -25,6 +25,7 @@ CONF_CONNECTION_TYPE = "connection_type"
 CONNECTION_TYPE_NETWORK = "network"
 CONNECTION_TYPE_USB = "usb"
 CONNECTION_TYPE_BLUETOOTH = "bluetooth"
+CONNECTION_TYPE_SERIAL = "serial"
 
 # USB configuration keys
 CONF_VENDOR_ID = "vendor_id"
@@ -36,6 +37,10 @@ CONF_OUT_EP = "out_ep"
 CONF_BT_MAC = "bt_mac"
 CONF_BT_DEVICE = "bt_device"
 CONF_RFCOMM_CHANNEL = "rfcomm_channel"
+
+# Serial configuration keys
+CONF_SERIAL_PORT = "serial_port"
+CONF_BAUDRATE = "baudrate"
 
 # Sentinel value for the manual-MAC-entry choice in the BT picker dropdown.
 BT_MANUAL_ENTRY_KEY = "__manual__"
@@ -58,6 +63,9 @@ DEFAULT_OUT_EP = 0x01
 
 # Bluetooth defaults
 DEFAULT_RFCOMM_CHANNEL = 1
+
+# Serial defaults
+DEFAULT_BAUDRATE = 9600
 
 # Known thermal printer vendor IDs for auto-discovery.
 # Source: http://www.linux-usb.org/usb.ids

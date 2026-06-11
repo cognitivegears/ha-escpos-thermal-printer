@@ -21,6 +21,11 @@ dependencies = [
   # CJK / fullwidth / emoji columns line up under the 1-col-per-glyph
   # text mode (instead of silently misaligning via len()).
   "wcwidth==0.7.0",
+  # Serial port support. serialx is used instead of bare pyserial because
+  # serial_for_url() transparently dispatches to native device paths
+  # (/dev/ttyUSB0), esphome://, rfc2217://, and socket:// — enabling
+  # ESPHome serial-proxy connections without adapter changes.
+  "serialx==1.8.1",
 ]
 
 [build-system]

@@ -34,6 +34,7 @@ from ..const import (
     CONF_TIMEOUT,
     CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
+    CONNECTION_TYPE_SERIAL,
     CONNECTION_TYPE_USB,
     DEFAULT_ALIGN,
     DEFAULT_ALLOW_LOCAL_IMAGE_URLS,
@@ -205,8 +206,8 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
         )
         reliability_choices = dict(_RELIABILITY_LABELS)
 
-        # Build schema - USB printers don't have keepalive option
-        if connection_type == CONNECTION_TYPE_USB:
+        # Build schema - USB and serial printers don't have keepalive option
+        if connection_type in (CONNECTION_TYPE_USB, CONNECTION_TYPE_SERIAL):
             data_schema = vol.Schema(
                 {
                     vol.Optional(
