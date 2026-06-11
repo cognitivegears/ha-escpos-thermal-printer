@@ -414,7 +414,7 @@ class EscposPrinterAdapterBase(
                     await _print_text_under_lock(self, hass, printer, **text_kwargs)
                     await _print_prepared_under_lock(hass, printer, prepared)
                     await self._apply_cut_and_feed(hass, printer, cut, feed)
-                except asyncio.CancelledError, Exception:
+                except asyncio.CancelledError, Exception:  # pragma: no cover (T-L4)
                     # S-M3: shield the cleanup so a second cancellation
                     # mid-flush doesn't leave paper half-printed. The
                     # suppress() catches Exception only — CancelledError

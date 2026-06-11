@@ -167,6 +167,28 @@ async def test_wrap_text_zero_width_no_wrap(hass):  # type: ignore[no-untyped-de
     assert adapter._wrap_text(text) == text  # type: ignore[attr-defined]
 
 
+async def test_get_profile_pixel_width_handles_broken_profile_data(hass):  # type: ignore[no-untyped-def]
+    """A printer whose profile_data is missing the media/width keys must not raise.
+
+    Exercises the AttributeError/KeyError/TypeError/ValueError guard in
+    get_profile_pixel_width: a connected printer with a malformed profile
+    falls back to None rather than crashing the image pipeline.
+    """
+    entry = await _setup_entry(hass)
+    adapter = entry.runtime_data.adapter
+
+    class _BrokenProfile:
+        # Real dict so ["media"] raises KeyError (not a Mock that auto-vivifies).
+        profile_data: dict = {}
+
+    class _Printer:
+        profile = _BrokenProfile()
+
+    adapter._printer = _Printer()  # type: ignore[attr-defined]
+    # No hass passed → skips the repair-issue path; just exercises the guard.
+    assert adapter.get_profile_pixel_width() is None
+
+
 async def test_get_connection_info(hass):  # type: ignore[no-untyped-def]
     """Network adapter exposes a human-readable connection string."""
     entry = await _setup_entry(hass)
