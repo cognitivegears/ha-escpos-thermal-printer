@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **HTTP/HTTPS image-URL printing failed for every URL** with
+  `Cannot connect to host <host>:443 ssl:default [None]` (issue #95).
+  The DNS-pinning `_StaticResolver` only answered lookups for an
+  explicit `AF_INET` / `AF_INET6` family, but `aiohttp.TCPConnector`
+  resolves with `AF_UNSPEC` (0) by default — so every fetch matched no
+  address bucket and raised a `strerror`-less `OSError` that surfaced as
+  the misleading `[None]` connect error. `AF_UNSPEC` now returns all
+  pre-validated addresses, each tagged with its real family. The
+  DNS-rebinding defense is unchanged (still pinned to the one validated
+  hostname and its pre-resolved IPs). `print_image_url` and the other
+  URL-backed image services now work again. Added an `AF_UNSPEC`
+  regression test plus a guard locking in aiohttp's default family.
+
 ## [0.7.1] - 2026-05-26
 
 ### Breaking changes

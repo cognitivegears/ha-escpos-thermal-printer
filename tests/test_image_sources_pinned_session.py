@@ -54,6 +54,62 @@ async def test_static_resolver_rejects_unsupported_family() -> None:
 
 
 @pytest.mark.asyncio
+async def test_static_resolver_resolves_default_af_unspec_family() -> None:
+    # Regression (issue #95): ``aiohttp.TCPConnector`` resolves with
+    # ``family=AF_UNSPEC`` (0) by default — it does NOT split the lookup
+    # per family. The old ``get(family, [])`` filter only knew AF_INET /
+    # AF_INET6 buckets, so the default lookup matched neither bucket and
+    # every HTTP/HTTPS image fetch died with
+    # ``Cannot connect to host <host> ssl:default [None]``. AF_UNSPEC must
+    # mean "any pre-validated address", each tagged with its real family.
+    resolver = _StaticResolver("example.com", ["192.0.2.1", "2001:db8::1"])
+    out = await resolver.resolve("example.com", port=443, family=socket.AF_UNSPEC)
+    by_family = {entry["family"]: entry["host"] for entry in out}
+    assert by_family == {
+        socket.AF_INET: "192.0.2.1",
+        socket.AF_INET6: "2001:db8::1",
+    }
+    for entry in out:
+        assert entry["hostname"] == "example.com"
+        assert entry["port"] == 443
+
+
+@pytest.mark.asyncio
+async def test_static_resolver_af_unspec_with_ipv4_only() -> None:
+    # AF_UNSPEC lookup against an IPv4-only pin must still succeed and
+    # tag the result AF_INET (not the requested AF_UNSPEC).
+    resolver = _StaticResolver("example.com", ["192.0.2.1"])
+    out = await resolver.resolve("example.com", port=80, family=socket.AF_UNSPEC)
+    assert len(out) == 1
+    assert out[0]["host"] == "192.0.2.1"
+    assert out[0]["family"] == socket.AF_INET
+
+
+@pytest.mark.asyncio
+async def test_static_resolver_af_unspec_with_no_valid_addresses_raises() -> None:
+    # Defense intact: if nothing pre-validated, even an AF_UNSPEC lookup
+    # must raise rather than hand the connector an empty address set.
+    resolver = _StaticResolver("example.com", ["not-an-ip"])
+    with pytest.raises(OSError, match="no pre-validated addresses"):
+        await resolver.resolve("example.com", port=443, family=socket.AF_UNSPEC)
+
+
+@pytest.mark.asyncio
+async def test_build_pinned_session_connector_resolves_with_af_unspec() -> None:
+    # Locks in the assumption behind issue #95: the connector built for
+    # the actual fetch uses ``family=AF_UNSPEC``, so that is the value the
+    # resolver must handle. If a future aiohttp changes this default, this
+    # guard fires and tells us to revisit the resolver contract.
+    session = _build_pinned_session("example.com", ["192.0.2.1"])
+    try:
+        connector = session.connector
+        assert connector is not None
+        assert connector._family == socket.AF_UNSPEC
+    finally:
+        await session.close()
+
+
+@pytest.mark.asyncio
 async def test_static_resolver_returns_aiohttp_shaped_address_dicts() -> None:
     resolver = _StaticResolver("example.com", ["192.0.2.1", "192.0.2.2"])
     out = await resolver.resolve("example.com", port=443, family=socket.AF_INET)

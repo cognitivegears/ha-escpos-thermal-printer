@@ -317,26 +317,38 @@ class _StaticResolver(aiohttp.abc.AbstractResolver):
         self,
         host: str,
         port: int = 0,
-        family: int = socket.AF_INET,
+        family: int = socket.AF_UNSPEC,
     ) -> list[dict[str, Any]]:
         if host.lower() != self._hostname:
             raise OSError(
                 f"DNS pin: hostname '{host}' was not pre-validated (expected '{self._hostname}')"
             )
-        addrs = self._addrs_by_family.get(family, [])
-        if not addrs:
-            raise OSError(f"DNS pin: no pre-validated addresses for family {family}")
-        return [
+        # ``aiohttp.TCPConnector`` resolves with ``family=AF_UNSPEC`` (0) by
+        # default — it does not split the lookup per address family. The old
+        # ``get(family, [])`` filter only knew AF_INET / AF_INET6 buckets, so a
+        # default-family lookup matched neither and every URL fetch died with
+        # ``Cannot connect to host <host> ssl:default [None]`` (the single-arg
+        # OSError below carries no ``strerror``). Treat AF_UNSPEC as "any" and
+        # return each address tagged with its own real family so the connector
+        # opens the correct socket type.
+        families: tuple[int, ...] = (
+            (socket.AF_INET, socket.AF_INET6) if family == socket.AF_UNSPEC else (family,)
+        )
+        results = [
             {
                 "hostname": host,
                 "host": addr,
                 "port": port,
-                "family": family,
+                "family": fam,
                 "proto": 0,
                 "flags": 0,
             }
-            for addr in addrs
+            for fam in families
+            for addr in self._addrs_by_family.get(fam, [])
         ]
+        if not results:
+            raise OSError(f"DNS pin: no pre-validated addresses for family {family}")
+        return results
 
     async def close(self) -> None:
         return None
