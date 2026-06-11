@@ -17,9 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   (e.g. `:5000`), a NAS, or your own Home Assistant instance (`:8123`).
   Enabling it lifts both the private-address block and the default-port
   (80/443) restriction. The dangerous ranges stay blocked even when
-  enabled: link-local/cloud-metadata (`169.254.0.0/16`, `fe80::/10`),
-  multicast, reserved (`240.0.0.0/4`), and unspecified. The fetch sends
-  no auth token, so only unauthenticated endpoints work. The strict-mode
+  enabled: link-local/cloud-metadata (`169.254.0.0/16`, `fe80::/10`, and
+  the AWS IMDSv6 endpoint `fd00:ec2::254`), multicast, reserved
+  (`240.0.0.0/4`), and unspecified. The fetch sends no auth token, so
+  only unauthenticated endpoints work, and `print_image_url` has no
+  per-user authorization — enabling the option lets any HA user or
+  automation reach LAN hosts/ports through that printer. The strict-mode
   rejection messages now point at the new toggle. See
   [docs/images.md](docs/images.md#allowing-local--lan-urls).
 
