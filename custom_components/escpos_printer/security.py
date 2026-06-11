@@ -238,7 +238,7 @@ def validate_barcode_data(code: str, bc_type: str) -> tuple[str, str]:
 # ---------------------------------------------------------------------------
 
 
-def validate_image_url(url: str) -> str:
+def validate_image_url(url: str, *, allow_local: bool = False) -> str:
     """Cheap synchronous URL validation.
 
     Rejects URLs that are structurally bad (wrong scheme, no hostname, too
@@ -246,6 +246,12 @@ def validate_image_url(url: str) -> str:
     punycode). Does **not** resolve DNS — use
     :func:`validate_image_url_and_resolve` from the event loop to also
     check the resolved address is public.
+
+    ``allow_local`` is the per-printer opt-in. When set, the default-port
+    allowlist is lifted so local image servers on non-standard ports
+    (Frigate ``:5000``, cameras ``:8080``/``:81``, Home Assistant
+    ``:8123``) are reachable — the SSRF boundary is then carried entirely
+    by the resolved-address check in :func:`validate_image_url_and_resolve`.
     """
     if not isinstance(url, str):
         raise HomeAssistantError("Image URL must be a string")
@@ -288,11 +294,24 @@ def validate_image_url(url: str) -> str:
             "use the ASCII hostname or a numeric IP to avoid homograph confusion."
         )
 
-    # Restrict to default ports for the scheme. Catches both 22 (SSH) and
-    # 8123 (HA itself).
-    if parsed.port not in VALID_URL_PORTS:
+    # Accessing ``.port`` parses+range-checks it lazily (raises ValueError
+    # for out-of-range like ``:99999``); guard it in both modes.
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise HomeAssistantError(f"Invalid URL port: {exc}") from exc
+
+    # Restrict to default ports for the scheme unless the local opt-in is
+    # set. In the strict (public-only) default this catches 22 (SSH) and
+    # 8123 (HA itself) and keeps the integration from being a port-scan
+    # oracle. Once the user has opted into trusting local image servers,
+    # non-standard ports are exactly what they need, so the allowlist is
+    # lifted — the resolved-address SSRF check still applies.
+    if not allow_local and port not in VALID_URL_PORTS:
         raise HomeAssistantError(
-            f"URL port {parsed.port} not allowed; only {sorted(p for p in VALID_URL_PORTS if p)} are permitted"
+            f"URL port {port} not allowed; only {sorted(p for p in VALID_URL_PORTS if p)} "
+            "are permitted (enable 'Allow local image URLs' in the printer options to "
+            "use non-standard ports)"
         )
 
     return url
@@ -376,7 +395,7 @@ async def validate_image_url_and_resolve(
     targets while still rejecting link-local/metadata, multicast, reserved,
     and unspecified addresses — see :func:`_is_allowed_address`.
     """
-    validated = validate_image_url(url)
+    validated = validate_image_url(url, allow_local=allow_local)
     parsed = urlparse(validated)
     hostname = parsed.hostname
     if hostname is None:  # pragma: no cover — validate_image_url enforces it

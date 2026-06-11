@@ -151,6 +151,32 @@ class TestImageURLValidation:
         with pytest.raises(HomeAssistantError, match="port"):
             validate_image_url(url)
 
+    def test_strict_port_rejection_points_at_toggle(self):  # type: ignore[no-untyped-def]
+        with pytest.raises(HomeAssistantError, match="Allow local image URLs"):
+            validate_image_url("http://example.com:5000/x.png")
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "http://192.168.1.10:5000/x.png",  # Frigate
+            "http://example.com:8080/x.png",  # camera
+            "https://homeassistant.local:8123/x.png",  # HA itself
+        ],
+    )
+    def test_validate_image_url_allows_non_default_ports_with_allow_local(  # type: ignore[no-untyped-def]
+        self, url
+    ):
+        # The opt-in lifts the default-port allowlist; the address-level
+        # SSRF check (validate_image_url_and_resolve) is the real boundary.
+        assert validate_image_url(url, allow_local=True) == url
+
+    @pytest.mark.parametrize("allow_local", [False, True])
+    def test_validate_image_url_rejects_out_of_range_port(self, allow_local):  # type: ignore[no-untyped-def]
+        # Accessing urlparse().port range-checks lazily; both modes must
+        # surface a clean HomeAssistantError, never a bare ValueError.
+        with pytest.raises(HomeAssistantError, match="port"):
+            validate_image_url("https://example.com:99999/x.png", allow_local=allow_local)
+
 
 # ---------------------------------------------------------------------------
 # Local-image path validation (T-C2: pathlib.resolve, symlinks).

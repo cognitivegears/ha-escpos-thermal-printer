@@ -49,9 +49,11 @@ data:
 
 URL validation enforces:
 
-- Scheme `http` or `https` only; default ports (80/443) only; no
-  embedded credentials (`https://user:pass@host/` is rejected); no
-  IDN/punycode hostnames.
+- Scheme `http` or `https` only; no embedded credentials
+  (`https://user:pass@host/` is rejected); no IDN/punycode hostnames.
+- By default only the standard ports (80/443) are allowed. The "Allow
+  local image URLs" option below lifts this so non-standard ports
+  (Frigate `:5000`, cameras `:8080`/`:81`, HA `:8123`) work.
 - Hostname is resolved via `getaddrinfo`; by default the request is
   **refused if any resolved address is private, loopback, link-local,
   reserved, multicast, or unspecified**. That includes `127.0.0.1`,
@@ -60,24 +62,27 @@ URL validation enforces:
 - Redirects are followed manually (max 5); every redirect target is
   re-validated against the rules above.
 
-> **Note (default port).** The port restriction means a URL like
-> `http://192.168.1.10:8123/...` is rejected even with the option below
-> — only ports 80/443 are allowed. Fetching authenticated Home Assistant
-> `/api/...` endpoints also won't work because the fetch sends no auth
-> token; only **unauthenticated** endpoints (e.g. Frigate notification
-> thumbnails) succeed.
-
 #### Allowing local / LAN URLs
 
-The private-address block is on by default so the integration can't be
-used as an SSRF proxy. If you need to print from a **local** image URL —
-a LAN camera, an NVR/Frigate proxy, a NAS, or your own Home Assistant
-instance — enable **Settings → Devices & Services → ESC/POS printer →
-Configure → "Allow local image URLs"**. With it on, private/RFC1918 and
-loopback addresses are accepted. The genuinely dangerous ranges stay
-blocked **even when enabled**: link-local/cloud-metadata
-(`169.254.0.0/16`, `fe80::/10`), multicast, reserved (`240.0.0.0/4`),
-and unspecified. The toggle is per-printer.
+The private-address block and the default-port allowlist are on by
+default so the integration can't be used as an SSRF proxy. If you need to
+print from a **local** image URL — a LAN camera, an NVR/Frigate proxy, a
+NAS, or your own Home Assistant instance — enable **Settings → Devices &
+Services → ESC/POS printer → Configure → "Allow local image URLs"**. With
+it on:
+
+- private/RFC1918 (and IPv6 ULA) and loopback addresses are accepted, and
+- **non-standard ports** are accepted (e.g. Frigate on `:5000`, a camera
+  on `:8080`, Home Assistant on `:8123`).
+
+The genuinely dangerous ranges stay blocked **even when enabled**:
+link-local/cloud-metadata (`169.254.0.0/16`, `fe80::/10`), multicast,
+reserved (`240.0.0.0/4`), and unspecified. The toggle is per-printer.
+
+> **Note (auth).** The fetch sends no authentication token, so an
+> authenticated Home Assistant `/api/...` endpoint returns 401 — only
+> **unauthenticated** endpoints (e.g. Frigate notification thumbnails)
+> succeed.
 
 If the source is a Home-Assistant-managed camera or image, prefer the
 [camera entity](#camera-entity) / [image entity](#image-entity) sources

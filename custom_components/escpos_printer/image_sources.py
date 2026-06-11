@@ -448,7 +448,7 @@ async def _resolve_http(
     targets; see :func:`security.validate_image_url_and_resolve`.
     """
     # Cheap pre-flight: reject obvious junk before resolving DNS.
-    validate_image_url(url)
+    validate_image_url(url, allow_local=allow_local)
     _LOGGER.debug(
         "Downloading image from URL: %s",
         sanitize_log_message(url),

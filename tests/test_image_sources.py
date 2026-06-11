@@ -254,6 +254,43 @@ async def test_resolve_http_allow_local_still_blocks_metadata(  # type: ignore[n
         )
 
 
+async def test_resolve_http_allow_local_fetches_non_default_port(  # type: ignore[no-untyped-def]
+    hass, monkeypatch, mock_pooled_aiohttp
+):
+    """allow_local lifts both the private-address block and the port allowlist.
+
+    The classic Frigate case: a LAN proxy on :5000 — private IP *and* a
+    non-standard port, the exact combination that previously failed.
+    """
+
+    def fake_getaddrinfo(_host, _port, **_kw):  # type: ignore[no-untyped-def]
+        return [(socket.AF_INET, socket.SOCK_STREAM, 0, "", ("192.168.1.10", 0))]
+
+    monkeypatch.setattr("socket.getaddrinfo", fake_getaddrinfo)
+
+    def _factory():  # type: ignore[no-untyped-def]
+        from tests.conftest import fake_aiohttp_response
+
+        return fake_aiohttp_response(
+            status=200, headers={"Content-Type": "image/jpeg"}, chunks=[_png_bytes()]
+        )
+
+    mock_pooled_aiohttp(_factory)
+    raw, content_type = await resolve_image_bytes(
+        hass, "http://192.168.1.10:5000/api/events/abc/thumbnail.jpg", allow_local=True
+    )
+    assert raw == _png_bytes()
+    assert content_type == "image/jpeg"
+
+
+async def test_resolve_http_non_default_port_blocked_without_allow_local(  # type: ignore[no-untyped-def]
+    hass,
+):
+    """Strict default still rejects a non-standard port and names the toggle."""
+    with pytest.raises(HomeAssistantError, match="Allow local image URLs"):
+        await resolve_image_bytes(hass, "http://example.com:5000/x.png")
+
+
 async def test_resolve_http_rejects_non_default_port(hass):  # type: ignore[no-untyped-def]
     with pytest.raises(HomeAssistantError, match="port"):
         await resolve_image_bytes(hass, "https://example.com:22/x.png")
