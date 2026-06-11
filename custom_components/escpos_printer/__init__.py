@@ -196,11 +196,6 @@ async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) ->
     return True
 
 
-async def _async_options_updated(hass: HomeAssistant, entry: EscposConfigEntry) -> None:
-    """Reload the entry when options change so new settings take effect immediately."""
-    await hass.config_entries.async_reload(entry.entry_id)
-
-
 async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bool:
     """Set up ESC/POS Printer from a config entry."""
     _LOGGER.debug("Setting up escpos_printer entry: %s", entry.entry_id)
@@ -297,7 +292,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bo
     if os.environ.get("ESC_POS_DISABLE_PLATFORMS") == "1":
         platforms = []
     await hass.config_entries.async_forward_entry_setups(entry, platforms)
-    entry.add_update_listener(_async_options_updated)
     return True
 
 
