@@ -28,9 +28,11 @@ from ..const import (
     CONF_PORT,
     CONF_PRODUCT_ID,
     CONF_PROFILE,
+    CONF_SERIAL_PORT,
     CONF_VENDOR_ID,
     CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
+    CONNECTION_TYPE_SERIAL,
     CONNECTION_TYPE_USB,
     DEFAULT_ALIGN,
     DEFAULT_CUT,
@@ -55,6 +57,13 @@ def _make_entry_title(data: dict[str, Any], user_data: dict[str, Any]) -> str:
             user_data.get(
                 "_printer_name",
                 f"Bluetooth Printer {data.get(CONF_BT_MAC, '')}",
+            )
+        )
+    if connection_type == CONNECTION_TYPE_SERIAL:
+        return str(
+            user_data.get(
+                "_printer_name",
+                f"Serial Printer {data.get(CONF_SERIAL_PORT, '')}",
             )
         )
     return f"{data[CONF_HOST]}:{data[CONF_PORT]}"
