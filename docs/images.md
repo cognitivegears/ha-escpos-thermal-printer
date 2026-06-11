@@ -76,13 +76,27 @@ it on:
   on `:8080`, Home Assistant on `:8123`).
 
 The genuinely dangerous ranges stay blocked **even when enabled**:
-link-local/cloud-metadata (`169.254.0.0/16`, `fe80::/10`), multicast,
-reserved (`240.0.0.0/4`), and unspecified. The toggle is per-printer.
+link-local/cloud-metadata (`169.254.0.0/16`, `fe80::/10`, and the AWS
+IMDSv6 endpoint `fd00:ec2::254`), multicast, reserved (`240.0.0.0/4`),
+and unspecified.
+
+The toggle is **per-printer**, and it's evaluated against the **printer
+you print to**, not the URL. In a multi-printer setup the same LAN URL
+succeeds when sent to a printer that has the option enabled and is
+rejected when sent to one that doesn't.
 
 > **Note (auth).** The fetch sends no authentication token, so an
 > authenticated Home Assistant `/api/...` endpoint returns 401 — only
 > **unauthenticated** endpoints (e.g. Frigate notification thumbnails)
 > succeed.
+>
+> **Note (who can reach your LAN).** `print_image_url` has no per-user
+> authorization. With this option on, *any* Home Assistant user or
+> automation that can call the service can make this printer fetch
+> arbitrary LAN hosts and ports — and the success/failure/timing of a
+> fetch can reveal which internal hosts and ports are open (an SSRF /
+> port-scan oracle). Only enable it on printers whose service calls you
+> trust.
 
 If the source is a Home-Assistant-managed camera or image, prefer the
 [camera entity](#camera-entity) / [image entity](#image-entity) sources

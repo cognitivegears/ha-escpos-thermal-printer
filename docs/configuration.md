@@ -60,3 +60,11 @@ How often to probe the printer (seconds). Set to 0 to disable. Drives the binary
 
 - **Network**: any value works; default 30s is fine.
 - **Bluetooth**: set to 60s or longer (or 0). RFCOMM accepts only one client at a time, and many cheap BT printers beep on every connect. The integration auto-skips probes during prints, so aggressive polling has no benefit.
+
+## Allow Local Image URLs
+
+Off by default. When enabled, `print_image_url` (and the other image services) may fetch URLs that resolve to private/LAN/loopback addresses **and** use non-standard ports — e.g. a LAN camera, a Frigate proxy on `:5000`, or your Home Assistant instance on `:8123`. By default only public addresses and ports 80/443 are allowed.
+
+Cloud-metadata (`169.254.169.254` and AWS IMDSv6 `fd00:ec2::254`), link-local, multicast, reserved, and unspecified addresses stay blocked even when this is on. The fetch carries no auth token, so only unauthenticated endpoints work.
+
+The option is **per-printer** and is evaluated against the printer you print to. Because `print_image_url` has no per-user authorization, enabling it lets any HA user/automation reach LAN hosts/ports through that printer (an SSRF / port-scan oracle) — only enable it where callers are trusted, and prefer camera/image entity sources where possible. See the [Images guide](images.md#allowing-local--lan-urls).

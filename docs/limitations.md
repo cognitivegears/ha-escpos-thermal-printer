@@ -16,10 +16,18 @@ The image pipeline applies meaningful but bounded defenses; deployers
 should understand what is and isn't enforced. Cross-linked from
 [SECURITY.md](../SECURITY.md).
 
-- **HTTP image fetches block private and loopback addresses.** URLs
-  resolving to RFC1918 networks, `127.0.0.1`, `::1`, `169.254.169.254`
-  (cloud metadata), or other non-public ranges are rejected. Redirects
-  are followed manually and re-validated. There is a residual
+- **HTTP image fetches block private and loopback addresses by
+  default.** URLs resolving to RFC1918 networks, `127.0.0.1`, `::1`,
+  `169.254.169.254` (cloud metadata), or other non-public ranges are
+  rejected, and only ports 80/443 are allowed. Redirects are followed
+  manually and re-validated. A per-printer **"Allow local image URLs"**
+  option (off by default) relaxes the private/loopback block and the
+  port allowlist for that printer; cloud-metadata (incl. AWS IMDSv6
+  `fd00:ec2::254`), link-local, multicast, reserved, and unspecified
+  addresses stay blocked regardless. Enabling it makes that printer's
+  `print_image_url` an **unauthenticated LAN-reach primitive** (see the
+  Trust boundary note). See
+  [images.md](images.md#allowing-local--lan-urls). There is a residual
   TOCTOU window between our DNS resolution and the actual fetch; DNS
   rebinding remains a partially-mitigated threat.
 - **Embedded URL credentials are rejected.** `https://user:pass@host/`
@@ -35,7 +43,10 @@ should understand what is and isn't enforced. Cross-linked from
   Bluetooth MACs are redacted from logs.
 - **Trust boundary.** Any HA user who can call `escpos_printer.print_image`
   or `notify.<printer>` can print to your physical paper roll.
-  Restrict service exposure for shared installations.
+  Restrict service exposure for shared installations. If a printer has
+  **"Allow local image URLs"** enabled, those same callers can also make
+  it fetch arbitrary LAN hosts/ports — a port-scan / SSRF oracle — so
+  enable it only on printers whose callers you trust.
 
 ## Network printers
 
