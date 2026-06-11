@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Home Assistant custom integration for ESC/POS thermal receipt printers. Supports both **network (TCP/IP)** and **USB** connected printers. Enables printing text, QR codes, barcodes, images, and control commands (feed, cut, beep) through HA services and automations.
+Home Assistant custom integration for ESC/POS thermal receipt printers. Supports **network (TCP/IP)**, **USB**, **Bluetooth**, and **serial (UART/RS-232)** connected printers. Enables printing text, QR codes, barcodes, images, and control commands (feed, cut, beep) through HA services and automations.
 
 ## Common Commands
 

@@ -7,6 +7,7 @@ from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant
 
 from .const import (
+    CONF_BAUDRATE,
     CONF_BT_MAC,
     CONF_CODEPAGE,
     CONF_CONNECTION_TYPE,
@@ -17,27 +18,29 @@ from .const import (
     CONF_PRODUCT_ID,
     CONF_PROFILE,
     CONF_RFCOMM_CHANNEL,
+    CONF_SERIAL_PORT,
     CONF_STATUS_INTERVAL,
     CONF_VENDOR_ID,
     CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
+    CONNECTION_TYPE_SERIAL,
     CONNECTION_TYPE_USB,
 )
-from .printer import BluetoothPrinterConfig, NetworkPrinterConfig, UsbPrinterConfig
+from .printer import BluetoothPrinterConfig, NetworkPrinterConfig, SerialPrinterConfig, UsbPrinterConfig
 
 if TYPE_CHECKING:
     from . import EscposConfigEntry
 
 # Fields to redact in diagnostics output
-# - CONF_HOST: network printer hostname/IP
-# - "host": runtime host field
+# - CONF_HOST / "host": network printer hostname/IP
 # - "mac" / CONF_BT_MAC: Bluetooth device address
-# - "connection_info": contains host:port or BT MAC
+# - CONF_SERIAL_PORT / "serial_port": serial port path or URL
+# - "connection_info": contains host:port, BT MAC, or port path
 # - "title": the default entry title embeds the host:port (network) or
 #   the MAC (Bluetooth), so it would otherwise re-leak the very
 #   identifiers the other keys redact. Diagnostics downloads are commonly
 #   attached to public issues.
-TO_REDACT = {CONF_HOST, "host", "mac", CONF_BT_MAC, "connection_info", "title"}
+TO_REDACT = {CONF_HOST, "host", "mac", CONF_BT_MAC, CONF_SERIAL_PORT, "serial_port", "connection_info", "title"}
 
 
 async def async_get_config_entry_diagnostics(
@@ -82,6 +85,9 @@ async def async_get_config_entry_diagnostics(
         elif isinstance(config, BluetoothPrinterConfig):
             runtime["mac"] = config.mac
             runtime["rfcomm_channel"] = config.rfcomm_channel
+        elif connection_type == CONNECTION_TYPE_SERIAL and isinstance(config, SerialPrinterConfig):
+            runtime["serial_port"] = config.serial_port  # redacted by TO_REDACT
+            runtime["baudrate"] = config.baudrate
         elif isinstance(config, NetworkPrinterConfig):
             runtime["host"] = config.host
             runtime["port"] = config.port
@@ -107,6 +113,15 @@ async def async_get_config_entry_diagnostics(
             CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH,
             CONF_BT_MAC: data.get(CONF_BT_MAC),
             CONF_RFCOMM_CHANNEL: data.get(CONF_RFCOMM_CHANNEL),
+            CONF_CODEPAGE: data.get(CONF_CODEPAGE),
+            CONF_PROFILE: data.get(CONF_PROFILE),
+            CONF_LINE_WIDTH: data.get(CONF_LINE_WIDTH),
+        }
+    elif connection_type == CONNECTION_TYPE_SERIAL:
+        entry_data = {
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_SERIAL,
+            CONF_SERIAL_PORT: data.get(CONF_SERIAL_PORT),  # redacted by TO_REDACT
+            CONF_BAUDRATE: data.get(CONF_BAUDRATE),
             CONF_CODEPAGE: data.get(CONF_CODEPAGE),
             CONF_PROFILE: data.get(CONF_PROFILE),
             CONF_LINE_WIDTH: data.get(CONF_LINE_WIDTH),
