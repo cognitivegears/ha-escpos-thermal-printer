@@ -68,7 +68,13 @@ class SerialPrinterAdapter(EscposPrinterAdapterBase):
 
         for attempt in range(self._CONNECT_RETRIES + 1):
             try:
-                transport = serial_transport.open_serial_transport(port, baudrate, timeout)
+                transport = serial_transport.open_serial_transport(
+                    port,
+                    baudrate,
+                    timeout,
+                    write_chunk_size=self._serial_config.write_chunk_size,
+                    write_chunk_delay_ms=self._serial_config.write_chunk_delay_ms,
+                )
             except Exception as exc:
                 last_exc = exc
                 err_no = getattr(exc, "errno", None)

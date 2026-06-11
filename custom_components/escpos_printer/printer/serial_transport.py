@@ -12,6 +12,7 @@ This module exposes:
 from __future__ import annotations
 
 import contextlib
+import time
 from typing import Any, Protocol
 
 
@@ -28,13 +29,30 @@ class SerialTransport(Protocol):
 class _SerialTransportImpl:
     """Concrete byte-sink wrapping a connected ``serialx`` serial port."""
 
-    def __init__(self, port: Any) -> None:
+    def __init__(
+        self,
+        port: Any,
+        write_chunk_size: int = 0,
+        write_chunk_delay_s: float = 0.0,
+    ) -> None:
         self._port: Any = port
+        self._write_chunk_size = write_chunk_size
+        self._write_chunk_delay_s = write_chunk_delay_s
 
     def write(self, data: bytes) -> None:
         if not data:
             return
-        self._port.write(data)
+        if self._write_chunk_size <= 0 or len(data) <= self._write_chunk_size:
+            self._port.write(data)
+            return
+        # Split into chunks with an inter-chunk delay to avoid overrunning
+        # receive buffers on resource-constrained serial proxies (e.g. ESP32
+        # running ESPHome). Runs on an executor thread so time.sleep is safe.
+        for i in range(0, len(data), self._write_chunk_size):
+            chunk = data[i : i + self._write_chunk_size]
+            self._port.write(chunk)
+            if self._write_chunk_delay_s > 0 and i + self._write_chunk_size < len(data):
+                time.sleep(self._write_chunk_delay_s)
 
     def close(self) -> None:
         with contextlib.suppress(Exception):
@@ -45,6 +63,8 @@ def open_serial_transport(
     port_or_url: str,
     baudrate: int,
     timeout: float,
+    write_chunk_size: int = 0,
+    write_chunk_delay_ms: int = 0,
 ) -> SerialTransport:
     """Open a serial transport for the given port path or URL.
 
@@ -52,6 +72,11 @@ def open_serial_transport(
     schemes (``esphome://``, ``rfc2217://``, ``socket://``). The ``baudrate``
     argument is passed through for direct serial connections; URL-based
     backends (e.g. ESPHome serial proxy) silently ignore it.
+
+    ``write_chunk_size`` limits the number of bytes sent per write call.
+    ``write_chunk_delay_ms`` adds a pause between consecutive chunks.
+    Both default to 0 (disabled), preserving the original send-all-at-once
+    behaviour for direct serial connections.
 
     Raises ``OSError`` on failure; the caller maps errno to user-facing error
     keys.
@@ -63,4 +88,11 @@ def open_serial_transport(
         baudrate=baudrate,
         read_timeout=max(timeout, 0.1),
     )
-    return _SerialTransportImpl(port)
+    # serialx does not auto-open on construction (unlike pyserial); _fileno
+    # remains None until open() is called, causing AssertionError on write().
+    port.open()
+    return _SerialTransportImpl(
+        port,
+        write_chunk_size=write_chunk_size,
+        write_chunk_delay_s=write_chunk_delay_ms / 1000.0,
+    )

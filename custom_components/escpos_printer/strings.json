@@ -194,34 +194,16 @@
         }
       },
       "serial": {
-        "title": "Select serial port",
-        "description": "Choose a discovered serial port. Select **Enter manually** to type a path or URL (e.g. esphome://, rfc2217://, socket://).",
-        "data": {
-          "serial_port": "Serial port"
-        },
-        "data_description": {
-          "serial_port": "Select your printer's serial port from the list of detected devices."
-        }
-      },
-      "serial_manual": {
-        "title": "Enter serial port or URL",
-        "description": "Type the serial port path or URL for your ESC/POS printer.",
-        "data": {
-          "serial_port": "Port or URL"
-        },
-        "data_description": {
-          "serial_port": "Serial port path (e.g. /dev/ttyUSB0, /dev/ttyACM0, COM3) or URL (e.g. esphome://192.168.1.100:6638, rfc2217://host:2217, socket://host:9100)."
-        }
-      },
-      "serial_config": {
         "title": "Configure serial printer",
-        "description": "Configure connection settings for **{port}**.",
+        "description": "Select your printer's serial port and configure connection settings.",
         "data": {
+          "serial_port": "Serial port",
           "baudrate": "Baud rate",
           "timeout": "Timeout (seconds)",
           "profile": "Printer profile"
         },
         "data_description": {
+          "serial_port": "Serial port path (e.g. /dev/ttyUSB0, /dev/ttyACM0, COM3) or URL (e.g. esphome://192.168.1.100:6638, rfc2217://host:2217, socket://host:9100).",
           "baudrate": "Baud rate for direct serial connections. Ignored for URL-based connections such as ESPHome serial proxies.",
           "timeout": "Connection timeout in seconds.",
           "profile": "Select your printer model or Auto-detect. Choose 'Custom' to enter a profile name manually."
@@ -280,7 +262,9 @@
           "reliability_profile": "Image reliability profile",
           "keepalive": "Keep persistent connection",
           "status_interval": "Status check interval (seconds)",
-          "allow_local_image_urls": "Allow local image URLs"
+          "allow_local_image_urls": "Allow local image URLs",
+          "serial_write_chunk_size": "Write chunk size (bytes)",
+          "serial_write_chunk_delay_ms": "Inter-chunk delay (ms)"
         },
         "data_description": {
           "timeout": "Connection timeout in seconds.",
@@ -292,7 +276,9 @@
           "reliability_profile": "Picks safe defaults for image chunk size, inter-chunk delay, and ESC/POS image command. Service-call options always override these.",
           "keepalive": "Keep the connection open between print jobs (network printers only).",
           "status_interval": "How often to check printer status (0 to disable).",
-          "allow_local_image_urls": "Permit print_image_url (and the other image services) to fetch URLs that resolve to private/LAN/loopback addresses and to use non-standard ports (e.g. a local camera, a Frigate proxy on :5000, or your Home Assistant instance on :8123). Off by default. Cloud-metadata/link-local addresses stay blocked even when enabled."
+          "allow_local_image_urls": "Permit print_image_url (and the other image services) to fetch URLs that resolve to private/LAN/loopback addresses and to use non-standard ports (e.g. a local camera, a Frigate proxy on :5000, or your Home Assistant instance on :8123). Off by default. Cloud-metadata/link-local addresses stay blocked even when enabled.",
+          "serial_write_chunk_size": "Maximum bytes per write call. Set to 256 for ESPHome/ESP32 serial proxies to prevent buffer overruns. 0 disables chunking.",
+          "serial_write_chunk_delay_ms": "Pause between consecutive chunks (milliseconds). Allows the receiving device time to drain its buffer. Only applies when chunk size is non-zero."
         }
       },
       "custom_profile": {

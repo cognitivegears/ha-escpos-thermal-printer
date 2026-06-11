@@ -18,7 +18,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
-from ..const import DEFAULT_BAUDRATE, DEFAULT_IN_EP, DEFAULT_OUT_EP, DEFAULT_RFCOMM_CHANNEL
+from ..const import (
+    DEFAULT_BAUDRATE,
+    DEFAULT_IN_EP,
+    DEFAULT_OUT_EP,
+    DEFAULT_RFCOMM_CHANNEL,
+    DEFAULT_SERIAL_WRITE_CHUNK_DELAY_MS,
+    DEFAULT_SERIAL_WRITE_CHUNK_SIZE,
+)
 
 
 @dataclass
@@ -81,6 +88,8 @@ class SerialPrinterConfig(BasePrinterConfig):
     connection_type: Literal["serial"] = field(default="serial", repr=False)
     serial_port: str = ""
     baudrate: int = DEFAULT_BAUDRATE
+    write_chunk_size: int = DEFAULT_SERIAL_WRITE_CHUNK_SIZE
+    write_chunk_delay_ms: int = DEFAULT_SERIAL_WRITE_CHUNK_DELAY_MS
 
 
 # Type alias for config union (use for type hints)

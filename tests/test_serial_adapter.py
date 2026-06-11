@@ -154,7 +154,13 @@ class TestSerialPrinterAdapter:
         ):
             result = serial_adapter._connect()
 
-        mock_open.assert_called_once_with("/dev/ttyUSB0", 9600, pytest.approx(4.0, abs=0.01))
+        mock_open.assert_called_once_with(
+            "/dev/ttyUSB0",
+            9600,
+            pytest.approx(4.0, abs=0.01),
+            write_chunk_size=0,
+            write_chunk_delay_ms=0,
+        )
         mock_make.assert_called_once_with(mock_transport, serial_adapter._get_profile_obj())
         assert result is mock_escpos
 

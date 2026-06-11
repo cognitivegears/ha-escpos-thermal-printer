@@ -35,7 +35,7 @@ UVLOCK = ROOT / "uv.lock"
 # Packages for which we intentionally keep a version range in the HA manifest
 # to avoid conflicts with Home Assistant's own pins.
 MANIFEST_OVERRIDES: dict[str, str] = {
-    # HA 2026.3 ships Pillow 12.1.1; later HA versions are expected to bump
+    # HA 2026.5 ships Pillow 12.2.0; later HA versions are expected to bump
     # within the 12.x line. Range matches HA core's expected Pillow range so
     # pip's resolver doesn't fight with HA's bundled wheel.
     "pillow": ">=12.1.1,<13.0.0",
@@ -43,7 +43,7 @@ MANIFEST_OVERRIDES: dict[str, str] = {
     # HA 2026.3/2026.4 ship 3.1.2, HA 2026.5 ships 4.0.4, HA master is on
     # 5.0.3. Range covers the supported HA window so pip's resolver
     # doesn't fight with HA bluetooth's manifest pin at install time.
-    # pyproject.toml keeps `dbus-fast==3.1.2` for dev/CI reproducibility
+    # pyproject.toml keeps `dbus-fast==4.0.4` for dev/CI reproducibility
     # against the locked HA test wheel.
     "dbus-fast": ">=3.1.2,<6",
     # serialx is shipped by the ESPHome integration manifest; HA installs

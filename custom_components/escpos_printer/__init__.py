@@ -30,6 +30,8 @@ from .const import (
     CONF_RELIABILITY_PROFILE,
     CONF_RFCOMM_CHANNEL,
     CONF_SERIAL_PORT,
+    CONF_SERIAL_WRITE_CHUNK_DELAY_MS,
+    CONF_SERIAL_WRITE_CHUNK_SIZE,
     CONF_STATUS_INTERVAL,
     CONF_TIMEOUT,
     CONF_VENDOR_ID,
@@ -45,6 +47,8 @@ from .const import (
     DEFAULT_LINE_WIDTH,
     DEFAULT_OUT_EP,
     DEFAULT_RFCOMM_CHANNEL,
+    DEFAULT_SERIAL_WRITE_CHUNK_DELAY_MS,
+    DEFAULT_SERIAL_WRITE_CHUNK_SIZE,
     DOMAIN,
     RELIABILITY_PROFILE_AUTO,
     RELIABILITY_PROFILE_PRESETS,
@@ -230,6 +234,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bo
             serial_port=str(entry.data.get(CONF_SERIAL_PORT, "")),
             baudrate=int(entry.data.get(CONF_BAUDRATE, DEFAULT_BAUDRATE)),
             **shared,
+            write_chunk_size=int(
+                entry.options.get(CONF_SERIAL_WRITE_CHUNK_SIZE, DEFAULT_SERIAL_WRITE_CHUNK_SIZE)
+            ),
+            write_chunk_delay_ms=int(
+                entry.options.get(
+                    CONF_SERIAL_WRITE_CHUNK_DELAY_MS, DEFAULT_SERIAL_WRITE_CHUNK_DELAY_MS
+                )
+            ),
         )
     else:
         config = NetworkPrinterConfig(
