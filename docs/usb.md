@@ -29,8 +29,8 @@ If your printer isn't auto-discovered:
 
 | Setting | Description | Default |
 |---------|-------------|---------|
-| Vendor ID | USB Vendor ID (hex, e.g. 04B8) | From discovery |
-| Product ID | USB Product ID (hex, e.g. 0E03) | From discovery |
+| Vendor ID | USB Vendor ID — use the `0x`-prefixed hex form, e.g. `0x04B8` (a plain decimal number is also accepted) | From discovery |
+| Product ID | USB Product ID — use the `0x`-prefixed hex form, e.g. `0x0E03` (a plain decimal number is also accepted) | From discovery |
 | Input Endpoint | USB IN endpoint | 0x82 |
 | Output Endpoint | USB OUT endpoint | 0x01 |
 | Timeout | Connect timeout (seconds) | 4.0 |

@@ -102,6 +102,14 @@ class EscposNotifyEntity(NotifyEntity):
 
     async def print_message(self, **kwargs: Any) -> None:
         """Print a formatted message — with optional image — to the printer."""
+        # Capture the calling user's context BEFORE any await. The
+        # entity-service dispatcher sets it on the entity via
+        # ``async_set_context`` immediately before this method runs;
+        # reading it after an await (e.g. the utf8 transcode below) would
+        # race a concurrent call's ``async_set_context`` and could read
+        # another user's context, defeating the camera/image entity ACL.
+        context: Context | None = kwargs.get("context") or self._context
+
         message = kwargs.get("message", "")
         title = kwargs.get("title")
 
@@ -138,7 +146,6 @@ class EscposNotifyEntity(NotifyEntity):
         }
 
         image_source_raw = kwargs.get("image")
-        context: Context | None = kwargs.get("context")
 
         try:
             if image_source_raw is None:
@@ -156,6 +163,7 @@ class EscposNotifyEntity(NotifyEntity):
                 {**kwargs, "image": image_source},
                 defaults,
                 prefix="image_",
+                hass=self._hass,
             )
             await adapter.print_text_with_image(
                 self._hass,

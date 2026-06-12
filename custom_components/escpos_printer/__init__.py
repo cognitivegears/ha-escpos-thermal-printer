@@ -9,6 +9,7 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 
 from .capabilities import PROFILE_AUTO, is_valid_profile
@@ -51,6 +52,7 @@ from .printer import (
     UsbPrinterConfig,
     create_printer_adapter,
 )
+from .security import sanitize_log_message
 from .services import async_setup_services, async_unload_services
 
 _LOGGER = logging.getLogger(__name__)
@@ -73,6 +75,30 @@ class EscposRuntimeData:
 
 
 type EscposConfigEntry = ConfigEntry[EscposRuntimeData]
+
+
+def _shared_print_config(entry: EscposConfigEntry) -> dict[str, Any]:
+    """Transport-independent print settings, resolved options-over-data.
+
+    Uses ``options.get(key, data.get(key))`` rather than
+    ``options.get(key) or data.get(key)`` so an explicitly-chosen empty
+    value — codepage/profile ``""`` meaning *auto* — is honoured instead
+    of silently snapping back to the original setup value. Shared by all
+    three transports so the resolution rule lives in one place.
+    """
+    opt = entry.options
+    data = entry.data
+    return {
+        "timeout": float(opt.get(CONF_TIMEOUT, data.get(CONF_TIMEOUT, 4.0))),
+        "codepage": opt.get(CONF_CODEPAGE, data.get(CONF_CODEPAGE)),
+        "profile": opt.get(CONF_PROFILE, data.get(CONF_PROFILE)),
+        "line_width": int(opt.get(CONF_LINE_WIDTH, data.get(CONF_LINE_WIDTH, DEFAULT_LINE_WIDTH))),
+        "allow_local_image_urls": bool(
+            opt.get(CONF_ALLOW_LOCAL_IMAGE_URLS, DEFAULT_ALLOW_LOCAL_IMAGE_URLS)
+        ),
+    }
+
+
 
 
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
@@ -178,6 +204,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bo
     # Determine connection type and create appropriate config
     connection_type = entry.data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
 
+    shared = _shared_print_config(entry)
     config: UsbPrinterConfig | NetworkPrinterConfig | BluetoothPrinterConfig
     if connection_type == CONNECTION_TYPE_USB:
         config = UsbPrinterConfig(
@@ -185,37 +212,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bo
             product_id=entry.data.get(CONF_PRODUCT_ID, 0),
             in_ep=entry.data.get(CONF_IN_EP, DEFAULT_IN_EP),
             out_ep=entry.data.get(CONF_OUT_EP, DEFAULT_OUT_EP),
-            timeout=float(entry.options.get(CONF_TIMEOUT, entry.data.get(CONF_TIMEOUT, 4.0))),
-            codepage=entry.options.get(CONF_CODEPAGE) or entry.data.get(CONF_CODEPAGE),
-            profile=entry.options.get(CONF_PROFILE) or entry.data.get(CONF_PROFILE),
-            line_width=int(entry.options.get(CONF_LINE_WIDTH, entry.data.get(CONF_LINE_WIDTH, 48))),
-            allow_local_image_urls=bool(
-                entry.options.get(CONF_ALLOW_LOCAL_IMAGE_URLS, DEFAULT_ALLOW_LOCAL_IMAGE_URLS)
-            ),
+            **shared,
         )
     elif connection_type == CONNECTION_TYPE_BLUETOOTH:
         config = BluetoothPrinterConfig(
             mac=str(entry.data.get(CONF_BT_MAC, "")),
             rfcomm_channel=int(entry.data.get(CONF_RFCOMM_CHANNEL, DEFAULT_RFCOMM_CHANNEL)),
-            timeout=float(entry.options.get(CONF_TIMEOUT, entry.data.get(CONF_TIMEOUT, 4.0))),
-            codepage=entry.options.get(CONF_CODEPAGE) or entry.data.get(CONF_CODEPAGE),
-            profile=entry.options.get(CONF_PROFILE) or entry.data.get(CONF_PROFILE),
-            line_width=int(entry.options.get(CONF_LINE_WIDTH, entry.data.get(CONF_LINE_WIDTH, 48))),
-            allow_local_image_urls=bool(
-                entry.options.get(CONF_ALLOW_LOCAL_IMAGE_URLS, DEFAULT_ALLOW_LOCAL_IMAGE_URLS)
-            ),
+            **shared,
         )
     else:
         config = NetworkPrinterConfig(
             host=entry.data[CONF_HOST],
             port=entry.data.get(CONF_PORT, 9100),
-            timeout=float(entry.options.get(CONF_TIMEOUT, entry.data.get(CONF_TIMEOUT, 4.0))),
-            codepage=entry.options.get(CONF_CODEPAGE) or entry.data.get(CONF_CODEPAGE),
-            profile=entry.options.get(CONF_PROFILE) or entry.data.get(CONF_PROFILE),
-            line_width=int(entry.options.get(CONF_LINE_WIDTH, entry.data.get(CONF_LINE_WIDTH, 48))),
-            allow_local_image_urls=bool(
-                entry.options.get(CONF_ALLOW_LOCAL_IMAGE_URLS, DEFAULT_ALLOW_LOCAL_IMAGE_URLS)
-            ),
+            **shared,
         )
 
     adapter = create_printer_adapter(config)
@@ -235,11 +244,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bo
 
     # Start adapter background tasks (keepalive/status)
     # Note: USB printers don't support keepalive, but the adapter handles this
-    await adapter.start(
-        hass,
-        keepalive=bool(entry.options.get(CONF_KEEPALIVE, False)),
-        status_interval=int(entry.options.get(CONF_STATUS_INTERVAL, 0)),
-    )
+    try:
+        await adapter.start(
+            hass,
+            keepalive=bool(entry.options.get(CONF_KEEPALIVE, False)),
+            status_interval=int(entry.options.get(CONF_STATUS_INTERVAL, 0)),
+        )
+    except Exception as err:
+        # The only blocking work in start() is the initial keepalive
+        # connect; a printer that's off/asleep at HA boot should retry
+        # with backoff (ConfigEntryNotReady), not hard-fail the entry.
+        # Sanitise the message so a host/MAC in the error doesn't leak.
+        await adapter.stop(hass)
+        raise ConfigEntryNotReady(
+            f"Could not connect to printer: {sanitize_log_message(str(err))}"
+        ) from err
+
+    # Note: options changes are picked up automatically — the options flow
+    # extends ``OptionsFlowWithReload``, which reloads the entry when the
+    # options change (the integration reads them only here at setup).
 
     # Optionally disable platform forwarding (used by unit tests)
     platforms = PLATFORMS
@@ -257,7 +280,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> b
         # Stop adapter background tasks
         try:
             adapter = entry.runtime_data.adapter
-            await adapter.stop()
+            await adapter.stop(hass)
         except Exception:  # best effort on unload
             pass
         _LOGGER.debug("Unloaded entry %s", entry.entry_id)

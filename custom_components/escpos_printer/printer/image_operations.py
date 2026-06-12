@@ -35,7 +35,7 @@ from .image_processor import (
     ImageProcessOptions,
     process_image_from_bytes,
 )
-from .mapping_utils import map_align
+from .mapping_utils import cleanup_cut, map_align
 
 if TYPE_CHECKING:
     from homeassistant.core import Context, HomeAssistant
@@ -345,10 +345,12 @@ class ImageOperationsMixin:
         stats = getattr(self, "_image_stats", None)
         async with self._lock:
             printer, owned = await self._acquire_printer(hass)
+            failed = True
             try:
                 try:
                     await _print_prepared_under_lock(hass, printer, prepared)
                     await self._apply_cut_and_feed(hass, printer, cut, feed)
+                    failed = False
                 except (asyncio.CancelledError, Exception) as err:
                     # Best-effort cleanup so a cancelled mid-print doesn't
                     # leave paper hanging mid-image.
@@ -356,10 +358,12 @@ class ImageOperationsMixin:
                         stats.total_failures += 1
                         stats.last_error_class = type(err).__name__
                     with contextlib.suppress(Exception):
-                        await self._apply_cut_and_feed(hass, printer, cut or "full", feed or 1)
+                        await self._apply_cut_and_feed(
+                            hass, printer, cleanup_cut(cut), feed or 1
+                        )
                     raise
             finally:
-                await self._release_printer(hass, printer, owned=owned)
+                await self._release_printer(hass, printer, owned=owned, failed=failed)
         if stats is not None:
             stats.total_prints += 1
             stats.last_error_class = None

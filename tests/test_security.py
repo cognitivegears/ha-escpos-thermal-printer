@@ -88,6 +88,17 @@ class TestBarcodeDataValidation:
         with pytest.raises(HomeAssistantError, match="exceeds maximum"):
             validate_barcode_data("x" * (MAX_BARCODE_LENGTH + 1), "CODE128")
 
+    @pytest.mark.parametrize(
+        "payload",
+        ["12345\x00\x1bp", "ab\x1dcd", "foo\x00bar", "x\x1bX", "\x10dle"],
+    )
+    def test_validate_barcode_data_rejects_control_bytes(self, payload):  # type: ignore[no-untyped-def]
+        # ESC/GS/NUL/C0 bytes could terminate the GS k barcode frame early
+        # and inject raw ESC/POS commands (cash-drawer kick, codepage
+        # change). They must be rejected, not stripped.
+        with pytest.raises(HomeAssistantError, match="control characters"):
+            validate_barcode_data(payload, "CODE128")
+
 
 # ---------------------------------------------------------------------------
 # URL validation (legacy + Phase 3 T-C1 hardening).

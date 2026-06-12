@@ -198,7 +198,7 @@ See [docs/bluetooth.md](docs/bluetooth.md) for the full pairing walkthrough, con
 
 ## Blueprints
 
-The [`blueprints/`](blueprints/) directory ships eight ready-to-import Home Assistant scripts and automations that exercise the text-effects services. They cover the common day-to-day workflows so you don't need to write YAML from scratch.
+The [`blueprints/`](blueprints/) directory ships 13 ready-to-import Home Assistant scripts and automations that exercise the text-effects services. They cover the common day-to-day workflows so you don't need to write YAML from scratch.
 
 | Blueprint | Type | Use case |
 |-----------|------|----------|
@@ -208,8 +208,13 @@ The [`blueprints/`](blueprints/) directory ships eight ready-to-import Home Assi
 | [Weather Forecast](blueprints/script/escpos_printer/weather_forecast.yaml) | Script | Print an N-day forecast table. |
 | [Receipt](blueprints/script/escpos_printer/receipt.yaml) | Script | Itemised receipt with subtotal / tax / total. |
 | [Recipe Card](blueprints/script/escpos_printer/recipe_card.yaml) | Script | Kitchen card — name, servings, ingredients, numbered steps. |
+| [Guest Wi-Fi QR](blueprints/script/escpos_printer/guest_wifi_qr.yaml) | Script | Print a scannable Wi-Fi join QR code for guests. |
 | [Sensor Alert](blueprints/automation/escpos_printer/sensor_alert.yaml) | Automation | Print a bordered alert when a sensor reaches a target state. |
 | [TODO Item](blueprints/automation/escpos_printer/todo_item.yaml) | Automation | Print a card per item added to a `todo` entity (fridge-printer style). |
+| [TODO Ticket](blueprints/automation/escpos_printer/todo_ticket.yaml) | Automation | Print a ticket (with QR) per item added to a `todo` entity. |
+| [Doorbell Snapshot](blueprints/automation/escpos_printer/doorbell_snapshot.yaml) | Automation | Print a camera snapshot when the doorbell is pressed. |
+| [Morning Briefing](blueprints/automation/escpos_printer/morning_briefing.yaml) | Automation | Print a combined weather + agenda briefing each morning. |
+| [Trash Reminder](blueprints/automation/escpos_printer/trash_reminder.yaml) | Automation | Print a bin / recycling reminder on collection eve. |
 
 See [`blueprints/README.md`](blueprints/README.md) for import instructions, per-blueprint inputs, and troubleshooting notes.
 

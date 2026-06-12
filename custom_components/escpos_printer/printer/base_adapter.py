@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import asyncio
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 import contextlib
 import logging
 import textwrap
@@ -29,7 +29,7 @@ from .image_operations import (
     prepare_image_for_print,
 )
 from .image_processor import FALLBACK_PROFILE_WIDTH
-from .mapping_utils import map_align, map_cut, map_multiplier, map_underline
+from .mapping_utils import cleanup_cut, map_align, map_cut, map_multiplier, map_underline
 from .print_operations import PrintOperationsMixin, _print_text_under_lock
 
 if TYPE_CHECKING:
@@ -150,15 +150,62 @@ class EscposPrinterAdapterBase(
         if self._status_interval > 0:
             await self._status_check(hass)
 
-    async def stop(self) -> None:
-        """Stop the adapter and clean up resources."""
+    async def stop(self, hass: HomeAssistant | None = None) -> None:
+        """Stop the adapter and clean up resources.
+
+        Acquires the operation lock so an in-flight keepalive print isn't
+        torn out from under the executor thread writing to the socket,
+        and closes the connection on an executor thread (``close()`` does
+        a blocking ``socket.shutdown``) rather than on the event loop.
+        """
         if self._cancel_status:
             self._cancel_status()
         self._cancel_status = None
-        if self._printer is not None:
-            with contextlib.suppress(Exception):
-                self._printer.close()
+
+        async with self._lock:
+            printer = self._printer
             self._printer = None
+            if printer is None:
+                return
+
+            def _close() -> None:
+                with contextlib.suppress(Exception):
+                    printer.close()
+
+            if hass is not None:
+                await hass.async_add_executor_job(_close)
+            else:
+                # No hass available (rare teardown path): close inline as
+                # a last resort rather than leaking the socket.
+                _close()
+
+    @contextlib.asynccontextmanager
+    async def _probe_lock_or_skip(self) -> AsyncIterator[bool]:
+        """Hold the op lock for a status probe, or yield ``False`` if busy.
+
+        A status probe must be mutually exclusive with a print on the
+        same transport (opening a second connection mid-print can flap
+        bandwidth-constrained links or, on USB/BT, disturb the active
+        job). ``if self._lock.locked(): return`` followed by awaiting
+        the probe was TOCTOU — a print could acquire the lock between the
+        check and the probe. Acquiring the lock makes check-and-hold
+        atomic: when the lock is free, asyncio's ``Lock.acquire``
+        completes without suspending, so nothing can interleave between
+        the ``locked()`` test and the acquisition.
+
+        Note the contention now runs both ways: a print arriving while a
+        probe is mid-flight blocks on the lock until the probe finishes
+        (bounded by the probe's ``min(timeout, 3.0)`` ceiling). This is
+        the intended correctness-over-latency trade-off.
+        """
+        if self._lock.locked():
+            yield False
+            return
+        await self._lock.acquire()
+        try:
+            yield True
+        finally:
+            self._lock.release()
 
     def get_status(self) -> bool | None:
         """Return the current printer status."""
@@ -204,16 +251,38 @@ class EscposPrinterAdapterBase(
         printer = await hass.async_add_executor_job(self._connect)
         return printer, True
 
-    async def _release_printer(self, hass: HomeAssistant, printer: Any, *, owned: bool) -> None:
-        """Close a printer instance if owned by the caller."""
-        if not owned:
+    async def _release_printer(
+        self, hass: HomeAssistant, printer: Any, *, owned: bool, failed: bool = False
+    ) -> None:
+        """Release a printer instance after an operation.
+
+        Caller-owned connections (the reconnect-per-operation model) are
+        always closed. A persistent keepalive connection is kept open on
+        success, but **invalidated on failure**: a broken pipe / idle
+        timeout / power-cycle leaves the socket dead, and reusing it
+        would brick every subsequent print until the entry is reloaded.
+        Dropping it here forces the next ``_acquire_printer`` to
+        reconnect. Runs under the operation lock, so nulling
+        ``self._printer`` is race-free.
+        """
+        if owned:
+
+            def _close() -> None:
+                with contextlib.suppress(Exception):
+                    printer.close()
+
+            await hass.async_add_executor_job(_close)
             return
 
-        def _close() -> None:
-            with contextlib.suppress(Exception):
-                printer.close()
+        if failed and self._printer is not None:
+            stale = self._printer
+            self._printer = None
 
-        await hass.async_add_executor_job(_close)
+            def _close_stale() -> None:
+                with contextlib.suppress(Exception):
+                    stale.close()
+
+            await hass.async_add_executor_job(_close_stale)
 
     def _notify_status_change(self, ok: bool) -> None:
         """Notify all status listeners of a status change."""
@@ -264,9 +333,14 @@ class EscposPrinterAdapterBase(
         """Get the escpos profile object for this configuration."""
         if self._config.profile:
             try:
-                from escpos import profile as escpos_profile  # noqa: PLC0415
+                # python-escpos 3.x exposes ``get_profile`` from
+                # ``escpos.capabilities`` (the old ``escpos.profile``
+                # module was removed; importing it silently returned
+                # None, so the configured profile was never applied at
+                # connect time).
+                from escpos.capabilities import get_profile  # noqa: PLC0415
 
-                return escpos_profile.get_profile(self._config.profile)
+                return get_profile(self._config.profile)
             except Exception as e:
                 _LOGGER.debug(
                     "Unknown printer profile '%s': %s",
@@ -278,30 +352,41 @@ class EscposPrinterAdapterBase(
     def get_profile_pixel_width(self, hass: HomeAssistant | None = None) -> int | None:
         """Return the printer profile's max pixel width (cached).
 
-        Falls back to :data:`FALLBACK_PROFILE_WIDTH`, logs a single
-        WARNING per adapter instance, and (when ``hass`` is provided)
-        raises a repairs issue so the miss is visible in the UI. A
-        silent log line is easy to miss; silently miscalibrated images
-        are the resulting #1 support question.
+        Resolved from the configured python-escpos profile object — not
+        from the live connection, which is ``None`` for USB, Bluetooth,
+        and non-keepalive network printers (i.e. nearly every install),
+        so reading it there always missed.
+
+        When a profile *is* configured but exposes no pixel width, falls
+        back to :data:`FALLBACK_PROFILE_WIDTH`, logs a single WARNING per
+        adapter instance, and (when ``hass`` is provided) raises a
+        repairs issue so the miss is visible in the UI — silently
+        miscalibrated images are the resulting #1 support question. The
+        auto/default profile (no profile chosen) has no declared pixel
+        width by design, so it falls back silently without warning.
         """
         if self._profile_width_lookup_done:
             return self._cached_profile_width
         width: int | None = None
-        printer = self._printer
-        if printer is not None:
+        profile_obj = self._get_profile_obj()
+        if profile_obj is not None:
             try:
-                data = printer.profile.profile_data["media"]["width"]["pixels"]
+                data = profile_obj.profile_data["media"]["width"]["pixels"]
                 if isinstance(data, (int, float)):
                     width = int(data)
-            except AttributeError, KeyError, TypeError, ValueError:
+            except (AttributeError, KeyError, TypeError, ValueError):
                 width = None
         self._cached_profile_width = width
         self._profile_width_lookup_done = True
-        if width is None and not self._profile_width_warning_logged:
+        # Only surface the fallback when the user actually picked a
+        # profile that turned out to lack width data; auto/default
+        # (``profile_obj is None``) is an expected, silent fallback.
+        if width is None and profile_obj is not None and not self._profile_width_warning_logged:
             _LOGGER.warning(
-                "Printer profile does not expose media.width.pixels; "
+                "Printer profile '%s' does not expose media.width.pixels; "
                 "falling back to %dpx for image width. Set image_width "
-                "explicitly or check the python-escpos profile data.",
+                "explicitly or pick a profile that declares a pixel width.",
+                self._config.profile,
                 FALLBACK_PROFILE_WIDTH,
             )
             self._profile_width_warning_logged = True
@@ -409,12 +494,14 @@ class EscposPrinterAdapterBase(
 
         async with self._lock:
             printer, owned = await self._acquire_printer(hass)
+            failed = True
             try:
                 try:
                     await _print_text_under_lock(self, hass, printer, **text_kwargs)
                     await _print_prepared_under_lock(hass, printer, prepared)
                     await self._apply_cut_and_feed(hass, printer, cut, feed)
-                except asyncio.CancelledError, Exception:  # pragma: no cover (T-L4)
+                    failed = False
+                except (asyncio.CancelledError, Exception):  # pragma: no cover (T-L4)
                     # S-M3: shield the cleanup so a second cancellation
                     # mid-flush doesn't leave paper half-printed. The
                     # suppress() catches Exception only — CancelledError
@@ -430,10 +517,12 @@ class EscposPrinterAdapterBase(
                     with contextlib.suppress(Exception):
                         await asyncio.shield(
                             asyncio.ensure_future(
-                                self._apply_cut_and_feed(hass, printer, cut or "full", feed or 1)
+                                self._apply_cut_and_feed(
+                                    hass, printer, cleanup_cut(cut), feed or 1
+                                )
                             )
                         )
                     raise
             finally:
-                await self._release_printer(hass, printer, owned=owned)
+                await self._release_printer(hass, printer, owned=owned, failed=failed)
         await self._mark_success()

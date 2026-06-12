@@ -180,7 +180,11 @@ print_text:
             - "8"
     encoding:
       name: Encoding
-      description: Character encoding override
+      description: >-
+        Codepage override for this print — a python-escpos codepage name
+        such as CP437, CP850, or CP858 (not a Python codec name). Leave
+        empty to use the printer's configured codepage.
+      example: CP858
       selector:
         text: {}
     cut:
@@ -1569,7 +1573,7 @@ beep:
     times:
       name: Times
       description: Number of beeps
-      default: 1
+      default: 2
       selector:
         number:
           min: 1
@@ -1578,8 +1582,8 @@ beep:
           mode: slider
     duration:
       name: Duration
-      description: Duration of each beep
-      default: 1
+      description: Duration of each beep (in the printer's buzzer time units, ~100 ms each)
+      default: 4
       selector:
         number:
           min: 1
@@ -1681,7 +1685,10 @@ print_message:
         boolean: {}
     encoding:
       name: Encoding
-      description: Character encoding override (ignored when UTF-8 mode is enabled)
+      description: >-
+        Codepage override — a python-escpos codepage name such as CP437 or
+        CP858 (not a Python codec name). Ignored when UTF-8 mode is enabled.
+      example: CP858
       selector:
         text: {}
     image:

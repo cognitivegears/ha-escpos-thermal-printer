@@ -168,11 +168,14 @@ async def test_wrap_text_zero_width_no_wrap(hass):  # type: ignore[no-untyped-de
 
 
 async def test_get_profile_pixel_width_handles_broken_profile_data(hass):  # type: ignore[no-untyped-def]
-    """A printer whose profile_data is missing the media/width keys must not raise.
+    """A configured profile missing the media/width keys must not raise.
 
     Exercises the AttributeError/KeyError/TypeError/ValueError guard in
-    get_profile_pixel_width: a connected printer with a malformed profile
-    falls back to None rather than crashing the image pipeline.
+    get_profile_pixel_width: a profile object with malformed profile_data
+    falls back to None rather than crashing the image pipeline. The width
+    is read from the configured profile object (``_get_profile_obj``),
+    not the live connection — the connection is None for USB/Bluetooth
+    and non-keepalive network printers.
     """
     entry = await _setup_entry(hass)
     adapter = entry.runtime_data.adapter
@@ -181,12 +184,40 @@ async def test_get_profile_pixel_width_handles_broken_profile_data(hass):  # typ
         # Real dict so ["media"] raises KeyError (not a Mock that auto-vivifies).
         profile_data: dict = {}
 
-    class _Printer:
-        profile = _BrokenProfile()
-
-    adapter._printer = _Printer()  # type: ignore[attr-defined]
+    # Class is callable with no args → returns a fresh instance, matching
+    # the _get_profile_obj() contract.
+    adapter._get_profile_obj = _BrokenProfile  # type: ignore[attr-defined,method-assign]
     # No hass passed → skips the repair-issue path; just exercises the guard.
     assert adapter.get_profile_pixel_width() is None
+
+
+async def test_get_profile_pixel_width_reads_configured_profile(hass):  # type: ignore[no-untyped-def]
+    """A profile that declares media.width.pixels is read without a connection."""
+    entry = await _setup_entry(hass)
+    adapter = entry.runtime_data.adapter
+
+    class _Profile:
+        profile_data = {"media": {"width": {"pixels": 576}}}
+
+    adapter._get_profile_obj = _Profile  # type: ignore[attr-defined,method-assign]
+    # self._printer is None (no keepalive), proving the width comes from
+    # the profile object, not the connection.
+    assert adapter._printer is None  # type: ignore[attr-defined]
+    assert adapter.get_profile_pixel_width() == 576
+
+
+async def test_get_profile_pixel_width_auto_profile_silent_fallback(hass, caplog):  # type: ignore[no-untyped-def]
+    """The auto/default profile (no profile chosen) falls back silently."""
+    entry = await _setup_entry(hass)
+    adapter = entry.runtime_data.adapter
+
+    # Auto profile → _get_profile_obj() returns None → fallback with no
+    # warning and no repair issue (it's expected, not a misconfiguration).
+    adapter._get_profile_obj = lambda: None  # type: ignore[attr-defined,method-assign]
+    assert adapter.get_profile_pixel_width(hass) is None
+    assert not any(
+        "does not expose media.width.pixels" in rec.message for rec in caplog.records
+    )
 
 
 async def test_get_connection_info(hass):  # type: ignore[no-untyped-def]

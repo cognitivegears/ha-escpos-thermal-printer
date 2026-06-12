@@ -45,8 +45,10 @@ schema (Bronze quality-scale `action-setup` rule):
 - **Base64 data URIs** — input length capped *before* regex/decoding
   (no OOM on a 200 MB base64 string); subtype pinned to
   `png|jpe?g|gif|bmp|tiff|webp` (no SVG / XML decoder reach).
-- **Pillow** — `Image.MAX_IMAGE_PIXELS` set process-globally so
-  decompression bombs raise deterministically; `Image.open` is invoked
+- **Pillow** — a decompression-bomb guard is enforced per-decode against
+  the image header dimensions (before any full-bitmap allocation),
+  scoped to this integration so Pillow's process-global limit is left
+  untouched for other Home Assistant consumers; `Image.open` is invoked
   with a pinned `formats=` allow-list.
 - **Numeric input** — every numeric parameter validated within safe
   bounds (`MAX_FEED_LINES`, `IMAGE_FRAGMENT_MIN/MAX`, etc.) declared in
@@ -105,7 +107,8 @@ _LOGGER.debug(log_msg)
 - Maximum barcode data length: 100 characters
 - Maximum image download size: 10 MB (also the **decoded** cap for base64
   data URIs)
-- Maximum decoded pixel count: 20 million (`Image.MAX_IMAGE_PIXELS`)
+- Maximum decoded pixel count: 20 million per decode (40 million with
+  `auto_resize`, since the source is downscaled after decode)
 - Maximum processed image height: 8192 px
 - Maximum image slices per print: 64 (avoids paper-DoS via tall ribbons)
 - Maximum feed lines: 50

@@ -1,6 +1,13 @@
 rules:
   # Bronze
-  action-setup: done
+  action-setup:
+    status: todo
+    comment: >-
+      Services are registered in async_setup_entry (gated on the first
+      config entry) rather than async_setup. Calls still raise
+      ServiceValidationError when no printer entries are loaded (see
+      target_resolution); moving registration to async_setup to fully
+      satisfy this rule is pending.
   appropriate-polling: done
   brands: todo  # PR to home-assistant/brands required before submission
   common-modules: done
@@ -30,7 +37,7 @@ rules:
   parallel-updates: done
   reauthentication-flow:
     status: exempt
-    comment: Local-push integration with no authentication; reauth has nothing to refresh.
+    comment: Local integration with no authentication; reauth has nothing to refresh.
   test-coverage: todo  # currently ~70%; silver target is ≥95%
 
   # Gold
@@ -55,7 +62,7 @@ rules:
   exception-translations: done  # `no_target_found` wired up in strings.json + translations/en.json
   icon-translations: done
   reconfiguration-flow: todo  # only options-flow exists; no async_step_reconfigure. Blocks discovery-update-info.
-  repair-issues: todo
+  repair-issues: done  # profile_width_fallback issue raised in printer/base_adapter.py
   stale-devices:
     status: exempt
     comment: One device per config entry; entry removal handles device cleanup.
@@ -66,5 +73,10 @@ rules:
     comment: Upstream python-escpos is synchronous; calls run via hass.async_add_executor_job with a per-adapter asyncio.Lock and asyncio.timeout boundaries.
   inject-websession:
     status: exempt
-    comment: Transports are TCP sockets / pyusb / RFCOMM. aiohttp is not used.
+    comment: >-
+      Printer transports are TCP sockets / pyusb / RFCOMM. aiohttp is
+      used only for image-URL fetches, where a per-request session is
+      built with a DNS-pinned connector (image_sources._StaticResolver)
+      to defeat DNS rebinding; HA's shared session can't carry that
+      pinning, so it cannot be injected here.
   strict-typing: todo  # mypy strict mode partial; integration imports lack full type coverage

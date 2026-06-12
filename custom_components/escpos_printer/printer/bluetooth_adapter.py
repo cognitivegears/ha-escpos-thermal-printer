@@ -116,14 +116,6 @@ class BluetoothPrinterAdapter(EscposPrinterAdapterBase):
         We skip the tick if a print operation currently holds the lock and
         let the next print/tick refresh status.
         """
-        if self._lock.locked():
-            _LOGGER.debug(
-                "Skipping Bluetooth status probe for %s ch=%s — print operation in flight",
-                self._mac_redacted,
-                self._bt_config.rfcomm_channel,
-            )
-            return
-
         def _probe() -> tuple[bool, str | None, int | None, int | None]:
             start = time.perf_counter()
             try:
@@ -141,7 +133,15 @@ class BluetoothPrinterAdapter(EscposPrinterAdapterBase):
                     transport.close()
                 return True, None, latency_ms, None
 
-        ok, err, latency_ms, err_no = await hass.async_add_executor_job(_probe)
+        async with self._probe_lock_or_skip() as acquired:
+            if not acquired:
+                _LOGGER.debug(
+                    "Skipping Bluetooth status probe for %s ch=%s — print operation in flight",
+                    self._mac_redacted,
+                    self._bt_config.rfcomm_channel,
+                )
+                return
+            ok, err, latency_ms, err_no = await hass.async_add_executor_job(_probe)
         now = dt_util.utcnow()
         self._last_check = now
         self._last_latency_ms = latency_ms

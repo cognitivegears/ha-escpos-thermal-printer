@@ -46,6 +46,7 @@ class PrintOperationsMixin:
         """Print text to the printer."""
         async with self._lock:
             printer, owned = await self._acquire_printer(hass)
+            failed = True
             try:
                 await _print_text_under_lock(
                     self,
@@ -60,8 +61,9 @@ class PrintOperationsMixin:
                     encoding=encoding,
                 )
                 await self._apply_cut_and_feed(hass, printer, cut, feed)
+                failed = False
             finally:
-                await self._release_printer(hass, printer, owned=owned)
+                await self._release_printer(hass, printer, owned=owned, failed=failed)
         await self._mark_success()
 
     async def print_qr(
@@ -104,11 +106,13 @@ class PrintOperationsMixin:
 
         async with self._lock:
             printer, owned = await self._acquire_printer(hass)
+            failed = True
             try:
                 await hass.async_add_executor_job(_do_print, printer)
                 await self._apply_cut_and_feed(hass, printer, cut, feed)
+                failed = False
             finally:
-                await self._release_printer(hass, printer, owned=owned)
+                await self._release_printer(hass, printer, owned=owned, failed=failed)
         await self._mark_success()
 
 
@@ -163,20 +167,21 @@ async def _print_text_under_lock(
             )
 
         if encoding:
+            # ``encoding`` is a per-call codepage override. ``charcode``
+            # both selects the codepage table on the printer *and* points
+            # python-escpos's text encoder at the matching codec, so a
+            # subsequent ``p.text`` encodes correctly. (The old path
+            # called ``p._set_codepage`` — removed in python-escpos 3.x —
+            # so the override was silently a no-op and printed mojibake.)
             try:
-                if hasattr(p, "_set_codepage"):
-                    try:
-                        p._set_codepage(encoding)
-                    except Exception:
-                        _LOGGER.warning("Unsupported encoding/codepage: %s", encoding)
-                text_bytes = text_to_print.encode(encoding, errors="replace")
-                if hasattr(p, "_raw"):
-                    p._raw(text_bytes)
-                else:
-                    p.text(text_to_print)
-            except Exception:
-                p.text(text_to_print)
-        else:
-            p.text(text_to_print)
+                if hasattr(p, "charcode"):
+                    p.charcode(encoding)
+            except Exception as e:
+                _LOGGER.warning(
+                    "Unsupported encoding/codepage override '%s': %s",
+                    encoding,
+                    sanitize_log_message(str(e)),
+                )
+        p.text(text_to_print)
 
     await hass.async_add_executor_job(_do_print, printer)

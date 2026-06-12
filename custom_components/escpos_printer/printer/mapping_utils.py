@@ -56,3 +56,20 @@ def map_cut(mode: str | None) -> str | None:
     if mode_l == "none":
         return None
     return None
+
+
+def cleanup_cut(cut: str | None) -> str:
+    """Return the cut mode to use for best-effort cleanup after a failure.
+
+    The normal default ``cut="none"`` means "don't cut" on a *successful*
+    print, but on a cancelled/failed print we want to sever the
+    half-printed receipt so it doesn't hang into the next job. ``"none"``
+    (or empty/None) therefore falls through to a full cut here; an
+    explicit ``"partial"``/``"full"`` is honoured as-is.
+
+    (Plain ``cut or "full"`` was wrong because ``DEFAULT_CUT == "none"``
+    is truthy, so it was never replaced and ``map_cut("none")`` → no cut.)
+    """
+    if cut and cut.lower() != "none":
+        return cut
+    return "full"

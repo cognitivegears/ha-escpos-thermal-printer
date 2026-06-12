@@ -6,11 +6,14 @@ from homeassistant.const import CONF_HOST, CONF_PORT
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.escpos_printer.const import (
+    CONF_BT_MAC,
     CONF_CONNECTION_TYPE,
     CONF_IN_EP,
     CONF_OUT_EP,
     CONF_PRODUCT_ID,
+    CONF_RFCOMM_CHANNEL,
     CONF_VENDOR_ID,
+    CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
     CONNECTION_TYPE_USB,
     DOMAIN,
@@ -35,7 +38,10 @@ async def test_diagnostics_network_entry(hass):  # type: ignore[no-untyped-def]
 
     diag = await async_get_config_entry_diagnostics(hass, entry)
 
-    assert diag["entry"]["title"] == "1.2.3.4:9100"
+    # Title is redacted: the default network title embeds host:port (and
+    # the BT title embeds the MAC), so it must not leak in a diagnostics
+    # download.
+    assert diag["entry"]["title"] == "**REDACTED**"
     # Host is redacted
     assert diag["entry"]["data"][CONF_HOST] == "**REDACTED**"
     assert diag["entry"]["data"][CONF_PORT] == 9100
@@ -81,6 +87,37 @@ async def test_diagnostics_usb_entry(hass):  # type: ignore[no-untyped-def]
     assert diag["runtime"]["product_id"] == "0x0E03"
 
 
+async def test_diagnostics_bluetooth_entry_redacts_mac(hass):  # type: ignore[no-untyped-def]
+    """A Bluetooth entry must be labelled bluetooth and have its MAC + title redacted.
+
+    Regression: the BT branch was missing (entries were mislabelled
+    ``network`` with a null host), and the MAC leaked via both the
+    ``bt_mac`` field and the entry title.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Bluetooth Printer AA:BB:CC:DD:EE:FF",
+        data={
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH,
+            CONF_BT_MAC: "AA:BB:CC:DD:EE:FF",
+            CONF_RFCOMM_CHANNEL: 1,
+        },
+        unique_id="bt:AA:BB:CC:DD:EE:FF",
+    )
+    # NOT calling async_setup (BT setup needs RFCOMM/D-Bus); the entry_data
+    # branch + redaction are exercised from the static data.
+    entry.add_to_hass(hass)
+
+    diag = await async_get_config_entry_diagnostics(hass, entry)
+
+    entry_data = diag["entry"]["data"]
+    assert entry_data[CONF_CONNECTION_TYPE] == CONNECTION_TYPE_BLUETOOTH
+    # MAC and title (which embeds the MAC) are redacted; channel is kept.
+    assert entry_data[CONF_BT_MAC] == "**REDACTED**"
+    assert diag["entry"]["title"] == "**REDACTED**"
+    assert entry_data[CONF_RFCOMM_CHANNEL] == 1
+
+
 async def test_diagnostics_without_runtime_data(hass):  # type: ignore[no-untyped-def]
     """Diagnostics must work even when runtime_data hasn't been set (e.g. setup failed)."""
     entry = MockConfigEntry(
@@ -94,8 +131,9 @@ async def test_diagnostics_without_runtime_data(hass):  # type: ignore[no-untype
 
     diag = await async_get_config_entry_diagnostics(hass, entry)
 
-    # Entry section is still populated from the static data
-    assert diag["entry"]["title"] == "1.2.3.4:9100"
+    # Entry section is still populated from the static data; the title
+    # (which embeds host:port) is redacted.
+    assert diag["entry"]["title"] == "**REDACTED**"
     assert diag["entry"]["data"][CONF_PORT] == 9100
     # Runtime section is empty because no adapter exists
     assert diag["runtime"] == {}

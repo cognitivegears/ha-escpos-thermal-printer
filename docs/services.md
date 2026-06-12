@@ -14,9 +14,9 @@ Print raw text using the configured codepage. No transcoding.
 | underline | string | `none`, `single`, `double` |
 | width | string\|int | `normal`, `double`, `triple`, or 1–8 |
 | height | string\|int | `normal`, `double`, `triple`, or 1–8 |
-| encoding | string | Override codepage |
+| encoding | string | Codepage override — a python-escpos codepage name such as `CP437`/`CP858` (not a Python codec name) |
 | cut | string | `none`, `partial`, `full` |
-| feed | int | Lines to feed (0–10) |
+| feed | int | Lines to feed (0–50) |
 
 ## escpos_printer.print_text_utf8
 
@@ -52,11 +52,11 @@ Entity service for the notify platform. Targets a notify entity and supports all
 | ec | string | Error correction: `L`, `M`, `Q`, `H` |
 | align | string | `left`, `center`, `right` |
 | cut | string | `none`, `partial`, `full` |
-| feed | int | Lines to feed (0–10) |
+| feed | int | Lines to feed (0–50) |
 
 ## escpos_printer.print_barcode
 
-Supported types: `EAN13`, `EAN8`, `UPC-A`, `UPC-E`, `CODE39`, `CODE93`, `CODE128`, `ITF`, `CODABAR`.
+Supported types: `EAN13`, `EAN8`, `UPC-A`, `UPC-E`, `CODE39`, `CODE93`, `CODE128`, `ITF`, `ITF14`, `CODABAR`, `JAN`, `JAN13`, `JAN8`.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -70,7 +70,7 @@ Supported types: `EAN13`, `EAN8`, `UPC-A`, `UPC-E`, `CODE39`, `CODE93`, `CODE128
 | check | boolean | Validate checksum |
 | force_software | string | Rendering mode |
 | cut | string | `none`, `partial`, `full` |
-| feed | int | Lines to feed (0–10) |
+| feed | int | Lines to feed (0–50) |
 
 ## Image services
 
@@ -221,7 +221,7 @@ Response shape: `{path, width, line_count, codepage}`.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| lines | int | Lines to feed 1–10 (required) |
+| lines | int | Lines to feed 1–50 (required) |
 
 ## escpos_printer.cut
 
@@ -237,3 +237,17 @@ If the printer supports it.
 |-----------|------|-------------|
 | times | int | Number of beeps (default 2) |
 | duration | int | Beep duration (default 4) |
+
+## escpos_printer.calibration_print
+
+Prints a test sheet of dither/threshold swatches so you can pick the
+image settings that look best on your paper. Use it after setup to
+choose a `dither` mode and `threshold` for `print_image`.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| device_id | string\|list | Target printer(s); omit to broadcast to all |
+| cut | string | `none`, `partial`, `full` (default `full`) |
+| feed | int | Lines to feed after printing (default 2) |
+
+The test sheet width is taken from the printer profile (falling back to 384 px); it is not configurable.

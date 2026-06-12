@@ -3,11 +3,11 @@
 ## All connection types
 
 - **One queued operation per printer.** Each adapter holds an `asyncio.Lock`; service calls to the same printer serialize. Concurrent prints to the same device wait their turn.
-- **Images auto-fit to the printer's profile width.** By default, images wider than the printer profile's maximum pixel width are resized down (with aspect ratio preserved). When the profile doesn't expose `media.width.pixels`, the integration falls back to **512 px** and logs a `WARNING` once per adapter — check `home-assistant.log` for `Printer profile does not expose media.width.pixels`. Set `image_width` on `print_image` to override. Images are never upscaled. See the [Images guide](images.md).
+- **Images auto-fit to the printer's profile width.** By default, images wider than the printer profile's maximum pixel width are resized down (with aspect ratio preserved). When you've selected a profile that doesn't expose `media.width.pixels`, the integration falls back to **512 px**, logs a `WARNING` once per adapter (check `home-assistant.log` for `does not expose media.width.pixels`), and raises a Repairs issue. The auto/default profile (no profile chosen) also uses the 512 px fallback, but silently — it has no declared width by design. Set `image_width` on `print_image` to override, or pick a profile that declares a pixel width. Images are never upscaled. See the [Images guide](images.md).
 - **Image files are capped at 10 MB** (both for HTTP download and for decoded base64 data URIs).
-- **Image processing caps.** Decoded images cannot exceed 20 M pixels (`Image.MAX_IMAGE_PIXELS`), 8192 rows of processed height, or 64 slices per print. These guard against decompression bombs and paper-DoS via tall ribbons.
+- **Image processing caps.** Decoded images cannot exceed 20 M pixels (40 M with `auto_resize`, since the source is downscaled after decode) — enforced per-decode against the image header, scoped to this integration — 8192 rows of processed height, or 64 slices per print. These guard against decompression bombs and paper-DoS via tall ribbons.
 - **Buffer overruns on tall images.** Chunked transmission (`fragment_height`, `chunk_delay_ms`) mitigates this; tune both per printer if you still see freezes or character dumps. Default `chunk_delay_ms` is 0 on Network / USB and 50 on Bluetooth.
-- **No print preview.** Output is unbuffered ESC/POS — what you send is what prints.
+- **Output is unbuffered ESC/POS** — once a print service runs, the bytes go straight to the printer. To iterate on layout without wasting paper, use the `preview_image`, `preview_box`, and `preview_table` services, which render to a PNG/TXT file instead of printing.
 - **Print quality** depends on the printer's hardware density setting and paper. Not adjustable from the integration.
 
 ## Security posture (image pipeline)

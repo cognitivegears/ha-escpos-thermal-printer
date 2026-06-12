@@ -64,8 +64,10 @@ async def test_print_image_url_download_error(hass, caplog):  # type: ignore[no-
 async def test_encoding_codepage_warning(hass, caplog):  # type: ignore[no-untyped-def]
     await _setup_entry(hass)
     fake = MagicMock()
-    # Cause _set_codepage to raise
-    fake._set_codepage.side_effect = RuntimeError("bad codepage")
+    # The per-call ``encoding`` override is applied via ``charcode`` (the
+    # python-escpos 3.x API). An unknown codepage raises and must warn —
+    # but the text must still print.
+    fake.charcode.side_effect = KeyError("XYZ")
     with patch("escpos.printer.Network", return_value=fake):
         await hass.services.async_call(
             DOMAIN,
@@ -73,7 +75,9 @@ async def test_encoding_codepage_warning(hass, caplog):  # type: ignore[no-untyp
             {"text": "Hello", "encoding": "XYZ"},
             blocking=True,
         )
+    fake.charcode.assert_any_call("XYZ")
     assert any("Unsupported encoding/codepage" in rec.message for rec in caplog.records)
+    fake.text.assert_called()
 
 
 async def test_print_barcode_service_calls_escpos(hass):  # type: ignore[no-untyped-def]

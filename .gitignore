@@ -27,3 +27,4 @@ coverage.json
 
 # Local Claude Code review artifacts
 .full-review/
+.full-review-archive/

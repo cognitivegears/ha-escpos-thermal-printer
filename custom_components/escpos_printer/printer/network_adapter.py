@@ -51,9 +51,6 @@ class NetworkPrinterAdapter(EscposPrinterAdapterBase):
         until the print completes — strictly better than corrupting an
         active job.
         """
-        if self._lock.locked():
-            return
-
         def _probe() -> tuple[bool, str | None, int | None]:
             start = time.perf_counter()
             try:
@@ -67,7 +64,11 @@ class NetworkPrinterAdapter(EscposPrinterAdapterBase):
                 latency_ms = int((time.perf_counter() - start) * 1000)
                 return False, str(e), latency_ms
 
-        ok, err, latency_ms = await hass.async_add_executor_job(_probe)
+        async with self._probe_lock_or_skip() as acquired:
+            if not acquired:
+                _LOGGER.debug("Skipping network status probe; print in flight")
+                return
+            ok, err, latency_ms = await hass.async_add_executor_job(_probe)
         now = dt_util.utcnow()
         self._last_check = now
         self._last_latency_ms = latency_ms

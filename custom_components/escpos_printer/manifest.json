@@ -7,7 +7,7 @@
   "config_flow": true,
   "documentation": "https://github.com/cognitivegears/ha-escpos-thermal-printer#readme",
   "integration_type": "service",
-  "iot_class": "local_push",
+  "iot_class": "local_polling",
   "issue_tracker": "https://github.com/cognitivegears/ha-escpos-thermal-printer/issues",
   "loggers": [
     "escpos"
@@ -76,6 +76,10 @@
       "description": "*"
     },
     {
+      "vid": "0FE6",
+      "description": "*"
+    },
+    {
       "vid": "1203",
       "description": "*"
     },
@@ -112,5 +116,5 @@
       "description": "*pos*"
     }
   ],
-  "version": "0.7.2"
+  "version": "0.7.3"
 }

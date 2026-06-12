@@ -9,8 +9,10 @@ Home Assistant custom integration for ESC/POS thermal receipt printers. Supports
 ## Common Commands
 
 ```bash
-# Install dependencies (use uv)
-uv sync --all-extras --group dev
+# Install dependencies (use uv). Dev/test deps live in
+# [project.optional-dependencies], so --all-extras pulls them in;
+# there is no PEP 735 [dependency-groups] table (see pyproject.toml).
+uv sync --all-extras
 
 # Run tests (excludes integration tests by default)
 uv run pytest -q
@@ -21,9 +23,9 @@ uv run pytest tests/test_services_text.py -v
 # Run integration tests specifically
 uv run pytest -m integration
 
-# Linting and type checking
+# Linting and type checking (mypy needs an explicit target, as CI uses)
 uv run ruff check .
-uv run mypy
+uv run mypy custom_components/
 
 # Pre-commit (runs automatically on commit)
 pre-commit run --all-files
@@ -120,7 +122,7 @@ docker compose down  # to stop
 
 - **pyproject.toml** is source of truth for dependencies.
 - **manifest.json** must mirror runtime deps (synced via `scripts/sync_manifest_requirements.py`).
-- Renovate auto-updates pyproject.toml; a post-upgrade task syncs manifest.json.
+- Dependabot auto-updates pyproject.toml (see `.github/dependabot.yml`); a post-upgrade task syncs manifest.json.
 - Pre-commit hooks block commits if files drift.
 - **Always use pinned versions** (`==`) for all dependencies, not ranges (`>=`). This ensures reproducible builds and better security.
 - **`pytest` is pinned by `pytest-homeassistant-custom-component`** (currently `pytest==9.0.0`). Dependabot is configured to ignore standalone `pytest` bumps (see `.github/dependabot.yml`). When upgrading the HA test harness (`pytest-homeassistant-custom-component`), check whether the new version pins a different `pytest` and bump `pytest` in `pyproject.toml` to match. If upstream ever loosens the pin, remove the `pytest` ignore rule from `dependabot.yml`.
