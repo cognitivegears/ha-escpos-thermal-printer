@@ -59,15 +59,21 @@ class NetworkFlowMixin:
         errors: dict[str, str] = {}
         if user_input is not None:
             _LOGGER.debug("Config flow network step input: %s", user_input)
-            host = user_input[CONF_HOST]
+            host = str(user_input[CONF_HOST]).strip()
             port = user_input.get(CONF_PORT, DEFAULT_PORT)
             timeout = float(user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
 
-            await self.async_set_unique_id(f"{host}:{port}")  # type: ignore[attr-defined]
+            # Normalise the unique_id so "Printer.local" / "printer.local"
+            # (hostnames are case-insensitive) don't create duplicate
+            # entries for the same printer. IP literals are unaffected by
+            # lowercasing.
+            await self.async_set_unique_id(f"{host.lower()}:{port}")  # type: ignore[attr-defined]
             self._abort_if_unique_id_configured()  # type: ignore[attr-defined]
 
             _LOGGER.debug("Attempting connection test to %s:%s (timeout=%s)", host, port, timeout)
-            ok = await self.hass.async_add_executor_job(_can_connect, host, port, timeout)
+            ok = bool(host) and await self.hass.async_add_executor_job(
+                _can_connect, host, port, timeout
+            )
             if ok:
                 _LOGGER.debug("Connection test succeeded for %s:%s", host, port)
 
@@ -97,7 +103,9 @@ class NetworkFlowMixin:
         data_schema = vol.Schema(
             {
                 vol.Required(CONF_HOST): str,
-                vol.Optional(CONF_PORT, default=DEFAULT_PORT): int,
+                vol.Optional(CONF_PORT, default=DEFAULT_PORT): vol.All(
+                    vol.Coerce(int), vol.Range(min=1, max=65535)
+                ),
                 vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
                 vol.Optional(CONF_PROFILE, default=PROFILE_AUTO): vol.In(profile_choices),
             }

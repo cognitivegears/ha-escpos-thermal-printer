@@ -164,7 +164,7 @@ sudo rfcomm connect 0 AA:BB:CC:DD:EE:FF 1  # manual RFCOMM probe
 
 ## Image issues
 
-- **"Image too large"** — resize under 512px wide.
+- **"Image too large"** — the source file exceeds the 10 MB cap (40 MB with `auto_resize: true`), or the decoded image exceeds 20 M pixels. Re-export at lower resolution/quality, or set `auto_resize: true`. Width is fitted to the printer automatically and is not the cause of this error.
 - **Image doesn't print** — use PNG or JPEG; for URLs verify reachable from HA host; for local files use absolute paths starting with `/config/`.
 - **Image prints solid black** — image is too dark or has alpha issues. Use white background, increase contrast, convert to 1-bit B&W.
 

@@ -137,11 +137,16 @@ class SettingsFlowMixin:
                     CONF_DEFAULT_ALIGN, DEFAULT_ALIGN
                 )
                 self._user_data[CONF_DEFAULT_CUT] = user_input.get(CONF_DEFAULT_CUT, DEFAULT_CUT)
-                self._user_data[CONF_LINE_WIDTH] = (
-                    int(line_width)
-                    if line_width and line_width != OPTION_CUSTOM
-                    else DEFAULT_LINE_WIDTH
-                )
+                # Preserve the custom-line-width sentinel so the custom
+                # codepage step can chain to the custom-line-width step.
+                # (Collapsing it to DEFAULT_LINE_WIDTH here silently
+                # dropped a "custom codepage + custom width" request.)
+                if line_width == OPTION_CUSTOM:
+                    self._user_data[CONF_LINE_WIDTH] = OPTION_CUSTOM
+                else:
+                    self._user_data[CONF_LINE_WIDTH] = (
+                        int(line_width) if line_width else DEFAULT_LINE_WIDTH
+                    )
                 return await self.async_step_custom_codepage()
 
             # Handle custom line width

@@ -36,7 +36,9 @@ class ControlOperationsMixin:
         """Return a printer instance and whether it should be closed by the caller."""
         raise NotImplementedError
 
-    async def _release_printer(self, hass: Any, printer: Any, *, owned: bool) -> None:
+    async def _release_printer(
+        self, hass: Any, printer: Any, *, owned: bool, failed: bool = False
+    ) -> None:
         """Close a printer instance if owned by the caller."""
         raise NotImplementedError
 
@@ -70,10 +72,12 @@ class ControlOperationsMixin:
 
         async with self._lock:
             printer, owned = await self._acquire_printer(hass)
+            failed = True
             try:
                 await hass.async_add_executor_job(_feed_inner, printer)
+                failed = False
             finally:
-                await self._release_printer(hass, printer, owned=owned)
+                await self._release_printer(hass, printer, owned=owned, failed=failed)
 
     async def cut(self, hass: HomeAssistant, *, mode: str) -> None:
         """Cut the paper."""
@@ -83,10 +87,12 @@ class ControlOperationsMixin:
             cut_mode = "FULL"
         async with self._lock:
             printer, owned = await self._acquire_printer(hass)
+            failed = True
             try:
                 await hass.async_add_executor_job(lambda: printer.cut(mode=cut_mode))
+                failed = False
             finally:
-                await self._release_printer(hass, printer, owned=owned)
+                await self._release_printer(hass, printer, owned=owned, failed=failed)
 
     async def beep(self, hass: HomeAssistant, *, times: int = 2, duration: int = 4) -> None:
         """Trigger the printer buzzer."""
@@ -114,7 +120,9 @@ class ControlOperationsMixin:
 
         async with self._lock:
             printer, owned = await self._acquire_printer(hass)
+            failed = True
             try:
                 await hass.async_add_executor_job(_beep_inner, printer)
+                failed = False
             finally:
-                await self._release_printer(hass, printer, owned=owned)
+                await self._release_printer(hass, printer, owned=owned, failed=failed)

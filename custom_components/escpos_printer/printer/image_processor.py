@@ -21,10 +21,13 @@ import io
 import logging
 
 from PIL import Image, ImageOps
-import PIL.Image
 
 from ..const import DEFAULT_DITHER, DEFAULT_THRESHOLD
-from ..security import MAX_IMAGE_PIXELS, MAX_PROCESSED_HEIGHT
+from ..security import (
+    MAX_IMAGE_PIXELS,
+    MAX_IMAGE_PIXELS_AUTO_RESIZE,
+    MAX_PROCESSED_HEIGHT,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -33,12 +36,13 @@ _LOGGER = logging.getLogger(__name__)
 # override with their actual width (576) via the adapter base.
 FALLBACK_PROFILE_WIDTH = 512
 
-# Set Pillow's process-global pixel cap so DecompressionBombError fires
-# deterministically on attacker-controlled images. This is a process-wide
-# setting; the value here is the maximum across all PIL consumers in the
-# Python process (Pillow checks ``> 2*MAX_IMAGE_PIXELS`` for the hard
-# error and warns at ``> MAX_IMAGE_PIXELS``).
-PIL.Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
+# NOTE: we deliberately do NOT set ``PIL.Image.MAX_IMAGE_PIXELS`` — that
+# is a process-global shared with every other Pillow consumer in the HA
+# process (camera processing, the ``image`` platform, …), and lowering it
+# to our cap made *those* integrations throw DecompressionBombError on
+# legitimate large photos. The decompression-bomb guard is instead
+# enforced per-decode in ``process_image_from_bytes`` against the header
+# dimensions, before any full-bitmap allocation.
 
 # Pinned decoder allow-list for ``Image.open`` so we never invoke novelty
 # or vulnerability-prone decoders on attacker-controlled bytes. HEIC /
@@ -198,5 +202,29 @@ def process_image_from_bytes(raw: bytes, opts: ImageProcessOptions) -> Image.Ima
     in :func:`process_image`), so it is safe to close ``src`` afterward.
     """
     with Image.open(io.BytesIO(raw), formats=_DECODER_ALLOWLIST) as src:
+        # Decompression-bomb guard: reject oversized images by their
+        # declared header dimensions *before* ``load()`` allocates the
+        # full bitmap. Scoped to this integration so we don't perturb
+        # Pillow's process-global limit for other HA consumers.
+        #
+        # When ``auto_resize`` is set the caller has opted into decoding a
+        # larger source that we then downscale, so the cap is raised to
+        # ``MAX_IMAGE_PIXELS_AUTO_RESIZE`` (matching the pre-0.7.3 hard
+        # limit). We still bound it — even with auto_resize we ``load()``
+        # the full bitmap before thumbnailing, so an unbounded source
+        # would still be a bomb.
+        cap = MAX_IMAGE_PIXELS_AUTO_RESIZE if opts.auto_resize else MAX_IMAGE_PIXELS
+        width, height = src.size
+        pixels = width * height
+        if pixels > cap:
+            hint = (
+                "reduce the source resolution"
+                if opts.auto_resize
+                else "reduce the source resolution or enable auto_resize"
+            )
+            raise ValueError(
+                f"Image {width}x{height} ({pixels} px) exceeds the maximum of "
+                f"{cap} px; {hint}"
+            )
         src.load()
         return process_image(src, opts)

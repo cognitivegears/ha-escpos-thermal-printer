@@ -8,7 +8,7 @@ Native Home Assistant control for ESC/POS thermal receipt printers connected via
 - **Status binary sensor** — reachability check works for network, USB, and Bluetooth
 - **Battery sensor** — reports battery level for portable BT printers that expose `org.bluez.Battery1`
 - **Auto-discovery** — USB printers matched against known thermal-printer vendor IDs
-- **Local push** — no cloud, no account
+- **Fully local** — no cloud, no account
 
 ## Setup
 

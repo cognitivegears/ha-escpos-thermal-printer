@@ -223,7 +223,7 @@ async def _resolve_camera(
     _LOGGER.debug("Fetching camera snapshot: %s", entity_id)
     try:
         image = await async_get_image(hass, entity_id, timeout=_ENTITY_FETCH_TIMEOUT_SECONDS)
-    except HomeAssistantError, Unauthorized:
+    except (HomeAssistantError, Unauthorized):
         raise
     except Exception as exc:
         raise HomeAssistantError(
@@ -253,7 +253,7 @@ async def _resolve_image_entity(
     _LOGGER.debug("Fetching image entity: %s", entity_id)
     try:
         image = await async_get_image(hass, entity_id, timeout=_ENTITY_FETCH_TIMEOUT_SECONDS)
-    except HomeAssistantError, Unauthorized:
+    except (HomeAssistantError, Unauthorized):
         raise
     except Exception as exc:
         raise HomeAssistantError(
@@ -282,7 +282,7 @@ def _check_content_length(headers: Mapping[str, str], max_bytes: int) -> None:
         return
     try:
         size = int(raw)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return
     if size > max_bytes:
         raise HomeAssistantError(
@@ -548,6 +548,7 @@ def extract_image_kwargs(
     printer_defaults: Mapping[str, Any],
     *,
     prefix: str = "",
+    hass: HomeAssistant | None = None,
 ) -> dict[str, Any]:
     """Pull the print_image kwargs from a service-call/notify-call dict.
 
@@ -556,6 +557,13 @@ def extract_image_kwargs(
     never prefixed (both are already namespaced). Only keys present
     in ``data`` are included — missing keys fall through to the
     adapter's signature defaults.
+
+    ``fallback_image`` is run through :func:`render_template` (when
+    ``hass`` is supplied) because the schema validates it with
+    ``cv.template``, producing a ``Template`` *object*; the downstream
+    resolver requires a string, so without this the fallback could never
+    fire — it silently failed the ``isinstance(str)`` guard and the
+    primary error was re-raised.
 
     Selection precedence for each image option:
     1. The prefixed key (``image_dither`` on notify; ``dither`` on
@@ -584,6 +592,10 @@ def extract_image_kwargs(
             # Notify form: accept bare ``dither``/``threshold``/etc. as
             # fallback when ``image_dither`` was not supplied.
             out[target] = data[key]
+
+    fallback = out.get(ATTR_FALLBACK_IMAGE)
+    if fallback is not None and hass is not None:
+        out[ATTR_FALLBACK_IMAGE] = render_template(hass, fallback)
     return out
 
 

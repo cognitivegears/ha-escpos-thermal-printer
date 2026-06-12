@@ -654,6 +654,7 @@ async def _prepare_text_image_kwargs(
         },
         defaults,
         prefix="image_",
+        hass=call.hass,
     )
     cut = call.data.get(ATTR_CUT) or defaults.get("cut")
     feed = call.data.get(ATTR_FEED)
@@ -713,6 +714,7 @@ async def _dispatch_print_image(call: ServiceCall, *, image_value: str, service_
             {**call.data, ATTR_IMAGE: image_value},
             defaults,
             prefix="",
+            hass=call.hass,
         )
         await adapter.print_image(
             call.hass,
@@ -806,7 +808,9 @@ async def handle_preview_image(call: ServiceCall) -> ServiceResponse:
     # actually print. We accept the slight overhead of resolving image
     # bytes twice (once in prepare_image_for_print, once here for
     # source_kind) in exchange for code reuse.
-    image_kwargs = extract_image_kwargs({**call.data, ATTR_IMAGE: image_value}, defaults, prefix="")
+    image_kwargs = extract_image_kwargs(
+        {**call.data, ATTR_IMAGE: image_value}, defaults, prefix="", hass=call.hass
+    )
     image_kwargs.pop(ATTR_IMAGE, None)
     prepared = await prepare_image_for_print(
         adapter,
@@ -942,7 +946,7 @@ async def handle_print_barcode(call: ServiceCall) -> None:
             align_ct=call.data.get(ATTR_ALIGN_CT, True),
             check=call.data.get(ATTR_CHECK, False),
             force_software=fs,
-            align=defaults.get("align"),
+            align=call.data.get(ATTR_ALIGN) or defaults.get("align"),
             cut=call.data.get(ATTR_CUT) or defaults.get("cut"),
             feed=call.data.get(ATTR_FEED),
         )

@@ -7,6 +7,7 @@ from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant
 
 from .const import (
+    CONF_BT_MAC,
     CONF_CODEPAGE,
     CONF_CONNECTION_TYPE,
     CONF_IN_EP,
@@ -15,12 +16,14 @@ from .const import (
     CONF_OUT_EP,
     CONF_PRODUCT_ID,
     CONF_PROFILE,
+    CONF_RFCOMM_CHANNEL,
     CONF_STATUS_INTERVAL,
     CONF_VENDOR_ID,
+    CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
     CONNECTION_TYPE_USB,
 )
-from .printer import NetworkPrinterConfig, UsbPrinterConfig
+from .printer import BluetoothPrinterConfig, NetworkPrinterConfig, UsbPrinterConfig
 
 if TYPE_CHECKING:
     from . import EscposConfigEntry
@@ -28,8 +31,13 @@ if TYPE_CHECKING:
 # Fields to redact in diagnostics output
 # - CONF_HOST: network printer hostname/IP
 # - "host": runtime host field
-# - "connection_info": contains host:port for network printers
-TO_REDACT = {CONF_HOST, "host", "connection_info"}
+# - "mac" / CONF_BT_MAC: Bluetooth device address
+# - "connection_info": contains host:port or BT MAC
+# - "title": the default entry title embeds the host:port (network) or
+#   the MAC (Bluetooth), so it would otherwise re-leak the very
+#   identifiers the other keys redact. Diagnostics downloads are commonly
+#   attached to public issues.
+TO_REDACT = {CONF_HOST, "host", "mac", CONF_BT_MAC, "connection_info", "title"}
 
 
 async def async_get_config_entry_diagnostics(
@@ -71,6 +79,9 @@ async def async_get_config_entry_diagnostics(
             runtime["product_id"] = f"0x{config.product_id:04X}" if config.product_id else None
             runtime["in_ep"] = f"0x{config.in_ep:02X}" if config.in_ep else None
             runtime["out_ep"] = f"0x{config.out_ep:02X}" if config.out_ep else None
+        elif isinstance(config, BluetoothPrinterConfig):
+            runtime["mac"] = config.mac
+            runtime["rfcomm_channel"] = config.rfcomm_channel
         elif isinstance(config, NetworkPrinterConfig):
             runtime["host"] = config.host
             runtime["port"] = config.port
@@ -87,6 +98,15 @@ async def async_get_config_entry_diagnostics(
             CONF_PRODUCT_ID: f"0x{data.get(CONF_PRODUCT_ID, 0):04X}",
             CONF_IN_EP: f"0x{data.get(CONF_IN_EP, 0):02X}",
             CONF_OUT_EP: f"0x{data.get(CONF_OUT_EP, 0):02X}",
+            CONF_CODEPAGE: data.get(CONF_CODEPAGE),
+            CONF_PROFILE: data.get(CONF_PROFILE),
+            CONF_LINE_WIDTH: data.get(CONF_LINE_WIDTH),
+        }
+    elif connection_type == CONNECTION_TYPE_BLUETOOTH:
+        entry_data = {
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH,
+            CONF_BT_MAC: data.get(CONF_BT_MAC),
+            CONF_RFCOMM_CHANNEL: data.get(CONF_RFCOMM_CHANNEL),
             CONF_CODEPAGE: data.get(CONF_CODEPAGE),
             CONF_PROFILE: data.get(CONF_PROFILE),
             CONF_LINE_WIDTH: data.get(CONF_LINE_WIDTH),

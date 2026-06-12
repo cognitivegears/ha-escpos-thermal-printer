@@ -58,8 +58,14 @@ _RELIABILITY_LABELS: dict[str, str] = {
 _LOGGER = logging.getLogger(__name__)
 
 
-class EscposOptionsFlowHandler(config_entries.OptionsFlow):
+class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
     """Options flow handler for ESC/POS Thermal Printer.
+
+    Extends ``OptionsFlowWithReload`` so HA reloads the entry automatically
+    when the options actually change (the integration reads its options
+    only in ``async_setup_entry``). This is the modern replacement for a
+    manual ``add_update_listener`` and, unlike that listener, does NOT
+    reload on a no-op save.
 
     Modern HA (>= 2024.11; this project pins >= 2026.3) injects
     ``config_entry`` via the base class. B-M1: the 2024.8-2024.10

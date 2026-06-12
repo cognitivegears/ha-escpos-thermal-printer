@@ -293,3 +293,55 @@ async def test_config_flow_custom_line_width(hass):  # type: ignore[no-untyped-d
 
         assert result5["type"] == "create_entry"
         assert result5["data"][CONF_LINE_WIDTH] == 80
+
+
+async def test_config_flow_custom_codepage_and_custom_line_width(hass):  # type: ignore[no-untyped-def]
+    """Choosing BOTH custom codepage and custom width must chain, not drop the width.
+
+    Regression: the codepage step overwrote the custom-width sentinel with
+    DEFAULT_LINE_WIDTH, so the width prompt was skipped and the entry was
+    silently created with the default width.
+    """
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=True,
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.settings_steps.is_valid_codepage_for_profile",
+            return_value=True,
+        ),
+    ):
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK}
+        )
+        result3 = await hass.config_entries.flow.async_configure(
+            result2["flow_id"], {CONF_HOST: "1.2.3.4", CONF_PORT: 9100}
+        )
+        # Select BOTH custom codepage AND custom line width.
+        result4 = await hass.config_entries.flow.async_configure(
+            result3["flow_id"],
+            {
+                CONF_CODEPAGE: "__custom__",
+                CONF_LINE_WIDTH: "__custom__",
+                CONF_DEFAULT_ALIGN: "left",
+                CONF_DEFAULT_CUT: "none",
+            },
+        )
+        assert result4["step_id"] == "custom_codepage"
+
+        # After the custom codepage, the flow must chain to custom width
+        # (not create the entry with the default width).
+        result5 = await hass.config_entries.flow.async_configure(
+            result4["flow_id"], {"custom_codepage": "CP932"}
+        )
+        assert result5["type"] == "form"
+        assert result5["step_id"] == "custom_line_width"
+
+        result6 = await hass.config_entries.flow.async_configure(
+            result5["flow_id"], {"custom_line_width": 80}
+        )
+        assert result6["type"] == "create_entry"
+        assert result6["data"][CONF_CODEPAGE] == "CP932"
+        assert result6["data"][CONF_LINE_WIDTH] == 80

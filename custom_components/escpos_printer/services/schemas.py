@@ -348,13 +348,20 @@ def _local_path_only(value: Any) -> str:
     return s
 
 
+# The focused services advertise a friendly feed default in services.yaml
+# (a small paper buffer so a one-off print tears off cleanly). Set the
+# same default in the schema so a YAML/script caller that omits ``feed``
+# gets the advertised behaviour instead of 0 — without the schema default
+# voluptuous never injects the key and the handler's
+# ``call.data.get(ATTR_FEED)`` returns None (→ 0 lines). The generic
+# ``print_image`` keeps no default (services.yaml advertises 0).
 PRINT_CAMERA_SNAPSHOT_SCHEMA = vol.Schema(
     {
         vol.Optional("device_id"): _DEVICE_ID,
         vol.Required("camera_entity"): _entity_id_in_domain("camera"),
         **_IMAGE_OPTION_FRAGMENT_CAMERA,
         vol.Optional(ATTR_CUT): _CUT,
-        vol.Optional(ATTR_FEED): _FEED,
+        vol.Optional(ATTR_FEED, default=2): _FEED,
     }
 )
 
@@ -364,7 +371,7 @@ PRINT_IMAGE_ENTITY_SCHEMA = vol.Schema(
         vol.Required("image_entity"): _entity_id_in_domain("image"),
         **_IMAGE_OPTION_FRAGMENT_PLAIN,
         vol.Optional(ATTR_CUT): _CUT,
-        vol.Optional(ATTR_FEED): _FEED,
+        vol.Optional(ATTR_FEED, default=1): _FEED,
     }
 )
 
@@ -374,7 +381,7 @@ PRINT_IMAGE_URL_SCHEMA = vol.Schema(
         vol.Required("url"): vol.All(_url_only, vol.Length(min=1, max=MAX_URL_LENGTH)),
         **_IMAGE_OPTION_FRAGMENT_URL,
         vol.Optional(ATTR_CUT): _CUT,
-        vol.Optional(ATTR_FEED): _FEED,
+        vol.Optional(ATTR_FEED, default=1): _FEED,
     }
 )
 
@@ -386,7 +393,7 @@ PRINT_IMAGE_PATH_SCHEMA = vol.Schema(
         ),
         **_IMAGE_OPTION_FRAGMENT_URL,
         vol.Optional(ATTR_CUT): _CUT,
-        vol.Optional(ATTR_FEED): _FEED,
+        vol.Optional(ATTR_FEED, default=1): _FEED,
     }
 )
 

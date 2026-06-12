@@ -61,10 +61,15 @@ IMAGE_FRAGMENT_MAX = 1024
 IMAGE_CHUNK_DELAY_MIN = 0
 IMAGE_CHUNK_DELAY_MAX = 5000
 
-# Maximum decoded pixel count for a single image. Set process-globally on
-# ``PIL.Image.MAX_IMAGE_PIXELS`` by ``image_processor`` so PIL's bomb
-# protection fires deterministically.
+# Maximum decoded pixel count for a single image. Enforced per-decode
+# against the image header in ``image_processor.process_image_from_bytes``
+# (not via Pillow's process-global ``PIL.Image.MAX_IMAGE_PIXELS``, which is
+# shared with — and was perturbing — other Home Assistant Pillow
+# consumers). ``MAX_IMAGE_PIXELS_AUTO_RESIZE`` is the raised ceiling when
+# the caller opts into ``auto_resize`` (the source is downscaled after
+# decode), still bounded so an unbounded source can't allocate freely.
 MAX_IMAGE_PIXELS = 20_000_000
+MAX_IMAGE_PIXELS_AUTO_RESIZE = 40_000_000
 
 # Post-processing height (rows) and per-print slice count caps. Both
 # protect against paper-waste DoS (legitimate receipts rarely exceed
@@ -200,6 +205,15 @@ def validate_barcode_data(code: str, bc_type: str) -> tuple[str, str]:
 
     if not code.strip():
         raise HomeAssistantError("Barcode data cannot be empty")
+
+    # Reject ESC/GS/C0 control bytes. python-escpos frames barcode data
+    # in a ``GS k`` command (NUL-terminated for the type-A form), so an
+    # embedded NUL/ESC could terminate the barcode early and let the
+    # trailing bytes execute as raw ESC/POS commands (cash-drawer kick,
+    # codepage/config change). Text input is stripped of these bytes;
+    # barcode data must be *exact*, so we reject rather than strip.
+    if _CONTROL_CHAR_RE.search(code):
+        raise HomeAssistantError("Barcode data contains disallowed control characters")
 
     aliases = {
         "UPC-A": "UPCA",
@@ -426,6 +440,19 @@ async def validate_image_url_and_resolve(
     if hostname is None:  # pragma: no cover — validate_image_url enforces it
         raise HomeAssistantError("URL must include a valid hostname")
     addrs = await hass.async_add_executor_job(_resolve_hostname_sync, hostname, parsed.port)
+    # The ``allow_local`` opt-in lifts the port allowlist (see
+    # ``validate_image_url``) so LAN cameras/NVRs on non-standard ports
+    # work. But it should only do so for *private* targets — a public
+    # host on an arbitrary port would turn the HA box into a port-scan
+    # oracle for the internet, which the opt-in never intended. Re-apply
+    # the port allowlist to any resolved *public* address.
+    if allow_local and parsed.port not in VALID_URL_PORTS:
+        public = [a for a in addrs if _is_public_address(a)]
+        if public:
+            raise HomeAssistantError(
+                f"URL port {parsed.port} is only permitted for private/LAN "
+                "targets; this hostname resolves to a public address"
+            )
     bad = [a for a in addrs if not _is_allowed_address(a, allow_local=allow_local)]
     if bad:
         if allow_local:

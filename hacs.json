@@ -1,7 +1,5 @@
 {
   "name": "ESC/POS Thermal Printer",
-  "filename": "",
   "render_readme": true,
-  "country": ["US"],
   "homeassistant": "2026.3.0"
 }

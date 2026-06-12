@@ -65,17 +65,36 @@ async def _async_get_target_entries(
     for device_id in device_id_list:
         device = device_registry.async_get(device_id)
         if device is None:
-            _LOGGER.warning("Device %s not found in registry", device_id)
+            _LOGGER.warning("Targeted device %s not found in registry; skipping", device_id)
             continue
 
         # Get config entry IDs from the device
+        matched = False
         for config_entry_id in device.config_entries:
             # Check if this config entry is for our domain
             entry = hass.config_entries.async_get_entry(config_entry_id)
             if entry and entry.domain == DOMAIN:
                 target_entry_ids.add(config_entry_id)
+                matched = True
+        if not matched:
+            _LOGGER.warning(
+                "Targeted device %s is not an ESC/POS printer; skipping", device_id
+            )
 
     # Get the actual config entry objects
+    loaded_entry_ids = {e.entry_id for e in hass.config_entries.async_loaded_entries(DOMAIN)}
+    not_loaded = target_entry_ids - loaded_entry_ids
+    if not_loaded:
+        # An entry that resolved from a targeted device but isn't loaded
+        # (setup failed / disabled) would otherwise be dropped silently,
+        # making a multi-printer call look fully successful.
+        _LOGGER.warning(
+            "Skipping %d targeted ESC/POS printer(s) that are not currently loaded "
+            "(setup failed or entry disabled): %s",
+            len(not_loaded),
+            sorted(not_loaded),
+        )
+
     target_entries: list[ConfigEntry] = [
         loaded_entry
         for loaded_entry in hass.config_entries.async_loaded_entries(DOMAIN)

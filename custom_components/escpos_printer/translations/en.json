@@ -72,8 +72,8 @@
           "profile": "Printer profile"
         },
         "data_description": {
-          "vendor_id": "USB Vendor ID (decimal, e.g., 1208 for Epson).",
-          "product_id": "USB Product ID (decimal).",
+          "vendor_id": "USB Vendor ID. Use the 0x-prefixed hex form shown by lsusb / discovery, e.g. 0x04B8 (recommended). A plain decimal number is also accepted.",
+          "product_id": "USB Product ID. Use the 0x-prefixed hex form, e.g. 0x0E03. A plain decimal number is also accepted.",
           "in_ep": "Leave at default (130) unless your printer doesn't work. This is the USB address for receiving status from the printer.",
           "out_ep": "Leave at default (1) unless your printer doesn't work. This is the USB address for sending data to the printer.",
           "timeout": "Connection timeout in seconds.",
@@ -186,7 +186,7 @@
       }
     },
     "error": {
-      "cannot_connect": "Failed to connect to network printer.",
+      "cannot_connect": "Failed to connect to the network printer. Check the IP address and port (most ESC/POS printers listen on 9100), that the printer is powered on and reachable on the same network, and that no firewall is blocking the connection. If the printer sleeps when idle, try printing once to wake it.",
       "cannot_connect_usb": "Failed to connect to USB printer. Check that the printer is connected and permissions are configured correctly.",
       "usb_permission_denied": "Permission denied accessing USB device. On Linux, add udev rules or run with appropriate permissions. On Docker/HAOS, ensure the USB device is passed through to the container.",
       "usb_kernel_driver_active": "A kernel driver is active for this USB device. Stop other printing services or detach/blacklist the driver (e.g., usblp on Linux).",
@@ -229,6 +229,7 @@
           "line_width": "Characters per line",
           "default_align": "Default alignment",
           "default_cut": "Default cut mode",
+          "reliability_profile": "Image reliability profile",
           "keepalive": "Keep persistent connection",
           "status_interval": "Status check interval (seconds)",
           "allow_local_image_urls": "Allow local image URLs"
@@ -240,6 +241,7 @@
           "line_width": "Number of characters per line (columns).",
           "default_align": "Default text alignment for printing.",
           "default_cut": "Default paper cut mode after printing.",
+          "reliability_profile": "Picks safe defaults for image chunk size, inter-chunk delay, and ESC/POS image command. Service-call options always override these.",
           "keepalive": "Keep the connection open between print jobs (network printers only).",
           "status_interval": "How often to check printer status (0 to disable).",
           "allow_local_image_urls": "Permit print_image_url (and the other image services) to fetch URLs that resolve to private/LAN/loopback addresses and to use non-standard ports (e.g. a local camera, a Frigate proxy on :5000, or your Home Assistant instance on :8123). Off by default. Cloud-metadata/link-local addresses stay blocked even when enabled."
@@ -289,115 +291,10 @@
       "beep": "Beep"
     }
   },
-  "services": {
-    "print_text": {
-      "name": "Print Text (Raw Encoding)",
-      "description": "Print text to the ESC/POS printer using raw encoding.",
-      "fields": {
-        "text": {"name": "Text", "description": "Text content to print."},
-        "align": {"name": "Alignment", "description": "Horizontal alignment for the text."},
-        "bold": {"name": "Bold", "description": "Render text in bold font."},
-        "underline": {"name": "Underline", "description": "Underline mode for text."},
-        "width": {"name": "Width multiplier", "description": "Text width multiplier (normal/double/triple, or 1-8 in YAML)."},
-        "height": {"name": "Height multiplier", "description": "Text height multiplier (normal/double/triple, or 1-8 in YAML)."},
-        "encoding": {"name": "Encoding", "description": "Character encoding/codepage for text."},
-        "cut": {"name": "Cut", "description": "Cut mode after printing."},
-        "feed": {"name": "Feed lines", "description": "Lines to feed after printing."}
-      }
-    },
-    "print_text_utf8": {
-      "name": "Print Text (UTF-8)",
-      "description": "Print UTF-8 text with automatic transcoding to the printer's codepage. Converts special characters like curly quotes, em-dashes, and accented letters to their closest equivalents.",
-      "fields": {
-        "text": {"name": "Text", "description": "UTF-8 text content to print. Special characters will be automatically converted."},
-        "align": {"name": "Alignment", "description": "Horizontal alignment for the text."},
-        "bold": {"name": "Bold", "description": "Render text in bold font."},
-        "underline": {"name": "Underline", "description": "Underline mode for text."},
-        "width": {"name": "Width multiplier", "description": "Text width multiplier (normal/double/triple, or 1-8 in YAML)."},
-        "height": {"name": "Height multiplier", "description": "Text height multiplier (normal/double/triple, or 1-8 in YAML)."},
-        "cut": {"name": "Cut", "description": "Cut mode after printing."},
-        "feed": {"name": "Feed lines", "description": "Lines to feed after printing."}
-      }
-    },
-    "print_qr": {
-      "name": "Print QR",
-      "description": "Print a QR code.",
-      "fields": {
-        "data": {"name": "Data", "description": "Data content to encode in the QR code."},
-        "size": {"name": "Size", "description": "Module size for the QR code (1-16)."},
-        "ec": {"name": "Error correction", "description": "QR error correction level (L/M/Q/H)."},
-        "align": {"name": "Alignment", "description": "Horizontal alignment for the QR code."},
-        "cut": {"name": "Cut", "description": "Cut mode after printing."},
-        "feed": {"name": "Feed lines", "description": "Lines to feed after printing."}
-      }
-    },
-    "print_image": {
-      "name": "Print image",
-      "description": "Print an image by URL or local path.",
-      "fields": {
-        "image": {"name": "Image", "description": "Path or URL to the image to print."},
-        "high_density": {"name": "High density", "description": "Use high density image mode if supported."},
-        "align": {"name": "Alignment", "description": "Horizontal alignment for the image."},
-        "cut": {"name": "Cut", "description": "Cut mode after printing."},
-        "feed": {"name": "Feed lines", "description": "Lines to feed after printing."}
-      }
-    },
-    "feed": {
-      "name": "Feed",
-      "description": "Feed the paper by a number of lines.",
-      "fields": {
-        "lines": {"name": "Lines", "description": "Number of lines to feed."}
-      }
-    },
-    "cut": {
-      "name": "Cut",
-      "description": "Cut the paper.",
-      "fields": {
-        "mode": {"name": "Mode", "description": "Cut mode (full or partial)."}
-      }
-    },
-    "print_barcode": {
-      "name": "Print barcode",
-      "description": "Print a barcode.",
-      "fields": {
-        "code": {"name": "Code", "description": "Barcode data to print."},
-        "bc": {"name": "Type", "description": "Barcode symbology to use."},
-        "height": {"name": "Height", "description": "Barcode height in dots (1-255)."},
-        "width": {"name": "Width", "description": "Barcode module width (2-6)."},
-        "pos": {"name": "Text position", "description": "Human-readable text position (ABOVE/BELOW/BOTH/OFF)."},
-        "font": {"name": "Font", "description": "Font for human-readable text (A or B)."},
-        "align_ct": {"name": "Center align", "description": "Center the barcode on the line."},
-        "check": {"name": "Validate code", "description": "Enable checksum/validation when supported."},
-        "force_software": {"name": "Force software renderer", "description": "Force software rendering mode to improve compatibility."},
-        "align": {"name": "Alignment", "description": "Horizontal alignment for the barcode."},
-        "cut": {"name": "Cut", "description": "Cut mode after printing."},
-        "feed": {"name": "Feed lines", "description": "Lines to feed after printing."}
-      }
-    },
-    "beep": {
-      "name": "Beep",
-      "description": "Trigger the printer buzzer (if supported).",
-      "fields": {
-        "times": {"name": "Times", "description": "Number of beep cycles."},
-        "duration": {"name": "Duration", "description": "Duration of each beep in units supported by the printer."}
-      }
-    },
-    "print_message": {
-      "name": "Print Formatted Message",
-      "description": "Print a message with full text formatting to an ESC/POS thermal printer.",
-      "fields": {
-        "message": {"name": "Message", "description": "Text content to print."},
-        "title": {"name": "Title", "description": "Optional title printed before the message."},
-        "align": {"name": "Alignment", "description": "Horizontal alignment for the text."},
-        "bold": {"name": "Bold", "description": "Render text in bold font."},
-        "underline": {"name": "Underline", "description": "Underline mode for text."},
-        "width": {"name": "Width multiplier", "description": "Text width multiplier (normal/double/triple, or 1-8 in YAML)."},
-        "height": {"name": "Height multiplier", "description": "Text height multiplier (normal/double/triple, or 1-8 in YAML)."},
-        "utf8": {"name": "UTF-8 mode", "description": "Enable UTF-8 transcoding to automatically convert special characters to printer-compatible encoding."},
-        "encoding": {"name": "Encoding", "description": "Character encoding/codepage for text (ignored when UTF-8 mode is enabled)."},
-        "cut": {"name": "Cut", "description": "Cut mode after printing."},
-        "feed": {"name": "Feed lines", "description": "Lines to feed after printing."}
-      }
+  "issues": {
+    "profile_width_fallback": {
+      "title": "Printer profile is missing the pixel width",
+      "description": "The selected printer profile ({profile}) does not expose `media.width.pixels`, so images are being scaled to a generic {fallback}px width. This is usually correct for 58 mm thermals but may print stretched or truncated on 80 mm printers.\n\n**To fix:** open the integration's options, pick the closest matching printer profile, or set `image_width` explicitly in your service calls. If your printer's profile name is correct, the python-escpos profile database may need updating."
     }
   },
   "exceptions": {

@@ -50,7 +50,9 @@ class _PrinterHost(Protocol):
     async def _acquire_printer(self, hass: HomeAssistant) -> tuple[Any, bool]:
         """Acquire the underlying connection (returns ``(printer, owned)``)."""
 
-    async def _release_printer(self, hass: HomeAssistant, printer: Any, *, owned: bool) -> None:
+    async def _release_printer(
+        self, hass: HomeAssistant, printer: Any, *, owned: bool, failed: bool = False
+    ) -> None:
         """Release the connection acquired via :meth:`_acquire_printer`."""
 
     async def _apply_cut_and_feed(

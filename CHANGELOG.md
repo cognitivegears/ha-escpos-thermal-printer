@@ -7,6 +7,104 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-06-12
+
+### Fixed
+
+- **Configured printer profile was never applied, and image width fell
+  back to 512 px on nearly every install.** `_get_profile_obj()`
+  imported `get_profile` from the removed `escpos.profile` module
+  (python-escpos 3.x moved it to `escpos.capabilities`); the
+  `ImportError` was swallowed, so the profile was silently dropped at
+  connect time. Separately, `get_profile_pixel_width()` read the width
+  from the live connection, which is `None` for USB, Bluetooth, and
+  non-keepalive network printers — so the width lookup always missed and
+  filed a spurious Repairs issue. Width is now read from the configured
+  profile object, and the fallback warning/Repairs issue only fires when
+  you actually selected a profile that lacks a pixel width (the
+  auto/default profile falls back silently, as intended).
+- **Options changes (codepage, profile, line width, keepalive,
+  reliability profile, "Allow local image URLs", …) now take effect
+  immediately** instead of requiring an HA restart. The entry reloads on
+  an options update.
+- **Codepage / profile can be reset back to "(Default - Auto)" in
+  options.** The previous `options or data` fallback treated the empty
+  "auto" value as falsy and snapped the original setup value back.
+- **`fallback_image` now actually works** on all image services and the
+  notify `print_message`. The schema produced a `Template` object that
+  the resolver rejected, so the fallback could never fire.
+- **A keepalive connection is dropped after a failed operation** instead
+  of being reused. A single transient error (power-cycle, idle timeout)
+  no longer bricks all subsequent prints until the entry is reloaded.
+- **`print_text`'s `encoding` override no longer prints mojibake.** It
+  called the removed `_set_codepage`; it now selects the codepage via
+  `charcode`.
+- **Setup now retries with backoff** (`ConfigEntryNotReady`) when the
+  printer is unreachable at startup, instead of hard-failing the entry.
+- **Multi-printer service calls attempt every target** even if one
+  fails, and report an aggregate error naming the failed printer(s) and
+  how many succeeded. Targeted devices that aren't loaded are logged
+  instead of silently skipped.
+- **`print_barcode`'s `align` option is honoured** (it was accepted and
+  advertised but ignored).
+- **Focused image services feed the advertised number of lines** for
+  script/automation callers (the schema now injects the per-service
+  `feed` default, matching the UI).
+- **The `beep` service UI now advertises its real defaults** (2 beeps,
+  duration 4) instead of 1/1.
+- **Config flow: selecting both "Custom codepage" and "Custom line
+  width" at setup no longer drops the custom width.**
+- **Diagnostics correctly label Bluetooth entries** (was reported as
+  `network` with null host) and redact the BT MAC, host, and the entry
+  title (which embeds the host:port or MAC).
+- **Network config flow normalises the unique ID** (case-insensitive
+  host) so the same printer isn't added twice, and validates the port
+  range.
+- **USB auto-discovery now covers the generic POS-printer VID `0x0FE6`**,
+  syncing `manifest.json` with the known-VID list in `const.py` (a sync
+  test now guards against future drift).
+
+### Security
+
+- **Barcode data with embedded control bytes is rejected.**
+  `print_barcode` did not strip ESC/GS/NUL/C0 bytes (unlike text input)
+  and defaulted `check=False`, so a crafted payload could terminate the
+  barcode early and inject raw ESC/POS commands (e.g. a cash-drawer
+  kick).
+- **The "Allow local image URLs" opt-in no longer lifts the port
+  allowlist for public targets.** Non-standard ports are now permitted
+  only for resolved private/LAN addresses, closing a blind port-scan
+  oracle against arbitrary internet hosts.
+- **Notify `print_message` enforces the calling user's entity
+  permissions** for `camera.*` / `image.*` sources. The service context
+  was lost on the entity-service path, so the per-entity read ACL was
+  bypassed. The context is captured before any `await` so concurrent
+  calls can't race it.
+- **Multi-printer calls fail closed on authorization/validation errors.**
+  An `Unauthorized` or `ServiceValidationError` on any target propagates
+  immediately with its context instead of being aggregated into a
+  generic "N of M failed" message.
+
+### Changed
+
+- **Pillow's process-global decompression-bomb limit is no longer
+  lowered.** The 20 M-pixel cap is enforced per-decode against the image
+  header instead, so other Home Assistant integrations sharing the
+  process keep Pillow's default limit on legitimate large photos. With
+  `auto_resize` the per-decode ceiling rises to 40 M pixels (the image is
+  downscaled after decode), preserving the large-source workflow.
+- **`iot_class` corrected to `local_polling`** (reachability is polled).
+- Status reachability probes now hold the operation lock atomically
+  (closing a check-then-probe race with in-flight prints), and the
+  adapter is torn down on the executor thread under the lock.
+- **The integration is no longer geo-restricted in HACS** (`country`
+  removed from `hacs.json`).
+- Service descriptions in Developer Tools now come from `services.yaml`
+  for every service; a stale partial translation block that overrode
+  nine of them with worse text was removed. Added the missing Repairs
+  and `reliability_profile` option translations. Made the network
+  `cannot_connect` error actionable.
+
 ## [0.7.2] - 2026-06-11
 
 ### Added
@@ -819,7 +917,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 Earlier releases — see git history.
 
-[Unreleased]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.7.3...HEAD
+[0.7.3]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.7.2...v0.7.3
+[0.7.2]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.7.1...v0.7.2
+[0.7.1]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.5.0...v0.5.1
