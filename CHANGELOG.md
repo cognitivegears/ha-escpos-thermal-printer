@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-06-12
+
+### Fixed
+
+- **0.7.3 broke every print on entries with a configured printer
+  profile** (`Service … failed: <escpos.capabilities.TMT20IIProfile
+  object at 0x…>`). The 0.7.3 profile fix passed the *resolved profile
+  object* into the python-escpos printer constructors, but
+  `Escpos.__init__` re-runs that kwarg through `get_profile()`, which
+  only accepts a profile *name* — the object fell through to a dict
+  lookup keyed by the object itself and every connect raised `KeyError`.
+  The adapters now hand over the validated profile name; an unknown
+  profile still degrades to the library default with a debug log. The
+  test-suite escpos fakes now mirror the real constructor's profile
+  round-trip so this class of bug can't slip through again.
+- **URL image fetches identify as Home Assistant again.** The
+  SSRF-hardened per-request fetch session sent aiohttp's default
+  `Python/3.x aiohttp/…` User-Agent, which CDN/WAF bot rules
+  (WordPress/Photon, Cloudflare) often answer with an HTML block page
+  served as 200 — surfacing as `cannot identify image file`. The session
+  now sends HA's own User-Agent (as the pooled clients did pre-0.7) plus
+  an Accept header biased toward the decodable image formats.
+- **Undecodable image bytes now produce an actionable error.** Instead
+  of Pillow's bare `cannot identify image file <_io.BytesIO …>`, the
+  error reports the declared content type, payload size, and the leading
+  bytes — and calls out the likely HTML-error/bot-block page when the
+  body looks like HTML.
+
 ## [0.7.3] - 2026-06-12
 
 ### Fixed

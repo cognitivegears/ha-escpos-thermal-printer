@@ -59,7 +59,7 @@ class BluetoothPrinterAdapter(EscposPrinterAdapterBase):
 
     def _connect(self) -> Any:
         """Open an RFCOMM transport and wrap it in a python-escpos printer."""
-        profile_obj = self._get_profile_obj()
+        profile_name = self._profile_for_constructor()
         last_exc: Exception | None = None
         for attempt in range(self._CONNECT_RETRIES + 1):
             try:
@@ -94,7 +94,7 @@ class BluetoothPrinterAdapter(EscposPrinterAdapterBase):
                 time.sleep(self._CONNECT_RETRY_DELAY_S)
                 continue
             else:
-                return make_bluetooth_escpos(transport, profile_obj)
+                return make_bluetooth_escpos(transport, profile_name)
         # Loop only exits via return or re-raise above. This line is
         # defensive: if a future refactor changes a `raise` to `break`,
         # the assert fails loudly instead of silently passing `None` to
@@ -116,6 +116,7 @@ class BluetoothPrinterAdapter(EscposPrinterAdapterBase):
         We skip the tick if a print operation currently holds the lock and
         let the next print/tick refresh status.
         """
+
         def _probe() -> tuple[bool, str | None, int | None, int | None]:
             start = time.perf_counter()
             try:

@@ -14,6 +14,7 @@ import logging
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 from homeassistant.exceptions import HomeAssistantError
+from PIL import UnidentifiedImageError
 
 from ..const import (
     DEFAULT_CUT,
@@ -31,6 +32,7 @@ from ..security import (
 )
 from ._host import _PrinterHost
 from .image_processor import (
+    _DECODER_ALLOWLIST,
     FALLBACK_PROFILE_WIDTH,
     ImageProcessOptions,
     process_image_from_bytes,
@@ -133,7 +135,7 @@ async def prepare_image_for_print(
     )
     allow_local = bool(getattr(host, "allow_local_image_urls", False))
     try:
-        raw, _content_type = await _resolve_with_retry(
+        raw, content_type = await _resolve_with_retry(
             hass,
             image,
             context=context,
@@ -141,7 +143,7 @@ async def prepare_image_for_print(
             fallback=fallback_image,
             allow_local=allow_local,
         )
-        img_obj = await _process_bytes(hass, raw, process_opts)
+        img_obj = await _process_bytes(hass, raw, process_opts, content_type=content_type)
         raw_len = len(raw)
         del raw
 
@@ -358,9 +360,7 @@ class ImageOperationsMixin:
                         stats.total_failures += 1
                         stats.last_error_class = type(err).__name__
                     with contextlib.suppress(Exception):
-                        await self._apply_cut_and_feed(
-                            hass, printer, cleanup_cut(cut), feed or 1
-                        )
+                        await self._apply_cut_and_feed(hass, printer, cleanup_cut(cut), feed or 1)
                     raise
             finally:
                 await self._release_printer(hass, printer, owned=owned, failed=failed)
@@ -375,11 +375,43 @@ class ImageOperationsMixin:
 # ---------------------------------------------------------------------------
 
 
-async def _process_bytes(hass: HomeAssistant, raw: bytes, opts: ImageProcessOptions) -> Image.Image:
+def _describe_undecodable(raw: bytes, content_type: str | None) -> str:
+    """Build an actionable error for bytes PIL could not identify.
+
+    Pillow's own ``UnidentifiedImageError`` text ("cannot identify image
+    file <_io.BytesIO …>") tells the user nothing about *what* came back.
+    The usual culprit for a URL source is a CDN/WAF answering with an
+    HTML error or block page served as 200, so surface the declared
+    content type and a bounded sniff of the leading bytes.
+    """
+    sniff = bytes(raw[:16])
+    looks_html = sniff.lstrip()[:1] == b"<"
+    detail = f"content-type {content_type!r}, {len(raw)} bytes, starts with {sniff!r}"
+    hint = (
+        " — the server appears to have returned an HTML page (error/bot-block) instead of the image"
+        if looks_html or (content_type or "").lower().startswith("text/")
+        else ""
+    )
+    return (
+        f"Source did not return a decodable image ({detail}){hint}. "
+        f"Supported formats: {', '.join(_DECODER_ALLOWLIST)}."
+    )
+
+
+async def _process_bytes(
+    hass: HomeAssistant,
+    raw: bytes,
+    opts: ImageProcessOptions,
+    *,
+    content_type: str | None = None,
+) -> Image.Image:
     """Run ``process_image_from_bytes`` on an executor thread."""
 
     def _go() -> Image.Image:
-        return process_image_from_bytes(raw, opts)
+        try:
+            return process_image_from_bytes(raw, opts)
+        except UnidentifiedImageError as exc:
+            raise HomeAssistantError(_describe_undecodable(raw, content_type)) from exc
 
     return await hass.async_add_executor_job(_go)
 

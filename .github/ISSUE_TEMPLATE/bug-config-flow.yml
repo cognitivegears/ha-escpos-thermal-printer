@@ -69,5 +69,5 @@ body:
     id: logs
     attributes:
       label: Relevant log lines
-      description: Enable debug logging (`logger.logs.custom_components.escpos_printer: debug`), reproduce, paste here.
+      description: "Enable debug logging (`logger.logs.custom_components.escpos_printer: debug`), reproduce, paste here."
       render: text
