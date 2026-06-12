@@ -20,7 +20,7 @@ dependencies = [
   # Visual-width measurement for the text-effects box / table padders so
   # CJK / fullwidth / emoji columns line up under the 1-col-per-glyph
   # text mode (instead of silently misaligning via len()).
-  "wcwidth==0.7.0",
+  "wcwidth==0.8.1",
 ]
 
 [build-system]
