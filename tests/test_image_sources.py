@@ -201,6 +201,96 @@ async def test_resolve_http_rejects_private_resolved_address(  # type: ignore[no
         await resolve_image_bytes(hass, "https://example.com/x.png")
 
 
+async def test_resolve_http_strict_error_hints_at_option(  # type: ignore[no-untyped-def]
+    hass, monkeypatch
+):
+    """The strict-mode rejection must point the user at the opt-in toggle."""
+
+    def fake_getaddrinfo(_host, _port, **_kw):  # type: ignore[no-untyped-def]
+        return [(socket.AF_INET, socket.SOCK_STREAM, 0, "", ("192.168.1.50", 0))]
+
+    monkeypatch.setattr("socket.getaddrinfo", fake_getaddrinfo)
+    with pytest.raises(HomeAssistantError, match="Allow local image URLs"):
+        await resolve_image_bytes(hass, "https://example.com/x.png")
+
+
+async def test_resolve_http_allows_private_with_allow_local(  # type: ignore[no-untyped-def]
+    hass, monkeypatch, mock_pooled_aiohttp
+):
+    """``allow_local=True`` lets a private/LAN address resolve and fetch."""
+
+    def fake_getaddrinfo(_host, _port, **_kw):  # type: ignore[no-untyped-def]
+        return [(socket.AF_INET, socket.SOCK_STREAM, 0, "", ("192.168.1.50", 0))]
+
+    monkeypatch.setattr("socket.getaddrinfo", fake_getaddrinfo)
+
+    def _factory():  # type: ignore[no-untyped-def]
+        from tests.conftest import fake_aiohttp_response
+
+        return fake_aiohttp_response(
+            status=200, headers={"Content-Type": "image/png"}, chunks=[_png_bytes()]
+        )
+
+    mock_pooled_aiohttp(_factory)
+    raw, content_type = await resolve_image_bytes(
+        hass, "https://camera.local/snapshot.png", allow_local=True
+    )
+    assert raw == _png_bytes()
+    assert content_type == "image/png"
+
+
+async def test_resolve_http_allow_local_still_blocks_metadata(  # type: ignore[no-untyped-def]
+    hass, monkeypatch
+):
+    """Even with ``allow_local=True`` the cloud-metadata endpoint stays blocked."""
+
+    def fake_getaddrinfo(_host, _port, **_kw):  # type: ignore[no-untyped-def]
+        return [(socket.AF_INET, socket.SOCK_STREAM, 0, "", ("169.254.169.254", 0))]
+
+    monkeypatch.setattr("socket.getaddrinfo", fake_getaddrinfo)
+    with pytest.raises(HomeAssistantError, match="blocked address"):
+        await resolve_image_bytes(
+            hass, "https://metadata.example/latest/meta-data/", allow_local=True
+        )
+
+
+async def test_resolve_http_allow_local_fetches_non_default_port(  # type: ignore[no-untyped-def]
+    hass, monkeypatch, mock_pooled_aiohttp
+):
+    """allow_local lifts both the private-address block and the port allowlist.
+
+    The classic Frigate case: a LAN proxy on :5000 — private IP *and* a
+    non-standard port, the exact combination that previously failed.
+    """
+
+    def fake_getaddrinfo(_host, _port, **_kw):  # type: ignore[no-untyped-def]
+        return [(socket.AF_INET, socket.SOCK_STREAM, 0, "", ("192.168.1.10", 0))]
+
+    monkeypatch.setattr("socket.getaddrinfo", fake_getaddrinfo)
+
+    def _factory():  # type: ignore[no-untyped-def]
+        from tests.conftest import fake_aiohttp_response
+
+        return fake_aiohttp_response(
+            status=200, headers={"Content-Type": "image/jpeg"}, chunks=[_png_bytes()]
+        )
+
+    mock_pooled_aiohttp(_factory)
+    raw, content_type = await resolve_image_bytes(
+        hass, "http://192.168.1.10:5000/api/events/abc/thumbnail.jpg", allow_local=True
+    )
+    assert raw == _png_bytes()
+    assert content_type == "image/jpeg"
+
+
+async def test_resolve_http_non_default_port_blocked_without_allow_local(  # type: ignore[no-untyped-def]
+    hass,
+):
+    """Strict default still rejects a non-standard port and names the toggle."""
+    with pytest.raises(HomeAssistantError, match="Allow local image URLs"):
+        await resolve_image_bytes(hass, "http://example.com:5000/x.png")
+
+
 async def test_resolve_http_rejects_non_default_port(hass):  # type: ignore[no-untyped-def]
     with pytest.raises(HomeAssistantError, match="port"):
         await resolve_image_bytes(hass, "https://example.com:22/x.png")
@@ -329,6 +419,173 @@ async def test_resolve_http_http_error_propagates_as_ha_error(  # type: ignore[n
     mock_pooled_aiohttp(_factory)
     with pytest.raises(HomeAssistantError, match="download image"):
         await resolve_image_bytes(hass, "https://example.com/x.png")
+
+
+async def test_resolve_camera_reraises_home_assistant_error(  # type: ignore[no-untyped-def]
+    hass, monkeypatch
+):
+    """A HomeAssistantError from async_get_image must propagate unchanged (not be wrapped)."""
+
+    async def _raise(*_a, **_k):  # type: ignore[no-untyped-def]
+        raise HomeAssistantError("camera offline")
+
+    _install_fake_camera_module(monkeypatch, _raise)
+    with pytest.raises(HomeAssistantError, match="camera offline"):
+        await resolve_image_bytes(hass, "camera.front_door")
+
+
+async def test_resolve_image_entity_reraises_home_assistant_error(  # type: ignore[no-untyped-def]
+    hass, monkeypatch
+):
+    """A HomeAssistantError from the image entity must propagate unchanged."""
+
+    async def _raise(*_a, **_k):  # type: ignore[no-untyped-def]
+        raise HomeAssistantError("image entity unavailable")
+
+    _install_fake_image_module(monkeypatch, _raise)
+    with pytest.raises(HomeAssistantError, match="image entity unavailable"):
+        await resolve_image_bytes(hass, "image.weather_map")
+
+
+def test_check_content_length_ignores_malformed_header():  # type: ignore[no-untyped-def]
+    """A non-numeric Content-Length must be ignored (the streaming read still caps size)."""
+    from custom_components.escpos_printer.image_sources import _check_content_length
+
+    # int("not-a-number") raises ValueError → swallowed → no raise.
+    _check_content_length({"Content-Length": "not-a-number"}, 1000)
+    # Missing header → early return, also no raise.
+    _check_content_length({}, 1000)
+
+
+def _redirect_factory(*responses):  # type: ignore[no-untyped-def]
+    """Return a factory that yields each prepared response in turn (one per .get())."""
+    it = iter(responses)
+
+    def _factory():  # type: ignore[no-untyped-def]
+        return next(it)
+
+    return _factory
+
+
+async def test_resolve_http_follows_redirect(  # type: ignore[no-untyped-def]
+    hass, monkeypatch, mock_pooled_aiohttp
+):
+    """A 302 with a Location must be followed to the final 200 response."""
+
+    def fake_getaddrinfo(_host, _port, **_kw):  # type: ignore[no-untyped-def]
+        return [(socket.AF_INET, socket.SOCK_STREAM, 0, "", ("93.184.216.34", 0))]
+
+    monkeypatch.setattr("socket.getaddrinfo", fake_getaddrinfo)
+
+    from tests.conftest import fake_aiohttp_response
+
+    mock_pooled_aiohttp(
+        _redirect_factory(
+            fake_aiohttp_response(status=302, headers={"Location": "https://example.com/final.png"}),
+            fake_aiohttp_response(
+                status=200, headers={"Content-Type": "image/png"}, chunks=[_png_bytes()]
+            ),
+        )
+    )
+    raw, content_type = await resolve_image_bytes(hass, "https://example.com/start.png")
+    assert raw == _png_bytes()
+    assert content_type == "image/png"
+
+
+async def test_resolve_http_redirect_without_location_raises(  # type: ignore[no-untyped-def]
+    hass, monkeypatch, mock_pooled_aiohttp
+):
+    """A redirect status with no Location header must raise, not loop forever."""
+
+    def fake_getaddrinfo(_host, _port, **_kw):  # type: ignore[no-untyped-def]
+        return [(socket.AF_INET, socket.SOCK_STREAM, 0, "", ("93.184.216.34", 0))]
+
+    monkeypatch.setattr("socket.getaddrinfo", fake_getaddrinfo)
+
+    from tests.conftest import fake_aiohttp_response
+
+    mock_pooled_aiohttp(_redirect_factory(fake_aiohttp_response(status=302, headers={})))
+    with pytest.raises(HomeAssistantError, match="redirect without Location"):
+        await resolve_image_bytes(hass, "https://example.com/start.png")
+
+
+async def test_resolve_http_redirect_revalidates_each_hop_under_allow_local(  # type: ignore[no-untyped-def]
+    hass, monkeypatch, mock_pooled_aiohttp
+):
+    """G1: a public->private redirect is allowed with allow_local and the hop re-resolves.
+
+    The redirect target resolves to a private address; under allow_local the
+    second hop's validation accepts it, proving the flag is threaded per hop.
+    """
+
+    def fake_getaddrinfo(host, _port, **_kw):  # type: ignore[no-untyped-def]
+        addr = "93.184.216.34" if host == "start.example" else "192.168.1.50"
+        return [(socket.AF_INET, socket.SOCK_STREAM, 0, "", (addr, 0))]
+
+    monkeypatch.setattr("socket.getaddrinfo", fake_getaddrinfo)
+
+    from tests.conftest import fake_aiohttp_response
+
+    mock_pooled_aiohttp(
+        _redirect_factory(
+            fake_aiohttp_response(status=302, headers={"Location": "https://lan.local/snap.png"}),
+            fake_aiohttp_response(
+                status=200, headers={"Content-Type": "image/png"}, chunks=[_png_bytes()]
+            ),
+        )
+    )
+    # With the opt-in, the private redirect target is fetched.
+    raw, _ = await resolve_image_bytes(
+        hass, "https://start.example/start.png", allow_local=True
+    )
+    assert raw == _png_bytes()
+
+
+async def test_resolve_http_redirect_to_private_rejected_in_strict_mode(  # type: ignore[no-untyped-def]
+    hass, monkeypatch, mock_pooled_aiohttp
+):
+    """G1 counterpart: the same public->private redirect is rejected without allow_local."""
+
+    def fake_getaddrinfo(host, _port, **_kw):  # type: ignore[no-untyped-def]
+        addr = "93.184.216.34" if host == "start.example" else "192.168.1.50"
+        return [(socket.AF_INET, socket.SOCK_STREAM, 0, "", (addr, 0))]
+
+    monkeypatch.setattr("socket.getaddrinfo", fake_getaddrinfo)
+
+    from tests.conftest import fake_aiohttp_response
+
+    mock_pooled_aiohttp(
+        _redirect_factory(
+            fake_aiohttp_response(status=302, headers={"Location": "https://lan.local/snap.png"}),
+            fake_aiohttp_response(
+                status=200, headers={"Content-Type": "image/png"}, chunks=[_png_bytes()]
+            ),
+        )
+    )
+    # Strict default: the second hop re-validates and rejects the private target.
+    with pytest.raises(HomeAssistantError, match="non-public address"):
+        await resolve_image_bytes(hass, "https://start.example/start.png")
+
+
+async def test_resolve_http_rejects_when_any_resolved_address_blocked(  # type: ignore[no-untyped-def]
+    hass, monkeypatch
+):
+    """G5: dual-stack fail-closed — a host resolving to public+metadata is rejected entirely.
+
+    Defeats the DNS-SSRF bypass where a hostile resolver returns one good and
+    one bad address hoping Happy-Eyeballs races to the bad one.
+    """
+
+    def fake_getaddrinfo(_host, _port, **_kw):  # type: ignore[no-untyped-def]
+        return [
+            (socket.AF_INET, socket.SOCK_STREAM, 0, "", ("93.184.216.34", 0)),  # public
+            (socket.AF_INET, socket.SOCK_STREAM, 0, "", ("169.254.169.254", 0)),  # metadata
+        ]
+
+    monkeypatch.setattr("socket.getaddrinfo", fake_getaddrinfo)
+    # Even with the opt-in, ANY blocked address in the set rejects the fetch.
+    with pytest.raises(HomeAssistantError, match="blocked address"):
+        await resolve_image_bytes(hass, "https://dual.example/x.png", allow_local=True)
 
 
 async def test_static_resolver_rejects_unrelated_hostname(  # type: ignore[no-untyped-def]

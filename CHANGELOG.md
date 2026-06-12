@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-06-11
+
+### Added
+
+- **"Allow local image URLs" printer option** (issue #95). Image URL
+  fetches (`print_image_url` and the other image services) still reject
+  private/LAN/loopback targets and non-standard ports by default — an
+  SSRF guard — but you can now opt in per-printer (**Configure → "Allow
+  local image URLs"**) to print from a LAN camera, an NVR/Frigate proxy
+  (e.g. `:5000`), a NAS, or your own Home Assistant instance (`:8123`).
+  Enabling it lifts both the private-address block and the default-port
+  (80/443) restriction. The dangerous ranges stay blocked even when
+  enabled: link-local/cloud-metadata (`169.254.0.0/16`, `fe80::/10`, and
+  the AWS IMDSv6 endpoint `fd00:ec2::254`), multicast, reserved
+  (`240.0.0.0/4`), and unspecified. The fetch sends no auth token, so
+  only unauthenticated endpoints work, and `print_image_url` has no
+  per-user authorization — enabling the option lets any HA user or
+  automation reach LAN hosts/ports through that printer. The strict-mode
+  rejection messages now point at the new toggle. See
+  [docs/images.md](docs/images.md#allowing-local--lan-urls).
+
+### Fixed
+
+- **HTTP/HTTPS image-URL printing failed for every URL** with
+  `Cannot connect to host <host>:443 ssl:default [None]` (issue #95).
+  The DNS-pinning `_StaticResolver` only answered lookups for an
+  explicit `AF_INET` / `AF_INET6` family, but `aiohttp.TCPConnector`
+  resolves with `AF_UNSPEC` (0) by default — so every fetch matched no
+  address bucket and raised a `strerror`-less `OSError` that surfaced as
+  the misleading `[None]` connect error. `AF_UNSPEC` now returns all
+  pre-validated addresses, each tagged with its real family. The
+  DNS-rebinding defense is unchanged (still pinned to the one validated
+  hostname and its pre-resolved IPs). `print_image_url` and the other
+  URL-backed image services now work again. Added an `AF_UNSPEC`
+  regression test plus a guard locking in aiohttp's default family.
+
 ## [0.7.1] - 2026-05-26
 
 ### Breaking changes

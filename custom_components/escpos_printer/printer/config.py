@@ -33,6 +33,10 @@ class BasePrinterConfig:
     profile: str | None = None
     line_width: int = 48
     timeout: float = 4.0
+    # Opt-in: permit image URLs that resolve to private/LAN/loopback
+    # addresses. Off by default; the always-unsafe ranges (link-local
+    # metadata, multicast, reserved) stay blocked regardless.
+    allow_local_image_urls: bool = False
 
 
 @dataclass

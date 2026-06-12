@@ -145,6 +145,7 @@ async def resolve_image_bytes(
     *,
     context: Context | None = None,
     auto_resize: bool = False,
+    allow_local: bool = False,
 ) -> tuple[bytes, str | None]:
     """Resolve ``source`` to ``(raw_bytes, content_type_hint)``.
 
@@ -157,6 +158,11 @@ async def resolve_image_bytes(
     a 12 MB phone JPEG decoded from a camera/URL is acceptable. The
     image processor will then ``.thumbnail()`` the decoded image down
     before any expensive work happens.
+
+    ``allow_local`` (per-printer opt-in) lets an ``http(s)`` source resolve
+    to a private/LAN/loopback address. Only the HTTP path consults it;
+    camera/image/local/data sources are unaffected. The always-unsafe
+    ranges (link-local metadata, multicast, reserved) stay blocked.
     """
     if not isinstance(source, str) or not source.strip():
         raise HomeAssistantError("Image source must be a non-empty string")
@@ -173,7 +179,9 @@ async def resolve_image_bytes(
                 hass, value, context=context, auto_resize=auto_resize
             )
         case "http":
-            return await _resolve_http(hass, value, auto_resize=auto_resize)
+            return await _resolve_http(
+                hass, value, auto_resize=auto_resize, allow_local=allow_local
+            )
         case "local":
             return await _resolve_local(hass, value, auto_resize=auto_resize)
 
@@ -215,7 +223,7 @@ async def _resolve_camera(
     _LOGGER.debug("Fetching camera snapshot: %s", entity_id)
     try:
         image = await async_get_image(hass, entity_id, timeout=_ENTITY_FETCH_TIMEOUT_SECONDS)
-    except (HomeAssistantError, Unauthorized):
+    except HomeAssistantError, Unauthorized:
         raise
     except Exception as exc:
         raise HomeAssistantError(
@@ -245,7 +253,7 @@ async def _resolve_image_entity(
     _LOGGER.debug("Fetching image entity: %s", entity_id)
     try:
         image = await async_get_image(hass, entity_id, timeout=_ENTITY_FETCH_TIMEOUT_SECONDS)
-    except (HomeAssistantError, Unauthorized):
+    except HomeAssistantError, Unauthorized:
         raise
     except Exception as exc:
         raise HomeAssistantError(
@@ -274,7 +282,7 @@ def _check_content_length(headers: Mapping[str, str], max_bytes: int) -> None:
         return
     try:
         size = int(raw)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return
     if size > max_bytes:
         raise HomeAssistantError(
@@ -317,26 +325,38 @@ class _StaticResolver(aiohttp.abc.AbstractResolver):
         self,
         host: str,
         port: int = 0,
-        family: int = socket.AF_INET,
+        family: int = socket.AF_UNSPEC,
     ) -> list[dict[str, Any]]:
         if host.lower() != self._hostname:
             raise OSError(
                 f"DNS pin: hostname '{host}' was not pre-validated (expected '{self._hostname}')"
             )
-        addrs = self._addrs_by_family.get(family, [])
-        if not addrs:
-            raise OSError(f"DNS pin: no pre-validated addresses for family {family}")
-        return [
+        # ``aiohttp.TCPConnector`` resolves with ``family=AF_UNSPEC`` (0) by
+        # default — it does not split the lookup per address family. The old
+        # ``get(family, [])`` filter only knew AF_INET / AF_INET6 buckets, so a
+        # default-family lookup matched neither and every URL fetch died with
+        # ``Cannot connect to host <host> ssl:default [None]`` (the single-arg
+        # OSError below carries no ``strerror``). Treat AF_UNSPEC as "any" and
+        # return each address tagged with its own real family so the connector
+        # opens the correct socket type.
+        families: tuple[int, ...] = (
+            (socket.AF_INET, socket.AF_INET6) if family == socket.AF_UNSPEC else (family,)
+        )
+        results = [
             {
                 "hostname": host,
                 "host": addr,
                 "port": port,
-                "family": family,
+                "family": fam,
                 "proto": 0,
                 "flags": 0,
             }
-            for addr in addrs
+            for fam in families
+            for addr in self._addrs_by_family.get(fam, [])
         ]
+        if not results:
+            raise OSError(f"DNS pin: no pre-validated addresses for family {family}")
+        return results
 
     async def close(self) -> None:
         return None
@@ -356,7 +376,7 @@ def _build_pinned_session(hostname: str, addresses: list[str]) -> aiohttp.Client
 
 
 async def _resolve_http_aiohttp(
-    hass: HomeAssistant, url: str, *, max_bytes: int
+    hass: HomeAssistant, url: str, *, max_bytes: int, allow_local: bool = False
 ) -> tuple[bytes, str | None]:
     """Fetch via a per-request aiohttp session pinned to validated IPs.
 
@@ -366,10 +386,15 @@ async def _resolve_http_aiohttp(
     :func:`validate_image_url_and_resolve` and gets a fresh resolver
     pin — a redirect to ``evil.example/``-resolves-to-127.0.0.1 is
     rejected at the validator, never reaches the connector.
+
+    ``allow_local`` is forwarded to every hop's validation so a relaxed
+    fetch stays relaxed across redirects (and a strict one stays strict).
     """
     current = url
     for _ in range(_MAX_REDIRECTS + 1):
-        validated, addrs = await validate_image_url_and_resolve(hass, current)
+        validated, addrs = await validate_image_url_and_resolve(
+            hass, current, allow_local=allow_local
+        )
         parsed = urlparse(validated)
         hostname = parsed.hostname
         if hostname is None:  # pragma: no cover — validator enforces it
@@ -387,19 +412,17 @@ async def _resolve_http_aiohttp(
                     allow_redirects=False,
                 ) as response,
             ):
-                    if response.status in (301, 302, 303, 307, 308):
-                        location = response.headers.get("Location")
-                        if not location:
-                            raise HomeAssistantError("HTTP redirect without Location header")
-                        current = urljoin(current, location)
-                        continue
-                    response.raise_for_status()
-                    _check_content_length(response.headers, max_bytes)
-                    buf = await _stream_to_buffer(
-                        response.content.iter_chunked(65536), max_bytes
-                    )
-                    content_type = response.headers.get("Content-Type")
-                    return bytes(buf), content_type
+                if response.status in (301, 302, 303, 307, 308):
+                    location = response.headers.get("Location")
+                    if not location:
+                        raise HomeAssistantError("HTTP redirect without Location header")
+                    current = urljoin(current, location)
+                    continue
+                response.raise_for_status()
+                _check_content_length(response.headers, max_bytes)
+                buf = await _stream_to_buffer(response.content.iter_chunked(65536), max_bytes)
+                content_type = response.headers.get("Content-Type")
+                return bytes(buf), content_type
         except HomeAssistantError:
             raise
         except aiohttp.ClientError as exc:
@@ -410,7 +433,7 @@ async def _resolve_http_aiohttp(
 
 
 async def _resolve_http(
-    hass: HomeAssistant, url: str, *, auto_resize: bool = False
+    hass: HomeAssistant, url: str, *, auto_resize: bool = False, allow_local: bool = False
 ) -> tuple[bytes, str | None]:
     """Fetch an HTTP/HTTPS image. Validates URL + IPs and streams the body.
 
@@ -420,15 +443,18 @@ async def _resolve_http(
     Always uses aiohttp (HA bundles it) — the old httpx fast-path was
     dropped because httpx 0.28 has no equivalent resolver hook, and
     the pooled-client win is small for image fetches.
+
+    ``allow_local`` (per-printer opt-in) permits private/LAN/loopback
+    targets; see :func:`security.validate_image_url_and_resolve`.
     """
     # Cheap pre-flight: reject obvious junk before resolving DNS.
-    validate_image_url(url)
+    validate_image_url(url, allow_local=allow_local)
     _LOGGER.debug(
         "Downloading image from URL: %s",
         sanitize_log_message(url),
     )
     max_bytes = _MAX_BYTES_AUTO_RESIZE if auto_resize else _MAX_BYTES
-    return await _resolve_http_aiohttp(hass, url, max_bytes=max_bytes)
+    return await _resolve_http_aiohttp(hass, url, max_bytes=max_bytes, allow_local=allow_local)
 
 
 async def _resolve_local(

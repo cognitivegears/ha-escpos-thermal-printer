@@ -25,7 +25,15 @@ schema (Bronze quality-scale `action-setup` rule):
   reserved, multicast, and unspecified IPs** (defends against SSRF to
   RFC1918 networks, `127.0.0.1`, `::1`, and cloud-metadata endpoints like
   `169.254.169.254`). HTTP redirects are followed manually and each
-  redirect target is re-validated.
+  redirect target is re-validated. A per-printer **"Allow local image
+  URLs"** opt-in (default off) relaxes the private/loopback block and the
+  port allowlist for that printer; the always-dangerous ranges remain
+  blocked even when enabled — cloud-metadata (`169.254.169.254` and AWS
+  IMDSv6 `fd00:ec2::254`, the `_ALWAYS_BLOCKED_HOSTS` denylist),
+  link-local, multicast, reserved, and unspecified. Enabling it turns that
+  printer's `print_image_url` into an unauthenticated LAN-reach primitive
+  (the service has no per-user authorization), so enable it only where the
+  callers are trusted.
 - **Local image paths** — `Path.resolve(strict=True)` dereferences
   symlinks before the extension / size / allowlist checks; the final
   `open()` uses `O_NOFOLLOW` to defeat TOCTOU swaps. Paths outside

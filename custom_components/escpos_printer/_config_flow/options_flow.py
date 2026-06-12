@@ -21,6 +21,7 @@ from ..capabilities import (
     is_valid_profile,
 )
 from ..const import (
+    CONF_ALLOW_LOCAL_IMAGE_URLS,
     CONF_CODEPAGE,
     CONF_CONNECTION_TYPE,
     CONF_DEFAULT_ALIGN,
@@ -35,6 +36,7 @@ from ..const import (
     CONNECTION_TYPE_NETWORK,
     CONNECTION_TYPE_USB,
     DEFAULT_ALIGN,
+    DEFAULT_ALLOW_LOCAL_IMAGE_URLS,
     DEFAULT_CUT,
     DEFAULT_LINE_WIDTH,
     DEFAULT_TIMEOUT,
@@ -227,6 +229,12 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlow):
                         CONF_STATUS_INTERVAL,
                         default=self.config_entry.options.get(CONF_STATUS_INTERVAL, 0),
                     ): int,
+                    vol.Optional(
+                        CONF_ALLOW_LOCAL_IMAGE_URLS,
+                        default=self.config_entry.options.get(
+                            CONF_ALLOW_LOCAL_IMAGE_URLS, DEFAULT_ALLOW_LOCAL_IMAGE_URLS
+                        ),
+                    ): bool,
                 }
             )
         else:
@@ -262,6 +270,12 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlow):
                         CONF_STATUS_INTERVAL,
                         default=self.config_entry.options.get(CONF_STATUS_INTERVAL, 0),
                     ): int,
+                    vol.Optional(
+                        CONF_ALLOW_LOCAL_IMAGE_URLS,
+                        default=self.config_entry.options.get(
+                            CONF_ALLOW_LOCAL_IMAGE_URLS, DEFAULT_ALLOW_LOCAL_IMAGE_URLS
+                        ),
+                    ): bool,
                 }
             )
 

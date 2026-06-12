@@ -15,6 +15,10 @@ CONF_KEEPALIVE = "keepalive"
 CONF_STATUS_INTERVAL = "status_interval"
 CONF_PROFILE = "profile"
 CONF_LINE_WIDTH = "line_width"
+# Opt-in: allow image URLs that resolve to private/LAN/loopback addresses.
+# Off by default so an upgrade never silently turns the integration into an
+# SSRF proxy; cloud-metadata / link-local ranges stay blocked even when on.
+CONF_ALLOW_LOCAL_IMAGE_URLS = "allow_local_image_urls"
 
 # Connection type configuration
 CONF_CONNECTION_TYPE = "connection_type"
@@ -46,6 +50,7 @@ DEFAULT_ALIGN = "left"
 DEFAULT_CUT = "none"
 DEFAULT_LINE_WIDTH = 48
 DEFAULT_CODEPAGE = "CP437"
+DEFAULT_ALLOW_LOCAL_IMAGE_URLS = False
 
 # USB defaults
 DEFAULT_IN_EP = 0x82

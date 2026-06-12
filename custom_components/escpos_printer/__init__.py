@@ -13,6 +13,7 @@ from homeassistant.helpers import config_validation as cv
 
 from .capabilities import PROFILE_AUTO, is_valid_profile
 from .const import (
+    CONF_ALLOW_LOCAL_IMAGE_URLS,
     CONF_BT_MAC,
     CONF_CODEPAGE,
     CONF_CONNECTION_TYPE,
@@ -33,6 +34,7 @@ from .const import (
     CONNECTION_TYPE_NETWORK,
     CONNECTION_TYPE_USB,
     DEFAULT_ALIGN,
+    DEFAULT_ALLOW_LOCAL_IMAGE_URLS,
     DEFAULT_CUT,
     DEFAULT_IN_EP,
     DEFAULT_LINE_WIDTH,
@@ -187,6 +189,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bo
             codepage=entry.options.get(CONF_CODEPAGE) or entry.data.get(CONF_CODEPAGE),
             profile=entry.options.get(CONF_PROFILE) or entry.data.get(CONF_PROFILE),
             line_width=int(entry.options.get(CONF_LINE_WIDTH, entry.data.get(CONF_LINE_WIDTH, 48))),
+            allow_local_image_urls=bool(
+                entry.options.get(CONF_ALLOW_LOCAL_IMAGE_URLS, DEFAULT_ALLOW_LOCAL_IMAGE_URLS)
+            ),
         )
     elif connection_type == CONNECTION_TYPE_BLUETOOTH:
         config = BluetoothPrinterConfig(
@@ -196,6 +201,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bo
             codepage=entry.options.get(CONF_CODEPAGE) or entry.data.get(CONF_CODEPAGE),
             profile=entry.options.get(CONF_PROFILE) or entry.data.get(CONF_PROFILE),
             line_width=int(entry.options.get(CONF_LINE_WIDTH, entry.data.get(CONF_LINE_WIDTH, 48))),
+            allow_local_image_urls=bool(
+                entry.options.get(CONF_ALLOW_LOCAL_IMAGE_URLS, DEFAULT_ALLOW_LOCAL_IMAGE_URLS)
+            ),
         )
     else:
         config = NetworkPrinterConfig(
@@ -205,6 +213,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bo
             codepage=entry.options.get(CONF_CODEPAGE) or entry.data.get(CONF_CODEPAGE),
             profile=entry.options.get(CONF_PROFILE) or entry.data.get(CONF_PROFILE),
             line_width=int(entry.options.get(CONF_LINE_WIDTH, entry.data.get(CONF_LINE_WIDTH, 48))),
+            allow_local_image_urls=bool(
+                entry.options.get(CONF_ALLOW_LOCAL_IMAGE_URLS, DEFAULT_ALLOW_LOCAL_IMAGE_URLS)
+            ),
         )
 
     adapter = create_printer_adapter(config)

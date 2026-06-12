@@ -89,3 +89,37 @@ rules:
         - "custom_components/escpos_printer/notify.py"
         - "custom_components/escpos_printer/image_sources.py"
         - "custom_components/escpos_printer/services/print_handlers.py"
+
+  - id: is-allowed-address-must-keep-metadata-denylist
+    # The `allow_local` opt-in relaxes the SSRF address filter to permit
+    # private/RFC1918/ULA + loopback. The cloud-metadata endpoints must stay
+    # blocked even then. AWS IMDSv6 (`fd00:ec2::254`) is an IPv6 ULA that the
+    # `is_private` permissive grant would otherwise allow, so the explicit
+    # `_ALWAYS_BLOCKED_HOSTS` denylist is the load-bearing guard (review M-1,
+    # CWE-918). This rule fires if `_is_allowed_address` no longer references
+    # it — i.e. a refactor silently re-opened metadata SSRF.
+    patterns:
+      - pattern: |
+          def _is_allowed_address(...):
+            ...
+      # Excluded only when the body has an `if` whose condition actually
+      # tests against `_ALWAYS_BLOCKED_HOSTS` (deep-expression match). A
+      # lingering docstring/comment mention is NOT enough — the guard must
+      # be a live branch, so the rule fires if the check itself is removed.
+      - pattern-not: |
+          def _is_allowed_address(...):
+            ...
+            if <... _ALWAYS_BLOCKED_HOSTS ...>:
+              ...
+            ...
+    message: >
+      `_is_allowed_address` must keep the `_ALWAYS_BLOCKED_HOSTS` denylist
+      check so the `allow_local` opt-in cannot re-open SSRF to cloud-metadata
+      endpoints (IMDSv4 `169.254.169.254` + AWS IMDSv6 ULA `fd00:ec2::254`;
+      review M-1, CWE-918). Do not remove this guard without a documented
+      equivalent that blocks both metadata hosts in permissive mode.
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - "custom_components/escpos_printer/security.py"

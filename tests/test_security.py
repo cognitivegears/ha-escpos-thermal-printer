@@ -151,6 +151,32 @@ class TestImageURLValidation:
         with pytest.raises(HomeAssistantError, match="port"):
             validate_image_url(url)
 
+    def test_strict_port_rejection_points_at_toggle(self):  # type: ignore[no-untyped-def]
+        with pytest.raises(HomeAssistantError, match="Allow local image URLs"):
+            validate_image_url("http://example.com:5000/x.png")
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "http://192.168.1.10:5000/x.png",  # Frigate
+            "http://example.com:8080/x.png",  # camera
+            "https://homeassistant.local:8123/x.png",  # HA itself
+        ],
+    )
+    def test_validate_image_url_allows_non_default_ports_with_allow_local(  # type: ignore[no-untyped-def]
+        self, url
+    ):
+        # The opt-in lifts the default-port allowlist; the address-level
+        # SSRF check (validate_image_url_and_resolve) is the real boundary.
+        assert validate_image_url(url, allow_local=True) == url
+
+    @pytest.mark.parametrize("allow_local", [False, True])
+    def test_validate_image_url_rejects_out_of_range_port(self, allow_local):  # type: ignore[no-untyped-def]
+        # Accessing urlparse().port range-checks lazily; both modes must
+        # surface a clean HomeAssistantError, never a bare ValueError.
+        with pytest.raises(HomeAssistantError, match="port"):
+            validate_image_url("https://example.com:99999/x.png", allow_local=allow_local)
+
 
 # ---------------------------------------------------------------------------
 # Local-image path validation (T-C2: pathlib.resolve, symlinks).
@@ -581,3 +607,68 @@ class TestValidateRows:
         out = validate_rows([["a\x00b\x07c"]])
         # validate_text_input strips C0 control characters except CR/LF/HT.
         assert out == [["abc"]]
+
+
+class TestIsAllowedAddress:
+    """The opt-in ``allow_local`` relaxation of the SSRF address filter.
+
+    Strict mode (``allow_local=False``) is the historical "public only"
+    behavior. Permissive mode allows private/LAN/loopback while keeping
+    the genuinely dangerous ranges (cloud-metadata link-local, multicast,
+    reserved, unspecified) blocked.
+    """
+
+    @pytest.mark.parametrize(
+        "addr",
+        ["93.184.216.34", "8.8.8.8", "2606:2800:220:1:248:1893:25c8:1946"],
+    )
+    def test_public_allowed_in_both_modes(self, addr):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import _is_allowed_address
+
+        assert _is_allowed_address(addr, allow_local=False) is True
+        assert _is_allowed_address(addr, allow_local=True) is True
+
+    @pytest.mark.parametrize(
+        "addr",
+        ["10.0.0.5", "192.168.1.50", "172.16.0.1", "127.0.0.1", "::1", "fc00::1"],
+    )
+    def test_private_loopback_only_with_allow_local(self, addr):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import _is_allowed_address
+
+        assert _is_allowed_address(addr, allow_local=False) is False
+        assert _is_allowed_address(addr, allow_local=True) is True
+
+    @pytest.mark.parametrize(
+        "addr",
+        [
+            "169.254.169.254",  # IMDSv4 cloud metadata — the whole point of keeping it blocked
+            "169.254.1.1",
+            "fe80::1",  # IPv6 link-local
+            "fd00:ec2::254",  # AWS IMDSv6 — a ULA that the private grant would otherwise allow
+            "224.0.0.1",  # multicast
+            "0.0.0.0",  # unspecified
+            "240.0.0.1",  # reserved
+        ],
+    )
+    def test_dangerous_ranges_blocked_even_with_allow_local(self, addr):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import _is_allowed_address
+
+        assert _is_allowed_address(addr, allow_local=False) is False
+        assert _is_allowed_address(addr, allow_local=True) is False
+
+    @pytest.mark.parametrize(
+        "addr",
+        ["fd12:3456:789a::1", "fdce:1234::abcd", "fc00::1"],
+    )
+    def test_legitimate_ula_still_allowed_with_opt_in(self, addr):  # type: ignore[no-untyped-def]
+        # The IMDSv6 block must be the *specific* metadata host, not the whole
+        # ULA range — home IPv6 LANs legitimately use fc00::/7.
+        from custom_components.escpos_printer.security import _is_allowed_address
+
+        assert _is_allowed_address(addr, allow_local=False) is False
+        assert _is_allowed_address(addr, allow_local=True) is True
+
+    def test_unparseable_address_rejected(self):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import _is_allowed_address
+
+        assert _is_allowed_address("not-an-ip", allow_local=True) is False
