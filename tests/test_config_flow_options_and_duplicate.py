@@ -38,18 +38,23 @@ async def test_options_flow_update(hass):  # type: ignore[no-untyped-def]
     result = await hass.config_entries.options.async_init(entry.entry_id)
     assert result["type"] == "form"
 
-    # Submit options
-    result2 = await hass.config_entries.options.async_configure(
-        result["flow_id"],
-        {
-            CONF_TIMEOUT: 5.5,
-            CONF_CODEPAGE: "CP437",
-            CONF_DEFAULT_ALIGN: "center",
-            CONF_DEFAULT_CUT: "partial",
-            CONF_KEEPALIVE: True,
-            CONF_STATUS_INTERVAL: 30,
-        },
-    )
+    # Submit options. Saving schedules an automatic entry reload
+    # (OptionsFlowWithReload); with keepalive enabled the real setup would
+    # open a TCP connection to the printer, which the HA test harness
+    # rejects — patch the setup so the reload stays hermetic.
+    with patch("custom_components.escpos_printer.async_setup_entry", return_value=True):
+        result2 = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {
+                CONF_TIMEOUT: 5.5,
+                CONF_CODEPAGE: "CP437",
+                CONF_DEFAULT_ALIGN: "center",
+                CONF_DEFAULT_CUT: "partial",
+                CONF_KEEPALIVE: True,
+                CONF_STATUS_INTERVAL: 30,
+            },
+        )
+        await hass.async_block_till_done()
     assert result2["type"] == "create_entry"
     assert result2["data"][CONF_TIMEOUT] == 5.5
     assert result2["data"][CONF_DEFAULT_ALIGN] == "center"

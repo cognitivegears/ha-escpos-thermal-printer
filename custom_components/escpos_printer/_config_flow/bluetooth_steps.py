@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from homeassistant.config_entries import ConfigFlowResult
+from homeassistant.data_entry_flow import section
 from homeassistant.exceptions import HomeAssistantError
 import voluptuous as vol
 
@@ -39,6 +40,11 @@ from .bluetooth_helpers import (
 
 _LOGGER = logging.getLogger(__name__)
 
+# Schema key of the collapsed section holding the RFCOMM channel on the
+# bluetooth_select form. Mirrored in strings.json / translations under
+# config.step.bluetooth_select.sections.
+SECTION_BT_ADVANCED = "advanced_options"
+
 
 class BluetoothFlowMixin:
     """Mixin providing Bluetooth Classic / RFCOMM configuration steps.
@@ -46,7 +52,6 @@ class BluetoothFlowMixin:
     This mixin expects to be used with a class that has the following attributes
     and methods (typically provided by ConfigFlow and other mixins):
     - hass: HomeAssistant instance
-    - show_advanced_options: bool — HA's "advanced settings" toggle
     - _user_data: dict for storing flow data
     - _paired_bt_devices: list of paired Bluetooth devices
     - _show_all_bt_devices: bool — when True, drop the imaging-only filter
@@ -59,7 +64,6 @@ class BluetoothFlowMixin:
     """
 
     hass: Any
-    show_advanced_options: bool
     _user_data: dict[str, Any]
     _paired_bt_devices: list[dict[str, Any]]
     _show_all_bt_devices: bool
@@ -92,9 +96,16 @@ class BluetoothFlowMixin:
             else:
                 mac = chosen["mac"]
                 timeout = float(user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
+                # The channel arrives nested under the collapsed advanced
+                # section; tolerate a flat key for programmatic callers that
+                # bypass the schema.
+                advanced = user_input.get(SECTION_BT_ADVANCED) or {}
                 try:
                     channel = validate_rfcomm_channel(
-                        user_input.get(CONF_RFCOMM_CHANNEL, DEFAULT_RFCOMM_CHANNEL)
+                        advanced.get(
+                            CONF_RFCOMM_CHANNEL,
+                            user_input.get(CONF_RFCOMM_CHANNEL, DEFAULT_RFCOMM_CHANNEL),
+                        )
                     )
                 except HomeAssistantError:
                     errors["base"] = "invalid_rfcomm_channel"
@@ -137,18 +148,25 @@ class BluetoothFlowMixin:
         profile_choices = await self.hass.async_add_executor_job(get_profile_choices_dict)
         default_device = next(iter(device_choices.keys()))
 
+        # Channel lives in a collapsed "Advanced options" section — almost
+        # every ESC/POS printer uses 1, and a refused default channel routes
+        # to bluetooth_channel_retry, which asks for the channel directly.
+        # (A section replaces the former `show_advanced_options` gating: HA
+        # deprecated that flag and hard-wires it to True until its removal
+        # in 2027.6, which would have surfaced the field for everyone.)
         schema_dict: dict[Any, Any] = {
             vol.Required(CONF_BT_DEVICE, default=default_device): vol.In(device_choices),
             vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
             vol.Optional(CONF_PROFILE, default=PROFILE_AUTO): vol.In(profile_choices),
+            vol.Required(SECTION_BT_ADVANCED): section(
+                vol.Schema(
+                    {
+                        vol.Optional(CONF_RFCOMM_CHANNEL, default=DEFAULT_RFCOMM_CHANNEL): int,
+                    }
+                ),
+                {"collapsed": True},
+            ),
         }
-        # Channel is hidden by default — almost every ESC/POS printer uses 1.
-        # Surface it only when "Advanced settings" is on in the user's HA
-        # profile, OR when a previous attempt was refused at the default
-        # channel. Otherwise we route to bluetooth_channel_retry on
-        # `bt_channel_refused` to ask for a channel specifically.
-        if self.show_advanced_options:
-            schema_dict[vol.Optional(CONF_RFCOMM_CHANNEL, default=DEFAULT_RFCOMM_CHANNEL)] = int
         data_schema = vol.Schema(schema_dict)
         return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
             step_id="bluetooth_select", data_schema=data_schema, errors=errors

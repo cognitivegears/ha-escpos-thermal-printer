@@ -95,15 +95,24 @@
         "description": "Select a paired Bluetooth printer. If your printer isn't listed, pair it on the host first (HA OS: Settings → System → Hardware; otherwise run 'bluetoothctl pair AA:BB:CC:DD:EE:FF' on the host) and try again, or choose Manual MAC entry.",
         "data": {
           "bt_device": "Bluetooth device",
-          "rfcomm_channel": "RFCOMM channel",
           "timeout": "Timeout (seconds)",
           "profile": "Printer profile"
         },
         "data_description": {
           "bt_device": "Select your printer from the list of paired Bluetooth devices.",
-          "rfcomm_channel": "RFCOMM channel (almost always 1 for ESC/POS printers; run 'bluetoothctl info [MAC]' on the host and look for the SerialPort service-record 'Channel:' line to confirm).",
           "timeout": "Connection timeout in seconds.",
           "profile": "Select your printer model or Auto-detect."
+        },
+        "sections": {
+          "advanced_options": {
+            "name": "Advanced options",
+            "data": {
+              "rfcomm_channel": "RFCOMM channel"
+            },
+            "data_description": {
+              "rfcomm_channel": "RFCOMM channel (almost always 1 for ESC/POS printers; run 'bluetoothctl info [MAC]' on the host and look for the SerialPort service-record 'Channel:' line to confirm)."
+            }
+          }
         }
       },
       "bluetooth_manual": {

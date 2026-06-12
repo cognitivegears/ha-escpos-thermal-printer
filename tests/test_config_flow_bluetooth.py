@@ -10,6 +10,9 @@ from custom_components.escpos_printer._config_flow.bluetooth_helpers import (
     _can_connect_bluetooth,
     _classify_bt_error,
 )
+from custom_components.escpos_printer._config_flow.bluetooth_steps import (
+    SECTION_BT_ADVANCED,
+)
 from custom_components.escpos_printer.config_flow import EscposConfigFlow
 from custom_components.escpos_printer.const import (
     CONF_BT_MAC,
@@ -397,14 +400,13 @@ class TestBluetoothImagingFilter:
 
 
 class TestBluetoothChannelHidden:
-    """The RFCOMM channel field is hidden by default (almost always 1)."""
+    """The RFCOMM channel is tucked into a collapsed Advanced section."""
 
     @pytest.mark.asyncio
-    async def test_channel_field_hidden_by_default(self, hass, mock_paired_devices):
+    async def test_channel_field_in_collapsed_section(self, hass, mock_paired_devices):
         flow = EscposConfigFlow()
         flow.hass = hass
-        # `show_advanced_options` reads from flow.context; default is False.
-        flow.context = {"source": "user", "show_advanced_options": False}
+        flow.context = {"source": "user"}
         flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH}
         flow._paired_bt_devices = mock_paired_devices
 
@@ -415,26 +417,43 @@ class TestBluetoothChannelHidden:
         ):
             result = await flow.async_step_bluetooth_select()
 
-        schema_keys = {str(k) for k in result["data_schema"].schema}
-        assert "rfcomm_channel" not in schema_keys
+        schema = result["data_schema"].schema
+        top_level_keys = {str(k) for k in schema}
+        assert "rfcomm_channel" not in top_level_keys
+        assert SECTION_BT_ADVANCED in top_level_keys
+
+        advanced = next(v for k, v in schema.items() if str(k) == SECTION_BT_ADVANCED)
+        assert advanced.options["collapsed"] is True
+        assert "rfcomm_channel" in {str(k) for k in advanced.schema.schema}
 
     @pytest.mark.asyncio
-    async def test_channel_field_visible_with_advanced_options(self, hass, mock_paired_devices):
+    async def test_channel_from_advanced_section_reaches_probe(self, hass, mock_paired_devices):
+        """A channel submitted inside the section is used for the connect test."""
         flow = EscposConfigFlow()
         flow.hass = hass
-        flow.context = {"source": "user", "show_advanced_options": True}
         flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH}
         flow._paired_bt_devices = mock_paired_devices
 
-        with patch(
-            "custom_components.escpos_printer._config_flow.bluetooth_steps."
-            "_list_paired_bluetooth_devices",
-            return_value=mock_paired_devices,
+        with (
+            patch(
+                "custom_components.escpos_printer._config_flow.bluetooth_steps."
+                "_can_connect_bluetooth",
+                return_value=(True, None, None),
+            ) as mock_connect,
+            patch.object(flow, "async_set_unique_id", return_value=None),
+            patch.object(flow, "_abort_if_unique_id_configured"),
+            patch.object(flow, "async_step_codepage", return_value={"type": "form"}),
         ):
-            result = await flow.async_step_bluetooth_select()
+            await flow.async_step_bluetooth_select(
+                {
+                    "bt_device": "AA:BB:CC:DD:EE:FF",
+                    "timeout": 4.0,
+                    "profile": "",
+                    SECTION_BT_ADVANCED: {CONF_RFCOMM_CHANNEL: 3},
+                }
+            )
 
-        schema_keys = {str(k) for k in result["data_schema"].schema}
-        assert "rfcomm_channel" in schema_keys
+        mock_connect.assert_called_once_with("AA:BB:CC:DD:EE:FF", 3, 4.0)
 
 
 class TestBluetoothChannelRetry:
@@ -444,7 +463,7 @@ class TestBluetoothChannelRetry:
     async def test_channel_refused_routes_to_retry_step(self, hass, mock_paired_devices):
         flow = EscposConfigFlow()
         flow.hass = hass
-        flow.context = {"source": "user", "show_advanced_options": False}
+        flow.context = {"source": "user"}
         flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH}
         flow._paired_bt_devices = mock_paired_devices
 

@@ -104,6 +104,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   nine of them with worse text was removed. Added the missing Repairs
   and `reliability_profile` option translations. Made the network
   `cannot_connect` error actionable.
+- **The RFCOMM channel field on the Bluetooth setup form moved into a
+  collapsed "Advanced options" section.** It was previously shown only
+  when "Advanced mode" was enabled on your HA user profile; that flag is
+  deprecated (removal in HA 2027.6) and newer HA versions hard-wire it
+  on, which would have surfaced the field for everyone. The section is
+  always available — expand it to set a non-default channel — and a
+  refused default channel still routes to the focused channel-retry
+  step.
 
 ## [0.7.2] - 2026-06-11
 
