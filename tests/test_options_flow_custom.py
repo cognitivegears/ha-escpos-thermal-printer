@@ -120,10 +120,15 @@ async def test_options_flow_custom_line_width_valid(hass):  # type: ignore[no-un
     )
     assert result["step_id"] == "custom_line_width"
 
-    result = await hass.config_entries.options.async_configure(
-        result["flow_id"],
-        user_input={"custom_line_width": 64},
-    )
+    # Saving schedules an automatic entry reload (OptionsFlowWithReload);
+    # patch the setup so the reload can't leave a half-finished real setup
+    # (and its delayed Store writes) lingering past the end of the test.
+    with patch("custom_components.escpos_printer.async_setup_entry", return_value=True):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            user_input={"custom_line_width": 64},
+        )
+        await hass.async_block_till_done()
     assert result["type"] == "create_entry"
     assert result["data"][CONF_LINE_WIDTH] == 64
 

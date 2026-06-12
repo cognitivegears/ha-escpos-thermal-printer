@@ -83,13 +83,18 @@ async def test_options_flow_allow_local_image_urls_roundtrips(hass):  # type: ig
     }
     assert schema_defaults.get(CONF_ALLOW_LOCAL_IMAGE_URLS) is False
 
-    result2 = await hass.config_entries.options.async_configure(
-        result["flow_id"],
-        {
-            CONF_TIMEOUT: 4.0,
-            CONF_ALLOW_LOCAL_IMAGE_URLS: True,
-        },
-    )
+    # Saving schedules an automatic entry reload (OptionsFlowWithReload);
+    # patch the setup so the reload can't leave a half-finished real setup
+    # (and its delayed Store writes) lingering past the end of the test.
+    with patch("custom_components.escpos_printer.async_setup_entry", return_value=True):
+        result2 = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {
+                CONF_TIMEOUT: 4.0,
+                CONF_ALLOW_LOCAL_IMAGE_URLS: True,
+            },
+        )
+        await hass.async_block_till_done()
     assert result2["type"] == "create_entry"
     assert result2["data"][CONF_ALLOW_LOCAL_IMAGE_URLS] is True
 
