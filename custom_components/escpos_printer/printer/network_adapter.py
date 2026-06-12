@@ -33,12 +33,11 @@ class NetworkPrinterAdapter(EscposPrinterAdapterBase):
     def _connect(self) -> Any:
         """Create and return a network printer connection."""
         network_class = _get_network_printer()
-        profile_obj = self._get_profile_obj()
         return network_class(
             self._network_config.host,
             port=self._network_config.port,
             timeout=self._network_config.timeout,
-            profile=profile_obj,
+            profile=self._profile_for_constructor(),
         )
 
     async def _status_check(self, hass: HomeAssistant) -> None:
@@ -51,6 +50,7 @@ class NetworkPrinterAdapter(EscposPrinterAdapterBase):
         until the print completes — strictly better than corrupting an
         active job.
         """
+
         def _probe() -> tuple[bool, str | None, int | None]:
             start = time.perf_counter()
             try:

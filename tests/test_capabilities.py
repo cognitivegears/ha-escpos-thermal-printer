@@ -255,10 +255,10 @@ class TestGetProfileLineWidths:
         assert result == sorted(result)
 
     def test_default_profile_has_widths(self):
-        """Default fallback profile should have line widths."""
+        """The escpos 'default' profile exposes its real font column counts."""
         result = get_profile_line_widths("default")
         assert len(result) > 0
-        assert 48 in result  # Default fallback has Font A with 48 columns
+        assert 42 in result  # escpos default profile: Font A = 42 columns
 
 
 class TestGetAllLineWidths:

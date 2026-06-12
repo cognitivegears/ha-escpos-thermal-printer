@@ -30,6 +30,7 @@ import aiohttp
 from homeassistant.auth.permissions.const import POLICY_READ
 from homeassistant.core import Context
 from homeassistant.exceptions import HomeAssistantError, Unauthorized
+from homeassistant.helpers.aiohttp_client import SERVER_SOFTWARE
 from homeassistant.helpers.template import Template
 
 from .const import (
@@ -78,6 +79,21 @@ _MAX_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024
 # cap, which is the real DoS axis.
 _MAX_BYTES_AUTO_RESIZE = MAX_IMAGE_SIZE_MB * 1024 * 1024 * 4
 _MAX_REDIRECTS = 5
+
+# Sent on every URL fetch. The bare per-request ``ClientSession`` (S-H1
+# pinning) otherwise advertises aiohttp's default ``Python/3.x aiohttp/…``
+# User-Agent, which CDN/WAF bot rules (WordPress/Photon, Cloudflare)
+# routinely answer with an HTML block page served as 200 — surfacing
+# downstream as "cannot identify image file". Pre-0.7.x fetches went
+# through HA's pooled clients and sent HA's own UA, so this restores the
+# identity that worked. The Accept header biases content negotiation
+# toward formats in the image-processor decoder allowlist (notably it
+# does not advertise AVIF, whose decode support depends on the optional
+# ``pillow-heif``).
+_FETCH_HEADERS: dict[str, str] = {
+    "User-Agent": SERVER_SOFTWARE,
+    "Accept": "image/jpeg,image/png,image/gif,image/webp,image/*;q=0.9,*/*;q=0.5",
+}
 
 # Public sentinel strings returned in the optional content-type hint slot
 # so callers / tests can rely on stable identifiers regardless of the
@@ -223,7 +239,7 @@ async def _resolve_camera(
     _LOGGER.debug("Fetching camera snapshot: %s", entity_id)
     try:
         image = await async_get_image(hass, entity_id, timeout=_ENTITY_FETCH_TIMEOUT_SECONDS)
-    except (HomeAssistantError, Unauthorized):
+    except HomeAssistantError, Unauthorized:
         raise
     except Exception as exc:
         raise HomeAssistantError(
@@ -253,7 +269,7 @@ async def _resolve_image_entity(
     _LOGGER.debug("Fetching image entity: %s", entity_id)
     try:
         image = await async_get_image(hass, entity_id, timeout=_ENTITY_FETCH_TIMEOUT_SECONDS)
-    except (HomeAssistantError, Unauthorized):
+    except HomeAssistantError, Unauthorized:
         raise
     except Exception as exc:
         raise HomeAssistantError(
@@ -282,7 +298,7 @@ def _check_content_length(headers: Mapping[str, str], max_bytes: int) -> None:
         return
     try:
         size = int(raw)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return
     if size > max_bytes:
         raise HomeAssistantError(
@@ -372,7 +388,7 @@ def _build_pinned_session(hostname: str, addresses: list[str]) -> aiohttp.Client
     """
     resolver = _StaticResolver(hostname, addresses)
     connector = aiohttp.TCPConnector(resolver=resolver, force_close=True)
-    return aiohttp.ClientSession(connector=connector)
+    return aiohttp.ClientSession(connector=connector, headers=_FETCH_HEADERS)
 
 
 async def _resolve_http_aiohttp(

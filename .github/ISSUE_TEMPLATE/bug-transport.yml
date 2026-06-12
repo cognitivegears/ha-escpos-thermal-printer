@@ -65,7 +65,7 @@ body:
     id: logs
     attributes:
       label: Relevant log lines
-      description: Enable debug logging via configuration.yaml (`logger.logs.custom_components.escpos_printer: debug`), reproduce, and paste the matching log block here.
+      description: "Enable debug logging via configuration.yaml (`logger.logs.custom_components.escpos_printer: debug`), reproduce, and paste the matching log block here."
       render: text
 
   - type: textarea

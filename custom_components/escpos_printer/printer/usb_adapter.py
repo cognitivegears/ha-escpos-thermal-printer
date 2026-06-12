@@ -37,7 +37,7 @@ class UsbPrinterAdapter(EscposPrinterAdapterBase):
     def _connect(self) -> Any:
         """Create and return a USB printer connection."""
         usb_class = _get_usb_printer()
-        profile_obj = self._get_profile_obj()
+        profile_name = self._profile_for_constructor()
 
         def _is_retryable(exc: Exception) -> bool:
             try:
@@ -79,7 +79,7 @@ class UsbPrinterAdapter(EscposPrinterAdapterBase):
                     timeout=int(self._usb_config.timeout * 1000),  # USB timeout in milliseconds
                     in_ep=self._usb_config.in_ep,
                     out_ep=self._usb_config.out_ep,
-                    profile=profile_obj,
+                    profile=profile_name,
                 )
             except Exception as exc:
                 last_exc = exc
@@ -118,6 +118,7 @@ class UsbPrinterAdapter(EscposPrinterAdapterBase):
         configurations; the cost of a stale status reading is strictly
         lower than the cost of corrupting an active print.
         """
+
         def _probe() -> tuple[bool, str | None, int | None]:
             start = time.perf_counter()
             try:

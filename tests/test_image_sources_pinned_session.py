@@ -150,6 +150,23 @@ async def test_build_pinned_session_returns_session_with_pinned_resolver() -> No
         await session.close()
 
 
+@pytest.mark.asyncio
+async def test_build_pinned_session_sends_identifying_headers() -> None:
+    # The bare per-request session must not fall back to aiohttp's default
+    # ``Python/3.x aiohttp/…`` User-Agent — CDN/WAF bot rules answer that
+    # with HTML block pages served as 200, which then die in the image
+    # decoder. HA's own UA (as sent by the pooled clients pre-0.7.x) plus
+    # an image-biased Accept header restore the identity that worked.
+    session = _build_pinned_session("example.com", ["192.0.2.1"])
+    try:
+        assert "HomeAssistant" in session.headers["User-Agent"]
+        assert session.headers["Accept"].startswith("image/")
+        # AVIF decode support is optional (pillow-heif); don't invite it.
+        assert "avif" not in session.headers["Accept"].lower()
+    finally:
+        await session.close()
+
+
 def test_check_size_below_max_returns_silently() -> None:
     # 1 byte is well under any plausible cap.
     _check_size(1, auto_resize=False)

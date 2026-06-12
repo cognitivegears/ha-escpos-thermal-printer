@@ -349,6 +349,24 @@ class EscposPrinterAdapterBase(
                 )
         return None
 
+    def _profile_for_constructor(self) -> str | None:
+        """Profile kwarg for python-escpos printer constructors.
+
+        Must be the profile *name*, not the resolved object:
+        ``Escpos.__init__`` runs the kwarg through
+        ``capabilities.get_profile()``, whose isinstance fast-path only
+        accepts instances of the library's *default* profile class. A
+        specific profile instance (e.g. ``TMT20IIProfile``) falls through
+        to a dict lookup keyed by the object itself, so every connect
+        dies with ``KeyError: <...TMT20IIProfile object...>``. Validating
+        via :meth:`_get_profile_obj` first keeps the old behaviour for
+        unknown profiles — degrade to the library default with a debug
+        log instead of raising at connect time.
+        """
+        if self._get_profile_obj() is not None:
+            return self._config.profile
+        return None
+
     def get_profile_pixel_width(self, hass: HomeAssistant | None = None) -> int | None:
         """Return the printer profile's max pixel width (cached).
 
@@ -374,7 +392,7 @@ class EscposPrinterAdapterBase(
                 data = profile_obj.profile_data["media"]["width"]["pixels"]
                 if isinstance(data, (int, float)):
                     width = int(data)
-            except (AttributeError, KeyError, TypeError, ValueError):
+            except AttributeError, KeyError, TypeError, ValueError:
                 width = None
         self._cached_profile_width = width
         self._profile_width_lookup_done = True
@@ -501,7 +519,7 @@ class EscposPrinterAdapterBase(
                     await _print_prepared_under_lock(hass, printer, prepared)
                     await self._apply_cut_and_feed(hass, printer, cut, feed)
                     failed = False
-                except (asyncio.CancelledError, Exception):  # pragma: no cover (T-L4)
+                except asyncio.CancelledError, Exception:  # pragma: no cover (T-L4)
                     # S-M3: shield the cleanup so a second cancellation
                     # mid-flush doesn't leave paper half-printed. The
                     # suppress() catches Exception only — CancelledError
@@ -517,9 +535,7 @@ class EscposPrinterAdapterBase(
                     with contextlib.suppress(Exception):
                         await asyncio.shield(
                             asyncio.ensure_future(
-                                self._apply_cut_and_feed(
-                                    hass, printer, cleanup_cut(cut), feed or 1
-                                )
+                                self._apply_cut_and_feed(hass, printer, cleanup_cut(cut), feed or 1)
                             )
                         )
                     raise

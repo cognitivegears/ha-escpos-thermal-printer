@@ -22,6 +22,15 @@ def fake_escpos_module(request: Any, monkeypatch: pytest.MonkeyPatch) -> Generat
     if request.node.get_closest_marker("integration"):
         yield
         return
+    # Import the REAL capabilities module before installing the fake
+    # package: profile resolution must behave exactly like production
+    # (``Escpos.__init__`` round-trips the profile kwarg through
+    # ``get_profile()``, which only accepts a *name* — passing the
+    # resolved profile object broke every connect in 0.7.3, and the
+    # all-fake escpos hid it by making ``_get_profile_obj`` silently
+    # return None in unit tests).
+    import escpos.capabilities as real_capabilities
+
     escpos = types.ModuleType("escpos")
     printer = types.ModuleType("escpos.printer")
     escpos_pkg = types.ModuleType("escpos.escpos")
@@ -73,8 +82,10 @@ def fake_escpos_module(request: Any, monkeypatch: pytest.MonkeyPatch) -> Generat
             pass
 
     class _FakeNetwork(_FakeEscposCommon):
-        def __init__(self, *_: Any, **__: Any) -> None:
-            pass
+        def __init__(self, *_: Any, profile: Any = None, **__: Any) -> None:
+            # Mirror real Escpos.__init__: the profile kwarg must be a
+            # name (or default-class instance) acceptable to get_profile.
+            self.profile = real_capabilities.get_profile(profile)
 
     class _FakeUsb(_FakeEscposCommon):
         def __init__(
@@ -92,17 +103,20 @@ def fake_escpos_module(request: Any, monkeypatch: pytest.MonkeyPatch) -> Generat
             self.timeout = timeout
             self.in_ep = in_ep
             self.out_ep = out_ep
-            self.profile = profile
+            self.profile = real_capabilities.get_profile(profile)
 
     class _FakeEscposBase(_FakeEscposCommon):
         def __init__(self, profile: Any = None, **__: Any) -> None:
-            self.profile = profile
+            self.profile = real_capabilities.get_profile(profile)
 
     printer.Network = _FakeNetwork  # type: ignore[attr-defined]
     printer.Usb = _FakeUsb  # type: ignore[attr-defined]
     escpos.printer = printer  # type: ignore[attr-defined]
     escpos_pkg.Escpos = _FakeEscposBase  # type: ignore[attr-defined]
     escpos.escpos = escpos_pkg  # type: ignore[attr-defined]
+    # Keep the real capabilities reachable through the fake package so
+    # ``from escpos.capabilities import get_profile`` works in unit tests.
+    escpos.capabilities = real_capabilities  # type: ignore[attr-defined]
 
     # Use monkeypatch.setitem so each test's stub is automatically reverted at
     # teardown. Previously this used sys.modules.setdefault which never cleaned
@@ -111,6 +125,7 @@ def fake_escpos_module(request: Any, monkeypatch: pytest.MonkeyPatch) -> Generat
     monkeypatch.setitem(sys.modules, "escpos", escpos)
     monkeypatch.setitem(sys.modules, "escpos.printer", printer)
     monkeypatch.setitem(sys.modules, "escpos.escpos", escpos_pkg)
+    monkeypatch.setitem(sys.modules, "escpos.capabilities", real_capabilities)
 
     # The Bluetooth subclass is cached at module scope; invalidate it so the
     # next make_bluetooth_escpos call resolves the (just-installed) fake base.

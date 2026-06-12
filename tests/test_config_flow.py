@@ -125,12 +125,14 @@ async def test_config_flow_with_profile_selection(hass):  # type: ignore[no-unty
         assert result3["type"] == "form"
         assert result3["step_id"] == "codepage"
 
-        # Complete with defaults
+        # Complete with defaults. The real escpos "default" profile offers
+        # 42/56-column fonts (the old 48 came from the test-only fallback
+        # capability table that the fake escpos module used to force).
         result4 = await hass.config_entries.flow.async_configure(
             result3["flow_id"],
             {
                 CONF_CODEPAGE: "CP437",
-                CONF_LINE_WIDTH: 48,
+                CONF_LINE_WIDTH: 42,
                 CONF_DEFAULT_ALIGN: "center",
                 CONF_DEFAULT_CUT: "partial",
             },
@@ -139,7 +141,7 @@ async def test_config_flow_with_profile_selection(hass):  # type: ignore[no-unty
         assert result4["type"] == "create_entry"
         assert result4["data"][CONF_PROFILE] == "default"
         assert result4["data"][CONF_CODEPAGE] == "CP437"
-        assert result4["data"][CONF_LINE_WIDTH] == 48
+        assert result4["data"][CONF_LINE_WIDTH] == 42
         assert result4["data"][CONF_DEFAULT_ALIGN] == "center"
         assert result4["data"][CONF_DEFAULT_CUT] == "partial"
 
@@ -184,12 +186,13 @@ async def test_config_flow_custom_profile(hass):  # type: ignore[no-untyped-def]
         assert result4["type"] == "form"
         assert result4["step_id"] == "codepage"
 
-        # Complete the flow
+        # Complete the flow. TM-T88V is a real escpos profile with
+        # 42/56-column fonts, so the schema no longer offers 48.
         result5 = await hass.config_entries.flow.async_configure(
             result4["flow_id"],
             {
                 CONF_CODEPAGE: "",
-                CONF_LINE_WIDTH: DEFAULT_LINE_WIDTH,
+                CONF_LINE_WIDTH: 42,
                 CONF_DEFAULT_ALIGN: "left",
                 CONF_DEFAULT_CUT: "none",
             },
