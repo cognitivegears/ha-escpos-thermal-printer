@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-06-11
+
 ### Added
 
 - **"Allow local image URLs" printer option** (issue #95). Image URL
