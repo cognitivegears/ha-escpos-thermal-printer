@@ -15,17 +15,21 @@ The integration supports four connection formats:
 
 - **Direct serial (device path):** The Home Assistant host must have a serial port accessible at the path (USB-to-serial adapters show up as `/dev/ttyUSB0` or `/dev/ttyACM0` on Linux).
 - **Serial port permissions on Linux:** The HA user must be in the `dialout` group (or `uucp` on some distributions):
+
   ```bash
   sudo usermod -aG dialout homeassistant
   ```
+
   Log out and back in (or restart HA) for the group change to take effect.
 - **Docker:** Pass the serial device through to the container:
+
   ```yaml
   services:
     homeassistant:
       devices:
         - /dev/ttyUSB0:/dev/ttyUSB0
   ```
+
 - **Network-based connections (ESPHome, RFC2217, socket):** No special permissions needed — the integration connects over TCP.
 
 ## Configuration
@@ -62,7 +66,7 @@ serial_proxy:
 
 In the serial port field, enter:
 
-```
+```text
 esphome://host:6053?port_name=Name
 ```
 
@@ -86,11 +90,13 @@ These options are available under **Settings → Devices & services → ESC/POS 
 For printers with a physical RS-232 or TTL serial port connected directly to the HA host (or via a USB-to-serial adapter):
 
 1. Find the port path:
+
    ```bash
    ls /dev/ttyUSB* /dev/ttyACM*
    # or, for a more descriptive listing:
    ls -l /dev/serial/by-id/
    ```
+
 2. Find the right baud rate — check your printer's manual or print a self-test page (hold the feed button while powering on). Common rates: 9600, 19200, 38400, 115200.
 3. In the integration setup, enter the device path (e.g. `/dev/ttyUSB0`) and select the baud rate.
 
