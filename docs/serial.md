@@ -41,20 +41,21 @@ The integration supports four connection formats:
 
 ## ESPHome serial proxy
 
-The most common networked-serial use case: an ESP32/ESP8266 bridging a UART-connected printer to your network. Add a `uart:` block and a `uart_switch:` (or equivalent ESPHome UART proxy component) to your device's YAML, then use the ESPHome URL format as the serial port.
+The most common networked-serial use case: an ESP32/ESP8266 bridging a UART-connected printer to your network. Add a `uart:` block and a `serial_proxy:` to your device's YAML, then use the ESPHome URL format as the serial port.
 
 ### Example ESPHome configuration
 
 ```yaml
 uart:
-  id: printer_uart
-  tx_pin: GPIO17
-  rx_pin: GPIO16
+  tx_pin: 18
+  rx_pin: 19
   baud_rate: 9600
+  id: printer
 
-uart_switch:
-  uart_id: printer_uart
-  port: 6638
+serial_proxy:
+  - name: Printer
+    uart_id: printer
+    port_type: TTL
 ```
 
 ### Connecting in HA
@@ -69,7 +70,7 @@ Replace `192.168.1.100` with the ESP device's IP and `6638` with the port you co
 
 ### Write chunk size and inter-chunk delay
 
-ESP32 UART FIFOs are small (128 bytes). When the integration sends a large print job the ESP32 can drop bytes if data arrives faster than it can drain the buffer, causing garbled or truncated output.
+ESP32 UART FIFOs are small (128 bytes). When the integration sends a large print job the ESP32 can drop bytes if data arrives faster than it can drain the buffer, causing garbled or truncated output and may result in crashing the ESP32 entirely.
 
 To work around this, set the **Write chunk size** and **Inter-chunk delay** options in the integration's settings:
 
