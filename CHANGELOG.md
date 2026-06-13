@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Breaking changes
+
+- **Minimum Home Assistant version raised to 2026.5.0.** The serial
+  connection type requires `SerialPortSelector`, which was introduced in
+  HA 2026.5.0 and is absent in 2026.3/2026.4. Because the selector is
+  imported at module level via the config flow, loading the integration
+  on an older HA version breaks the config flow for *all* connection
+  types, not just serial.
+
 ### Added
 
 - **Serial (UART/RS-232) printer support.** Printers connected via a
