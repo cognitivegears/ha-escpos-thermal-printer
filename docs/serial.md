@@ -72,6 +72,8 @@ esphome://host:6053?port_name=Name
 
 Replace `host` with the ESP device's IP and `Name` with the proxy name you configured. The **baud rate** setting in HA is used to override the rate set in the ESPHome configuration.
 
+If your ESPHome device uses API encryption, append `&key=<base64-psk>` to the URL (e.g. `esphome://host:6053?port_name=Name&key=...`). The full URL (including the key) is stored in the HA config entry and redacted automatically in diagnostics downloads.
+
 ### Write chunk size and inter-chunk delay
 
 ESP32 UART FIFOs are small (128 bytes). When the integration sends a large print job the ESP32 can drop bytes if data arrives faster than it can drain the buffer, causing garbled or truncated output and may result in crashing the ESP32 entirely.
