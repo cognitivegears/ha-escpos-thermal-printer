@@ -46,12 +46,13 @@ MANIFEST_OVERRIDES: dict[str, str] = {
     # pyproject.toml keeps `dbus-fast==4.0.4` for dev/CI reproducibility
     # against the locked HA test wheel.
     "dbus-fast": ">=3.1.2,<6",
-    # serialx is pinned by HA core's USB/serial integrations; HA installs
-    # exactly the version HA core pins (currently 1.8.0). An exact pin in
-    # manifest.json creates an unsatisfiable conflict when HA's version
-    # differs. Range accepts whatever version HA has already installed.
-    # pyproject.toml keeps `serialx==1.8.0` for dev/CI reproducibility.
-    "serialx": ">=1.8.0",
+    # serialx is pinned by HA core via package_constraints.txt (1.7.0 in
+    # 2026.5.0, 1.7.3 in 2026.5.4, 1.8.0 in 2026.6.0). An exact pin in
+    # manifest.json would be unsatisfiable on HA versions that carry a
+    # different pin. The 1.7→1.8 change only touched the async write API;
+    # this integration uses the sync API throughout, so >=1.7.0,<2 is safe
+    # across the supported HA window. pyproject.toml pins ==1.8.0 for CI.
+    "serialx": ">=1.7.0,<2",
 }
 
 
