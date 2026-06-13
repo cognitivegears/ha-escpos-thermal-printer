@@ -91,8 +91,8 @@ def open_serial_transport(
 
     Accepts filesystem paths (``/dev/ttyUSB0``, ``COM3``) and serialx URL
     schemes (``esphome://``, ``rfc2217://``, ``socket://``). The ``baudrate``
-    argument is passed through for direct serial connections; URL-based
-    backends (e.g. ESPHome serial proxy) silently ignore it.
+    argument is passed through to the underlying transport for all connection
+    types.
 
     All writes are buffered and flushed as a single payload when the
     transport is closed, coalescing the many small ``_raw()`` calls that
