@@ -7,7 +7,7 @@ The integration supports four connection formats:
 | Format | Example | Use case |
 |--------|---------|----------|
 | Device path | `/dev/ttyUSB0`, `/dev/ttyACM0`, `COM3` | Direct UART/RS-232 cable |
-| `esphome://host:port` | `esphome://192.168.1.100:6638` | ESPHome UART proxy |
+| `esphome://host:6053?port_name=Name` | `esphome://192.168.1.100:6053?port_name=Printer` | ESPHome UART proxy |
 | `rfc2217://host:port` | `rfc2217://192.168.1.50:2217` | RFC 2217 serial server |
 | `socket://host:port` | `socket://192.168.1.50:9100` | Raw TCP socket |
 
@@ -32,8 +32,8 @@ The integration supports four connection formats:
 
 | Setting | Description | Default |
 |---------|-------------|---------|
-| Serial port | Device path (e.g. `/dev/ttyUSB0`) or URL (e.g. `esphome://host:port`) | — |
-| Baud rate | Serial speed for direct connections. Ignored for URL-based connections. | 9600 |
+| Serial port | Device path (e.g. `/dev/ttyUSB0`) or URL (e.g. `esphome://host:6053?port_name=Name`) | — |
+| Baud rate | Serial speed for the serial connection. | 9600 |
 | Timeout | Connection timeout in seconds | 4.0 |
 | Printer Profile | Your printer model (or Auto-detect) | Auto-detect |
 | Codepage | Character encoding (or Auto-detect) | Auto-detect |
@@ -63,10 +63,10 @@ serial_proxy:
 In the serial port field, enter:
 
 ```
-esphome://192.168.1.100:6638
+esphome://host:6053?port_name=Name
 ```
 
-Replace `192.168.1.100` with the ESP device's IP and `6638` with the port you configured. The **baud rate** setting in HA is ignored for ESPHome URLs — the speed is set on the ESP side in the `uart:` block.
+Replace `host` with the ESP device's IP and `Name` with the proxy name you configured. The **baud rate** setting in HA is used to override the rate set in the ESPHome configuration.
 
 ### Write chunk size and inter-chunk delay
 
