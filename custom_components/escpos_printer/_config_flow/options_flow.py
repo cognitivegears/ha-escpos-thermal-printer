@@ -281,7 +281,7 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
                     CONF_SERIAL_WRITE_CHUNK_SIZE,
                     default=opts.get(CONF_SERIAL_WRITE_CHUNK_SIZE, DEFAULT_SERIAL_WRITE_CHUNK_SIZE),
                 )
-            ] = int
+            ] = vol.All(vol.Coerce(int), vol.Range(min=0, max=4096))
             schema_fields[
                 vol.Optional(
                     CONF_SERIAL_WRITE_CHUNK_DELAY_MS,
@@ -289,7 +289,7 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
                         CONF_SERIAL_WRITE_CHUNK_DELAY_MS, DEFAULT_SERIAL_WRITE_CHUNK_DELAY_MS
                     ),
                 )
-            ] = int
+            ] = vol.All(vol.Coerce(int), vol.Range(min=0, max=1000))
         return vol.Schema(schema_fields)
 
     async def async_step_custom_profile(
