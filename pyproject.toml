@@ -25,8 +25,8 @@ dependencies = [
   # serial_for_url() transparently dispatches to native device paths
   # (/dev/ttyUSB0), esphome://, rfc2217://, and socket:// — enabling
   # ESPHome serial-proxy connections without adapter changes.
-  # Pinned to match HA's bundled serialx (shipped via the ESPHome integration
-  # manifest). manifest.json carries a range — see MANIFEST_OVERRIDES in
+  # Pinned to match HA's bundled serialx (pinned by HA core's USB/serial
+  # integrations). manifest.json carries a range — see MANIFEST_OVERRIDES in
   # scripts/sync_manifest_requirements.py and CLAUDE.md for the rationale.
   "serialx==1.8.0",
 ]
