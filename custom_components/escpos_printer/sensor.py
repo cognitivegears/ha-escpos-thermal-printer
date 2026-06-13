@@ -26,6 +26,7 @@ from .const import (
     CONF_BT_MAC,
     CONF_CONNECTION_TYPE,
     CONNECTION_TYPE_BLUETOOTH,
+    CONNECTION_TYPE_SERIAL,
     DOMAIN,
 )
 
@@ -80,6 +81,8 @@ class LastImagePrintSensor(SensorEntity):
             model = "Bluetooth Printer"
         elif connection_type == "usb":
             model = "USB Printer"
+        elif connection_type == CONNECTION_TYPE_SERIAL:
+            model = "Serial Printer"
         else:
             model = "Network Printer"
         return DeviceInfo(

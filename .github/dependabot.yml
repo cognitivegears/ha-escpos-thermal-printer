@@ -51,3 +51,8 @@ updates:
       # harness install. Let the HA test harness drive the version; revisit
       # if upstream loosens the pin.
       - dependency-name: "respx"
+      # serialx is pinned by HA core via package_constraints.txt (different
+      # versions across HA releases). Bumping it independently risks
+      # unsatisfiable conflicts. Let HA core drive the version; check
+      # package_constraints.txt when upgrading HA and update pyproject.toml.
+      - dependency-name: "serialx"

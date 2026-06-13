@@ -18,7 +18,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
-from ..const import DEFAULT_IN_EP, DEFAULT_OUT_EP, DEFAULT_RFCOMM_CHANNEL
+from ..const import (
+    DEFAULT_BAUDRATE,
+    DEFAULT_IN_EP,
+    DEFAULT_OUT_EP,
+    DEFAULT_RFCOMM_CHANNEL,
+    DEFAULT_SERIAL_WRITE_CHUNK_DELAY_MS,
+    DEFAULT_SERIAL_WRITE_CHUNK_SIZE,
+)
 
 
 @dataclass
@@ -68,8 +75,25 @@ class BluetoothPrinterConfig(BasePrinterConfig):
     rfcomm_channel: int = DEFAULT_RFCOMM_CHANNEL
 
 
+@dataclass
+class SerialPrinterConfig(BasePrinterConfig):
+    """Configuration for serial (UART/RS-232) printers.
+
+    ``serial_port`` accepts a filesystem path (``/dev/ttyUSB0``, ``COM3``)
+    *or* a serialx URL (``esphome://host:port``, ``rfc2217://host:port``,
+    ``socket://host:port``). The baudrate field is passed through for all
+    connection types.
+    """
+
+    connection_type: Literal["serial"] = field(default="serial", repr=False)
+    serial_port: str = ""
+    baudrate: int = DEFAULT_BAUDRATE
+    write_chunk_size: int = DEFAULT_SERIAL_WRITE_CHUNK_SIZE
+    write_chunk_delay_ms: int = DEFAULT_SERIAL_WRITE_CHUNK_DELAY_MS
+
+
 # Type alias for config union (use for type hints)
-PrinterConfigTypes = NetworkPrinterConfig | UsbPrinterConfig | BluetoothPrinterConfig
+PrinterConfigTypes = NetworkPrinterConfig | UsbPrinterConfig | BluetoothPrinterConfig | SerialPrinterConfig
 
 # Backward-compatible alias: PrinterConfig(...) still works and creates NetworkPrinterConfig
 # This maintains API compatibility for existing code that instantiates PrinterConfig directly

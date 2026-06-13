@@ -47,7 +47,7 @@ async def test_options_flow_custom_profile_invalid(hass):  # type: ignore[no-unt
         user_input={
             CONF_PROFILE: PROFILE_CUSTOM,
             CONF_CODEPAGE: "",
-            CONF_LINE_WIDTH: 48,
+            CONF_LINE_WIDTH: "48",
             "default_align": "left",
             "default_cut": "none",
             "timeout": 4.0,
@@ -143,7 +143,7 @@ async def test_options_flow_custom_codepage_invalid(hass):  # type: ignore[no-un
         user_input={
             CONF_PROFILE: "TM-T20",
             CONF_CODEPAGE: OPTION_CUSTOM,
-            CONF_LINE_WIDTH: 48,
+            CONF_LINE_WIDTH: "48",
             "default_align": "left",
             "default_cut": "none",
             "timeout": 4.0,

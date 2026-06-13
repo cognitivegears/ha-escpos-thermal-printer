@@ -14,6 +14,7 @@ from .const import (
     CONF_CONNECTION_TYPE,
     CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
+    CONNECTION_TYPE_SERIAL,
     CONNECTION_TYPE_USB,
     DOMAIN,
 )
@@ -55,13 +56,16 @@ class EscposOnlineSensor(BinarySensorEntity):
     @property
     def device_info(self) -> DeviceInfo:
         connection_type = self._entry.data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
-        # B-L7: three-way branch matches notify.py / sensor.py. Pre-fix
-        # this picked "Network Printer" for Bluetooth entries because
-        # the Bluetooth transport landed after binary_sensor was written.
+        # B-L7: pre-fix this picked "Network Printer" for Bluetooth entries
+        # because the Bluetooth transport landed after binary_sensor was
+        # written. Now a four-way branch — keep in sync with notify.py /
+        # sensor.py when adding new connection types.
         if connection_type == CONNECTION_TYPE_USB:
             model = "USB Printer"
         elif connection_type == CONNECTION_TYPE_BLUETOOTH:
             model = "Bluetooth Printer"
+        elif connection_type == CONNECTION_TYPE_SERIAL:
+            model = "Serial Printer"
         else:
             model = "Network Printer"
 

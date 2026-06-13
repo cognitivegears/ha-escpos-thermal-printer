@@ -5,7 +5,7 @@
 [![HACS Validation](https://github.com/cognitivegears/ha-escpos-thermal-printer/actions/workflows/hacs.yml/badge.svg)](https://github.com/cognitivegears/ha-escpos-thermal-printer/actions/workflows/hacs.yml)
 
 Print receipts, labels, QR codes, and more from Home Assistant automations.
-Connect any ESC/POS capable network, USB, or bluetooth thermal printer and
+Connect any ESC/POS capable network, USB, bluetooth, or serial thermal printer and
 start printing in minutes.
 
 ![Printed Receipt Example](docs/assets/receipt.png)
@@ -15,11 +15,12 @@ start printing in minutes.
 - **Automate physical output** - Print door access logs, temperature alerts,
 todo lists, daily reports, or shopping lists automatically
 
-- **Works with cheap hardware** - Any $30+ thermal printer (network, USB, or bluetooth)
-that supports ESC/POS will work
+- **Works with cheap hardware** - Any $30+ thermal printer (network, USB, bluetooth,
+or serial) that supports ESC/POS will work
 
-- **Network, USB, and bluetooth support** - Connect via TCP/IP, plug directly via
-USB, or print wirelessly
+- **Network, USB, Bluetooth, and serial support** - Connect via TCP/IP, plug directly
+via USB, print wirelessly over Bluetooth, or use a serial (UART/RS-232) or ESPHome
+serial proxy connection
 
 - **Multiple printers** - Set up as many printers as you need and target them
 individually or broadcast to all
@@ -49,6 +50,8 @@ individually or broadcast to all
 - **USB printers:** Connected directly to your Home Assistant host (requires libusb)
 - **Bluetooth printers:** Linux host with kernel `AF_BLUETOOTH` support;
   printer paired on the host before adding to HA. See [Bluetooth printers](docs/bluetooth.md).
+- **Serial printers:** Linux host with serial port access (`dialout` group); or use
+  an ESPHome serial proxy over the network. See [Serial printers](docs/serial.md).
 
 ### Install via HACS
 
@@ -196,6 +199,12 @@ Cheap thermal printers (Netum, MUNBYN, POS-58 generics, Phomemo Classic line, et
 
 See [docs/bluetooth.md](docs/bluetooth.md) for the full pairing walkthrough, container deployment notes, the `socat` host-bridge fallback, and security considerations.
 
+## Serial (UART/RS-232) printers
+
+For printers connected via a physical serial cable or a network-based serial proxy. Supports direct device paths (`/dev/ttyUSB0`), ESPHome UART proxies (`esphome://host:port`), RFC2217 serial servers, and raw TCP sockets. On Linux, the HA user needs to be in the `dialout` group.
+
+See [docs/serial.md](docs/serial.md) for setup instructions, ESPHome YAML examples, write-chunking options for ESP32 buffer overruns, and troubleshooting.
+
 ## Blueprints
 
 The [`blueprints/`](blueprints/) directory ships 13 ready-to-import Home Assistant scripts and automations that exercise the text-effects services. They cover the common day-to-day workflows so you don't need to write YAML from scratch.
@@ -227,6 +236,7 @@ See [`blueprints/README.md`](blueprints/README.md) for import instructions, per-
 | [Network printers](docs/network.md) | TCP/IP setup |
 | [USB printers](docs/usb.md) | USB setup, permissions, container pass-through |
 | [Bluetooth printers](docs/bluetooth.md) | Pairing, RFCOMM, container caveats |
+| [Serial printers](docs/serial.md) | Serial/UART setup, ESPHome proxy, write chunking |
 | [Services](docs/services.md) | Service parameter reference |
 | [Images](docs/images.md) | Image printing — sources, processing, reliability, recipes |
 | [Text effects](docs/text-effects.md) | Boxes, multi-column tables, and custom-font / rotated text |
