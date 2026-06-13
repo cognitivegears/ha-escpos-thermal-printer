@@ -17,6 +17,7 @@ from .const import (
     CONF_CONNECTION_TYPE,
     CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
+    CONNECTION_TYPE_SERIAL,
     CONNECTION_TYPE_USB,
     DOMAIN,
 )
@@ -86,6 +87,8 @@ class EscposNotifyEntity(NotifyEntity):
             model = "USB Printer"
         elif connection_type == CONNECTION_TYPE_BLUETOOTH:
             model = "Bluetooth Printer"
+        elif connection_type == CONNECTION_TYPE_SERIAL:
+            model = "Serial Printer"
         else:
             model = "Network Printer"
 
