@@ -51,7 +51,7 @@ MANIFEST_OVERRIDES: dict[str, str] = {
     # manifest.json would be unsatisfiable on HA versions that carry a
     # different pin. The 1.7→1.8 change only touched the async write API;
     # this integration uses the sync API throughout, so >=1.7.0,<2 is safe
-    # across the supported HA window. pyproject.toml pins ==1.8.0 for CI.
+    # across the supported HA window. pyproject.toml pins ==1.7.3 for CI.
     "serialx": ">=1.7.0,<2",
 }
 
