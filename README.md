@@ -246,6 +246,7 @@ See [`blueprints/README.md`](blueprints/README.md) for import instructions, per-
 | [Limitations](docs/limitations.md) | Known limitations |
 | [Troubleshooting](docs/troubleshooting.md) | Common issues and solutions |
 | [Contributing](CONTRIBUTING.md) | Contributing, testing, and local development |
+| [Contributors](CONTRIBUTORS.md) | People who have contributed to this project |
 
 ## Getting Help
 
