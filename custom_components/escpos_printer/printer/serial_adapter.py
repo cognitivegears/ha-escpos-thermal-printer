@@ -104,72 +104,97 @@ class SerialPrinterAdapter(EscposPrinterAdapterBase):
         assert last_exc is not None  # pragma: no cover
         raise last_exc
 
+    async def _release_printer(
+        self, hass: HomeAssistant, printer: Any, *, owned: bool, failed: bool = False
+    ) -> None:
+        """Flush coalesced output (errors propagate) before the base close.
+
+        The serial transport buffers every ``_raw()`` micro-write and only
+        sends the payload to the wire when the connection is flushed/closed.
+        The base ``_release_printer`` closes best-effort (suppressing
+        exceptions), so without this a write that fails at flush time —
+        device unplugged, ESPHome proxy reset, socket dropped mid-flush —
+        would be swallowed and the operation reported as success. On the
+        success path (``owned`` reconnect-per-op, ``not failed``) we flush
+        explicitly here: a failed write raises out of the operation's
+        ``finally``, skipping ``_mark_success`` so the caller sees the
+        error. The connection is still closed afterwards either way.
+        """
+        flush_exc: Exception | None = None
+        if owned and not failed and printer is not None:
+
+            def _flush() -> None:
+                printer.flush()
+
+            try:
+                await hass.async_add_executor_job(_flush)
+            except Exception as exc:  # surfaced after the close below
+                flush_exc = exc
+                failed = True
+
+        await super()._release_printer(hass, printer, owned=owned, failed=failed)
+        if flush_exc is not None:
+            raise flush_exc
+
     async def _status_check(self, hass: HomeAssistant) -> None:
         """Check serial printer reachability.
 
         For filesystem paths we do a non-invasive character-device check
-        (``os.path.exists`` + ``stat.S_ISCHR``).  For URL-based connections
-        (ESPHome proxy, RFC2217, socket) we attempt a brief open/close, since
-        there is no device-file to inspect.
+        (``os.stat`` + ``stat.S_ISCHR``). For URL-based connections (ESPHome
+        proxy, RFC2217, socket) we attempt a brief open/close, since there is
+        no device-file to inspect.
 
-        Skips the check when a print operation currently holds the lock.
+        The probe runs under the operation lock via ``_probe_lock_or_skip``
+        so it cannot race a print onto the same transport: a bare
+        ``if self._lock.locked(): return`` was TOCTOU — a print could acquire
+        the lock between the check and the probe, leaving a status open/close
+        to a URL proxy (ESPHome/socket/RFC2217) running concurrently with the
+        active job. When a print already holds the lock, this tick is skipped.
         """
-        if self._lock.locked():
-            _LOGGER.debug(
-                "Skipping serial status probe for %s — print operation in flight",
-                sanitize_log_message(self._serial_config.serial_port),
-            )
-            return
-
         port = self._serial_config.serial_port
 
-        if _is_url(port):
-            await self._status_check_url(hass, port)
-        else:
-            await self._status_check_path(hass, port)
-
-    async def _status_check_path(self, hass: HomeAssistant, port: str) -> None:
-        """Non-invasive status check for filesystem serial ports."""
-
-        def _probe() -> tuple[bool, str | None, int | None, int | None]:
-            start = time.perf_counter()
-            try:
-                st = os.stat(port)
-            except OSError as exc:
-                latency_ms = int((time.perf_counter() - start) * 1000)
-                return False, str(exc), latency_ms, getattr(exc, "errno", None)
-            else:
-                latency_ms = int((time.perf_counter() - start) * 1000)
-                if not stat.S_ISCHR(st.st_mode):
-                    return False, f"{port} is not a character device", latency_ms, None
-                return True, None, latency_ms, None
-
-        ok, err, latency_ms, err_no = await hass.async_add_executor_job(_probe)
-        self._record_status(ok, err, latency_ms, err_no)
-
-    async def _status_check_url(self, hass: HomeAssistant, port: str) -> None:
-        """Status check for URL-based serial connections via a brief open/close probe."""
-
-        def _probe() -> tuple[bool, str | None, int | None, int | None]:
-            start = time.perf_counter()
-            probe_timeout = min(self._serial_config.timeout, 3.0)
-            try:
-                transport = serial_transport.open_serial_transport(
-                    port,
-                    self._serial_config.baudrate,
-                    probe_timeout,
+        async with self._probe_lock_or_skip() as acquired:
+            if not acquired:
+                _LOGGER.debug(
+                    "Skipping serial status probe for %s — print operation in flight",
+                    sanitize_log_message(port),
                 )
-            except OSError as exc:
-                latency_ms = int((time.perf_counter() - start) * 1000)
-                return False, str(exc), latency_ms, getattr(exc, "errno", None)
-            else:
-                latency_ms = int((time.perf_counter() - start) * 1000)
-                with contextlib.suppress(Exception):
-                    transport.close()
-                return True, None, latency_ms, None
+                return
+            probe = self._probe_url if _is_url(port) else self._probe_path
+            ok, err, latency_ms, err_no = await hass.async_add_executor_job(probe, port)
 
-        ok, err, latency_ms, err_no = await hass.async_add_executor_job(_probe)
         self._record_status(ok, err, latency_ms, err_no)
+
+    def _probe_path(self, port: str) -> tuple[bool, str | None, int | None, int | None]:
+        """Non-invasive reachability probe for filesystem serial ports."""
+        start = time.perf_counter()
+        try:
+            st = os.stat(port)
+        except OSError as exc:
+            latency_ms = int((time.perf_counter() - start) * 1000)
+            return False, str(exc), latency_ms, getattr(exc, "errno", None)
+        latency_ms = int((time.perf_counter() - start) * 1000)
+        if not stat.S_ISCHR(st.st_mode):
+            return False, f"{port} is not a character device", latency_ms, None
+        return True, None, latency_ms, None
+
+    def _probe_url(self, port: str) -> tuple[bool, str | None, int | None, int | None]:
+        """Reachability probe for URL serial ports via a brief open/close."""
+        start = time.perf_counter()
+        probe_timeout = min(self._serial_config.timeout, 3.0)
+        try:
+            transport = serial_transport.open_serial_transport(
+                port,
+                self._serial_config.baudrate,
+                probe_timeout,
+            )
+        except OSError as exc:
+            latency_ms = int((time.perf_counter() - start) * 1000)
+            return False, str(exc), latency_ms, getattr(exc, "errno", None)
+        latency_ms = int((time.perf_counter() - start) * 1000)
+        with contextlib.suppress(Exception):
+            transport.close()
+        return True, None, latency_ms, None
 
     def _record_status(
         self,

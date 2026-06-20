@@ -42,6 +42,17 @@ def _get_serial_escpos_cls() -> type[Any]:
                 raise OSError("Serial transport already closed")
             self._transport.write(msg)
 
+        def flush(self) -> None:
+            """Flush buffered bytes to the wire, raising on write failure.
+
+            python-escpos itself never calls this; the serial adapter calls
+            it on the success path (before the best-effort ``close``) so a
+            failed write is reported instead of silently swallowed.
+            """
+            if self._transport is None:
+                raise OSError("Serial transport already closed")
+            self._transport.flush()
+
         def _read(self) -> bytes:
             # ESC/POS serial connections are write-only in practice.
             # Returning empty keeps python-escpos paths that opportunistically

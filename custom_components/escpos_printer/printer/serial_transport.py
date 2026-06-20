@@ -22,6 +22,9 @@ class SerialTransport(Protocol):
     def write(self, data: bytes) -> None:
         """Write bytes to the underlying transport."""
 
+    def flush(self) -> None:
+        """Write any buffered bytes to the wire, raising on failure."""
+
     def close(self) -> None:
         """Close the underlying transport."""
 
@@ -73,7 +76,22 @@ class _SerialTransportImpl:
             if self._write_chunk_delay_s > 0 and i + self._write_chunk_size < len(data):
                 time.sleep(self._write_chunk_delay_s)
 
+    def flush(self) -> None:
+        """Write the buffered payload to the wire, propagating errors.
+
+        Unlike :meth:`close`, this does **not** suppress write failures —
+        the adapter calls it on the success path so a failed write surfaces
+        and the print operation is reported as failed instead of silently
+        "succeeding". Idempotent: ``_flush`` clears the buffer, so a later
+        ``close()`` flush is a no-op.
+        """
+        self._flush()
+
     def close(self) -> None:
+        # Best-effort flush for paths that did not call flush() first (the
+        # error path): a write failure here is intentionally suppressed so
+        # close() never raises during cleanup. The success path flushes via
+        # flush() above, where errors do propagate.
         with contextlib.suppress(Exception):
             self._flush()
         with contextlib.suppress(Exception):

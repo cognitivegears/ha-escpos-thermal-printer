@@ -406,3 +406,56 @@ class TestSerialTransportImpl:
         transport.write(b"data")
         transport.close()
         port.close.assert_called_once()
+
+    def test_flush_writes_buffer_to_port(self):
+        transport, port = self._make_transport()
+        transport.write(b"hello")
+        transport.flush()
+        port.write.assert_called_once_with(b"hello")
+
+    def test_flush_propagates_write_error(self):
+        # Unlike close(), flush() must NOT suppress: the adapter relies on the
+        # error surfacing so a failed write is reported instead of silently
+        # "succeeding".
+        transport, port = self._make_transport()
+        port.write.side_effect = OSError("port gone")
+        transport.write(b"data")
+        with pytest.raises(OSError, match="port gone"):
+            transport.flush()
+
+    def test_flush_then_close_writes_once(self):
+        # flush() clears the buffer, so the close() best-effort flush is a no-op.
+        transport, port = self._make_transport()
+        transport.write(b"hello")
+        transport.flush()
+        transport.close()
+        port.write.assert_called_once_with(b"hello")
+
+
+class TestSerialReleasePrinterFlush:
+    """Deferred-write fix: _release_printer flushes with error propagation."""
+
+    @pytest.mark.asyncio
+    async def test_release_flushes_on_success(self, hass, serial_adapter):
+        printer = MagicMock()
+        await serial_adapter._release_printer(hass, printer, owned=True, failed=False)
+        printer.flush.assert_called_once()
+        printer.close.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_release_surfaces_flush_error_and_still_closes(self, hass, serial_adapter):
+        printer = MagicMock()
+        printer.flush.side_effect = OSError("port gone")
+        with pytest.raises(OSError, match="port gone"):
+            await serial_adapter._release_printer(hass, printer, owned=True, failed=False)
+        # Connection is still closed even though the flush failed.
+        printer.close.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_release_skips_flush_when_op_already_failed(self, hass, serial_adapter):
+        # On the failure path the buffered partial payload is only sent
+        # best-effort via the (suppressed) close — no explicit flush.
+        printer = MagicMock()
+        await serial_adapter._release_printer(hass, printer, owned=True, failed=True)
+        printer.flush.assert_not_called()
+        printer.close.assert_called_once()

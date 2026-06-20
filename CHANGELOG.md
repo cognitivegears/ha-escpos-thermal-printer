@@ -33,11 +33,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   ESP32 via ESPHome `serial_proxy`). Recommended values: chunk size 128,
   delay 10 ms. Both are validated in the options flow (0–4096 bytes,
   0–1000 ms) to prevent runaway `time.sleep()` calls under the print
-  lock.
+  lock. Because serial writes are coalesced and only sent to the wire at
+  flush time, the payload is now flushed with error propagation before the
+  connection closes — a failed write (unplugged adapter, dropped proxy)
+  surfaces as a failed print instead of silently reporting success.
 - **Serial printer status sensor.** The binary sensor checks device-path
   ports via `os.stat` + `S_ISCHR` (non-invasive, no open required) and
   URL-based ports via a brief open/close probe — consistent with the
-  Bluetooth reachability model.
+  Bluetooth reachability model. The probe runs under the operation lock,
+  so it never opens a second connection to a URL proxy while a print is in
+  flight.
 - **Serial port redaction in diagnostics.** The serial port path or URL
   is included in the diagnostics download but redacted by
   `async_redact_data` (same treatment as network host and Bluetooth MAC).
