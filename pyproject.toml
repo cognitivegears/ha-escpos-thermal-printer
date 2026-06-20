@@ -20,7 +20,7 @@ dependencies = [
   # Visual-width measurement for the text-effects box / table padders so
   # CJK / fullwidth / emoji columns line up under the 1-col-per-glyph
   # text mode (instead of silently misaligning via len()).
-  "wcwidth==0.7.0",
+  "wcwidth==0.8.1",
   # Serial port support. serialx is used instead of bare pyserial because
   # serial_for_url() transparently dispatches to native device paths
   # (/dev/ttyUSB0), esphome://, rfc2217://, and socket:// — enabling
@@ -51,11 +51,11 @@ dev = [
     "pytest==9.0.3",
     "pytest-homeassistant-custom-component==0.13.333",
     "mypy==2.1.0",
-    "ruff==0.15.14",
+    "ruff==0.15.18",
     "pre-commit==4.6.0",
     "bandit==1.9.4",
     "bandit-sarif-formatter==1.1.1",
-    "pip-audit==2.10.0",
+    "pip-audit==2.10.1",
     # HTTP mocking for the SSRF / slow-loris / fallback-bug regression
     # tests in tests/test_image_sources.py. Used by tests/conftest.py
     # fixtures `mock_pooled_aiohttp` and `slow_aiter`. Pinned to the
@@ -66,12 +66,12 @@ dev = [
     # main to enforce >=90% on changed lines, on top of the global
     # `fail_under=80`). Catches regressions in large PRs where the
     # global average masks new untested code.
-    "diff-cover==10.2.1",
+    "diff-cover==10.3.0",
 ]
 security = [
   "bandit==1.9.4",
   "bandit-sarif-formatter==1.1.1",
-  "pip-audit==2.10.0",
+  "pip-audit==2.10.1",
 ]
 # Note: SAST scanning uses Opengrep (an open-source fork of Semgrep) installed
 # as a signed binary in the security-scan workflow. Opengrep is not on PyPI,

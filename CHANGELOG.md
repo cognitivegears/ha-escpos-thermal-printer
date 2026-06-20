@@ -47,6 +47,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   is included in the diagnostics download but redacted by
   `async_redact_data` (same treatment as network host and Bluetooth MAC).
 
+### Changed
+
+- **Dependency bump: `wcwidth` 0.7.0 → 0.8.1.** Picks up upstream's
+  terminal-aware width fixes (notably Variation Selector 15 emoji now
+  measured as narrow), which feeds the visual-column padding for the
+  text-effects box / table layouts. No configuration or service changes.
+
 ## [0.7.4] - 2026-06-12
 
 ### Fixed
