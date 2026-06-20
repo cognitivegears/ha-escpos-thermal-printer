@@ -15,7 +15,7 @@ jobs:
       contents: write
       pull-requests: read
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v7.0.0
       # Skip metadata mutation on PRs and forks; this requires elevated permissions.
       - name: Ensure repository metadata (description, topics)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
