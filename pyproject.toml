@@ -55,7 +55,7 @@ dev = [
     "pre-commit==4.6.0",
     "bandit==1.9.4",
     "bandit-sarif-formatter==1.1.1",
-    "pip-audit==2.10.0",
+    "pip-audit==2.10.1",
     # HTTP mocking for the SSRF / slow-loris / fallback-bug regression
     # tests in tests/test_image_sources.py. Used by tests/conftest.py
     # fixtures `mock_pooled_aiohttp` and `slow_aiter`. Pinned to the
@@ -66,12 +66,12 @@ dev = [
     # main to enforce >=90% on changed lines, on top of the global
     # `fail_under=80`). Catches regressions in large PRs where the
     # global average masks new untested code.
-    "diff-cover==10.2.1",
+    "diff-cover==10.3.0",
 ]
 security = [
   "bandit==1.9.4",
   "bandit-sarif-formatter==1.1.1",
-  "pip-audit==2.10.0",
+  "pip-audit==2.10.1",
 ]
 # Note: SAST scanning uses Opengrep (an open-source fork of Semgrep) installed
 # as a signed binary in the security-scan workflow. Opengrep is not on PyPI,
