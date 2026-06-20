@@ -30,15 +30,20 @@ from ..const import (
     CONF_LINE_WIDTH,
     CONF_PROFILE,
     CONF_RELIABILITY_PROFILE,
+    CONF_SERIAL_WRITE_CHUNK_DELAY_MS,
+    CONF_SERIAL_WRITE_CHUNK_SIZE,
     CONF_STATUS_INTERVAL,
     CONF_TIMEOUT,
     CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
+    CONNECTION_TYPE_SERIAL,
     CONNECTION_TYPE_USB,
     DEFAULT_ALIGN,
     DEFAULT_ALLOW_LOCAL_IMAGE_URLS,
     DEFAULT_CUT,
     DEFAULT_LINE_WIDTH,
+    DEFAULT_SERIAL_WRITE_CHUNK_DELAY_MS,
+    DEFAULT_SERIAL_WRITE_CHUNK_SIZE,
     DEFAULT_TIMEOUT,
     RELIABILITY_PROFILE_AUTO,
     RELIABILITY_PROFILE_BALANCED,
@@ -166,18 +171,22 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
         if current_codepage and current_codepage not in codepage_choices:
             codepage_choices[current_codepage] = f"{current_codepage} (current)"
 
-        # Get line widths for current profile
+        # Get line widths for current profile. String keys are required because
+        # the HA frontend submits all dropdown values as strings; integer keys
+        # cause vol.In to fail ("42" not in {42, 56, ...}).
         width_list = await self.hass.async_add_executor_job(
             get_profile_line_widths, current_profile
         )
-        width_choices: dict[str | int, str] = {}
+        width_choices: dict[str, str] = {}
         for w in width_list:
-            width_choices[w] = f"{w} columns"
+            width_choices[str(w)] = f"{w} columns"
         width_choices[OPTION_CUSTOM] = "Custom (enter columns)..."
 
-        # Ensure current line width is in choices (backward compatibility)
-        if current_line_width and current_line_width not in width_choices:
-            width_choices[current_line_width] = f"{current_line_width} columns (current)"
+        # Ensure current line width is in choices (backward compatibility).
+        # Normalise to str so the lookup works regardless of stored type.
+        current_line_width_str = str(current_line_width)
+        if current_line_width_str not in width_choices:
+            width_choices[current_line_width_str] = f"{current_line_width} columns (current)"
 
         # Get cut modes for current profile
         cut_modes = await self.hass.async_add_executor_job(get_profile_cut_modes, current_profile)
@@ -205,88 +214,83 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
         )
         reliability_choices = dict(_RELIABILITY_LABELS)
 
-        # Build schema - USB printers don't have keepalive option
-        if connection_type == CONNECTION_TYPE_USB:
-            data_schema = vol.Schema(
-                {
-                    vol.Optional(
-                        CONF_TIMEOUT,
-                        default=self.config_entry.options.get(
-                            CONF_TIMEOUT, self.config_entry.data.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)
-                        ),
-                    ): vol.Coerce(float),
-                    vol.Optional(CONF_PROFILE, default=current_profile): vol.In(profile_choices),
-                    vol.Optional(CONF_CODEPAGE, default=current_codepage): vol.In(codepage_choices),
-                    vol.Optional(CONF_LINE_WIDTH, default=current_line_width): vol.In(
-                        width_choices
-                    ),
-                    vol.Optional(
-                        CONF_DEFAULT_ALIGN,
-                        default=self.config_entry.options.get(
-                            CONF_DEFAULT_ALIGN,
-                            self.config_entry.data.get(CONF_DEFAULT_ALIGN, DEFAULT_ALIGN),
-                        ),
-                    ): vol.In(["left", "center", "right"]),
-                    vol.Optional(CONF_DEFAULT_CUT, default=current_cut): vol.In(cut_choices),
-                    vol.Optional(CONF_RELIABILITY_PROFILE, default=current_reliability): vol.In(
-                        reliability_choices
-                    ),
-                    vol.Optional(
-                        CONF_STATUS_INTERVAL,
-                        default=self.config_entry.options.get(CONF_STATUS_INTERVAL, 0),
-                    ): int,
-                    vol.Optional(
-                        CONF_ALLOW_LOCAL_IMAGE_URLS,
-                        default=self.config_entry.options.get(
-                            CONF_ALLOW_LOCAL_IMAGE_URLS, DEFAULT_ALLOW_LOCAL_IMAGE_URLS
-                        ),
-                    ): bool,
-                }
-            )
-        else:
-            data_schema = vol.Schema(
-                {
-                    vol.Optional(
-                        CONF_TIMEOUT,
-                        default=self.config_entry.options.get(
-                            CONF_TIMEOUT, self.config_entry.data.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)
-                        ),
-                    ): vol.Coerce(float),
-                    vol.Optional(CONF_PROFILE, default=current_profile): vol.In(profile_choices),
-                    vol.Optional(CONF_CODEPAGE, default=current_codepage): vol.In(codepage_choices),
-                    vol.Optional(CONF_LINE_WIDTH, default=current_line_width): vol.In(
-                        width_choices
-                    ),
-                    vol.Optional(
-                        CONF_DEFAULT_ALIGN,
-                        default=self.config_entry.options.get(
-                            CONF_DEFAULT_ALIGN,
-                            self.config_entry.data.get(CONF_DEFAULT_ALIGN, DEFAULT_ALIGN),
-                        ),
-                    ): vol.In(["left", "center", "right"]),
-                    vol.Optional(CONF_DEFAULT_CUT, default=current_cut): vol.In(cut_choices),
-                    vol.Optional(CONF_RELIABILITY_PROFILE, default=current_reliability): vol.In(
-                        reliability_choices
-                    ),
-                    vol.Optional(
-                        CONF_KEEPALIVE,
-                        default=self.config_entry.options.get(CONF_KEEPALIVE, False),
-                    ): bool,
-                    vol.Optional(
-                        CONF_STATUS_INTERVAL,
-                        default=self.config_entry.options.get(CONF_STATUS_INTERVAL, 0),
-                    ): int,
-                    vol.Optional(
-                        CONF_ALLOW_LOCAL_IMAGE_URLS,
-                        default=self.config_entry.options.get(
-                            CONF_ALLOW_LOCAL_IMAGE_URLS, DEFAULT_ALLOW_LOCAL_IMAGE_URLS
-                        ),
-                    ): bool,
-                }
-            )
+        data_schema = self._build_options_schema(
+            connection_type=connection_type,
+            current_profile=current_profile,
+            current_codepage=current_codepage,
+            current_line_width_str=current_line_width_str,
+            current_cut=current_cut,
+            current_reliability=current_reliability,
+            profile_choices=profile_choices,
+            codepage_choices=codepage_choices,
+            width_choices=width_choices,
+            cut_choices=cut_choices,
+            reliability_choices=reliability_choices,
+        )
 
         _LOGGER.debug("Showing options form for entry %s", self.config_entry.entry_id)
         return self.async_show_form(step_id="init", data_schema=data_schema)
+
+    def _build_options_schema(
+        self,
+        *,
+        connection_type: str,
+        current_profile: str,
+        current_codepage: str,
+        current_line_width_str: str,
+        current_cut: str,
+        current_reliability: str,
+        profile_choices: dict[str, str],
+        codepage_choices: dict[str, str],
+        width_choices: dict[str, str],
+        cut_choices: dict[str, str],
+        reliability_choices: dict[str, str],
+    ) -> vol.Schema:
+        """Build the options schema for the given connection type."""
+        opts = self.config_entry.options
+        data = self.config_entry.data
+        schema_fields: dict[Any, Any] = {
+            vol.Optional(
+                CONF_TIMEOUT,
+                default=opts.get(CONF_TIMEOUT, data.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)),
+            ): vol.Coerce(float),
+            vol.Optional(CONF_PROFILE, default=current_profile): vol.In(profile_choices),
+            vol.Optional(CONF_CODEPAGE, default=current_codepage): vol.In(codepage_choices),
+            vol.Optional(CONF_LINE_WIDTH, default=current_line_width_str): vol.In(width_choices),
+            vol.Optional(
+                CONF_DEFAULT_ALIGN,
+                default=opts.get(CONF_DEFAULT_ALIGN, data.get(CONF_DEFAULT_ALIGN, DEFAULT_ALIGN)),
+            ): vol.In(["left", "center", "right"]),
+            vol.Optional(CONF_DEFAULT_CUT, default=current_cut): vol.In(cut_choices),
+            vol.Optional(CONF_RELIABILITY_PROFILE, default=current_reliability): vol.In(
+                reliability_choices
+            ),
+            vol.Optional(CONF_STATUS_INTERVAL, default=opts.get(CONF_STATUS_INTERVAL, 0)): int,
+            vol.Optional(
+                CONF_ALLOW_LOCAL_IMAGE_URLS,
+                default=opts.get(CONF_ALLOW_LOCAL_IMAGE_URLS, DEFAULT_ALLOW_LOCAL_IMAGE_URLS),
+            ): bool,
+        }
+        if connection_type not in (CONNECTION_TYPE_USB, CONNECTION_TYPE_SERIAL):
+            schema_fields[
+                vol.Optional(CONF_KEEPALIVE, default=opts.get(CONF_KEEPALIVE, False))
+            ] = bool
+        if connection_type == CONNECTION_TYPE_SERIAL:
+            schema_fields[
+                vol.Optional(
+                    CONF_SERIAL_WRITE_CHUNK_SIZE,
+                    default=opts.get(CONF_SERIAL_WRITE_CHUNK_SIZE, DEFAULT_SERIAL_WRITE_CHUNK_SIZE),
+                )
+            ] = vol.All(vol.Coerce(int), vol.Range(min=0, max=4096))
+            schema_fields[
+                vol.Optional(
+                    CONF_SERIAL_WRITE_CHUNK_DELAY_MS,
+                    default=opts.get(
+                        CONF_SERIAL_WRITE_CHUNK_DELAY_MS, DEFAULT_SERIAL_WRITE_CHUNK_DELAY_MS
+                    ),
+                )
+            ] = vol.All(vol.Coerce(int), vol.Range(min=0, max=1000))
+        return vol.Schema(schema_fields)
 
     async def async_step_custom_profile(
         self, user_input: dict[str, Any] | None = None

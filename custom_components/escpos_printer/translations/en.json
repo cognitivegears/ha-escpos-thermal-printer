@@ -192,6 +192,22 @@
         "data_description": {
           "custom_line_width": "Number of characters that fit on one line (e.g., 32, 42, 48)."
         }
+      },
+      "serial": {
+        "title": "Configure serial printer",
+        "description": "Select your printer's serial port and configure connection settings.",
+        "data": {
+          "serial_port": "Serial port",
+          "baudrate": "Baud rate",
+          "timeout": "Timeout (seconds)",
+          "profile": "Printer profile"
+        },
+        "data_description": {
+          "serial_port": "Serial port path (e.g. /dev/ttyUSB0, /dev/ttyACM0, COM3) or URL (e.g. esphome://host:6053?port_name=Name, rfc2217://host:2217, socket://host:9100).",
+          "baudrate": "Baud rate for the serial connection.",
+          "timeout": "Connection timeout in seconds.",
+          "profile": "Select your printer model or Auto-detect. Choose 'Custom' to enter a profile name manually."
+        }
       }
     },
     "error": {
@@ -218,7 +234,12 @@
       "bt_timeout": "Timed out connecting to Bluetooth printer. The printer may be asleep — try printing once to wake it, or increase the timeout.",
       "bt_channel_refused": "The printer is reachable but refused the RFCOMM channel. Most ESC/POS printers use channel 1 — try a different channel, or run 'bluetoothctl info [MAC]' on the host to confirm the SerialPort service-record channel.",
       "invalid_bt_mac": "Invalid Bluetooth MAC address. Expected format AA:BB:CC:DD:EE:FF.",
-      "invalid_rfcomm_channel": "Invalid RFCOMM channel. Must be between 1 and 30."
+      "invalid_rfcomm_channel": "Invalid RFCOMM channel. Must be between 1 and 30.",
+      "cannot_connect_serial": "Failed to connect to serial printer. Check that the port exists and permissions are configured correctly.",
+      "serial_permission_denied": "Permission denied accessing serial port. On Linux, add the Home Assistant user to the 'dialout' group (sudo usermod -aG dialout homeassistant).",
+      "serial_port_not_found": "Serial port not found. Verify the port path or URL is correct.",
+      "serial_port_busy": "Serial port is busy. Another process may be using it.",
+      "invalid_baudrate": "Invalid baud rate. Select one of the supported rates."
     },
     "abort": {
       "already_configured": "This printer is already configured.",
@@ -241,7 +262,9 @@
           "reliability_profile": "Image reliability profile",
           "keepalive": "Keep persistent connection",
           "status_interval": "Status check interval (seconds)",
-          "allow_local_image_urls": "Allow local image URLs"
+          "allow_local_image_urls": "Allow local image URLs",
+          "serial_write_chunk_size": "Write chunk size (bytes)",
+          "serial_write_chunk_delay_ms": "Inter-chunk delay (ms)"
         },
         "data_description": {
           "timeout": "Connection timeout in seconds.",
@@ -253,7 +276,9 @@
           "reliability_profile": "Picks safe defaults for image chunk size, inter-chunk delay, and ESC/POS image command. Service-call options always override these.",
           "keepalive": "Keep the connection open between print jobs (network printers only).",
           "status_interval": "How often to check printer status (0 to disable).",
-          "allow_local_image_urls": "Permit print_image_url (and the other image services) to fetch URLs that resolve to private/LAN/loopback addresses and to use non-standard ports (e.g. a local camera, a Frigate proxy on :5000, or your Home Assistant instance on :8123). Off by default. Cloud-metadata/link-local addresses stay blocked even when enabled."
+          "allow_local_image_urls": "Permit print_image_url (and the other image services) to fetch URLs that resolve to private/LAN/loopback addresses and to use non-standard ports (e.g. a local camera, a Frigate proxy on :5000, or your Home Assistant instance on :8123). Off by default. Cloud-metadata/link-local addresses stay blocked even when enabled.",
+          "serial_write_chunk_size": "Maximum bytes per write call. Set to 128 for ESPHome/ESP32 serial proxies to prevent buffer overruns. 0 disables chunking.",
+          "serial_write_chunk_delay_ms": "Pause between consecutive chunks (milliseconds). Allows the receiving device time to drain its buffer. Only applies when chunk size is non-zero."
         }
       },
       "custom_profile": {

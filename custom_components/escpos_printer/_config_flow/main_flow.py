@@ -14,12 +14,14 @@ from ..const import (
     CONF_CONNECTION_TYPE,
     CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
+    CONNECTION_TYPE_SERIAL,
     CONNECTION_TYPE_USB,
     DOMAIN,
 )
 from .bluetooth_steps import BluetoothFlowMixin
 from .import_steps import ImportFlowMixin
 from .network_steps import NetworkFlowMixin
+from .serial_steps import SerialFlowMixin
 from .settings_steps import SettingsFlowMixin
 from .usb_steps import UsbFlowMixin
 
@@ -30,6 +32,7 @@ class EscposConfigFlow(
     NetworkFlowMixin,
     UsbFlowMixin,
     BluetoothFlowMixin,
+    SerialFlowMixin,
     SettingsFlowMixin,
     ImportFlowMixin,
     config_entries.ConfigFlow,
@@ -65,6 +68,8 @@ class EscposConfigFlow(
                 return await self.async_step_usb_select()
             if connection_type == CONNECTION_TYPE_BLUETOOTH:
                 return await self.async_step_bluetooth_select()
+            if connection_type == CONNECTION_TYPE_SERIAL:
+                return await self.async_step_serial()
             return await self.async_step_network()
 
         data_schema = vol.Schema(
@@ -74,6 +79,7 @@ class EscposConfigFlow(
                         CONNECTION_TYPE_NETWORK: "Network (TCP/IP)",
                         CONNECTION_TYPE_USB: "USB (Direct)",
                         CONNECTION_TYPE_BLUETOOTH: "Bluetooth (RFCOMM)",
+                        CONNECTION_TYPE_SERIAL: "Serial (UART/RS-232)",
                     }
                 ),
             }

@@ -24,7 +24,7 @@ services:
     # Recommended (least privilege): pass through the USB bus only.
     devices:
       - /dev/bus/usb:/dev/bus/usb  # All USB devices
-    # privileged: true  # diagnostic fallback only — see comment above
+    #privileged: true  # diagnostic fallback only — see comment above
 
     # Required for USB access without privileged mode.
     group_add:

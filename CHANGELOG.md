@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Breaking changes
+
+- **Minimum Home Assistant version raised to 2026.5.0.** The serial
+  connection type requires `SerialPortSelector`, which was introduced in
+  HA 2026.5.0 and is absent in 2026.3/2026.4. Because the selector is
+  imported at module level via the config flow, loading the integration
+  on an older HA version breaks the config flow for *all* connection
+  types, not just serial.
+
+### Added
+
+- **Serial (UART/RS-232) printer support.** Printers connected via a
+  physical serial cable (`/dev/ttyUSB0`, `COM3`) or a network-based
+  serial proxy can now be configured as a new connection type. Supported
+  URL schemes: `esphome://host:6053?port_name=Name` (ESPHome
+  `serial_proxy` component), `rfc2217://host:port` (RFC 2217 serial
+  servers), and `socket://host:port` (raw TCP). Requires HA ≥ 2026.5.0
+  (introduces `SerialPortSelector`) and serialx ≥ 1.7.0 (pinned by HA
+  core's `package_constraints.txt`).
+- **Write chunking for ESP32/serial buffer overruns.** Two new options
+  under **Configure** — *Write chunk size* (bytes per write call,
+  0 = disabled) and *Inter-chunk delay* (ms between chunks) — allow
+  the integration to pace output to devices with small UART FIFOs (e.g.
+  ESP32 via ESPHome `serial_proxy`). Recommended values: chunk size 128,
+  delay 10 ms. Both are validated in the options flow (0–4096 bytes,
+  0–1000 ms) to prevent runaway `time.sleep()` calls under the print
+  lock.
+- **Serial printer status sensor.** The binary sensor checks device-path
+  ports via `os.stat` + `S_ISCHR` (non-invasive, no open required) and
+  URL-based ports via a brief open/close probe — consistent with the
+  Bluetooth reachability model.
+- **Serial port redaction in diagnostics.** The serial port path or URL
+  is included in the diagnostics download but redacted by
+  `async_redact_data` (same treatment as network host and Bluetooth MAC).
+
 ## [0.7.4] - 2026-06-12
 
 ### Fixed

@@ -15,6 +15,7 @@ from homeassistant.helpers import config_validation as cv
 from .capabilities import PROFILE_AUTO, is_valid_profile
 from .const import (
     CONF_ALLOW_LOCAL_IMAGE_URLS,
+    CONF_BAUDRATE,
     CONF_BT_MAC,
     CONF_CODEPAGE,
     CONF_CONNECTION_TYPE,
@@ -28,19 +29,26 @@ from .const import (
     CONF_PROFILE,
     CONF_RELIABILITY_PROFILE,
     CONF_RFCOMM_CHANNEL,
+    CONF_SERIAL_PORT,
+    CONF_SERIAL_WRITE_CHUNK_DELAY_MS,
+    CONF_SERIAL_WRITE_CHUNK_SIZE,
     CONF_STATUS_INTERVAL,
     CONF_TIMEOUT,
     CONF_VENDOR_ID,
     CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
+    CONNECTION_TYPE_SERIAL,
     CONNECTION_TYPE_USB,
     DEFAULT_ALIGN,
     DEFAULT_ALLOW_LOCAL_IMAGE_URLS,
+    DEFAULT_BAUDRATE,
     DEFAULT_CUT,
     DEFAULT_IN_EP,
     DEFAULT_LINE_WIDTH,
     DEFAULT_OUT_EP,
     DEFAULT_RFCOMM_CHANNEL,
+    DEFAULT_SERIAL_WRITE_CHUNK_DELAY_MS,
+    DEFAULT_SERIAL_WRITE_CHUNK_SIZE,
     DOMAIN,
     RELIABILITY_PROFILE_AUTO,
     RELIABILITY_PROFILE_PRESETS,
@@ -49,6 +57,7 @@ from .printer import (
     BluetoothPrinterConfig,
     EscposPrinterAdapterBase,
     NetworkPrinterConfig,
+    SerialPrinterConfig,
     UsbPrinterConfig,
     create_printer_adapter,
 )
@@ -205,7 +214,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bo
     connection_type = entry.data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
 
     shared = _shared_print_config(entry)
-    config: UsbPrinterConfig | NetworkPrinterConfig | BluetoothPrinterConfig
+    config: UsbPrinterConfig | NetworkPrinterConfig | BluetoothPrinterConfig | SerialPrinterConfig
     if connection_type == CONNECTION_TYPE_USB:
         config = UsbPrinterConfig(
             vendor_id=entry.data.get(CONF_VENDOR_ID, 0),
@@ -219,6 +228,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bo
             mac=str(entry.data.get(CONF_BT_MAC, "")),
             rfcomm_channel=int(entry.data.get(CONF_RFCOMM_CHANNEL, DEFAULT_RFCOMM_CHANNEL)),
             **shared,
+        )
+    elif connection_type == CONNECTION_TYPE_SERIAL:
+        config = SerialPrinterConfig(
+            serial_port=str(entry.data.get(CONF_SERIAL_PORT, "")),
+            baudrate=int(entry.data.get(CONF_BAUDRATE, DEFAULT_BAUDRATE)),
+            **shared,
+            write_chunk_size=int(
+                entry.options.get(CONF_SERIAL_WRITE_CHUNK_SIZE, DEFAULT_SERIAL_WRITE_CHUNK_SIZE)
+            ),
+            write_chunk_delay_ms=int(
+                entry.options.get(
+                    CONF_SERIAL_WRITE_CHUNK_DELAY_MS, DEFAULT_SERIAL_WRITE_CHUNK_DELAY_MS
+                )
+            ),
         )
     else:
         config = NetworkPrinterConfig(

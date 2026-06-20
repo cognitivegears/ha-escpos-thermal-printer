@@ -53,7 +53,7 @@ async def test_config_flow_success(hass):  # type: ignore[no-untyped-def]
             result3["flow_id"],
             {
                 CONF_CODEPAGE: "",  # Default
-                CONF_LINE_WIDTH: DEFAULT_LINE_WIDTH,
+                CONF_LINE_WIDTH: str(DEFAULT_LINE_WIDTH),
                 CONF_DEFAULT_ALIGN: "left",
                 CONF_DEFAULT_CUT: "none",
             },
@@ -132,7 +132,7 @@ async def test_config_flow_with_profile_selection(hass):  # type: ignore[no-unty
             result3["flow_id"],
             {
                 CONF_CODEPAGE: "CP437",
-                CONF_LINE_WIDTH: 42,
+                CONF_LINE_WIDTH: "42",
                 CONF_DEFAULT_ALIGN: "center",
                 CONF_DEFAULT_CUT: "partial",
             },
@@ -192,7 +192,7 @@ async def test_config_flow_custom_profile(hass):  # type: ignore[no-untyped-def]
             result4["flow_id"],
             {
                 CONF_CODEPAGE: "",
-                CONF_LINE_WIDTH: 42,
+                CONF_LINE_WIDTH: "42",
                 CONF_DEFAULT_ALIGN: "left",
                 CONF_DEFAULT_CUT: "none",
             },
@@ -233,7 +233,7 @@ async def test_config_flow_custom_codepage(hass):  # type: ignore[no-untyped-def
             result3["flow_id"],
             {
                 CONF_CODEPAGE: "__custom__",
-                CONF_LINE_WIDTH: DEFAULT_LINE_WIDTH,
+                CONF_LINE_WIDTH: str(DEFAULT_LINE_WIDTH),
                 CONF_DEFAULT_ALIGN: "left",
                 CONF_DEFAULT_CUT: "none",
             },

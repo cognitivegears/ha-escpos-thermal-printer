@@ -148,6 +148,43 @@ sudo dmesg -w | grep -i bluetooth   # live BT events
 sudo rfcomm connect 0 AA:BB:CC:DD:EE:FF 1  # manual RFCOMM probe
 ```
 
+## Serial issues
+
+### "Permission denied accessing serial port"
+
+Add the HA user to the `dialout` group:
+
+```bash
+sudo usermod -aG dialout homeassistant
+```
+
+Restart Home Assistant. In Docker, also pass the device through (`--device /dev/ttyUSB0`).
+
+### "Serial port not found"
+
+Verify the path exists on the host:
+
+```bash
+ls /dev/ttyUSB* /dev/ttyACM*
+```
+
+For ESPHome/RFC2217 URLs, confirm the remote device is online and the port number matches your ESPHome configuration.
+
+### "Serial port is busy"
+
+Another process holds the port. Common culprits: **ModemManager** (`sudo systemctl disable --now ModemManager`) and **brltty**. A udev rule can prevent them from claiming the adapter:
+
+```bash
+# /etc/udev/rules.d/99-escpos-serial.rules
+SUBSYSTEM=="tty", ATTRS{idVendor}=="<VID>", ATTRS{idProduct}=="<PID>", ENV{ID_MM_DEVICE_IGNORE}="1"
+```
+
+### Garbled or truncated output (ESPHome / ESP32)
+
+The ESP32 UART FIFO is overflowing. Enable write chunking in **Settings → Devices & services → ESC/POS Thermal Printer → Configure**: set **Write chunk size** to `128` and **Inter-chunk delay** to `10` ms.
+
+See [serial.md](serial.md) for the full setup guide, ESPHome YAML, and detailed troubleshooting.
+
 ## Print-quality problems
 
 - **Garbled characters** — codepage mismatch. Try CP437, CP850, or use `print_text_utf8`.
