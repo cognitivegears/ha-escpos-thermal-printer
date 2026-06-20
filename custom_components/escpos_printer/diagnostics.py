@@ -26,7 +26,12 @@ from .const import (
     CONNECTION_TYPE_SERIAL,
     CONNECTION_TYPE_USB,
 )
-from .printer import BluetoothPrinterConfig, NetworkPrinterConfig, SerialPrinterConfig, UsbPrinterConfig
+from .printer import (
+    BluetoothPrinterConfig,
+    NetworkPrinterConfig,
+    SerialPrinterConfig,
+    UsbPrinterConfig,
+)
 
 if TYPE_CHECKING:
     from . import EscposConfigEntry
