@@ -25,7 +25,7 @@ dependencies = [
   # serial_for_url() transparently dispatches to native device paths
   # (/dev/ttyUSB0), esphome://, rfc2217://, and socket:// — enabling
   # ESPHome serial-proxy connections without adapter changes.
-  # Pinned to match pytest-homeassistant-custom-component==0.13.333
+  # Pinned to match pytest-homeassistant-custom-component==0.13.339
   # (HA 2026.5.4 → package_constraints.txt: serialx==1.7.3). Keeps CI on
   # the version most users actually get. manifest.json carries >=1.7.0,<2
   # — see MANIFEST_OVERRIDES in scripts/sync_manifest_requirements.py.
@@ -49,7 +49,7 @@ include = ["custom_components*", "scripts*"]
 # `[dependency-groups]` is intentionally NOT used to avoid drift.
 dev = [
     "pytest==9.0.3",
-    "pytest-homeassistant-custom-component==0.13.333",
+    "pytest-homeassistant-custom-component==0.13.339",
     "mypy==2.1.0",
     "ruff==0.15.18",
     "pre-commit==4.6.0",
