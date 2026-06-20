@@ -27,7 +27,7 @@ jobs:
             continue-on-error: true
     continue-on-error: ${{ matrix.continue-on-error == true }}
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v7.0.0
         with:
           # gitleaks scans the PR's commit range, which requires the
           # base commit to be present in history (default depth=1 only
@@ -75,7 +75,7 @@ jobs:
       # from forks (where the contributor may not have pre-commit
       # installed) still get the secret-scan gate.
       - name: Secret scan (gitleaks)
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -107,7 +107,7 @@ jobs:
   integration-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v7.0.0
       - uses: actions/setup-python@v6.2.0
         with:
           python-version: '3.14'

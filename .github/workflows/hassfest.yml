@@ -17,10 +17,10 @@ jobs:
   hassfest:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v7.0.0
       - name: Hassfest validation
         # CI-H2: pin to a SHA instead of `@master`. The HA actions repo
         # does not publish versioned tags for the hassfest sub-action;
         # update by re-pinning after reviewing
         # https://github.com/home-assistant/actions/commits/master
-        uses: home-assistant/actions/hassfest@f6f29a7ee3fa0eccadf3620a7b9ee00ab54ec03b  # master as of 2026-05-24
+        uses: home-assistant/actions/hassfest@e91ad1948e57189485b9c1ad608af0c303946f89  # master as of 2026-05-24
