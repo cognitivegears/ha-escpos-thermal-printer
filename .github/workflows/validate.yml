@@ -34,7 +34,7 @@ jobs:
           # fetches the head SHA, causing `git rev-parse <base>^..<head>`
           # to fail with "unknown revision"). 0 = full history.
           fetch-depth: 0
-      - uses: actions/setup-python@v6.2.0
+      - uses: actions/setup-python@v6.3.0
         with:
           python-version: '3.14'
 
@@ -108,7 +108,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.0
-      - uses: actions/setup-python@v6.2.0
+      - uses: actions/setup-python@v6.3.0
         with:
           python-version: '3.14'
 
