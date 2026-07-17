@@ -143,6 +143,8 @@ The ESP32 is dropping bytes due to UART buffer overruns. Enable write chunking â
 
 ### Status shows "Unknown" until first print
 
+Serial printers don't get a paper status sensor: the serial transport is write-only in this integration, so the real-time paper query has no response channel (network/USB only).
+
 The binary sensor for serial printers works by checking whether the device path exists and is a character device. For URL-based connections (ESPHome, RFC2217) it makes a brief test connection. If **Status check interval** is `0` (the default), no periodic check runs and the status remains unknown until something is printed. Set **Status check interval** to a non-zero value (e.g. 60 seconds) to enable periodic checks.
 
 See [troubleshooting.md](troubleshooting.md#serial-issues) for more.

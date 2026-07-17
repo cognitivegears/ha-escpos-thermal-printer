@@ -87,6 +87,7 @@ class EscposPrinterAdapterBase(
         self._last_ok: Any = None
         self._last_error: Any = None
         self._last_latency_ms: int | None = None
+        self._last_paper_status: int | None = None
         self._last_error_reason: str | None = None
         self._last_error_errno: int | None = None
         self._cached_profile_width: int | None = None
@@ -215,6 +216,40 @@ class EscposPrinterAdapterBase(
         """Request an immediate status check."""
         await self._status_check(hass)
 
+    async def get_paper_status(self, hass: HomeAssistant) -> int | None:
+        """Query the paper sensor via DLE EOT (2=ok, 1=low, 0=out).
+
+        Returns ``None`` when the status is unknown (printer unreachable
+        or the query failed). Only meaningful on transports with a real
+        read channel (network, USB): the Bluetooth/serial escpos
+        subclasses stub ``_read()`` to ``b""``, which python-escpos
+        misreports as "plenty of paper" — so those entries never create
+        the paper sensor.
+
+        If a print is in flight, returns the last known value instead of
+        contending for the transport.
+        """
+        async with self._probe_lock_or_skip() as acquired:
+            if not acquired:
+                _LOGGER.debug("Skipping paper status query; print in flight")
+                return self._last_paper_status
+            printer: Any = None
+            owned = False
+            failed = True
+            try:
+                printer, owned = await self._acquire_printer(hass)
+                status = await hass.async_add_executor_job(printer.paper_status)
+                failed = False
+            except Exception as e:
+                _LOGGER.debug("Paper status query failed: %s", sanitize_log_message(str(e)))
+                self._last_paper_status = None
+                return None
+            finally:
+                if printer is not None:
+                    await self._release_printer(hass, printer, owned=owned, failed=failed)
+            self._last_paper_status = int(status)
+            return self._last_paper_status
+
     def add_status_listener(self, callback: Callable[[bool], None]) -> Callable[[], None]:
         """Add a status change listener and return an unsubscribe function."""
         self._status_listeners.append(callback)
@@ -236,6 +271,7 @@ class EscposPrinterAdapterBase(
             "last_ok": _iso(self._last_ok),
             "last_error": _iso(self._last_error),
             "last_latency_ms": self._last_latency_ms,
+            "paper_status": self._last_paper_status,
             "last_error_reason": self._last_error_reason,
             "last_error_errno": self._last_error_errno,
             "default_chunk_delay_ms": self.default_chunk_delay_ms,

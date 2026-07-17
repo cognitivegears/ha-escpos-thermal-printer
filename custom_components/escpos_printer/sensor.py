@@ -26,7 +26,9 @@ from .const import (
     CONF_BT_MAC,
     CONF_CONNECTION_TYPE,
     CONNECTION_TYPE_BLUETOOTH,
+    CONNECTION_TYPE_NETWORK,
     CONNECTION_TYPE_SERIAL,
+    CONNECTION_TYPE_USB,
     DOMAIN,
 )
 
@@ -34,6 +36,28 @@ _LOGGER = logging.getLogger(__name__)
 
 # Battery polling cadence is set by _attr_should_poll on the entity.
 PARALLEL_UPDATES = 0
+
+# python-escpos paper_status() return codes → enum sensor options.
+_PAPER_STATUS_OPTIONS = {2: "ok", 1: "low", 0: "out"}
+
+
+def _device_info(entry: ConfigEntry) -> DeviceInfo:
+    """Shared DeviceInfo — keep model names in sync with binary_sensor.py."""
+    connection_type = entry.data.get(CONF_CONNECTION_TYPE)
+    if connection_type == CONNECTION_TYPE_BLUETOOTH:
+        model = "Bluetooth Printer"
+    elif connection_type == CONNECTION_TYPE_USB:
+        model = "USB Printer"
+    elif connection_type == CONNECTION_TYPE_SERIAL:
+        model = "Serial Printer"
+    else:
+        model = "Network Printer"
+    return DeviceInfo(
+        identifiers={(DOMAIN, entry.entry_id)},
+        name=f"ESC/POS Printer {entry.title}",
+        manufacturer="ESC/POS",
+        model=model,
+    )
 
 
 async def async_setup_entry(
@@ -51,6 +75,15 @@ async def async_setup_entry(
         mac = entry.data.get(CONF_BT_MAC, "")
         if mac:
             sensors.append(BluetoothPrinterBatterySensor(entry, mac))
+
+    # Paper status needs a real read channel (DLE EOT response); the
+    # Bluetooth/serial transports are write-only, and python-escpos
+    # reports an empty read as "plenty of paper" — a false OK.
+    if entry.data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK) in (
+        CONNECTION_TYPE_NETWORK,
+        CONNECTION_TYPE_USB,
+    ):
+        sensors.append(PaperStatusSensor(entry))
 
     async_add_entities(sensors, update_before_add=True)
 
@@ -76,21 +109,7 @@ class LastImagePrintSensor(SensorEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        connection_type = self._entry.data.get(CONF_CONNECTION_TYPE)
-        if connection_type == CONNECTION_TYPE_BLUETOOTH:
-            model = "Bluetooth Printer"
-        elif connection_type == "usb":
-            model = "USB Printer"
-        elif connection_type == CONNECTION_TYPE_SERIAL:
-            model = "Serial Printer"
-        else:
-            model = "Network Printer"
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._entry.entry_id)},
-            name=f"ESC/POS Printer {self._entry.title}",
-            manufacturer="ESC/POS",
-            model=model,
-        )
+        return _device_info(self._entry)
 
     async def async_update(self) -> None:
         """Pull the in-memory ImageStats snapshot off the adapter."""
@@ -135,12 +154,7 @@ class BluetoothPrinterBatterySensor(SensorEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._entry.entry_id)},
-            name=f"ESC/POS Printer {self._entry.title}",
-            manufacturer="ESC/POS",
-            model="Bluetooth Printer",
-        )
+        return _device_info(self._entry)
 
     async def async_update(self) -> None:
         """Poll bluez for the current battery percentage."""
@@ -158,3 +172,45 @@ class BluetoothPrinterBatterySensor(SensorEntity):
             return
         self._attr_available = True
         self._attr_native_value = percentage
+
+
+class PaperStatusSensor(SensorEntity):
+    """Paper sensor status via the ESC/POS real-time DLE EOT query.
+
+    Lets users automate on "paper low" / "paper out" (issue #109).
+    Network and USB printers only — see async_setup_entry.
+    """
+
+    _attr_has_entity_name = True
+    _attr_name = "Paper status"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = ["ok", "low", "out"]
+    _attr_should_poll = True
+    _attr_icon = "mdi:paper-roll-outline"
+
+    def __init__(self, entry: ConfigEntry) -> None:
+        self._entry = entry
+        self._attr_unique_id = f"{entry.entry_id}_paper_status"
+        self._attr_available = False
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return _device_info(self._entry)
+
+    async def async_update(self) -> None:
+        """Query the printer for its paper sensor state."""
+        runtime = getattr(self._entry, "runtime_data", None)
+        adapter = getattr(runtime, "adapter", None) if runtime else None
+        if adapter is None:
+            self._attr_available = False
+            self._attr_native_value = None
+            return
+        status = await adapter.get_paper_status(self.hass)
+        value = _PAPER_STATUS_OPTIONS.get(status)
+        if value is None:
+            # Printer unreachable, query failed, or an unexpected code.
+            self._attr_available = False
+            self._attr_native_value = None
+            return
+        self._attr_available = True
+        self._attr_native_value = value

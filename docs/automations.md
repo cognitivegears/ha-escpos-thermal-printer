@@ -25,6 +25,26 @@ automation:
           feed: 1
 ```
 
+## Paper low notification
+
+Network and USB printers expose a `paper_status` sensor (`ok` / `low` / `out`) — see [limitations.md](limitations.md) for transport caveats.
+
+```yaml
+automation:
+  - alias: "Printer Paper Low"
+    trigger:
+      - platform: state
+        entity_id: sensor.receipt_printer_paper_status
+        to:
+          - "low"
+          - "out"
+    action:
+      - service: notify.mobile_app_phone
+        data:
+          title: "Receipt printer"
+          message: "Paper is {{ trigger.to_state.state }} — replace the roll."
+```
+
 ## Temperature alert
 
 ```yaml

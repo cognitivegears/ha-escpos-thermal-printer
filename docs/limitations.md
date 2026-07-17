@@ -51,6 +51,7 @@ should understand what is and isn't enforced. Cross-linked from
 ## Network printers
 
 - **No keep-alive by default.** Connections reconnect per operation. Enabling Keep Alive trades latency for fragility when the printer goes offline.
+- **Paper status depends on firmware.** The paper status sensor uses the real-time `DLE EOT 4` query; printers that don't answer it show the sensor as unavailable.
 
 ## USB printers
 
@@ -67,6 +68,7 @@ should understand what is and isn't enforced. Cross-linked from
 - **Linux-only.** `AF_BLUETOOTH` is Linux-only. macOS / Windows HA installs cannot use this connection type natively.
 - **Container caveats.** HA Container needs `--net=host` + `NET_ADMIN` + `NET_RAW` + `/run/dbus` mount. Or use the `socat` host-bridge fallback (see README).
 - **Battery sensor only when bluez exposes it.** Most cheap thermal printers don't expose `org.bluez.Battery1`; the sensor stays unavailable for those.
+- **No paper status sensor.** The Bluetooth and serial transports are write-only in this integration, and an empty status read would misreport as "plenty of paper" — so those connection types don't create the sensor (network/USB only).
 
 ## Codepage / character set
 

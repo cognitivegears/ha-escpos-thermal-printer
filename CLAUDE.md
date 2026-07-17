@@ -101,7 +101,8 @@ docker compose down  # to stop
 
 - **Platforms** — `notify.py` (entity-based notify), `binary_sensor.py`
   (reachability), `sensor.py` (image-pipeline diagnostics + BT
-  battery), `diagnostics.py` (download-diagnostics with
+  battery + paper status for network/USB), `diagnostics.py`
+  (download-diagnostics with
   `CONF_HOST` redaction).
 
 - **Other** — `bluez.py` (paired-device discovery via D-Bus),

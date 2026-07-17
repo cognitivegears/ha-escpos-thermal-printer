@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Paper status sensor** (#109). Network and USB printers get a
+  `Paper status` enum sensor (`ok` / `low` / `out`) backed by the
+  ESC/POS real-time DLE EOT paper-sensor query, so automations can
+  notify when paper runs low or out. Bluetooth and serial printers
+  don't get the sensor: those transports are write-only in this
+  integration, and python-escpos reports an empty read as "plenty of
+  paper" — a false OK. The last polled value also appears in the
+  diagnostics download as `paper_status`.
+
 - **Serial (UART/RS-232) printer support.** Printers connected via a
   physical serial cable (`/dev/ttyUSB0`, `COM3`) or a network-based
   serial proxy can now be configured as a new connection type. Supported
