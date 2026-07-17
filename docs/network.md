@@ -23,6 +23,10 @@ Alternatively, check your router's DHCP client list.
 
 **Tip**: assign a static IP (or DHCP reservation). Otherwise the printer may move IPs and the entry will go offline silently until reconfigured.
 
+## Paper status sensor
+
+Network printers get a `sensor.<printer>_paper_status` entity reporting `ok`, `low`, or `out`, backed by the ESC/POS real-time paper-sensor query (`DLE EOT 4`). It polls on Home Assistant's standard entity cadence and automatically skips a poll while a print is in flight. If the printer doesn't answer the query (not all firmwares implement it) or is unreachable, the sensor shows unavailable. See [automations.md](automations.md) for a paper-low notification example.
+
 ## Multiple network printers
 
 Add the integration once per printer. Each gets its own device, binary sensor, and notify entity. See [multi-printer.md](multi-printer.md) for targeting in service calls.

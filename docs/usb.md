@@ -36,6 +36,10 @@ If your printer isn't auto-discovered:
 | Timeout | Connect timeout (seconds) | 4.0 |
 | Printer Profile | Your printer model | Auto-detect |
 
+## Paper status sensor
+
+USB printers get a `sensor.<printer>_paper_status` entity reporting `ok`, `low`, or `out`, backed by the ESC/POS real-time paper-sensor query (`DLE EOT 4`) over the IN endpoint. If the printer doesn't answer the query (not all firmwares implement it) or is disconnected, the sensor shows unavailable. Polls skip automatically while a print is in flight.
+
 ## USB permissions on Linux
 
 If you see `Permission denied`, create a udev rule:

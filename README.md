@@ -33,6 +33,7 @@ individually or broadcast to all
 - Print QR codes, barcodes, and images — from URLs, files, camera/image entities, or base64 ([guide](docs/images.md))
 - Text effects — boxes, multi-column tables, and custom-font / rotated text ([guide](docs/text-effects.md))
 - Paper feed and cut control
+- Paper status sensor (network/USB) — automate on paper low / paper out
 - Buzzer/beeper support
 - UTF-8 text with automatic character conversion
 - 35+ printer profiles with automatic feature detection
