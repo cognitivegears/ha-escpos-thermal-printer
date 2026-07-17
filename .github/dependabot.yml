@@ -36,6 +36,12 @@ updates:
       # creates an unresolvable conflict. Let the HA test harness drive the
       # pytest version; revisit if upstream loosens the pin.
       - dependency-name: "pytest"
+      # mypy 2.2+ requires ast-serialize>=0.6, but
+      # pytest-homeassistant-custom-component hard-pins ast-serialize==0.3.0
+      # (as of 0.13.339), so newer mypy is unresolvable alongside the HA
+      # test harness. Let harness upgrades unblock it; revisit when
+      # upstream relaxes the pin.
+      - dependency-name: "mypy"
       # dbus-fast is pinned by Home Assistant core (package_constraints.txt)
       # and the HA bluetooth integration manifest. Bumping it independently
       # breaks HA installs. Let HA core drive the version; revisit when HA

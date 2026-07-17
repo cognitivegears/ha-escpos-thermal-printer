@@ -49,6 +49,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Dependency bump: `wcwidth` 0.8.1 → 0.8.2.** Upstream bugfix for an
+  `IndexError` when a measured index exceeds the string length. No
+  configuration or service changes.
+- **Dev/CI stack moved to the HA 2026.6.3 test harness**
+  (`pytest-homeassistant-custom-component` 0.13.333 → 0.13.339). Dev
+  pins follow HA 2026.6.3's `package_constraints.txt`: `serialx`
+  1.7.3 → 1.8.0 and `dbus-fast` 4.0.4 → 5.0.16 (both already inside
+  the `manifest.json` ranges, so end-user installs are unchanged), plus
+  `ruff` 0.15.18 → 0.15.22. The pip-audit ignore list in
+  `security.yml` was rebuilt against the new stack (clears the stale
+  Pillow/aiohttp/PyJWT/requests/pytest/uv entries; adds the current
+  HA-pinned Pillow 12.2.0 / aiohttp 3.13.5 / cryptography 48.0.0 /
+  PyJWT 2.12.1 advisories, all fixed only in versions no HA release
+  ships yet). **The minimum supported HA version for users is
+  unchanged at 2026.5.0.**
+- **README requirements corrected** to state the actual minimum of
+  Home Assistant 2026.5 (previously still said 2026.3; the floor was
+  raised when serial support landed).
 - **Dependency bump: `wcwidth` 0.7.0 → 0.8.1.** Picks up upstream's
   terminal-aware width fixes (notably Variation Selector 15 emoji now
   measured as narrow), which feeds the visual-column padding for the
