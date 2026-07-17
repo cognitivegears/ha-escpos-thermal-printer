@@ -27,12 +27,12 @@ jobs:
         uses: actions/checkout@v7.0.0
 
       - name: Set up Python
-        uses: actions/setup-python@v6.2.0
+        uses: actions/setup-python@v6.3.0
         with:
           python-version: '3.14'
 
       - name: Cache pip dependencies
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
@@ -157,42 +157,39 @@ jobs:
         run: |
           PIP_AUDIT_ARGS=(
             --skip-editable
-            # Pillow 12.1.1 — pinned by homeassistant==2026.3.4.
-            # These CVEs are fixed in Pillow 12.2.0; HA 2026.5+ ships 12.2.0.
-            --ignore-vuln CVE-2026-40192
-            --ignore-vuln CVE-2026-42308
-            --ignore-vuln CVE-2026-42309
-            --ignore-vuln CVE-2026-42310
-            --ignore-vuln CVE-2026-42311
-            # aiohttp 3.13.3 — pinned by homeassistant==2026.3.4.
-            # All fixed in 3.13.4; clears when HA bumps the pin.
-            --ignore-vuln CVE-2026-22815
-            --ignore-vuln CVE-2026-34513
-            --ignore-vuln CVE-2026-34514
-            --ignore-vuln CVE-2026-34515
-            --ignore-vuln CVE-2026-34516
-            --ignore-vuln CVE-2026-34517
-            --ignore-vuln CVE-2026-34518
-            --ignore-vuln CVE-2026-34519
-            --ignore-vuln CVE-2026-34520
-            --ignore-vuln CVE-2026-34525
-            # cryptography 46.0.5 — pinned by homeassistant==2026.3.4.
-            # Fixed in 46.0.6 / 46.0.7.
-            --ignore-vuln PYSEC-2026-35
-            --ignore-vuln PYSEC-2026-36
-            # PyJWT 2.10.1 — pinned by homeassistant==2026.3.4.
-            # Fixed in 2.12.0.
-            --ignore-vuln PYSEC-2025-183
-            --ignore-vuln PYSEC-2026-120
-            # pytest 9.0.0 — pinned by pytest-homeassistant-custom-component.
-            # Fixed in 9.0.3; clears when the HA test harness bumps.
-            --ignore-vuln CVE-2025-71176
-            # requests 2.32.5 — pinned by homeassistant==2026.3.4.
-            # Fixed in 2.33.0.
-            --ignore-vuln CVE-2026-25645
-            # uv 0.10.6 — pinned by homeassistant==2026.3.4 (dev tooling).
-            # Fixed in 0.11.6.
-            --ignore-vuln GHSA-pjjw-68hj-v9mw
+            # Pillow 12.2.0 — pinned by homeassistant==2026.6.3.
+            # Fixed in 12.3.0; no HA release ships it yet.
+            --ignore-vuln PYSEC-2026-2253
+            --ignore-vuln PYSEC-2026-2254
+            --ignore-vuln PYSEC-2026-2255
+            --ignore-vuln PYSEC-2026-2256
+            --ignore-vuln PYSEC-2026-2257
+            --ignore-vuln PYSEC-2026-3451
+            --ignore-vuln PYSEC-2026-3452
+            --ignore-vuln PYSEC-2026-3453
+            # aiohttp 3.13.5 — pinned by homeassistant==2026.6.3.
+            # All fixed in 3.14.0 / 3.14.1; clears when HA bumps the pin.
+            --ignore-vuln PYSEC-2026-237
+            --ignore-vuln PYSEC-2026-2104
+            --ignore-vuln PYSEC-2026-2105
+            --ignore-vuln PYSEC-2026-2106
+            --ignore-vuln PYSEC-2026-2107
+            --ignore-vuln PYSEC-2026-2108
+            --ignore-vuln PYSEC-2026-2109
+            --ignore-vuln PYSEC-2026-2110
+            --ignore-vuln PYSEC-2026-2111
+            --ignore-vuln PYSEC-2026-2112
+            --ignore-vuln PYSEC-2026-2113
+            # cryptography 48.0.0 — pinned by homeassistant==2026.6.3.
+            # Fixed in 48.0.1.
+            --ignore-vuln GHSA-537c-gmf6-5ccf
+            # PyJWT 2.12.1 — pinned by homeassistant==2026.6.3.
+            # Fixed in 2.13.0.
+            --ignore-vuln PYSEC-2026-175
+            --ignore-vuln PYSEC-2026-176
+            --ignore-vuln PYSEC-2026-177
+            --ignore-vuln PYSEC-2026-178
+            --ignore-vuln PYSEC-2026-179
           )
           pip-audit "${PIP_AUDIT_ARGS[@]}" --format json --output pip-audit-report.json || true
           pip-audit "${PIP_AUDIT_ARGS[@]}"

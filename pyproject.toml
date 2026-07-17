@@ -16,20 +16,20 @@ dependencies = [
   "qrcode==8.2",
   "python-barcode==0.16.1",
   "pyusb==1.3.1",
-  "dbus-fast==4.0.4",
+  "dbus-fast==5.0.16",
   # Visual-width measurement for the text-effects box / table padders so
   # CJK / fullwidth / emoji columns line up under the 1-col-per-glyph
   # text mode (instead of silently misaligning via len()).
-  "wcwidth==0.8.1",
+  "wcwidth==0.8.2",
   # Serial port support. serialx is used instead of bare pyserial because
   # serial_for_url() transparently dispatches to native device paths
   # (/dev/ttyUSB0), esphome://, rfc2217://, and socket:// — enabling
   # ESPHome serial-proxy connections without adapter changes.
-  # Pinned to match pytest-homeassistant-custom-component==0.13.333
-  # (HA 2026.5.4 → package_constraints.txt: serialx==1.7.3). Keeps CI on
+  # Pinned to match pytest-homeassistant-custom-component==0.13.339
+  # (HA 2026.6.3 → package_constraints.txt: serialx==1.8.0). Keeps CI on
   # the version most users actually get. manifest.json carries >=1.7.0,<2
   # — see MANIFEST_OVERRIDES in scripts/sync_manifest_requirements.py.
-  "serialx==1.7.3",
+  "serialx==1.8.0",
 ]
 
 [build-system]
@@ -49,9 +49,9 @@ include = ["custom_components*", "scripts*"]
 # `[dependency-groups]` is intentionally NOT used to avoid drift.
 dev = [
     "pytest==9.0.3",
-    "pytest-homeassistant-custom-component==0.13.333",
+    "pytest-homeassistant-custom-component==0.13.339",
     "mypy==2.1.0",
-    "ruff==0.15.18",
+    "ruff==0.15.22",
     "pre-commit==4.6.0",
     "bandit==1.9.4",
     "bandit-sarif-formatter==1.1.1",
