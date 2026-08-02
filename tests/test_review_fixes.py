@@ -162,6 +162,50 @@ async def test_transport_failure_still_flips_connectivity(hass):  # type: ignore
     assert adapter._last_error_reason == "print operation failed"
 
 
+async def test_connect_failure_through_print_text_flips_connectivity_offline(hass):  # type: ignore[no-untyped-def]
+    """A ``_connect()`` failure must reach the offline notification too.
+
+    Regression: every operation acquired its printer *before* entering
+    the try/finally that calls ``_release_printer`` on failure, so a
+    connect-time exception propagated straight out without ever
+    notifying listeners -- the connectivity sensor stayed latched
+    "Online" through repeated connect failures.
+    """
+    adapter = _network_adapter()
+    adapter._status = True  # printer was already known online
+    received: list[bool] = []
+    adapter.add_status_listener(received.append)
+
+    def _boom():
+        raise OSError("connection refused")
+
+    adapter._connect = _boom  # type: ignore[method-assign]
+
+    with pytest.raises(OSError, match="connection refused"):
+        await adapter.print_text(hass, text="hello")
+
+    assert adapter.get_status() is False
+    assert received == [False]
+
+
+async def test_connect_failure_through_feed_flips_connectivity_offline(hass):  # type: ignore[no-untyped-def]
+    adapter = _network_adapter()
+    adapter._status = True
+    received: list[bool] = []
+    adapter.add_status_listener(received.append)
+
+    def _boom():
+        raise OSError("connection refused")
+
+    adapter._connect = _boom  # type: ignore[method-assign]
+
+    with pytest.raises(OSError, match="connection refused"):
+        await adapter.feed(hass, lines=1)
+
+    assert adapter.get_status() is False
+    assert received == [False]
+
+
 async def test_barcode_validation_error_does_not_flip_connectivity(hass):  # type: ignore[no-untyped-def]
     from escpos.exceptions import BarcodeTypeError
 

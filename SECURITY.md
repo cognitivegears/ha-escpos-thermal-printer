@@ -220,7 +220,7 @@ The project includes automated security scanning in CI/CD:
 1. **Dependency Scanning**: Runs on every push and pull request
 2. **Code Security Analysis**: Static analysis for security vulnerabilities
 3. **Automated Reporting**: Security findings are reported and can block merges
-4. **Scheduled Scans**: Weekly comprehensive security scans
+4. **Scheduled Scans**: Weekly security scans
 
 ### Running Security Scans Locally
 

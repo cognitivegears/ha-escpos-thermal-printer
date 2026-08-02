@@ -462,6 +462,27 @@ class TestSerialReleasePrinterFlush:
         printer.flush.assert_not_called()
         printer.close.assert_called_once()
 
+    @pytest.mark.asyncio
+    async def test_release_passes_through_notify_status_false(self, hass, serial_adapter):
+        """``notify_status`` must reach the base implementation unchanged.
+
+        ``SerialPrinterAdapter._release_printer`` overrides the base to add
+        the flush step, but must still forward ``notify_status`` -- a
+        caller opting out of the offline signal (e.g. ``get_paper_status``)
+        must not have that suppressed by the serial-specific override.
+        """
+        printer = MagicMock()
+        received: list[bool] = []
+        serial_adapter.add_status_listener(received.append)
+        serial_adapter._status = True
+
+        await serial_adapter._release_printer(
+            hass, printer, owned=True, failed=True, notify_status=False
+        )
+
+        assert serial_adapter.get_status() is True  # unchanged
+        assert received == []
+
 
 class TestOpenSerialTransportOpenFailure:
     """A failed ``port.open()`` must close the port, not leak its fd/handle."""

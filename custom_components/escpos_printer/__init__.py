@@ -344,6 +344,13 @@ async def async_remove_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> N
         from homeassistant.helpers import issue_registry as ir  # noqa: PLC0415
 
         ir.async_delete_issue(hass, DOMAIN, profile_width_issue_id(entry.entry_id))
+        # Pre-1.0 issue ids were scoped by profile name (see
+        # EscposPrinterAdapterBase._clear_profile_width_repair_issue);
+        # mirror that legacy-id deletion here too so an issue filed under
+        # the old scheme doesn't outlive the entry it was raised for.
+        profile = entry.options.get(CONF_PROFILE, entry.data.get(CONF_PROFILE))
+        if profile:
+            ir.async_delete_issue(hass, DOMAIN, f"profile_width_fallback_{profile}")
     except Exception as err:  # best effort
         _LOGGER.debug(
             "Could not clean up repair issues for entry %s: %s",

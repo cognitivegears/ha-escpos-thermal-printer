@@ -75,10 +75,10 @@ it on:
 - **non-standard ports** are accepted (e.g. Frigate on `:5000`, a camera
   on `:8080`, Home Assistant on `:8123`).
 
-The genuinely dangerous ranges stay blocked **even when enabled**:
-link-local/cloud-metadata (`169.254.0.0/16`, `fe80::/10`, and the AWS
-IMDSv6 endpoint `fd00:ec2::254`), multicast, reserved (`240.0.0.0/4`),
-and unspecified.
+The dangerous ranges stay blocked **even when enabled**:
+link-local/cloud-metadata (`169.254.0.0/16`, `fe80::/10`, the AWS
+IMDSv6 endpoint `fd00:ec2::254`, and the Alibaba Cloud IMDS endpoint
+`100.100.100.200`), multicast, reserved (`240.0.0.0/4`), and unspecified.
 
 The toggle is **per-printer**, and it's evaluated against the **printer
 you print to**, not the URL. In a multi-printer setup the same LAN URL
@@ -424,6 +424,17 @@ Symptoms-to-knob mapping:
 - **Print pauses mid-image then resumes garbled** → raise `chunk_delay_ms` first.
 - **Prints are too fast / motor stalls** → raise `chunk_delay_ms` to throttle.
 - **Prints are reliable but slow** → raise `fragment_height` and drop `chunk_delay_ms` to 0.
+
+## Diagnostics sensor
+
+`sensor.<printer>_last_image_print` is created for every printer, regardless of connection type. Its state is the count of successful image prints since Home Assistant started; the attributes carry details of the most recent print so you can tune `dither`, `fragment_height`, and the other knobs above without downloading diagnostics:
+
+- `total_failures` — count of failed image prints since startup
+- `last_source_kind` — `data`, `camera`, `image`, `http`, or `local`
+- `last_decoded_dims` — `[width, height]` of the decoded image
+- `last_decoded_bytes` — decoded image size in bytes
+- `last_slice_count` — number of `fragment_height` slices the last image was split into
+- `last_error_class` — exception class name of the last failure, if any
 
 ## Implementation selector
 

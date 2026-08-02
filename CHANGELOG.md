@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-08-02
+
 ### Added
 
 - **Reconfigure flow** for all four connection types (**Settings** →
@@ -149,6 +151,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `DeviceEntry.config_entry_id` when present, falling back to the
   deprecated `config_entries` set — forward-compat with HA 2026.8+ ahead
   of that attribute's 2027.8 removal.
+- **A printer connect failure during any print, feed, cut, beep, or
+  barcode operation now correctly marks the printer offline and
+  notifies the connectivity sensor.** Previously only a failure *after*
+  a successful connect flipped the sensor; a failure during the connect
+  itself went unreported.
+- **`beep()` no longer reports success when the buzzer command fails at
+  the transport level.** The error now propagates and the connectivity
+  sensor flips offline, instead of the operation silently completing.
+- **Image decode failures no longer echo the fetched response's raw
+  bytes back to the service caller.** The error message surfaced to the
+  caller still reports the declared content type and payload size; only
+  the leading-byte sniff used to detect an HTML error page is now
+  debug-logged instead of being included in that message.
+- **Unchanged printer status no longer redundantly re-fires the
+  connectivity sensor on every paper-status poll.**
+- **Reconfiguring a legacy USB entry onto a device already owned by
+  another entry now aborts with "already configured"** instead of
+  creating a duplicate unique ID.
+- **USB reconfigure now probes using the entry's stored endpoints**
+  instead of the defaults.
+- **Reconfiguring a network or serial printer to a new address now
+  updates the entry/device title** when it was still auto-generated
+  (manual renames are preserved).
+- **Removing a config entry now also cleans up its legacy
+  profile-name-scoped repair issue.**
+- **The barcode `force_software` selector no longer labels the wrong
+  option as the default.**
 
 ### Security
 
@@ -164,6 +193,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   context, so a non-admin could print camera frames a direct service call
   would refuse with `Unauthorized`. The action now passes the context
   through, enforcing the same entity ACL on both paths.
+- **`print_image_path` / `print_image_url` schema guards now strip
+  whitespace before checking the source shape**, closing a gap where a
+  leading/trailing-whitespace value could dodge the per-service
+  URL-only / local-path-only validator.
+- **Local image and font path validation now checks the allowlist
+  before any existence/extension/size check**, closing a
+  filesystem-enumeration oracle where a disallowed path's error message
+  differed depending on whether the file existed.
+- **Blocked the Alibaba Cloud metadata endpoint (`100.100.100.200`).**
+  CGNAT-space addresses (`100.64.0.0/10`) were previously treated as
+  publicly routable and reachable even without the "Allow local image
+  URLs" opt-in; this specific cloud-metadata address inside that range
+  is now blocked unconditionally, same as the AWS/link-local metadata
+  endpoints.
 
 ### Changed
 
@@ -193,6 +236,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   default-store review feedback). Pillow is still installed transitively
   via `python-escpos`; Bluetooth discovery already degrades gracefully if
   `dbus-fast` is unavailable.
+- **The documented 60-second Bluetooth status-interval floor is now
+  enforced in the options flow.** `0` still disables polling; `1`–`59`
+  is now rejected instead of silently accepted.
+- **The connectivity binary sensor now uses Home Assistant's dynamic
+  connectivity icons** instead of a static printer icon, so its icon
+  reflects the actual connected/disconnected state.
+- **Docs:** corrected the status-interval default (`0`/disabled, not
+  30 s), fixed a broken CJK section anchor, and documented the
+  last-image-print diagnostic sensor.
 
 ## [0.8.0] - 2026-07-20
 
@@ -1216,7 +1268,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 Earlier releases — see git history.
 
-[Unreleased]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.8.0...v1.0.0
 [0.8.0]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.7.4...v0.8.0
 [0.7.4]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.7.3...v0.7.4
 [0.7.3]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.7.2...v0.7.3

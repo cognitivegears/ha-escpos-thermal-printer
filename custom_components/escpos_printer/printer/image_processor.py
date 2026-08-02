@@ -91,7 +91,7 @@ class ImageProcessOptions:
     """Options controlling the image processing pipeline."""
 
     width: int | None = None
-    """Target width in pixels; if None, use ``profile_width`` (falls back to 512)."""
+    """Target width in pixels; if None, use ``profile_width`` (falls back to 384)."""
 
     profile_width: int | None = None
     """Printer profile's max pixel width, used when ``width`` is None."""

@@ -83,7 +83,7 @@ All six image-printing services (`print_image`, `print_image_url`, `print_image_
 
 `test_image_services_no_truncated_descriptions` is the regression guard for the YAML `#` comment-truncation class of bug (an unquoted plain-scalar description containing `#` silently terminated mid-sentence in the rendered HA tooltip). Quote any single-line description that contains `#`, or use a `>` folded scalar.
 
-`preview_image` deliberately omits the printer-communication knobs (`high_density`, `impl`, `fragment_height`, `chunk_delay_ms`, `center`, `cut`, `feed`) because they have no effect on the PNG written to disk. The schema still accepts them so programmatic callers don't break; `handle_preview_image()` logs a debug line when they're passed.
+`preview_image` deliberately omits the printer-communication knobs (`high_density`, `impl`, `fragment_height`, `chunk_delay_ms`, `cut`, `feed`) because they have no effect on the PNG written to disk. It also omits `broadcast`, since a preview writes to a single file and has no multi-printer target to broadcast to. The schema still accepts all of these so programmatic callers don't break; `handle_preview_image()` logs a debug line when they're passed.
 
 ### Per-service source-type validators
 

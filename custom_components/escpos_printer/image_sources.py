@@ -53,6 +53,7 @@ from .const import (
 )
 from .security import (
     MAX_IMAGE_SIZE_MB,
+    _best_effort_resolve,
     _validate_local_path_sync,
     open_local_image_no_follow,
     sanitize_log_message,
@@ -478,13 +479,33 @@ async def _resolve_local(
     final target is outside ``allowlist_external_dirs`` or fails any
     other check. The file is then opened with ``O_NOFOLLOW`` to defeat
     a TOCTOU symlink swap between validation and open.
+
+    The allowlist check runs *before* the existence/extension/size
+    checks in :func:`_validate_local_path_sync` (which each raise a
+    distinct, descriptive error): otherwise a caller could use those
+    distinct errors as an oracle to learn whether an arbitrary host
+    path outside the allowlist exists, its type, extension, or rough
+    size bucket. The precheck resolves symlinks itself (best-effort,
+    non-strict — the path need not exist yet) so the allowlist check
+    sees the same target `_validate_local_path_sync` would validate.
+
+    The precheck's resolve and `_validate_local_path_sync`'s own
+    ``Path.resolve(strict=True)`` are two separate syscalls, so a
+    symlink swapped in between could point resolve #2 somewhere the
+    precheck never saw. The allowlist is therefore re-checked against
+    the actually-resolved path before it's opened.
     """
     max_bytes = _MAX_BYTES_AUTO_RESIZE if auto_resize else _MAX_BYTES
 
     def _validate_and_read() -> bytes:
+        if not hass.config.is_allowed_path(_best_effort_resolve(path)):
+            raise ServiceValidationError(
+                "Image path is outside Home Assistant's allowlist_external_dirs",
+                translation_domain=DOMAIN,
+                translation_key="image_path_outside_allowlist",
+            )
         resolved = _validate_local_path_sync(path, max_bytes=max_bytes)
-        is_allowed = hass.config.is_allowed_path
-        if not is_allowed(str(resolved)):
+        if not hass.config.is_allowed_path(str(resolved)):
             raise ServiceValidationError(
                 "Image path is outside Home Assistant's allowlist_external_dirs",
                 translation_domain=DOMAIN,

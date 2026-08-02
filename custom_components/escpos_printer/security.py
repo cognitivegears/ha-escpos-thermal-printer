@@ -44,12 +44,12 @@ MAX_QR_DATA_LENGTH = 2000  # Maximum QR code data length
 MAX_BARCODE_LENGTH = 100  # Maximum barcode data length
 MAX_IMAGE_SIZE_MB = 10  # Maximum image download / decoded size, MB
 MAX_FEED_LINES = 50  # Maximum feed lines to prevent paper waste
-MAX_BEEP_TIMES = 10  # Maximum beep repetitions
+MAX_BEEP_TIMES = 9  # Maximum beep repetitions (python-escpos Escpos.buzzer() hard limit)
 # B-L2: separate semantic bound for beep *duration*. Numerically the same
 # upper bound today, but the schema + validators should not pretend the
 # two fields share a meaning. Units are python-escpos "buzzer ticks"
 # (~100ms per tick on most supported printers).
-MAX_BEEP_DURATION = 10
+MAX_BEEP_DURATION = 9  # python-escpos Escpos.buzzer() hard limit
 
 # Image processing bounds (mirror in `services.yaml` + voluptuous schemas).
 IMAGE_WIDTH_MIN = 16
@@ -440,18 +440,32 @@ def _is_public_address(addr: str) -> bool:
     )
 
 
-# Cloud-metadata endpoints that must never be fetched, even in permissive
-# (``allow_local``) mode. The IPv4 service (and its IPv6 *link-local* form)
-# is already caught by the link-local check, but the AWS IMDSv6 endpoint
-# ``fd00:ec2::254`` is an IPv6 *Unique-Local* address (``fc00::/7``) — Python
-# flags it ``is_private`` but not ``is_link_local``, so without this explicit
-# denylist it would slip through the permissive ULA grant on a dual-stack EC2
-# host. Home IPv6 LANs legitimately use ULA, so we block the specific
-# endpoints rather than the whole ULA range.
+# Cloud-metadata endpoints that must never be fetched, in *any* mode
+# (including the default strict/``allow_local=False`` mode — these are
+# checked before the public/private classification below, not just in the
+# permissive branch). The IPv4 AWS/GCP/Azure metadata service (and its IPv6
+# link-local form) is already caught by the link-local check, but a few
+# endpoints live in ranges Python's ``ipaddress`` doesn't flag as
+# link-local or private, so without this explicit denylist they would slip
+# through:
+#
+# - AWS IMDSv6 ``fd00:ec2::254`` is an IPv6 *Unique-Local* address
+#   (``fc00::/7``) — Python flags it ``is_private`` but not
+#   ``is_link_local``, so it would otherwise only be caught by the
+#   permissive-mode ULA grant (i.e. still reachable with ``allow_local``).
+# - Alibaba Cloud IMDS ``100.100.100.200`` lives in CGNAT space
+#   (``100.64.0.0/10``), which Python deliberately reports as *neither*
+#   ``is_private`` *nor* ``is_global`` (see the stdlib ``ipaddress``
+#   docs). That makes ``_is_public_address`` treat it as public, so
+#   without this denylist it would be reachable even in strict mode.
+#
+# Home IPv6 LANs legitimately use ULA, so we block the specific endpoints
+# rather than the whole ULA range.
 _ALWAYS_BLOCKED_HOSTS: frozenset[ipaddress.IPv4Address | ipaddress.IPv6Address] = frozenset(
     {
         ipaddress.ip_address("169.254.169.254"),  # IMDSv4 (also caught by link-local)
         ipaddress.ip_address("fd00:ec2::254"),  # AWS IMDSv6 (ULA — not otherwise caught)
+        ipaddress.ip_address("100.100.100.200"),  # Alibaba Cloud IMDS (CGNAT — not otherwise caught)
     }
 )
 
@@ -464,36 +478,41 @@ def _is_allowed_address(addr: str, *, allow_local: bool) -> bool:
     loopback addresses are *also* allowed so URLs pointing at LAN cameras,
     NVRs, NAS shares, or the Home Assistant instance itself work.
 
-    The genuinely dangerous ranges stay blocked **even with ``allow_local``**:
+    The genuinely dangerous ranges stay blocked **even with ``allow_local``,
+    and even in the default strict mode**:
 
+    - the cloud-metadata endpoints in :data:`_ALWAYS_BLOCKED_HOSTS`,
+      checked first so a quirk in the public/private classification below
+      (e.g. the Alibaba Cloud IMDS address sitting in CGNAT space, which
+      Python's ``ipaddress`` reports as neither private nor global) can't
+      accidentally classify one of them as "public" and let it through.
     - link-local (``169.254.0.0/16`` / ``fe80::/10``) — this is the cloud
       metadata endpoint (``169.254.169.254``); SSRF here leaks IAM creds.
-    - the IPv6 cloud-metadata endpoints in :data:`_ALWAYS_BLOCKED_HOSTS`
-      (AWS IMDSv6 ``fd00:ec2::254`` is a ULA that the private grant would
-      otherwise permit).
     - multicast / unspecified (``0.0.0.0`` / ``::``).
     - reserved/future-use ranges (e.g. ``240.0.0.0/4``) that aren't a real
       LAN. Note ``::1`` is flagged *both* loopback and reserved by Python,
       so loopback is granted before the reserved exclusion is applied.
 
-    With ``allow_local=False`` this is exactly :func:`_is_public_address`, so
-    the historical strict behavior is preserved by construction.
+    With ``allow_local=False`` this is :func:`_is_public_address` minus the
+    always-blocked hosts, so the historical strict behavior is otherwise
+    preserved by construction.
     """
-    if _is_public_address(addr):
-        return True
-    if not allow_local:
-        return False
     try:
         ip = ipaddress.ip_address(addr)
     except ValueError:
         return False
-    # Permissive (LAN) mode — still refuse the always-dangerous ranges
-    # (specific cloud-metadata hosts + link-local/multicast/unspecified).
-    if ip in _ALWAYS_BLOCKED_HOSTS or ip.is_link_local or ip.is_multicast or ip.is_unspecified:
+    if ip in _ALWAYS_BLOCKED_HOSTS:
         return False
-    if ip.is_loopback:
+    if _is_public_address(addr):
         return True
-    return ip.is_private and not ip.is_reserved
+    if not allow_local:
+        return False
+    # Permissive (LAN) mode — still refuse the always-dangerous ranges
+    # (link-local/multicast/unspecified; the cloud-metadata denylist was
+    # already applied above, before the public/private split).
+    if ip.is_link_local or ip.is_multicast or ip.is_unspecified:
+        return False
+    return ip.is_loopback or (ip.is_private and not ip.is_reserved)
 
 
 def _resolve_hostname_sync(hostname: str, port: int | None) -> list[str]:
@@ -682,6 +701,23 @@ def _validate_local_path_sync(
     return resolved
 
 
+def _best_effort_resolve(raw_path: str) -> str:
+    """Resolve ``raw_path`` for an allowlist pre-check without requiring it to exist.
+
+    Used to decide *where a path points* before running any check that
+    would reveal existence/type/size details about it — mirrors what
+    ``Config.is_allowed_path`` does internally (resolve if it exists,
+    else resolve the parent), but callers here need the string up front
+    to gate a subsequent trust decision. Falls back to the raw string on
+    ``OSError``/``ValueError`` (e.g. a symlink loop) so the caller fails
+    closed (an unresolvable path won't match an allowlist prefix).
+    """
+    try:
+        return str(Path(raw_path).resolve())
+    except (OSError, ValueError):
+        return raw_path
+
+
 def validate_font_path(
     raw_path: str,
     *,
@@ -695,9 +731,12 @@ def validate_font_path(
     not be a symlink (``Path.is_symlink``) — this defeats the "drop a
     symlink in ``<config>/fonts/`` pointing at ``/etc/...``" trick
     that would otherwise let an attacker make Pillow parse arbitrary
-    on-disk binaries. The resolved path is then rejected if it falls
-    outside ``hass``'s ``allowlist_external_dirs`` (when ``hass`` is
-    supplied — the standalone form is used by unit tests).
+    on-disk binaries. The path is rejected up front if it falls outside
+    ``hass``'s ``allowlist_external_dirs`` (when ``hass`` is supplied —
+    the standalone form is used by unit tests); this allowlist check
+    runs *before* the symlink/existence/extension/size checks below so
+    a caller can't use those distinct errors as an oracle for a path
+    outside the allowlist (existence, type, extension, size bucket).
 
     Blocking — call from an executor thread when ``hass`` is set,
     because ``hass.config.is_allowed_path`` may stat the filesystem.
@@ -715,6 +754,13 @@ def validate_font_path(
             translation_domain=DOMAIN,
             translation_key="text_too_long",
             translation_placeholders={"field": "Font path", "max": str(MAX_FONT_PATH_LENGTH)},
+        )
+    if hass is not None and not hass.config.is_allowed_path(_best_effort_resolve(raw_path)):
+        raise ServiceValidationError(
+            f"Font path '{raw_path}' is outside allowlist_external_dirs",
+            translation_domain=DOMAIN,
+            translation_key="font_path_outside_allowlist",
+            translation_placeholders={"path": raw_path},
         )
     try:
         raw_is_symlink = Path(raw_path).is_symlink()
@@ -786,15 +832,30 @@ def validate_font_path(
             translation_placeholders={"kind": "Font", "max_mb": str(mb)},
         )
 
-    if hass is not None and not hass.config.is_allowed_path(str(resolved)):
-        raise ServiceValidationError(
-            f"Font path '{resolved}' is outside allowlist_external_dirs",
-            translation_domain=DOMAIN,
-            translation_key="font_path_outside_allowlist",
-            translation_placeholders={"path": str(resolved)},
-        )
-
     return resolved
+
+
+def _is_trusted_font_location(raw_path: str, hass: HomeAssistant) -> bool:
+    """Return True if ``raw_path`` resolves inside the allowlist or ``<config>/fonts/``.
+
+    Tolerant of a non-existent leaf (via :func:`_best_effort_resolve`, same
+    trick ``Config.is_allowed_path`` uses internally) so this trust decision
+    doesn't require the file to exist. Callers run this *before* any
+    existence/extension/size/symlink check so those checks — each with a
+    distinct, descriptive error — can't be used as an oracle for a path
+    outside both trusted locations.
+    """
+    resolved_str = _best_effort_resolve(raw_path)
+    if hass.config.is_allowed_path(resolved_str):
+        return True
+    try:
+        fonts_dir = Path(hass.config.path("fonts")).resolve()
+    except (OSError, ValueError):
+        return False
+    try:
+        return Path(resolved_str).is_relative_to(fonts_dir)
+    except (OSError, ValueError):
+        return False
 
 
 def validate_font_path_with_fonts_dir(raw_path: str, hass: HomeAssistant) -> Path:
@@ -806,42 +867,46 @@ def validate_font_path_with_fonts_dir(raw_path: str, hass: HomeAssistant) -> Pat
 
     The narrowing — only one well-known subdirectory of the HA config
     dir, only for font loading — keeps HA's broader allowlist model
-    intact for other path-based services. Blocking; call from an
-    executor thread.
+    intact for other path-based services.
+
+    The "is this location trusted at all" decision (allowlist *or*
+    ``<config>/fonts/``) runs before ``validate_font_path``'s
+    symlink/existence/extension/size checks — see
+    :func:`_is_trusted_font_location`. Blocking; call from an executor
+    thread.
+
+    ``_is_trusted_font_location`` and ``validate_font_path`` each
+    resolve ``raw_path`` independently (separate ``Path.resolve()``
+    calls), so a symlink swapped in between could point the second
+    resolve somewhere the trust check never saw. The trust decision is
+    therefore re-checked against the actually-resolved path before it's
+    returned to the caller.
     """
-    # Run extension / size / symlink / regular-file checks first (these
-    # don't depend on the allowlist decision).
-    resolved = validate_font_path(raw_path)
-    resolved_str = str(resolved)
-    if hass.config.is_allowed_path(resolved_str):
-        return resolved
-    try:
-        fonts_dir = Path(hass.config.path("fonts")).resolve()
-    except (OSError, ValueError) as exc:
+    if not isinstance(raw_path, str):
         raise ServiceValidationError(
-            f"Font path '{resolved}' is outside allowlist_external_dirs "
-            f"(and <config>/fonts/ is not accessible)",
+            "Font path must be a string",
             translation_domain=DOMAIN,
-            translation_key="font_path_outside_allowlist",
-            translation_placeholders={"path": str(resolved)},
-        ) from exc
-    try:
-        if Path(resolved_str).resolve().is_relative_to(fonts_dir):
-            return resolved
-    except (OSError, ValueError) as exc:
+            translation_key="must_be_string",
+            translation_placeholders={"field": "Font path"},
+        )
+    if not _is_trusted_font_location(raw_path, hass):
         raise ServiceValidationError(
-            f"Font path '{resolved}' is outside allowlist_external_dirs "
+            f"Font path '{raw_path}' is outside allowlist_external_dirs "
             f"(and not under <config>/fonts/)",
             translation_domain=DOMAIN,
             translation_key="font_path_outside_allowlist",
-            translation_placeholders={"path": str(resolved)},
-        ) from exc
-    raise ServiceValidationError(
-        f"Font path '{resolved}' is outside allowlist_external_dirs (and not under <config>/fonts/)",
-        translation_domain=DOMAIN,
-        translation_key="font_path_outside_allowlist",
-        translation_placeholders={"path": str(resolved)},
-    )
+            translation_placeholders={"path": raw_path},
+        )
+    resolved = validate_font_path(raw_path)
+    if not _is_trusted_font_location(str(resolved), hass):
+        raise ServiceValidationError(
+            f"Font path '{raw_path}' is outside allowlist_external_dirs "
+            f"(and not under <config>/fonts/)",
+            translation_domain=DOMAIN,
+            translation_key="font_path_outside_allowlist",
+            translation_placeholders={"path": raw_path},
+        )
+    return resolved
 
 
 # Combined control-character strip regex. Used by both `validate_text_input`
@@ -967,6 +1032,15 @@ def open_local_image_no_follow(path: Path, *, max_bytes: int | None = None) -> b
     Used together with :func:`_validate_local_path_sync` to defeat
     TOCTOU symlink swaps between stat and open. Caller is expected to
     have already validated the path (size, extension, allowlist).
+
+    Scope: ``O_NOFOLLOW`` only guards the *leaf* path component — the
+    open fails if ``path`` itself is (or has become) a symlink, but any
+    intermediate directory in ``path`` is still traversed normally. An
+    attacker with local code execution (already a stronger position than
+    this integration defends against) could swap an intermediate
+    directory for a symlink between validation and open and redirect the
+    read to a different file tree; that residual TOCTOU window is not
+    closed by this primitive.
     """
     if max_bytes is None:
         max_bytes = MAX_IMAGE_SIZE_MB * 1024 * 1024
@@ -981,6 +1055,9 @@ def open_local_font_no_follow(path: Path, *, max_bytes: int | None = None) -> by
     these bytes through :class:`io.BytesIO` to ``ImageFont.truetype`` so
     Pillow does not re-open the resolved path (which would otherwise be
     swappable for an attacker-controlled file between validate and load).
+
+    Scope: same leaf-only ``O_NOFOLLOW`` guarantee (and residual
+    intermediate-directory-symlink risk) as :func:`open_local_image_no_follow`.
     """
     if max_bytes is None:
         max_bytes = MAX_FONT_SIZE_BYTES
@@ -988,7 +1065,12 @@ def open_local_font_no_follow(path: Path, *, max_bytes: int | None = None) -> by
 
 
 def _read_no_follow(path: Path, *, max_bytes: int, kind: str) -> bytes:
-    """Common O_NOFOLLOW open + size check for image / font readers."""
+    """Common O_NOFOLLOW open + size check for image / font readers.
+
+    ``O_NOFOLLOW`` rejects a symlink at the final path component only;
+    it does not protect against a symlink substituted into one of
+    ``path``'s parent directories (see the callers' docstrings).
+    """
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
     try:
         st = os.fstat(fd)
@@ -1025,6 +1107,12 @@ def write_file_no_follow(path: str, data: bytes) -> None:
     symlink. ``O_EXCL`` + ``O_CREAT`` would refuse to clobber an
     existing file, but preview writes intentionally overwrite — so we
     pair ``O_NOFOLLOW`` with ``O_TRUNC`` and explicit owner-only mode.
+
+    Scope: this only guards the *leaf* path component, same as
+    :func:`open_local_image_no_follow` / :func:`open_local_font_no_follow`.
+    A symlink swapped into one of ``path``'s parent directories between
+    validation and this call (which requires local code execution) is
+    not caught here.
 
     Blocking; call from an executor thread.
     """

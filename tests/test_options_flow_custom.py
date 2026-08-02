@@ -14,6 +14,7 @@ from custom_components.escpos_printer.const import (
     CONF_PROFILE,
     CONF_RELIABILITY_PROFILE,
     CONF_RFCOMM_CHANNEL,
+    CONF_STATUS_INTERVAL,
     CONF_TIMEOUT,
     CONNECTION_TYPE_BLUETOOTH,
     DOMAIN,
@@ -199,3 +200,97 @@ async def test_options_flow_custom_codepage_invalid(hass):  # type: ignore[no-un
     assert result["type"] == "form"
     assert result["step_id"] == "custom_codepage"
     assert result["errors"] == {"base": "invalid_codepage"}
+
+
+def _bt_entry() -> MockConfigEntry:
+    return MockConfigEntry(
+        domain=DOMAIN,
+        title="Bluetooth Printer AA:BB:CC:DD:EE:FF",
+        data={
+            CONF_BT_MAC: "AA:BB:CC:DD:EE:FF",
+            CONF_RFCOMM_CHANNEL: 1,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH,
+        },
+        unique_id="bt:aa:bb:cc:dd:ee:ff",
+    )
+
+
+def _options_submission(**overrides):  # type: ignore[no-untyped-def]
+    data = {
+        CONF_PROFILE: "",
+        CONF_CODEPAGE: "",
+        CONF_LINE_WIDTH: "42",
+        "default_align": "left",
+        "default_cut": "none",
+        "reliability_profile": RELIABILITY_PROFILE_AUTO,
+        "timeout": 4.0,
+        "status_interval": 0,
+        "allow_local_image_urls": False,
+    }
+    data.update(overrides)
+    return data
+
+
+async def test_options_flow_bt_status_interval_below_floor_errors(hass):  # type: ignore[no-untyped-def]
+    """1-59 seconds must be rejected for a Bluetooth entry (recommended floor is 60s)."""
+    entry = _bt_entry()
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input=_options_submission(status_interval=30),
+    )
+    assert result["type"] == "form"
+    assert result["step_id"] == "init"
+    assert result["errors"] == {"base": "bt_status_interval_too_low"}
+    # Entry untouched -- the invalid submission was never saved.
+    assert entry.options.get("status_interval") is None
+
+
+async def test_options_flow_bt_status_interval_zero_accepted(hass):  # type: ignore[no-untyped-def]
+    """0 (polling disabled) is a valid value for a Bluetooth entry."""
+    entry = _bt_entry()
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    with patch("custom_components.escpos_printer.async_setup_entry", return_value=True):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            user_input=_options_submission(status_interval=0),
+        )
+        await hass.async_block_till_done()
+    assert result["type"] == "create_entry"
+    assert result["data"][CONF_STATUS_INTERVAL] == 0
+
+
+async def test_options_flow_bt_status_interval_floor_accepted(hass):  # type: ignore[no-untyped-def]
+    """60 seconds (the floor itself) is accepted for a Bluetooth entry."""
+    entry = _bt_entry()
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    with patch("custom_components.escpos_printer.async_setup_entry", return_value=True):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            user_input=_options_submission(status_interval=60),
+        )
+        await hass.async_block_till_done()
+    assert result["type"] == "create_entry"
+    assert result["data"][CONF_STATUS_INTERVAL] == 60
+
+
+async def test_options_flow_non_bt_entry_status_interval_below_60_accepted(hass):  # type: ignore[no-untyped-def]
+    """The floor only applies to Bluetooth entries -- a network entry accepts 30s."""
+    entry = await _setup_entry(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    with patch("custom_components.escpos_printer.async_setup_entry", return_value=True):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            user_input=_options_submission(profile="TM-T20", line_width="48", status_interval=30),
+        )
+        await hass.async_block_till_done()
+    assert result["type"] == "create_entry"
+    assert result["data"][CONF_STATUS_INTERVAL] == 30

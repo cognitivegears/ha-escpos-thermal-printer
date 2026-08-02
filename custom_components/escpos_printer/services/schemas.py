@@ -98,6 +98,8 @@ from ..security import (
     IMAGE_WIDTH_MIN,
     MAX_BARCODE_LENGTH,
     MAX_BASE64_INPUT_BYTES,
+    MAX_BEEP_DURATION,
+    MAX_BEEP_TIMES,
     MAX_BOX_WIDTH,
     MAX_FEED_LINES,
     MAX_FONT_PATH_LENGTH,
@@ -381,14 +383,20 @@ def _entity_id_in_domain(domain: str):  # type: ignore[no-untyped-def]
 # entity ACL) still apply — these are defense-in-depth so the schema
 # matches the documented intent.
 def _url_only(value: Any) -> str:
-    s = cv.string(value)
+    # Strip before checking (and return the stripped value) so this guard
+    # sees the same string `_classify()` will: `_classify()` strips first,
+    # so a leading/trailing-whitespace value like " camera.front_door"
+    # would otherwise slip past both prefix checks here as an unmatched
+    # (non-URL, non-local-path) shape while still classifying as a camera
+    # entity downstream.
+    s = cv.string(value).strip()
     if not s.lower().startswith(("http://", "https://")):
         raise vol.Invalid("URL must start with http:// or https://")
     return s
 
 
 def _local_path_only(value: Any) -> str:
-    s = cv.string(value)
+    s = cv.string(value).strip()
     if s.lower().startswith(("http://", "https://", "data:", "camera.", "image.")):
         raise vol.Invalid("Path must be a local filesystem path")
     return s
@@ -768,8 +776,8 @@ CUT_SCHEMA = _with_target_validation(
 BEEP_SCHEMA = _with_target_validation(
     {
         **_TARGET_FIELDS,
-        vol.Optional(ATTR_TIMES): vol.All(vol.Coerce(int), vol.Range(min=1, max=10)),
-        vol.Optional(ATTR_DURATION): vol.All(vol.Coerce(int), vol.Range(min=1, max=10)),
+        vol.Optional(ATTR_TIMES): vol.All(vol.Coerce(int), vol.Range(min=1, max=MAX_BEEP_TIMES)),
+        vol.Optional(ATTR_DURATION): vol.All(vol.Coerce(int), vol.Range(min=1, max=MAX_BEEP_DURATION)),
     }
 )
 

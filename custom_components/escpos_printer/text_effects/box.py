@@ -105,7 +105,7 @@ def render_box(
             "Box content contains wide-width characters (CJK / fullwidth / "
             "emoji); the borders may misalign because textwrap wraps by "
             "code-point count, not display columns. Use print_text_image "
-            "for accurate layout — see docs/text-effects.md#cjk. "
+            "for accurate layout — see docs/text-effects.md#cjk--wide-character-content. "
             "(This warning fires once per process.)"
         )
         _WARNED_WIDE_CHARS_BOX[0] = True

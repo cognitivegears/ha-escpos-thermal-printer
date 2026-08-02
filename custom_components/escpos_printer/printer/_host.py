@@ -50,6 +50,9 @@ class _PrinterHost(Protocol):
     async def _acquire_printer(self, hass: HomeAssistant) -> tuple[Any, bool]:
         """Acquire the underlying connection (returns ``(printer, owned)``)."""
 
+    async def _acquire_printer_or_offline(self, hass: HomeAssistant) -> tuple[Any, bool]:
+        """``_acquire_printer``, marking the adapter offline on connect failure."""
+
     async def _release_printer(
         self,
         hass: HomeAssistant,

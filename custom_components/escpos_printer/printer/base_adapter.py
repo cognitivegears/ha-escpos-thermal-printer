@@ -261,23 +261,24 @@ class EscposPrinterAdapterBase(
             owned = False
             failed = True
             try:
-                printer, owned = await self._acquire_printer(hass)
+                printer, owned = await self._acquire_printer_or_offline(hass)
                 # Reaching the printer at all is the reachability signal --
                 # notify here, not after the DLE EOT query below, so a
                 # printer that ignores/times out on paper-status (a real,
                 # known category -- see the docstring) stays stably Online
-                # instead of flapping every ~30s on that query alone.
+                # instead of flapping every 5-minute poll (SCAN_INTERVAL
+                # in sensor.py) on that query alone.
                 await self._mark_success()
                 status = await hass.async_add_executor_job(printer.paper_status)
                 failed = False
             except Exception as e:
+                # Connect failures already went through
+                # `_acquire_printer_or_offline`, which set `_last_check` /
+                # `_last_error` / `_last_error_reason` and notified offline
+                # (a no-op here if already offline, via `_notify_status_change`'s
+                # dedup) -- no bespoke bookkeeping needed for that case.
                 _LOGGER.debug("Paper status query failed: %s", sanitize_log_message(str(e)))
                 self._last_paper_status = None
-                if printer is None:
-                    # Couldn't even acquire the transport -- an unambiguous
-                    # offline signal (unlike a printer that connected fine
-                    # but merely ignores the DLE EOT query).
-                    self._notify_status_change(False)
                 return None
             finally:
                 if printer is not None:
@@ -326,6 +327,26 @@ class EscposPrinterAdapterBase(
             return self._printer, False
         printer = await hass.async_add_executor_job(self._connect)
         return printer, True
+
+    async def _acquire_printer_or_offline(self, hass: HomeAssistant) -> tuple[Any, bool]:
+        """``_acquire_printer``, marking the adapter offline on connect failure.
+
+        Every operation acquires its printer *before* entering the
+        try/finally that calls ``_release_printer`` on failure -- so a
+        ``_connect()`` exception used to skip the offline notification
+        entirely and the connectivity sensor stayed latched "Online".
+        Wrapping the acquire here gives every call site the same offline
+        signal a failed operation already gets via ``_release_printer``.
+        """
+        try:
+            return await self._acquire_printer(hass)
+        except Exception:
+            now = dt_util.utcnow()
+            self._last_check = now
+            self._last_error = now
+            self._last_error_reason = "connect failed"
+            self._notify_status_change(False)
+            raise
 
     async def _release_printer(
         self,
@@ -598,15 +619,18 @@ class EscposPrinterAdapterBase(
             await hass.async_add_executor_job(_cut)
 
     async def _mark_success(self) -> None:
-        """Mark a successful operation (updates status tracking)."""
+        """Mark a successful operation (updates status tracking).
+
+        Routed through ``_notify_status_change`` (rather than firing
+        listeners directly) so a success that doesn't change the status
+        -- e.g. the 5-minute paper-status poll on an already-online
+        printer -- doesn't re-fire every listener with a no-op update.
+        """
         now = dt_util.utcnow()
-        self._status = True
         self._last_ok = now
         self._last_check = now
         self._last_error_errno = None
-        for cb in list(self._status_listeners):
-            with contextlib.suppress(Exception):
-                cb(True)
+        self._notify_status_change(True)
 
     async def print_text_with_image(
         self,
@@ -634,7 +658,7 @@ class EscposPrinterAdapterBase(
         )
 
         async with self._lock:
-            printer, owned = await self._acquire_printer(hass)
+            printer, owned = await self._acquire_printer_or_offline(hass)
             failed = True
             try:
                 try:

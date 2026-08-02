@@ -648,12 +648,24 @@ class UsbFlowMixin:
         # none) have unique_id=None -- that never matches a freshly
         # computed id, so the mismatch guard would permanently block
         # reconfigure. Skip it once and let this reconfigure adopt/set the
-        # unique ID instead.
+        # unique ID instead -- but still guard against the id landing on a
+        # *different* already-configured entry (the mismatch guard can't
+        # catch this case since it only fires when there's an original id
+        # to compare against).
         if existing_unique_id is not None:
             self._abort_if_unique_id_mismatch()  # type: ignore[attr-defined]
+        else:
+            colliding = self.hass.config_entries.async_entry_for_domain_unique_id(
+                self.handler,  # type: ignore[attr-defined]
+                unique_id,
+            )
+            if colliding is not None and colliding.entry_id != reconfigure_entry.entry_id:
+                return self.async_abort(reason="already_configured")  # type: ignore[attr-defined,no-any-return]
 
+        in_ep = reconfigure_entry.data.get(CONF_IN_EP, DEFAULT_IN_EP)
+        out_ep = reconfigure_entry.data.get(CONF_OUT_EP, DEFAULT_OUT_EP)
         ok, error_code, errno = await self.hass.async_add_executor_job(
-            _can_connect_usb, vendor_id, product_id, timeout
+            _can_connect_usb, vendor_id, product_id, timeout, in_ep, out_ep
         )
         if ok:
             return self.async_update_reload_and_abort(  # type: ignore[attr-defined,no-any-return]

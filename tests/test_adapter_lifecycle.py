@@ -303,6 +303,44 @@ async def test_profile_width_repair_issue_cleared_once_profile_resolves(hass):  
     assert registry.async_get_issue(DOMAIN, issue_id) is None
 
 
+async def test_profile_width_repair_issue_clears_legacy_profile_scoped_id(hass):  # type: ignore[no-untyped-def]
+    """Resolving the profile must also delete the pre-1.0 profile-name-scoped issue id.
+
+    Pre-1.0, the repair-issue id was keyed by profile *name* rather than
+    entry id; an install upgrading from that era could still have one of
+    those legacy issues sitting in the registry after the profile is
+    fixed. ``_clear_profile_width_repair_issue`` must delete both ids.
+    """
+    from homeassistant.helpers import issue_registry as ir
+
+    from custom_components.escpos_printer.const import DOMAIN
+
+    class _GoodProfile:
+        profile_data = {"media": {"width": {"pixels": 576}}}
+
+    entry = await _setup_entry(hass)
+    adapter = entry.runtime_data.adapter
+    adapter.config.profile = "TM-T88V"
+
+    registry = ir.async_get(hass)
+    legacy_issue_id = "profile_width_fallback_TM-T88V"
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        legacy_issue_id,
+        is_fixable=False,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key="profile_width_fallback",
+        translation_placeholders={"profile": "TM-T88V", "fallback": "384"},
+    )
+    assert registry.async_get_issue(DOMAIN, legacy_issue_id) is not None
+
+    adapter._get_profile_obj = _GoodProfile  # type: ignore[attr-defined,method-assign]
+    assert adapter.get_profile_pixel_width(hass) == 576
+
+    assert registry.async_get_issue(DOMAIN, legacy_issue_id) is None
+
+
 async def test_async_remove_entry_deletes_repair_issue(hass):  # type: ignore[no-untyped-def]
     """Removing the config entry must clean up its repair issue too."""
     from homeassistant.helpers import issue_registry as ir

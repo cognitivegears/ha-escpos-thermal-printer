@@ -118,6 +118,28 @@ async def test_adapter_get_paper_status_returns_none_on_error():
     assert adapter.get_diagnostics()["paper_status"] is None
 
 
+async def test_adapter_get_paper_status_connect_failure_updates_diagnostics():
+    """A connect failure during paper-status must not leave stale diagnostics.
+
+    Regression: `get_paper_status` used to acquire via the bare
+    `_acquire_printer`, whose connect-failure branch notified the
+    connectivity sensor offline but never touched `_last_check` /
+    `_last_error` / `_last_error_reason` -- those stayed at whatever an
+    earlier successful operation last set them to.
+    """
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+
+    def _boom():
+        raise OSError("unreachable")
+
+    adapter._connect = _boom  # type: ignore[method-assign]
+    assert await adapter.get_paper_status(_FakeHass()) is None
+    diagnostics = adapter.get_diagnostics()
+    assert diagnostics["last_check"] is not None
+    assert diagnostics["last_error"] is not None
+    assert diagnostics["last_error_reason"] == "connect failed"
+
+
 async def test_adapter_get_paper_status_skips_when_print_in_flight():
     """A busy lock returns the last known value without touching the printer."""
     adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))

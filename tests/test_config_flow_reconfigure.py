@@ -131,7 +131,78 @@ async def test_reconfigure_network_happy_path(hass):  # type: ignore[no-untyped-
     assert updated.entry_id == entry_id  # same entry -- entities/automations survive
     assert updated.data[CONF_HOST] == "5.6.7.8"
     assert updated.unique_id == "5.6.7.8:9100"
+    assert updated.title == "5.6.7.8:9100"  # auto-generated title follows the new address
     assert len(hass.config_entries.async_entries(DOMAIN)) == 1
+
+
+async def test_reconfigure_network_preserves_manual_rename(hass):  # type: ignore[no-untyped-def]
+    """A user-renamed title must survive a reconfigure to a new address."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Front Counter Printer",  # manually renamed, not "host:port"
+        data={
+            CONF_HOST: "1.2.3.4",
+            CONF_PORT: 9100,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK,
+        },
+        unique_id="1.2.3.4:9100",
+    )
+    entry.add_to_hass(hass)
+    entry_id = entry.entry_id
+
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=True,
+        ),
+        patch("custom_components.escpos_printer.async_setup_entry", return_value=True),
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_HOST: "5.6.7.8", CONF_PORT: 9100},
+        )
+        await hass.async_block_till_done()
+
+    assert result2["type"] == "abort"
+    assert result2["reason"] == "reconfigure_successful"
+
+    updated = hass.config_entries.async_get_entry(entry_id)
+    assert updated is not None
+    assert updated.data[CONF_HOST] == "5.6.7.8"
+    assert updated.title == "Front Counter Printer"  # untouched
+
+
+async def test_reconfigure_network_cannot_connect(hass):  # type: ignore[no-untyped-def]
+    """A failed connection probe re-renders the form with cannot_connect and leaves the entry alone."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="1.2.3.4:9100",
+        data={
+            CONF_HOST: "1.2.3.4",
+            CONF_PORT: 9100,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK,
+        },
+        unique_id="1.2.3.4:9100",
+    )
+    entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+        return_value=False,
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_HOST: "5.6.7.8", CONF_PORT: 9100},
+        )
+
+    assert result2["type"] == "form"
+    assert result2["step_id"] == "reconfigure_network"
+    assert result2["errors"]["base"] == "cannot_connect"
+    assert entry.data[CONF_HOST] == "1.2.3.4"  # untouched
 
 
 async def test_reconfigure_bluetooth_unique_id_mismatch_aborts(hass):  # type: ignore[no-untyped-def]
@@ -601,3 +672,438 @@ async def test_usb_manual_custom_endpoint_coexists_with_default(hass):  # type: 
         assert len(entries) == 2
         unique_ids = {e.unique_id for e in entries}
         assert unique_ids == {"usb:04b8:0202", "usb:04b8:0202:83:02"}
+
+
+async def test_reconfigure_usb_legacy_collision_with_other_entry_aborts(hass):  # type: ignore[no-untyped-def]
+    """A legacy (unique_id=None) USB entry reconfigured onto a device already
+    owned by a *different* entry must abort, not adopt a duplicate unique_id.
+    """
+    owner = MockConfigEntry(
+        domain=DOMAIN,
+        title="USB Printer 04B8:0202",
+        data={
+            CONF_VENDOR_ID: 0x04B8,
+            CONF_PRODUCT_ID: 0x0202,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+        },
+        unique_id="usb:04b8:0202",
+    )
+    owner.add_to_hass(hass)
+
+    legacy = MockConfigEntry(
+        domain=DOMAIN,
+        title="USB Printer 04B8:0202 (legacy)",
+        data={
+            CONF_VENDOR_ID: 0x04B8,
+            CONF_PRODUCT_ID: 0x0202,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+        },
+        unique_id=None,
+    )
+    legacy.add_to_hass(hass)
+
+    discovered = {
+        "vendor_id": 0x04B8,
+        "product_id": 0x0202,
+        "manufacturer": "Epson",
+        "product": "TM-T88V",
+        "serial_number": None,
+        "label": "Epson TM-T88V (04B8:0202)",
+        "_choice_key": "04B8:0202#0",
+    }
+
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.usb_steps._discover_usb_printers",
+            return_value=[discovered],
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.usb_steps._can_connect_usb"
+        ) as mock_can_connect,
+    ):
+        result = await legacy.start_reconfigure_flow(hass)
+        assert result["step_id"] == "reconfigure_usb"
+
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {"usb_device": "04B8:0202#0", "timeout": 4.0},
+        )
+
+    assert result2["type"] == "abort"
+    assert result2["reason"] == "already_configured"
+    mock_can_connect.assert_not_called()  # collision guard fires before any probe
+    assert legacy.unique_id is None  # legacy entry left untouched
+
+
+async def test_reconfigure_usb_uses_stored_endpoints_for_probe(hass):  # type: ignore[no-untyped-def]
+    """A manual entry with custom in_ep/out_ep is re-probed under those same endpoints."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="USB Printer 04B8:0202",
+        data={
+            CONF_VENDOR_ID: 0x04B8,
+            CONF_PRODUCT_ID: 0x0202,
+            CONF_IN_EP: 0x83,
+            CONF_OUT_EP: 0x02,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+        },
+        unique_id="usb:04b8:0202:83:02",
+    )
+    entry.add_to_hass(hass)
+
+    discovered = {
+        "vendor_id": 0x04B8,
+        "product_id": 0x0202,
+        "manufacturer": "Epson",
+        "product": "TM-T88V",
+        "serial_number": None,
+        "label": "Epson TM-T88V (04B8:0202)",
+        "_choice_key": "04B8:0202#0",
+    }
+
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.usb_steps._discover_usb_printers",
+            return_value=[discovered],
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.usb_steps._can_connect_usb",
+            return_value=(True, None, None),
+        ) as mock_can_connect,
+        patch("custom_components.escpos_printer.async_setup_entry", return_value=True),
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {"usb_device": "04B8:0202#0", "timeout": 4.0},
+        )
+        await hass.async_block_till_done()
+
+    assert result2["type"] == "abort"
+    assert result2["reason"] == "reconfigure_successful"
+    mock_can_connect.assert_called_once_with(0x04B8, 0x0202, 4.0, 0x83, 0x02)
+
+
+async def test_reconfigure_usb_invalid_device_selection_shows_error(hass):  # type: ignore[no-untyped-def]
+    """Selecting a choice key that no longer matches a discovered printer errors."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="USB Printer 04B8:0202",
+        data={
+            CONF_VENDOR_ID: 0x04B8,
+            CONF_PRODUCT_ID: 0x0202,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+        },
+        unique_id="usb:04b8:0202",
+    )
+    entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.escpos_printer._config_flow.usb_steps._discover_usb_printers",
+        return_value=[],
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        # A stale choice key can't reach here through vol.In(device_choices)
+        # in the real UI (the dropdown only ever offers current choices) --
+        # call the step directly, bypassing schema validation, to exercise
+        # the handler's own "not found" guard.
+        flow = hass.config_entries.flow._progress[result["flow_id"]]
+        result2 = await flow.async_step_reconfigure_usb(
+            {"usb_device": "no_longer_present#0", "timeout": 4.0}
+        )
+
+    assert result2["type"] == "form"
+    assert result2["step_id"] == "reconfigure_usb"
+    assert result2["errors"]["base"] == "invalid_usb_device"
+
+
+async def test_reconfigure_usb_manual_sentinel_routes_to_manual_step(hass):  # type: ignore[no-untyped-def]
+    """Picking the manual-entry sentinel routes to reconfigure_usb_manual."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="USB Printer 04B8:0202",
+        data={
+            CONF_VENDOR_ID: 0x04B8,
+            CONF_PRODUCT_ID: 0x0202,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+        },
+        unique_id="usb:04b8:0202",
+    )
+    entry.add_to_hass(hass)
+
+    discovered = {
+        "vendor_id": 0x04B8,
+        "product_id": 0x0202,
+        "manufacturer": "Epson",
+        "product": "TM-T88V",
+        "serial_number": None,
+        "label": "Epson TM-T88V (04B8:0202)",
+        "_choice_key": "04B8:0202#0",
+    }
+    with patch(
+        "custom_components.escpos_printer._config_flow.usb_steps._discover_usb_printers",
+        return_value=[discovered],
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"usb_device": "__manual__"}
+        )
+
+    assert result2["type"] == "form"
+    assert result2["step_id"] == "reconfigure_usb_manual"
+
+
+async def test_finalize_usb_reconfigure_probe_failure_shows_error(hass):  # type: ignore[no-untyped-def]
+    """A failed connect probe re-renders the manual reconfigure form with an error."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="USB Printer 04B8:0202",
+        data={
+            CONF_VENDOR_ID: 0x04B8,
+            CONF_PRODUCT_ID: 0x0202,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+        },
+        unique_id="usb:04b8:0202",
+    )
+    entry.add_to_hass(hass)
+
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.usb_steps._discover_usb_printers",
+            return_value=[],
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.usb_steps._can_connect_usb",
+            return_value=(False, "device_not_found", 19),
+        ),
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"usb_device": "__manual__"}
+        )
+        assert result2["step_id"] == "reconfigure_usb_manual"
+
+        result3 = await hass.config_entries.flow.async_configure(
+            result2["flow_id"],
+            {CONF_VENDOR_ID: "0x04B8", CONF_PRODUCT_ID: "0x0202", "timeout": 4.0},
+        )
+
+    assert result3["type"] == "form"
+    assert result3["step_id"] == "reconfigure_usb_manual"
+    assert result3["errors"]["base"] == "usb_device_not_found"
+    assert entry.unique_id == "usb:04b8:0202"  # untouched
+
+
+async def test_reconfigure_serial_happy_path(hass):  # type: ignore[no-untyped-def]
+    """Reconfiguring a serial printer's port updates the same entry and its auto title."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Serial /dev/ttyUSB0",
+        data={
+            CONF_SERIAL_PORT: "/dev/ttyUSB0",
+            CONF_BAUDRATE: 9600,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_SERIAL,
+        },
+        unique_id="serial:/dev/ttyusb0",
+    )
+    entry.add_to_hass(hass)
+    entry_id = entry.entry_id
+
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.serial_steps._can_connect_serial",
+            return_value=(True, None, None),
+        ),
+        patch("custom_components.escpos_printer.async_setup_entry", return_value=True),
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        assert result["type"] == "form"
+        assert result["step_id"] == "reconfigure_serial"
+
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_SERIAL_PORT: "/dev/ttyUSB1", CONF_BAUDRATE: "19200"},
+        )
+        await hass.async_block_till_done()
+
+    assert result2["type"] == "abort"
+    assert result2["reason"] == "reconfigure_successful"
+
+    updated = hass.config_entries.async_get_entry(entry_id)
+    assert updated is not None
+    assert updated.data[CONF_SERIAL_PORT] == "/dev/ttyUSB1"
+    assert updated.data[CONF_BAUDRATE] == 19200
+    assert updated.unique_id == "serial:/dev/ttyusb1"
+    assert updated.title == "Serial /dev/ttyUSB1"  # auto-generated title follows the new port
+
+
+async def test_reconfigure_serial_preserves_manual_rename(hass):  # type: ignore[no-untyped-def]
+    """A user-renamed title must survive a reconfigure to a new port."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Kitchen Receipt Printer",  # manually renamed, not "Serial <port>"
+        data={
+            CONF_SERIAL_PORT: "/dev/ttyUSB0",
+            CONF_BAUDRATE: 9600,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_SERIAL,
+        },
+        unique_id="serial:/dev/ttyusb0",
+    )
+    entry.add_to_hass(hass)
+    entry_id = entry.entry_id
+
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.serial_steps._can_connect_serial",
+            return_value=(True, None, None),
+        ),
+        patch("custom_components.escpos_printer.async_setup_entry", return_value=True),
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_SERIAL_PORT: "/dev/ttyUSB1", CONF_BAUDRATE: "9600"},
+        )
+        await hass.async_block_till_done()
+
+    assert result2["type"] == "abort"
+    assert result2["reason"] == "reconfigure_successful"
+
+    updated = hass.config_entries.async_get_entry(entry_id)
+    assert updated is not None
+    assert updated.data[CONF_SERIAL_PORT] == "/dev/ttyUSB1"
+    assert updated.title == "Kitchen Receipt Printer"  # untouched
+
+
+async def test_reconfigure_serial_invalid_baudrate_reorders_cleanly(hass):  # type: ignore[no-untyped-def]
+    """A non-numeric baudrate must hit invalid_baudrate, not raise out of int()."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Serial /dev/ttyUSB0",
+        data={
+            CONF_SERIAL_PORT: "/dev/ttyUSB0",
+            CONF_BAUDRATE: 9600,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_SERIAL,
+        },
+        unique_id="serial:/dev/ttyusb0",
+    )
+    entry.add_to_hass(hass)
+
+    result = await entry.start_reconfigure_flow(hass)
+    # A non-numeric baudrate can't reach here through vol.In(_BAUDRATE_CHOICES)
+    # in the real UI -- call the step directly, bypassing schema validation,
+    # to exercise the handler's own reordered parse-then-check guard.
+    flow = hass.config_entries.flow._progress[result["flow_id"]]
+    result2 = await flow.async_step_reconfigure_serial(
+        {CONF_SERIAL_PORT: "/dev/ttyUSB0", CONF_BAUDRATE: "not-a-number"}
+    )
+
+    assert result2["type"] == "form"
+    assert result2["step_id"] == "reconfigure_serial"
+    assert result2["errors"]["base"] == "invalid_baudrate"
+    assert entry.data[CONF_BAUDRATE] == 9600  # untouched
+
+
+async def test_reconfigure_bluetooth_happy_path(hass):  # type: ignore[no-untyped-def]
+    """Reconfiguring a Bluetooth printer's channel updates the same entry in place."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Bluetooth Printer AA:BB:CC:DD:EE:FF",
+        data={
+            CONF_BT_MAC: "AA:BB:CC:DD:EE:FF",
+            CONF_RFCOMM_CHANNEL: 1,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH,
+        },
+        unique_id="bt:aa:bb:cc:dd:ee:ff",
+    )
+    entry.add_to_hass(hass)
+    entry_id = entry.entry_id
+
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.bluetooth_steps._can_connect_bluetooth",
+            return_value=(True, None, None),
+        ),
+        patch("custom_components.escpos_printer.async_setup_entry", return_value=True),
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        assert result["type"] == "form"
+        assert result["step_id"] == "reconfigure_bluetooth"
+
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_BT_MAC: "AA:BB:CC:DD:EE:FF", CONF_RFCOMM_CHANNEL: 2},
+        )
+        await hass.async_block_till_done()
+
+    assert result2["type"] == "abort"
+    assert result2["reason"] == "reconfigure_successful"
+
+    updated = hass.config_entries.async_get_entry(entry_id)
+    assert updated is not None
+    assert updated.data[CONF_RFCOMM_CHANNEL] == 2
+    assert updated.unique_id == "bt:aa:bb:cc:dd:ee:ff"
+
+
+async def test_reconfigure_bluetooth_invalid_mac_shows_error(hass):  # type: ignore[no-untyped-def]
+    """An unparsable MAC re-renders the form instead of proceeding."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Bluetooth Printer AA:BB:CC:DD:EE:FF",
+        data={
+            CONF_BT_MAC: "AA:BB:CC:DD:EE:FF",
+            CONF_RFCOMM_CHANNEL: 1,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH,
+        },
+        unique_id="bt:aa:bb:cc:dd:ee:ff",
+    )
+    entry.add_to_hass(hass)
+
+    result = await entry.start_reconfigure_flow(hass)
+    result2 = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_BT_MAC: "not-a-mac", CONF_RFCOMM_CHANNEL: 1},
+    )
+
+    assert result2["type"] == "form"
+    assert result2["step_id"] == "reconfigure_bluetooth"
+    assert result2["errors"]["base"] == "invalid_bt_mac"
+    assert entry.data[CONF_BT_MAC] == "AA:BB:CC:DD:EE:FF"  # untouched
+
+
+async def test_reconfigure_bluetooth_invalid_channel_shows_error(hass):  # type: ignore[no-untyped-def]
+    """An out-of-range RFCOMM channel re-renders the form instead of proceeding."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Bluetooth Printer AA:BB:CC:DD:EE:FF",
+        data={
+            CONF_BT_MAC: "AA:BB:CC:DD:EE:FF",
+            CONF_RFCOMM_CHANNEL: 1,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH,
+        },
+        unique_id="bt:aa:bb:cc:dd:ee:ff",
+    )
+    entry.add_to_hass(hass)
+
+    result = await entry.start_reconfigure_flow(hass)
+    result2 = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_BT_MAC: "AA:BB:CC:DD:EE:FF", CONF_RFCOMM_CHANNEL: 99},
+    )
+
+    assert result2["type"] == "form"
+    assert result2["step_id"] == "reconfigure_bluetooth"
+    assert result2["errors"]["base"] == "invalid_rfcomm_channel"
+    assert entry.data[CONF_RFCOMM_CHANNEL] == 1  # untouched

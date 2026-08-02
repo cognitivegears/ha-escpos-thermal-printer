@@ -13,6 +13,7 @@ Covers:
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import re
 
@@ -248,6 +249,53 @@ def test_print_image_path_schema_auto_resize_default_is_true():
     assert out["auto_resize"] is True
 
 
+def test_print_image_path_schema_strips_and_rejects_whitespace_prefixed_entity():
+    """A leading-space value must be checked/rejected using the same shape ``_classify`` will see.
+
+    ``_classify()`` strips the source before classifying it, so
+    ``" camera.front_door"`` (leading space) is really a camera entity —
+    the path-only schema must reject it, not silently accept it as an
+    unmatched (non-URL, non-entity-looking) local path because it only
+    checked the un-stripped string.
+    """
+    from custom_components.escpos_printer.services.schemas import (
+        PRINT_IMAGE_PATH_SCHEMA,
+    )
+
+    with pytest.raises(vol.Invalid):
+        PRINT_IMAGE_PATH_SCHEMA({"path": " camera.front_door"})
+
+
+def test_print_image_path_schema_strips_leading_whitespace_from_local_path():
+    """A leading-space local path is still a local path once stripped; the schema accepts it."""
+    from custom_components.escpos_printer.services.schemas import (
+        PRINT_IMAGE_PATH_SCHEMA,
+    )
+
+    out = PRINT_IMAGE_PATH_SCHEMA({"path": " /config/www/x.png"})
+    assert out["path"] == "/config/www/x.png"
+
+
+def test_print_image_url_schema_strips_and_rejects_whitespace_prefixed_path():
+    """A leading-space local-path value must be rejected by the URL-only schema."""
+    from custom_components.escpos_printer.services.schemas import (
+        PRINT_IMAGE_URL_SCHEMA,
+    )
+
+    with pytest.raises(vol.Invalid):
+        PRINT_IMAGE_URL_SCHEMA({"url": " /config/www/x.png"})
+
+
+def test_print_image_url_schema_strips_leading_whitespace_from_url():
+    """A leading-space URL is still a URL once stripped; the schema accepts it."""
+    from custom_components.escpos_printer.services.schemas import (
+        PRINT_IMAGE_URL_SCHEMA,
+    )
+
+    out = PRINT_IMAGE_URL_SCHEMA({"url": " http://example.com/x.png"})
+    assert out["url"] == "http://example.com/x.png"
+
+
 def test_print_camera_snapshot_schema_defaults_match_ui():
     """services.yaml prefills autocontrast=true and auto_resize=true; the schema must agree."""
     from custom_components.escpos_printer.services.schemas import (
@@ -354,12 +402,13 @@ _FOCUSED_IMAGE_SERVICES = (
     "print_image_path",
     "print_camera_snapshot",
     "print_image_entity",
+    "preview_image",
 )
 
 # Fields that every image service must expose with identical UI metadata.
-# `image_width` / `cut` / `feed` are excluded because their YAML defaults
-# legitimately vary per service. `rotation`, `dither`, etc. carry their
-# own defaults but should be uniform.
+# `cut` is excluded because it's absent from the focused services' common
+# fragment entirely. `rotation`, `dither`, etc. carry their own per-service
+# defaults but should be uniform in name/description/selector.
 _PARITY_FIELDS = (
     "rotation",
     "dither",
@@ -374,12 +423,25 @@ _PARITY_FIELDS = (
     "chunk_delay_ms",
     "fallback_image",
     "broadcast",
+    "auto_resize",
+    "feed",
+    "image_width",
 )
 
 # Fields whose default *may* differ between services (documented per-service
 # UX choice). Listed explicitly so the parity test stays loud about any
 # *unintended* drift on other fields.
 _DEFAULT_MAY_VARY = frozenset({"auto_resize", "autocontrast", "feed"})
+
+# preview_image deliberately omits the printer-communication knobs
+# (CLAUDE.md "Image services: field-set parity invariant") because they
+# have no effect on the PNG written to disk — exempt from the "every
+# _PARITY_FIELDS entry must exist" check rather than failing as missing.
+_PARITY_EXEMPT_FIELDS: dict[str, frozenset[str]] = {
+    "preview_image": frozenset(
+        {"high_density", "impl", "fragment_height", "chunk_delay_ms", "broadcast", "feed"}
+    ),
+}
 
 
 def _load_services_yaml() -> dict:
@@ -419,7 +481,10 @@ def test_image_services_share_common_field_metadata() -> None:
     for svc in _FOCUSED_IMAGE_SERVICES:
         svc_def = services[svc]
         svc_fields = _flatten_fields(svc_def)
+        exempt = _PARITY_EXEMPT_FIELDS.get(svc, frozenset())
         for f in _PARITY_FIELDS:
+            if f in exempt:
+                continue
             if f not in svc_fields:
                 mismatches.append(f"{svc}.{f} missing entirely")
                 continue
@@ -514,6 +579,46 @@ def test_no_icu_tag_like_angle_brackets_in_user_visible_strings() -> None:
         "ICU-tag-like '<' in user-visible strings (frontend raises UNCLOSED_TAG):\n  "
         + "\n  ".join(offenders)
     )
+
+
+def test_no_unquoted_hash_in_plain_scalar_descriptions() -> None:
+    """Regression guard for the YAML `#`-comment-truncation bug class,
+    scanned across every service in services.yaml (not just the image
+    family). An unquoted `#` in a plain-scalar ``description:`` value
+    starts a YAML comment, silently dropping everything after it before
+    PyYAML ever hands the value back — so this scans the raw text, not
+    the parsed result.
+    """
+    root = Path(__file__).resolve().parents[1] / "custom_components" / "escpos_printer"
+    lines = (root / "services.yaml").read_text(encoding="utf-8").splitlines()
+
+    # A plain-scalar `description:` value: not quoted (`"`/`'`) and not a
+    # block-scalar indicator (`>`/`|`).
+    plain_scalar_desc = re.compile(r'^(\s*)description:\s+(?!["\'>|])(.*)$')
+    offenders = [
+        f"services.yaml:{lineno}: {line.strip()[:100]}"
+        for lineno, line in enumerate(lines, start=1)
+        if (match := plain_scalar_desc.match(line))
+        # `#` preceded by whitespace (or leading the value) opens a
+        # comment in a plain scalar.
+        and re.search(r"(^|\s)#", match.group(2))
+    ]
+    assert not offenders, (
+        "Unquoted '#' in a plain-scalar description silently truncates the "
+        "value at YAML-parse time — quote the description or use a '>' "
+        "folded scalar:\n  " + "\n  ".join(offenders)
+    )
+
+
+def test_icons_json_services_match_services_yaml() -> None:
+    """icons.json's service icon keys must exactly match services.yaml's
+    registered services — no stale entries for removed/renamed services,
+    no service missing an automation-picker icon.
+    """
+    services = _load_services_yaml()
+    root = Path(__file__).resolve().parents[1] / "custom_components" / "escpos_printer"
+    icons = json.loads((root / "icons.json").read_text(encoding="utf-8"))
+    assert set(icons["services"].keys()) == set(services.keys())
 
 
 def _assert_description_not_truncated(svc: str, fname: str, desc: object) -> None:

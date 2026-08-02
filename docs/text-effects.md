@@ -38,7 +38,7 @@ size / rotation but takes longer than text mode.
 
 > **Heads-up on non-ASCII text.** `print_box` and `print_table` use one
 > character cell per column. CJK characters, emoji, and combining marks
-> may misalign on narrow printers — see [CJK / wide-character content](#cjk)
+> may misalign on narrow printers — see [CJK / wide-character content](#cjk--wide-character-content)
 > at the bottom of this guide. For mixed-script content, prefer
 > `print_text_image` (which measures actual glyph widths in pixels).
 
@@ -583,7 +583,7 @@ ready-to-import automations and scripts that use these patterns.
   python-escpos release adds the bind, this note is the canary to
   re-evaluate the text path.
 
-## CJK / wide-character content {#cjk}
+## CJK / wide-character content
 
 Text-mode services (`print_box`, `print_table`, `print_kvtable`)
 measure cell width in Python characters — they treat every codepoint
@@ -600,7 +600,7 @@ sees wide-width characters in the input it logs a one-shot warning:
 Box content contains wide-width characters (CJK / fullwidth /
 emoji); the borders may misalign because textwrap wraps by
 code-point count, not display columns. Use print_text_image for
-accurate layout — see docs/text-effects.md#cjk.
+accurate layout — see docs/text-effects.md#cjk--wide-character-content.
 (This warning fires once per process.)
 ```
 

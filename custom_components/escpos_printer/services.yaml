@@ -1628,9 +1628,9 @@ print_barcode:
           selector:
             select:
               options:
-                - label: "Auto (printer native)"
+                - label: "Auto (printer native) (default)"
                   value: "false"
-                - label: "Force software (default)"
+                - label: "Force software"
                   value: "true"
                 - label: "Software: Graphics"
                   value: "graphics"
@@ -1733,7 +1733,7 @@ beep:
       selector:
         number:
           min: 1
-          max: 10
+          max: 9
           step: 1
           mode: slider
     duration:
@@ -1743,7 +1743,7 @@ beep:
       selector:
         number:
           min: 1
-          max: 10
+          max: 9
           step: 1
           mode: slider
 
@@ -2394,9 +2394,12 @@ print_text_image:
           selector:
             select:
               options:
-                - "bitImageRaster"
-                - "graphics"
-                - "bitImageColumn"
+                - label: "Raster (default — Epson)"
+                  value: "bitImageRaster"
+                - label: "Graphics (newer ESC/POS)"
+                  value: "graphics"
+                - label: "Column (legacy POS-58/80)"
+                  value: "bitImageColumn"
         image_fragment_height:
           name: Fragment Height (pixels)
           description: Per-slice height for buffered raster output.

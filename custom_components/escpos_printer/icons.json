@@ -1,8 +1,5 @@
 {
   "entity": {
-    "binary_sensor": {
-      "online": {"default": "mdi:printer"}
-    },
     "sensor": {
       "last_image_print": {"default": "mdi:image-outline"},
       "paper_status": {"default": "mdi:paper-roll-outline"}

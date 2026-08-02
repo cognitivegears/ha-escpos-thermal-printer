@@ -822,7 +822,7 @@ These configuration tests should be designed to verify:
 
 1. **Graceful Error Handling:** All invalid configurations should be detected and handled gracefully
 2. **Default Behaviors:** Default parameters should be correctly applied when not explicitly specified
-3. **Model Compatibility:** Printer model-specific features should be properly detected and utilized
+3. **Model Compatibility:** Printer model-specific features should be properly detected and used
 4. **Configuration Persistence:** Configuration changes should persist correctly between service calls
 5. **Parameter Overrides:** Explicit parameters should override defaults when specified
 

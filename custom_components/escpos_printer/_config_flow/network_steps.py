@@ -7,6 +7,7 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_PORT
+from homeassistant.helpers.typing import UNDEFINED, UndefinedType
 import voluptuous as vol
 
 from ..capabilities import (
@@ -151,9 +152,18 @@ class NetworkFlowMixin:
                 _can_connect, host, port, timeout
             )
             if ok:
+                # Only follow the address to a new auto-generated title
+                # when the entry still carries the original auto-generated
+                # one -- a user's manual rename must never be clobbered.
+                title: str | UndefinedType = UNDEFINED
+                old_host = reconfigure_entry.data.get(CONF_HOST, "")
+                old_port = reconfigure_entry.data.get(CONF_PORT, DEFAULT_PORT)
+                if reconfigure_entry.title == f"{old_host}:{old_port}":
+                    title = f"{host}:{port}"
                 return self.async_update_reload_and_abort(  # type: ignore[attr-defined,no-any-return]
                     reconfigure_entry,
                     unique_id=new_unique_id,
+                    title=title,
                     data_updates={
                         CONF_HOST: host,
                         CONF_PORT: port,

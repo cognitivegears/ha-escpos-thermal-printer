@@ -64,7 +64,7 @@ should understand what is and isn't enforced. Cross-linked from
 - **Pair on the host first.** The integration does not initiate pairing. It only opens RFCOMM sockets to already-paired devices.
 - **One client at a time.** RFCOMM is single-session. The integration auto-skips status probes during prints; aggressive `status_interval` settings hurt rather than help.
 - **Plaintext over the air.** Bluetooth Classic SPP with no PIN or PIN `0000` is unencrypted. Don't route OTPs, 2FA codes, or other sensitive content to a BT printer.
-- **`status_interval` floor of 60s.** Cheap BT printers beep on every connect; aggressive polling competes with in-flight prints. Set to 60s+ or 0.
+- **`status_interval` floor of 60s (enforced).** Cheap BT printers beep on every connect; aggressive polling competes with in-flight prints. `0` disables polling, `1`–`59` is rejected with a form error, `60`+ is accepted.
 - **Linux-only.** `AF_BLUETOOTH` is Linux-only. macOS / Windows HA installs cannot use this connection type natively.
 - **Container caveats.** HA Container needs `--net=host` + `NET_ADMIN` + `NET_RAW` + `/run/dbus` mount. Or use the `socat` host-bridge fallback (see README).
 - **Battery sensor only when bluez exposes it.** Most cheap thermal printers don't expose `org.bluez.Battery1`; the sensor stays unavailable for those.

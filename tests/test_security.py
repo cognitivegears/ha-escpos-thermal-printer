@@ -409,7 +409,7 @@ class TestSecurityConstants:
         assert MAX_QR_DATA_LENGTH == 2000
         assert MAX_BARCODE_LENGTH == 100
         assert MAX_FEED_LINES == 50
-        assert MAX_BEEP_TIMES == 10
+        assert MAX_BEEP_TIMES == 9
 
     def test_text_effects_max_constants(self):  # type: ignore[no-untyped-def]
         """T-M3: pin the text-effects bounds added in the 0.7 branch.
@@ -536,6 +536,98 @@ class TestFontPathValidation:
         link_at_validated_path.symlink_to(decoy)
         with pytest.raises(OSError):
             open_local_font_no_follow(link_at_validated_path)
+
+    async def test_validate_font_path_allowlist_checked_before_existence(  # type: ignore[no-untyped-def]
+        self, hass, monkeypatch
+    ):
+        """A nonexistent path outside the allowlist must yield the allowlist error.
+
+        The ``hass`` allowlist decision runs before the existence check,
+        so a caller outside the allowlist can't use the distinct "does not
+        exist" error as an oracle for arbitrary host paths.
+        """
+        from custom_components.escpos_printer.security import validate_font_path
+
+        monkeypatch.setattr(hass.config, "is_allowed_path", lambda _p: False)
+        with pytest.raises(HomeAssistantError, match="allowlist"):
+            validate_font_path("/nonexistent/outside/font.ttf", hass=hass)
+
+    async def test_validate_font_path_allowlist_checked_before_oversize(  # type: ignore[no-untyped-def]
+        self, hass, monkeypatch, tmp_path
+    ):
+        """An oversized file outside the allowlist must yield the allowlist error, not 'too large'."""
+        from custom_components.escpos_printer.security import (
+            MAX_FONT_SIZE_BYTES,
+            validate_font_path,
+        )
+
+        monkeypatch.setattr(hass.config, "is_allowed_path", lambda _p: False)
+        big = tmp_path / "huge.ttf"
+        with open(big, "wb") as fh:
+            fh.seek(MAX_FONT_SIZE_BYTES + 1)
+            fh.write(b"\0")
+        with pytest.raises(HomeAssistantError, match="allowlist"):
+            validate_font_path(str(big), hass=hass)
+
+    async def test_validate_font_path_with_fonts_dir_rejects_sibling_dir(  # type: ignore[no-untyped-def]
+        self, hass, monkeypatch
+    ):
+        """A path under a sibling dir (``<config>/fonts-evil/``) must not be accepted.
+
+        Guards against a future ``startswith`` simplification of the
+        fonts-dir trust check, which would incorrectly treat
+        ``<config>/fonts-evil/...`` as if it were under ``<config>/fonts/``.
+        """
+        from pathlib import Path
+
+        from custom_components.escpos_printer.security import (
+            validate_font_path_with_fonts_dir,
+        )
+
+        monkeypatch.setattr(hass.config, "is_allowed_path", lambda _p: False)
+        evil_dir = Path(hass.config.path("fonts-evil"))
+        evil_dir.mkdir(parents=True, exist_ok=True)
+        bundled = (
+            Path(__file__).resolve().parents[1]
+            / "custom_components"
+            / "escpos_printer"
+            / "fonts"
+            / "DejaVuSansMono.ttf"
+        )
+        evil_font = evil_dir / "x.ttf"
+        evil_font.write_bytes(bundled.read_bytes())
+        with pytest.raises(HomeAssistantError, match="allowlist"):
+            validate_font_path_with_fonts_dir(str(evil_font), hass)
+
+    async def test_validate_font_path_with_fonts_dir_rechecks_after_second_resolve(  # type: ignore[no-untyped-def]
+        self, hass, monkeypatch, tmp_path
+    ):
+        """TOCTOU: a symlink swapped between the trust precheck and
+        ``validate_font_path``'s own resolve must still be rejected.
+
+        The precheck sees a path inside ``<config>/fonts/``; the second
+        resolve (``validate_font_path``'s internal ``Path.resolve``)
+        simulates the swap by returning a path outside any trusted
+        location. The trust decision must be re-checked against that
+        second-resolve result.
+        """
+        from pathlib import Path
+
+        from custom_components.escpos_printer import security
+        from custom_components.escpos_printer.security import (
+            validate_font_path_with_fonts_dir,
+        )
+
+        fonts_dir = Path(hass.config.path("fonts"))
+        fonts_dir.mkdir(parents=True, exist_ok=True)
+        good = fonts_dir / "trusted.ttf"
+        good.write_bytes(b"OTTO")
+        outside = tmp_path / "outside" / "evil.ttf"
+
+        monkeypatch.setattr(hass.config, "is_allowed_path", lambda p: False)
+        monkeypatch.setattr(security, "validate_font_path", lambda *a, **kw: outside)
+        with pytest.raises(HomeAssistantError, match="allowlist"):
+            validate_font_path_with_fonts_dir(str(good), hass)
 
 
 class TestWriteFileNoFollow:

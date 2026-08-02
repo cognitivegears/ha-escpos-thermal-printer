@@ -347,7 +347,7 @@ class ImageOperationsMixin:
 
         stats = getattr(self, "_image_stats", None)
         async with self._lock:
-            printer, owned = await self._acquire_printer(hass)
+            printer, owned = await self._acquire_printer_or_offline(hass)
             failed = True
             try:
                 try:
@@ -383,11 +383,15 @@ def _describe_undecodable(raw: bytes, content_type: str | None) -> str:
     file <_io.BytesIO …>") tells the user nothing about *what* came back.
     The usual culprit for a URL source is a CDN/WAF answering with an
     HTML error or block page served as 200, so surface the declared
-    content type and a bounded sniff of the leading bytes.
+    content type and byte count. The leading-byte sniff itself only goes
+    to the debug log -- echoing fetched response bytes back to the
+    service caller would turn this error into a content oracle for
+    SSRF-adjacent probing.
     """
     sniff = bytes(raw[:16])
     looks_html = sniff.lstrip()[:1] == b"<"
-    detail = f"content-type {content_type!r}, {len(raw)} bytes, starts with {sniff!r}"
+    _LOGGER.debug("Undecodable image bytes starts with: %r", sniff)
+    detail = f"content-type {content_type!r}, {len(raw)} bytes"
     hint = (
         " — the server appears to have returned an HTML page (error/bot-block) instead of the image"
         if looks_html or (content_type or "").lower().startswith("text/")

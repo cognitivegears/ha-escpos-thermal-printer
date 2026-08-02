@@ -161,18 +161,27 @@ async def test_beep_swallows_attribute_error_from_buzzer(hass: Any, caplog: Any)
     assert any("does not support buzzer" in rec.message for rec in caplog.records)
 
 
-async def test_beep_swallows_generic_exception_from_buzzer(hass: Any, caplog: Any) -> None:
-    """A buzzer that raises an unexpected error logs at debug and does not crash."""
-    import logging
+async def test_beep_propagates_transport_error_and_marks_offline(hass: Any) -> None:
+    """A buzzer transport failure (not AttributeError) must not be swallowed.
 
-    caplog.set_level(logging.DEBUG)
+    Regression: ``beep`` used to catch every ``Exception`` around the
+    buzzer call, so ``failed`` was always False and ``_mark_success``
+    latched status Online even though the write failed -- and a dead
+    keepalive connection was retained instead of invalidated.
+    """
     await _setup_entry(hass)
     fake = MagicMock()
-    fake.buzzer = MagicMock(side_effect=RuntimeError("buzzer fried"))
+    fake.buzzer = MagicMock(side_effect=OSError("buzzer fried"))
     with patch("escpos.printer.Network", return_value=fake):
         adapter = _make_adapter()
-        await adapter.beep(hass, times=1, duration=1)
-    assert any("Beep failed" in rec.message for rec in caplog.records)
+        received: list[bool] = []
+        adapter.add_status_listener(received.append)
+
+        with pytest.raises(OSError, match="buzzer fried"):
+            await adapter.beep(hass, times=1, duration=1)
+
+    assert adapter.get_status() is False
+    assert received == [False]
 
 
 async def test_failed_print_marks_status_offline_and_notifies(hass: Any) -> None:

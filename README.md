@@ -13,20 +13,16 @@ start printing in minutes.
 
 ## Why Use This?
 
-- **Automate physical output** - Print door access logs, temperature alerts,
-todo lists, daily reports, or shopping lists automatically
-
-- **Works with cheap hardware** - Any $30+ thermal printer (network, USB, bluetooth,
-or serial) that supports ESC/POS will work
-
-- **Network, USB, Bluetooth, and serial support** - Connect via TCP/IP, plug directly
-via USB, print wirelessly over Bluetooth, or use a serial (UART/RS-232) or ESPHome
-serial proxy connection
-
-- **Multiple printers** - Set up as many printers as you need and target them
-individually or broadcast to all
-
-- **No cloud required** - Direct connection to your printers, everything stays local
+- Print door access logs, temperature alerts, todo lists, daily reports, or
+  shopping lists automatically
+- Works with any $30+ thermal printer (network, USB, Bluetooth, or serial)
+  that supports ESC/POS
+- Connects via TCP/IP, USB, Bluetooth, or a serial (UART/RS-232) cable or
+  ESPHome serial proxy
+- Set up as many printers as you need and target them individually or
+  broadcast to all
+- Direct connection to your printers, no cloud required and everything
+  stays local
 
 ## Features
 
@@ -35,6 +31,7 @@ individually or broadcast to all
 - Text effects — boxes, multi-column tables, and custom-font / rotated text ([guide](docs/text-effects.md))
 - Paper feed and cut control
 - Paper status sensor (network/USB) — automate on paper low / paper out
+- Image-print diagnostics sensor — success/failure counts and last-print details for tuning image options ([guide](docs/images.md#diagnostics-sensor))
 - Buzzer/beeper support
 - UTF-8 text with automatic character conversion
 - 35+ printer profiles with automatic feature detection

@@ -34,6 +34,7 @@ from ..const import (
     CONF_SERIAL_WRITE_CHUNK_SIZE,
     CONF_STATUS_INTERVAL,
     CONF_TIMEOUT,
+    CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
     CONNECTION_TYPE_SERIAL,
     CONNECTION_TYPE_USB,
@@ -58,6 +59,10 @@ _RELIABILITY_LABELS: dict[str, str] = {
     RELIABILITY_PROFILE_CONSERVATIVE: "Conservative (cheap POS-58/80)",
     RELIABILITY_PROFILE_BLUETOOTH: "Bluetooth-safe (slow SPP printers)",
 }
+
+# Cheap BT printers beep / drain battery on every poll -- see docs/bluetooth.md
+# and docs/limitations.md, which already document this floor as enforced.
+_MIN_BT_STATUS_INTERVAL = 60
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -87,7 +92,9 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
         self._pending_data: dict[str, Any] = {}
         super().__init__()
 
-    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_init(  # noqa: PLR0912, PLR0915
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Handle the options flow initialization.
 
         Args:
@@ -96,6 +103,8 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
         Returns:
             FlowResult containing the next step or final result
         """
+        errors: dict[str, str] = {}
+
         if user_input is not None:
             _LOGGER.debug(
                 "Options flow update for entry %s: %s",
@@ -103,42 +112,56 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
                 user_input,
             )
 
-            # Check for custom options
-            profile = user_input.get(CONF_PROFILE)
-            codepage = user_input.get(CONF_CODEPAGE)
-            line_width = user_input.get(CONF_LINE_WIDTH)
-
-            # Handle profile change - reset dependent options
-            old_profile = self.config_entry.options.get(CONF_PROFILE) or self.config_entry.data.get(
-                CONF_PROFILE, PROFILE_AUTO
+            # Cheap BT printers beep / drain battery on every poll -- see
+            # docs/bluetooth.md and docs/limitations.md, which already
+            # document this floor as enforced.
+            connection_type = self.config_entry.data.get(
+                CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK
             )
+            status_interval = user_input.get(CONF_STATUS_INTERVAL, 0)
+            if (
+                connection_type == CONNECTION_TYPE_BLUETOOTH
+                and 0 < status_interval < _MIN_BT_STATUS_INTERVAL
+            ):
+                errors["base"] = "bt_status_interval_too_low"
 
-            if profile not in (old_profile, PROFILE_CUSTOM):
-                _LOGGER.info(
-                    "Profile changed from %s to %s, resetting dependent options",
-                    old_profile,
-                    profile,
-                )
-                user_input[CONF_CODEPAGE] = ""
-                codepage = ""
-                # Encoding options are reset to profile defaults.
+            if not errors:
+                # Check for custom options
+                profile = user_input.get(CONF_PROFILE)
+                codepage = user_input.get(CONF_CODEPAGE)
+                line_width = user_input.get(CONF_LINE_WIDTH)
 
-            # Handle custom profile
-            if profile == PROFILE_CUSTOM:
-                self._pending_data = dict(user_input)
-                return await self.async_step_custom_profile()
+                # Handle profile change - reset dependent options
+                old_profile = self.config_entry.options.get(
+                    CONF_PROFILE
+                ) or self.config_entry.data.get(CONF_PROFILE, PROFILE_AUTO)
 
-            # Handle custom codepage
-            if codepage == OPTION_CUSTOM:
-                self._pending_data = dict(user_input)
-                return await self.async_step_custom_codepage()
+                if profile not in (old_profile, PROFILE_CUSTOM):
+                    _LOGGER.info(
+                        "Profile changed from %s to %s, resetting dependent options",
+                        old_profile,
+                        profile,
+                    )
+                    user_input[CONF_CODEPAGE] = ""
+                    codepage = ""
+                    # Encoding options are reset to profile defaults.
 
-            # Handle custom line width
-            if line_width == OPTION_CUSTOM:
-                self._pending_data = dict(user_input)
-                return await self.async_step_custom_line_width()
+                # Handle custom profile
+                if profile == PROFILE_CUSTOM:
+                    self._pending_data = dict(user_input)
+                    return await self.async_step_custom_profile()
 
-            return self.async_create_entry(title="Options", data=user_input)
+                # Handle custom codepage
+                if codepage == OPTION_CUSTOM:
+                    self._pending_data = dict(user_input)
+                    return await self.async_step_custom_codepage()
+
+                # Handle custom line width
+                if line_width == OPTION_CUSTOM:
+                    self._pending_data = dict(user_input)
+                    return await self.async_step_custom_line_width()
+
+                return self.async_create_entry(title="Options", data=user_input)
 
         # Get current values
         current_profile = self.config_entry.options.get(CONF_PROFILE) or self.config_entry.data.get(
@@ -226,8 +249,13 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
             reliability_choices=reliability_choices,
         )
 
+        if errors:
+            # Re-render with what the user just submitted (not the stored
+            # options) so a validation error doesn't discard their edits.
+            data_schema = self.add_suggested_values_to_schema(data_schema, user_input)
+
         _LOGGER.debug("Showing options form for entry %s", self.config_entry.entry_id)
-        return self.async_show_form(step_id="init", data_schema=data_schema)
+        return self.async_show_form(step_id="init", data_schema=data_schema, errors=errors)
 
     def _build_options_schema(
         self,

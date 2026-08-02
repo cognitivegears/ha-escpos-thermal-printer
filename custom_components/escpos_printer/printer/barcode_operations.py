@@ -68,6 +68,10 @@ class BarcodeOperationsMixin:
         """Return a printer instance and whether it should be closed by the caller."""
         raise NotImplementedError
 
+    async def _acquire_printer_or_offline(self, hass: Any) -> tuple[Any, bool]:
+        """``_acquire_printer``, marking the adapter offline on connect failure."""
+        raise NotImplementedError
+
     async def _release_printer(
         self, hass: Any, printer: Any, *, owned: bool, failed: bool = False
     ) -> None:
@@ -146,7 +150,7 @@ class BarcodeOperationsMixin:
         )
 
         async with self._lock:
-            printer, owned = await self._acquire_printer(hass)
+            printer, owned = await self._acquire_printer_or_offline(hass)
             failed = True
             try:
                 await hass.async_add_executor_job(_do_print, printer)

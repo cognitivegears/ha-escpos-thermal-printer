@@ -7,6 +7,7 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.helpers.selector import SerialPortSelector
+from homeassistant.helpers.typing import UNDEFINED, UndefinedType
 import voluptuous as vol
 
 from ..capabilities import (
@@ -67,12 +68,15 @@ class SerialFlowMixin:
             # Convert to str first so the vol.In string-key check works for
             # both UI submissions (always strings) and unit tests (may be int).
             baudrate_str = str(user_input.get(CONF_BAUDRATE, str(DEFAULT_BAUDRATE)))
-            baudrate = int(baudrate_str)
             timeout = float(user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
             profile = user_input.get(CONF_PROFILE, PROFILE_AUTO)
 
+            # Check membership before parsing -- a non-numeric baudrate_str
+            # must hit the invalid_baudrate branch, not raise out of int().
             if baudrate_str not in _BAUDRATE_CHOICES:
                 errors["base"] = "invalid_baudrate"
+            else:
+                baudrate = int(baudrate_str)
 
             if not errors:
                 await self.async_set_unique_id(  # type: ignore[attr-defined]
@@ -143,11 +147,14 @@ class SerialFlowMixin:
         if user_input is not None:
             port = str(user_input.get(CONF_SERIAL_PORT, "")).strip()
             baudrate_str = str(user_input.get(CONF_BAUDRATE, str(DEFAULT_BAUDRATE)))
-            baudrate = int(baudrate_str)
             timeout = float(user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
 
+            # Check membership before parsing -- a non-numeric baudrate_str
+            # must hit the invalid_baudrate branch, not raise out of int().
             if baudrate_str not in _BAUDRATE_CHOICES:
                 errors["base"] = "invalid_baudrate"
+            else:
+                baudrate = int(baudrate_str)
 
             if not errors:
                 # Raw ``_async_abort_entries_match`` is case-sensitive but
@@ -167,9 +174,18 @@ class SerialFlowMixin:
                     _can_connect_serial, port, baudrate, timeout
                 )
                 if ok:
+                    # Only follow the port to a new auto-generated title
+                    # when the entry still carries the original
+                    # auto-generated one -- a user's manual rename must
+                    # never be clobbered.
+                    title: str | UndefinedType = UNDEFINED
+                    old_port = reconfigure_entry.data.get(CONF_SERIAL_PORT, "")
+                    if reconfigure_entry.title == f"Serial {sanitize_log_message(old_port)}":
+                        title = f"Serial {sanitize_log_message(port)}"
                     return self.async_update_reload_and_abort(  # type: ignore[attr-defined,no-any-return]
                         reconfigure_entry,
                         unique_id=new_unique_id,
+                        title=title,
                         data_updates={
                             CONF_SERIAL_PORT: port,
                             CONF_BAUDRATE: baudrate,

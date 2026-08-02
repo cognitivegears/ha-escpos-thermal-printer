@@ -34,6 +34,13 @@ def _usb_serial_number(entry: ConfigEntry) -> str | None:
     entry's unique_id (``usb:VID:PID[:serial]``) rather than persisting it
     as its own entry.data key. Check entry.data anyway in case a future
     flow starts storing it directly.
+
+    Note: the ``len(parts) == 4`` split below drops the serial number if
+    it itself contains a ``:`` (the id would then have more than 4
+    colon-separated parts). This is a deliberate trade-off, not an
+    oversight -- it keeps the endpoint-suffixed manual-entry id
+    (``usb:vid:pid:in_ep:out_ep``, 5 parts) from being misparsed as a
+    serial number.
     """
     serial = entry.data.get("serial_number")
     if serial:

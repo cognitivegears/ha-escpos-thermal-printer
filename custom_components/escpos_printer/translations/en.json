@@ -322,7 +322,8 @@
     "error": {
       "invalid_profile": "Invalid printer profile name.",
       "invalid_codepage": "Invalid codepage/encoding.",
-      "invalid_line_width": "Invalid line width. Must be a positive number."
+      "invalid_line_width": "Invalid line width. Must be a positive number.",
+      "bt_status_interval_too_low": "Status check interval must be 0 (disabled) or at least 60 seconds for Bluetooth printers."
     },
     "step": {
       "init": {

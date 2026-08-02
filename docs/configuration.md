@@ -56,10 +56,10 @@ Maintains a persistent TCP connection. Reduces print latency at the cost of misb
 
 ## Status Interval
 
-How often to probe the printer (seconds). Set to 0 to disable. Drives the binary sensor.
+How often to probe the printer (seconds). Default is `0` (disabled) for every connection type. A one-shot status probe still runs at startup regardless of this setting, so the binary sensor doesn't stay unknown even with periodic polling off.
 
-- **Network**: any value works; default 30s is fine.
-- **Bluetooth**: set to 60s or longer (or 0). RFCOMM accepts only one client at a time, and many cheap BT printers beep on every connect. The integration auto-skips probes during prints, so aggressive polling has no benefit.
+- **Network**: any value works; `0` is fine for most setups since print success/failure already updates the sensor.
+- **Bluetooth**: `0` disables polling, `60` or higher is accepted, and `1`–`59` is rejected with a form error. RFCOMM accepts only one client at a time, and many cheap BT printers beep on every connect. The integration auto-skips probes during prints, so aggressive polling has no benefit.
 
 ## Allow Local Image URLs
 

@@ -195,6 +195,23 @@ async def test_capabilities_print_text_cut_field_gated_by_profile(hass: Any) -> 
         schema({"text": "hi", "cut": "full"})
 
 
+async def test_capabilities_cut_mode_unrestricted_when_entry_has_no_runtime_data(
+    hass: Any,
+) -> None:
+    """A device whose entry was added but never set up (no runtime_data) falls
+    back to the unrestricted default instead of raising.
+    """
+    device_id = await _make_device(hass, {(DOMAIN, "1.2.3.4:9100")})
+
+    caps = await async_get_action_capabilities(
+        hass, {CONF_TYPE: ACTION_CUT, CONF_DEVICE_ID: device_id, CONF_DOMAIN: DOMAIN}
+    )
+    schema = caps["extra_fields"]
+
+    schema({"mode": "partial"})
+    schema({"mode": "full"})
+
+
 async def test_capabilities_cut_mode_unrestricted_for_unknown_device(hass: Any) -> None:
     """An unresolvable device_id falls back to the unrestricted default (no crash)."""
     caps = await async_get_action_capabilities(

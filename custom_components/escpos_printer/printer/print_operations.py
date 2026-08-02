@@ -45,7 +45,7 @@ class PrintOperationsMixin:
     ) -> None:
         """Print text to the printer."""
         async with self._lock:
-            printer, owned = await self._acquire_printer(hass)
+            printer, owned = await self._acquire_printer_or_offline(hass)
             failed = True
             try:
                 await _print_text_under_lock(
@@ -105,7 +105,7 @@ class PrintOperationsMixin:
             printer.qr(data, size=qsize, ec=_map_qr_ec(qec))
 
         async with self._lock:
-            printer, owned = await self._acquire_printer(hass)
+            printer, owned = await self._acquire_printer_or_offline(hass)
             failed = True
             try:
                 await hass.async_add_executor_job(_do_print, printer)

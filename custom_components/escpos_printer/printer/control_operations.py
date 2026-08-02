@@ -9,7 +9,6 @@ from ..security import (
     MAX_BEEP_DURATION,
     MAX_BEEP_TIMES,
     MAX_FEED_LINES,
-    sanitize_log_message,
     validate_numeric_input,
 )
 from .mapping_utils import map_cut
@@ -34,6 +33,10 @@ class ControlOperationsMixin:
 
     async def _acquire_printer(self, hass: Any) -> tuple[Any, bool]:
         """Return a printer instance and whether it should be closed by the caller."""
+        raise NotImplementedError
+
+    async def _acquire_printer_or_offline(self, hass: Any) -> tuple[Any, bool]:
+        """``_acquire_printer``, marking the adapter offline on connect failure."""
         raise NotImplementedError
 
     async def _release_printer(
@@ -75,7 +78,7 @@ class ControlOperationsMixin:
                         printer.text("\n")
 
         async with self._lock:
-            printer, owned = await self._acquire_printer(hass)
+            printer, owned = await self._acquire_printer_or_offline(hass)
             failed = True
             try:
                 await hass.async_add_executor_job(_feed_inner, printer)
@@ -91,7 +94,7 @@ class ControlOperationsMixin:
             _LOGGER.warning("Invalid cut mode '%s', defaulting to full", mode)
             cut_mode = "FULL"
         async with self._lock:
-            printer, owned = await self._acquire_printer(hass)
+            printer, owned = await self._acquire_printer_or_offline(hass)
             failed = True
             try:
                 await hass.async_add_executor_job(lambda: printer.cut(mode=cut_mode))
@@ -109,23 +112,27 @@ class ControlOperationsMixin:
         duration_v = validate_numeric_input(duration, 1, MAX_BEEP_DURATION, "duration")
 
         def _beep_inner(printer: Any) -> None:
+            _LOGGER.debug("beep begin: times=%s duration=%s", times_v, duration_v)
             try:
-                _LOGGER.debug("beep begin: times=%s duration=%s", times_v, duration_v)
-                try:
-                    if hasattr(printer, "buzzer"):
-                        printer.buzzer(times_v, duration_v)
-                    elif hasattr(printer, "beep"):
-                        printer.beep(times_v, duration_v)
-                    else:
-                        _LOGGER.warning("Printer does not support buzzer")
-                        return
-                except AttributeError:
+                if hasattr(printer, "buzzer"):
+                    printer.buzzer(times_v, duration_v)
+                elif hasattr(printer, "beep"):
+                    printer.beep(times_v, duration_v)
+                else:
                     _LOGGER.warning("Printer does not support buzzer")
-            except Exception as e:
-                _LOGGER.debug("Beep failed: %s", sanitize_log_message(str(e)))
+                    return
+            except AttributeError:
+                # Some python-escpos builds expose ``buzzer``/``beep`` as an
+                # attribute that raises AttributeError deeper in the call
+                # (e.g. delegating to a capability the transport lacks) --
+                # treat that the same as "unsupported". Anything else (a
+                # real transport failure) propagates so the normal
+                # failed=True path below invalidates the connection and
+                # flips the connectivity sensor offline.
+                _LOGGER.warning("Printer does not support buzzer")
 
         async with self._lock:
-            printer, owned = await self._acquire_printer(hass)
+            printer, owned = await self._acquire_printer_or_offline(hass)
             failed = True
             try:
                 await hass.async_add_executor_job(_beep_inner, printer)

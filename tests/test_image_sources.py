@@ -169,6 +169,70 @@ async def test_resolve_local_path_respects_allowlist(  # type: ignore[no-untyped
         await resolve_image_bytes(hass, str(img))
 
 
+async def test_resolve_local_path_allowlist_checked_before_existence(  # type: ignore[no-untyped-def]
+    hass, monkeypatch
+):
+    """A nonexistent path outside the allowlist must yield the allowlist error.
+
+    Regression: the allowlist check must run before
+    ``_validate_local_path_sync``'s existence check, otherwise a caller
+    outside the allowlist could use the distinct "does not exist" error
+    as an oracle for arbitrary host paths never intended to be readable.
+    """
+    monkeypatch.setattr(hass.config, "is_allowed_path", lambda _p: False)
+    with pytest.raises(HomeAssistantError, match="allowlist"):
+        await resolve_image_bytes(hass, "/nope/outside-allowlist.png")
+
+
+async def test_resolve_local_path_allowlist_checked_before_oversize(  # type: ignore[no-untyped-def]
+    hass, tmp_path, monkeypatch
+):
+    """An oversized file outside the allowlist must yield the allowlist error, not 'too large'."""
+    from custom_components.escpos_printer.security import MAX_IMAGE_SIZE_MB
+
+    big = tmp_path / "huge.png"
+    with open(big, "wb") as fh:
+        fh.seek(MAX_IMAGE_SIZE_MB * 1024 * 1024 + 1)
+        fh.write(b"\0")
+    monkeypatch.setattr(hass.config, "is_allowed_path", lambda _p: False)
+    with pytest.raises(HomeAssistantError, match="allowlist"):
+        await resolve_image_bytes(hass, str(big))
+
+
+async def test_resolve_local_path_rechecks_allowlist_after_second_resolve(  # type: ignore[no-untyped-def]
+    hass, tmp_path, monkeypatch
+):
+    """TOCTOU: a symlink swapped between the precheck resolve and
+    ``_validate_local_path_sync``'s own resolve must still be rejected.
+
+    The precheck resolve sees a path inside the allowlist; the second
+    resolve (inside ``_validate_local_path_sync``) simulates the swap by
+    returning a path outside it. The allowlist must be re-checked against
+    that second-resolve result, and the file must never be opened.
+    """
+    img = tmp_path / "logo.png"
+    img.write_bytes(_png_bytes())
+    outside = tmp_path / "outside" / "secret.png"
+
+    monkeypatch.setattr(
+        hass.config,
+        "is_allowed_path",
+        lambda p: str(img) in str(p),
+    )
+    monkeypatch.setattr(
+        "custom_components.escpos_printer.image_sources._validate_local_path_sync",
+        lambda *a, **kw: outside,
+    )
+    open_mock = MagicMock()
+    monkeypatch.setattr(
+        "custom_components.escpos_printer.image_sources.open_local_image_no_follow",
+        open_mock,
+    )
+    with pytest.raises(HomeAssistantError, match="allowlist"):
+        await resolve_image_bytes(hass, str(img))
+    open_mock.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # T-C1: SSRF regression — private/loopback/link-local rejected at validation.
 # ---------------------------------------------------------------------------
@@ -508,6 +572,28 @@ async def test_resolve_http_redirect_without_location_raises(  # type: ignore[no
 
     mock_pooled_aiohttp(_redirect_factory(fake_aiohttp_response(status=302, headers={})))
     with pytest.raises(HomeAssistantError, match="redirect without Location"):
+        await resolve_image_bytes(hass, "https://example.com/start.png")
+
+
+async def test_resolve_http_redirect_loop_exceeds_max_raises(  # type: ignore[no-untyped-def]
+    hass, monkeypatch, mock_pooled_aiohttp
+):
+    """More than ``_MAX_REDIRECTS`` hops must raise the loop-termination error, not hang forever."""
+    from custom_components.escpos_printer.image_sources import _MAX_REDIRECTS
+
+    def fake_getaddrinfo(_host, _port, **_kw):  # type: ignore[no-untyped-def]
+        return [(socket.AF_INET, socket.SOCK_STREAM, 0, "", ("93.184.216.34", 0))]
+
+    monkeypatch.setattr("socket.getaddrinfo", fake_getaddrinfo)
+
+    from tests.conftest import fake_aiohttp_response
+
+    responses = [
+        fake_aiohttp_response(status=302, headers={"Location": "https://example.com/next.png"})
+        for _ in range(_MAX_REDIRECTS + 1)
+    ]
+    mock_pooled_aiohttp(_redirect_factory(*responses))
+    with pytest.raises(HomeAssistantError, match="Too many redirects"):
         await resolve_image_bytes(hass, "https://example.com/start.png")
 
 
