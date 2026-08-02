@@ -47,6 +47,10 @@ class BarcodeOperationsMixin:
         """Apply feed and cut operations (implemented in base)."""
         raise NotImplementedError
 
+    async def _mark_success(self) -> None:
+        """Mark a successful operation (implemented in base)."""
+        raise NotImplementedError
+
     async def print_barcode(
         self,
         hass: HomeAssistant,
@@ -113,6 +117,12 @@ class BarcodeOperationsMixin:
                 else:
                     raise
 
+        from escpos.exceptions import (  # noqa: PLC0415
+            BarcodeCodeError,
+            BarcodeSizeError,
+            BarcodeTypeError,
+        )
+
         async with self._lock:
             printer, owned = await self._acquire_printer(hass)
             failed = True
@@ -120,5 +130,14 @@ class BarcodeOperationsMixin:
                 await hass.async_add_executor_job(_do_print, printer)
                 await self._apply_cut_and_feed(hass, printer, cut, feed)
                 failed = False
+            except (BarcodeTypeError, BarcodeCodeError, BarcodeSizeError):
+                # python-escpos validates the barcode type/payload/size
+                # before writing anything to the transport -- the
+                # connection is fine, only this payload is bad. Don't
+                # invalidate a keepalive connection or flap the
+                # connectivity sensor over a caller error.
+                failed = False
+                raise
             finally:
                 await self._release_printer(hass, printer, owned=owned, failed=failed)
+        await self._mark_success()

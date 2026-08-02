@@ -112,3 +112,68 @@ class NetworkFlowMixin:
         )
 
         return self.async_show_form(step_id="network", data_schema=data_schema, errors=errors)  # type: ignore[attr-defined,no-any-return]
+
+    async def async_step_reconfigure_network(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle reconfiguration of an existing network printer entry.
+
+        host:port *is* the unique_id for network printers, so changing
+        either one legitimately changes the unique_id -- this mirrors HA
+        core's address-based reconfigure pattern (e.g. ``cert_expiry``):
+        update the unique_id directly instead of guarding it, and only
+        abort if the new host/port collides with a *different* existing
+        entry.
+        """
+        reconfigure_entry = self._get_reconfigure_entry()  # type: ignore[attr-defined]
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            host = str(user_input[CONF_HOST]).strip()
+            port = user_input.get(CONF_PORT, DEFAULT_PORT)
+            timeout = float(user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
+
+            # ``_async_abort_entries_match`` does a raw, case-sensitive
+            # compare against stored entry data, but the unique_id is
+            # lower-cased -- "Printer.local" and "printer.local" would
+            # pass that check yet collide on unique_id, leaving two
+            # entries that share one id. Look up by the would-be
+            # normalised unique_id instead, excluding this entry itself.
+            new_unique_id = f"{host.lower()}:{port}"
+            colliding = self.hass.config_entries.async_entry_for_domain_unique_id(
+                self.handler, new_unique_id  # type: ignore[attr-defined]
+            )
+            if colliding is not None and colliding.entry_id != reconfigure_entry.entry_id:
+                return self.async_abort(reason="already_configured")  # type: ignore[attr-defined,no-any-return]
+
+            ok = bool(host) and await self.hass.async_add_executor_job(
+                _can_connect, host, port, timeout
+            )
+            if ok:
+                return self.async_update_reload_and_abort(  # type: ignore[attr-defined,no-any-return]
+                    reconfigure_entry,
+                    unique_id=new_unique_id,
+                    data_updates={
+                        CONF_HOST: host,
+                        CONF_PORT: port,
+                        CONF_TIMEOUT: timeout,
+                    },
+                )
+            errors["base"] = "cannot_connect"
+
+        data_schema = vol.Schema(
+            {
+                vol.Required(CONF_HOST): str,
+                vol.Optional(CONF_PORT, default=DEFAULT_PORT): vol.All(
+                    vol.Coerce(int), vol.Range(min=1, max=65535)
+                ),
+                vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
+            }
+        )
+        return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
+            step_id="reconfigure_network",
+            data_schema=self.add_suggested_values_to_schema(  # type: ignore[attr-defined]
+                data_schema, user_input or reconfigure_entry.data
+            ),
+            errors=errors,
+        )

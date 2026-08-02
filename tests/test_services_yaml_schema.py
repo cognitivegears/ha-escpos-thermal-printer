@@ -373,6 +373,7 @@ _PARITY_FIELDS = (
     "fragment_height",
     "chunk_delay_ms",
     "fallback_image",
+    "broadcast",
 )
 
 # Fields whose default *may* differ between services (documented per-service

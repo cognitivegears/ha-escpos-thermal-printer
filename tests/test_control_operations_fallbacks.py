@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.escpos_printer.const import DOMAIN
@@ -172,3 +173,49 @@ async def test_beep_swallows_generic_exception_from_buzzer(hass: Any, caplog: An
         adapter = _make_adapter()
         await adapter.beep(hass, times=1, duration=1)
     assert any("Beep failed" in rec.message for rec in caplog.records)
+
+
+async def test_failed_print_marks_status_offline_and_notifies(hass: Any) -> None:
+    """A failed print operation must mark the adapter offline and notify listeners.
+
+    Regression test: with status polling disabled by default
+    (status_interval=0), a failed operation was previously invisible to
+    the connectivity sensor — ``_release_printer`` dropped the dead
+    connection but never called ``_notify_status_change``, so the
+    "Online" sensor latched on after repeated failures.
+    """
+    await _setup_entry(hass)
+    fake = MagicMock()
+    fake.text = MagicMock(side_effect=RuntimeError("write failed"))
+    with patch("escpos.printer.Network", return_value=fake):
+        adapter = _make_adapter()
+        received: list[bool] = []
+        adapter.add_status_listener(received.append)
+        assert adapter.get_status() is None
+
+        with pytest.raises(RuntimeError):
+            await adapter.print_text(hass, text="hello")
+
+    assert adapter.get_status() is False
+    assert received == [False]
+
+
+async def test_successful_feed_and_barcode_mark_status_online(hass: Any) -> None:
+    """feed/cut/beep and print_barcode must mark status online on success.
+
+    Regression test: ``_mark_success`` was only wired into
+    print_text/print_qr/image printing, so an entry that only ever fed
+    paper or printed barcodes stayed "unknown" forever.
+    """
+    await _setup_entry(hass)
+    fake = MagicMock()
+    with patch("escpos.printer.Network", return_value=fake):
+        adapter = _make_adapter()
+        assert adapter.get_status() is None
+
+        await adapter.feed(hass, lines=1)
+        assert adapter.get_status() is True
+
+        adapter._status = None  # reset to "unknown" to isolate the barcode path
+        await adapter.print_barcode(hass, code="123456", bc="CODE128")
+        assert adapter.get_status() is True

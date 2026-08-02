@@ -128,3 +128,70 @@ class SerialFlowMixin:
             data_schema=data_schema,
             errors=errors,
         )
+
+    async def async_step_reconfigure_serial(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle reconfiguration of an existing serial printer entry.
+
+        The port path *is* the unique_id for serial printers (device
+        nodes can be reassigned across reboots), so changing it
+        legitimately changes the unique_id -- same address-based pattern
+        as :meth:`NetworkFlowMixin.async_step_reconfigure_network`.
+        """
+        reconfigure_entry = self._get_reconfigure_entry()  # type: ignore[attr-defined]
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            port = str(user_input.get(CONF_SERIAL_PORT, "")).strip()
+            baudrate_str = str(user_input.get(CONF_BAUDRATE, str(DEFAULT_BAUDRATE)))
+            baudrate = int(baudrate_str)
+            timeout = float(user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
+
+            if baudrate_str not in _BAUDRATE_CHOICES:
+                errors["base"] = "invalid_baudrate"
+
+            if not errors:
+                # Raw ``_async_abort_entries_match`` is case-sensitive but
+                # the unique_id is lower-cased -- look up by the would-be
+                # normalised unique_id instead, mirroring the network
+                # reconfigure guard, so e.g. "/dev/TTYUSB0" vs
+                # "/dev/ttyUSB0" can't collide on unique_id undetected.
+                new_unique_id = f"serial:{port.lower()}"
+                colliding = self.hass.config_entries.async_entry_for_domain_unique_id(
+                    self.handler, new_unique_id  # type: ignore[attr-defined]
+                )
+                if colliding is not None and colliding.entry_id != reconfigure_entry.entry_id:
+                    return self.async_abort(reason="already_configured")  # type: ignore[attr-defined,no-any-return]
+
+                ok, error_code, _err_no = await self.hass.async_add_executor_job(
+                    _can_connect_serial, port, baudrate, timeout
+                )
+                if ok:
+                    return self.async_update_reload_and_abort(  # type: ignore[attr-defined,no-any-return]
+                        reconfigure_entry,
+                        unique_id=new_unique_id,
+                        data_updates={
+                            CONF_SERIAL_PORT: port,
+                            CONF_BAUDRATE: baudrate,
+                            CONF_TIMEOUT: timeout,
+                        },
+                    )
+                errors["base"] = _serial_error_to_key(error_code)
+
+        data_schema = vol.Schema(
+            {
+                vol.Required(CONF_SERIAL_PORT): SerialPortSelector(),
+                vol.Optional(CONF_BAUDRATE, default=str(DEFAULT_BAUDRATE)): vol.In(
+                    _BAUDRATE_CHOICES
+                ),
+                vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
+            }
+        )
+        return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
+            step_id="reconfigure_serial",
+            data_schema=self.add_suggested_values_to_schema(  # type: ignore[attr-defined]
+                data_schema, user_input or reconfigure_entry.data
+            ),
+            errors=errors,
+        )

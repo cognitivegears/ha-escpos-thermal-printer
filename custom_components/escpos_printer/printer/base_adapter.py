@@ -246,7 +246,12 @@ class EscposPrinterAdapterBase(
                 return None
             finally:
                 if printer is not None:
-                    await self._release_printer(hass, printer, owned=owned, failed=failed)
+                    # A printer that ignores the DLE EOT query or times out
+                    # reading it is not necessarily unreachable -- don't
+                    # flap the connectivity sensor over a paper-status probe.
+                    await self._release_printer(
+                        hass, printer, owned=owned, failed=failed, notify_status=False
+                    )
             self._last_paper_status = int(status)
             return self._last_paper_status
 
@@ -288,7 +293,13 @@ class EscposPrinterAdapterBase(
         return printer, True
 
     async def _release_printer(
-        self, hass: HomeAssistant, printer: Any, *, owned: bool, failed: bool = False
+        self,
+        hass: HomeAssistant,
+        printer: Any,
+        *,
+        owned: bool,
+        failed: bool = False,
+        notify_status: bool = True,
     ) -> None:
         """Release a printer instance after an operation.
 
@@ -300,6 +311,18 @@ class EscposPrinterAdapterBase(
         Dropping it here forces the next ``_acquire_printer`` to
         reconnect. Runs under the operation lock, so nulling
         ``self._printer`` is race-free.
+
+        A failed operation is also an offline signal in its own right —
+        with status polling disabled by default (``status_interval=0``),
+        operation outcomes are the only thing that ever updates the
+        connectivity sensor. Without this, a run of failed prints leaves
+        the "Online" sensor latched on indefinitely.
+
+        ``notify_status=False`` opts a caller out of that offline signal
+        for failures that don't indicate the transport is down (e.g. a
+        paper-status probe the printer silently ignores) — pass
+        ``failed=True`` for the keepalive-invalidation behaviour above
+        without flapping the connectivity sensor.
         """
         if owned:
 
@@ -308,9 +331,7 @@ class EscposPrinterAdapterBase(
                     printer.close()
 
             await hass.async_add_executor_job(_close)
-            return
-
-        if failed and self._printer is not None:
+        elif failed and self._printer is not None:
             stale = self._printer
             self._printer = None
 
@@ -319,6 +340,13 @@ class EscposPrinterAdapterBase(
                     stale.close()
 
             await hass.async_add_executor_job(_close_stale)
+
+        if failed and notify_status:
+            now = dt_util.utcnow()
+            self._last_check = now
+            self._last_error = now
+            self._last_error_reason = "print operation failed"
+            self._notify_status_change(False)
 
     def _notify_status_change(self, ok: bool) -> None:
         """Notify all status listeners of a status change."""

@@ -1,6 +1,6 @@
 # Services
 
-The integration registers these services. All accept a `target` parameter for device targeting (see [multi-printer.md](multi-printer.md)).
+The integration registers these services. All printer services accept a `device_id` for targeting, plus a `broadcast: true` flag to explicitly print to every configured printer (`broadcast` and `device_id` are mutually exclusive). Omitting both also prints to all printers — kept for backward compatibility — but logs a warning when more than one printer is configured. See [multi-printer.md](multi-printer.md).
 
 ## escpos_printer.print_text
 
@@ -78,12 +78,12 @@ The integration ships six image-printing services. They all share the same image
 
 | Service | Source field | When to use |
 |---------|--------------|-------------|
-| `escpos_printer.print_image` | `image` (template) | Generic / power-user. Accepts any source form — URL, file path, `camera.<id>`, `image.<id>`, base64 data URI, or a Jinja template producing any of those. **Existing automations using a literal URL or path keep working unchanged.** |
+| `escpos_printer.print_image` | `image` (text) | Generic / power-user. Accepts any source form — URL, file path, `camera.<id>`, `image.<id>`, or base64 data URI. **Existing automations using a literal URL or path keep working unchanged**, and automations can still compute the value with a Jinja template — Home Assistant renders it before the service is called. |
 | `escpos_printer.print_image_url` | `url` (text) | Print from an HTTP(S) URL. SSRF-aware — private, loopback, and link-local addresses are refused. |
 | `escpos_printer.print_image_path` | `path` (text) | Print a local file. The path must lie inside `allowlist_external_dirs` (typically `/config` or `/media`). |
 | `escpos_printer.print_camera_snapshot` | `camera_entity` (camera entity picker) | Print a live snapshot from a camera entity. |
 | `escpos_printer.print_image_entity` | `image_entity` (image entity picker) | Print the current frame from an HA `image` entity (weather radar, ML overlay, generated chart). |
-| `escpos_printer.preview_image` | `image` (template) | Run the image pipeline and write the 1-bit PNG to disk **without** printing. Returns `{path, width, height, slice_count}`. |
+| `escpos_printer.preview_image` | `image` (text) | Run the image pipeline and write the 1-bit PNG to disk **without** printing. Returns `{path, width, height, slice_count}`. |
 
 > See the [Images guide](images.md) for end-to-end examples, source-form security notes, and tuning recipes.
 
@@ -246,7 +246,8 @@ choose a `dither` mode and `threshold` for `print_image`.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| device_id | string\|list | Target printer(s); omit to broadcast to all |
+| device_id | string\|list | Target printer(s); omit to print to all (warns with several printers) |
+| broadcast | boolean | Explicitly print to all printers (mutually exclusive with device_id) |
 | cut | string | `none`, `partial`, `full` (default `full`) |
 | feed | int | Lines to feed after printing (default 2) |
 

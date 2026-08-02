@@ -31,7 +31,6 @@ from homeassistant.auth.permissions.const import POLICY_READ
 from homeassistant.core import Context
 from homeassistant.exceptions import HomeAssistantError, Unauthorized
 from homeassistant.helpers.aiohttp_client import SERVER_SOFTWARE
-from homeassistant.helpers.template import Template
 
 from .const import (
     ATTR_ALIGN,
@@ -128,31 +127,6 @@ def _classify(source: str) -> tuple[SourceKind, str]:
     if lower.startswith(("http://", "https://")):
         return "http", stripped
     return "local", stripped
-
-
-def render_template(hass: HomeAssistant, value: Any) -> str:
-    """Render ``value`` as a Jinja template if it looks like one.
-
-    Accepts either a ``Template`` object (as produced by ``cv.template``
-    in a service schema) or a raw string. The string fast-path avoids
-    constructing a ``Template`` for the common case where no template
-    syntax is present.
-    """
-    if isinstance(value, Template):
-        if value.hass is None:
-            # HA core 2025.10 made Template.hass non-Optional; mypy
-            # against HA master flags this branch as unreachable, but
-            # it is still reachable on older pinned HA versions.
-            value.hass = hass  # type: ignore[unreachable, unused-ignore]
-        rendered: Any = value.async_render(parse_result=False)
-        return str(rendered)
-    if not isinstance(value, str):
-        raise HomeAssistantError("Image source must be a string or template")
-    if "{{" in value or "{%" in value:
-        tpl = Template(value, hass)
-        rendered = tpl.async_render(parse_result=False)
-        return str(rendered)
-    return value
 
 
 async def resolve_image_bytes(
@@ -564,7 +538,6 @@ def extract_image_kwargs(
     printer_defaults: Mapping[str, Any],
     *,
     prefix: str = "",
-    hass: HomeAssistant | None = None,
 ) -> dict[str, Any]:
     """Pull the print_image kwargs from a service-call/notify-call dict.
 
@@ -574,12 +547,8 @@ def extract_image_kwargs(
     in ``data`` are included — missing keys fall through to the
     adapter's signature defaults.
 
-    ``fallback_image`` is run through :func:`render_template` (when
-    ``hass`` is supplied) because the schema validates it with
-    ``cv.template``, producing a ``Template`` *object*; the downstream
-    resolver requires a string, so without this the fallback could never
-    fire — it silently failed the ``isinstance(str)`` guard and the
-    primary error was re-raised.
+    Image source strings (including ``fallback_image``) are used as-is;
+    no template rendering happens here.
 
     Selection precedence for each image option:
     1. The prefixed key (``image_dither`` on notify; ``dither`` on
@@ -609,9 +578,6 @@ def extract_image_kwargs(
             # fallback when ``image_dither`` was not supplied.
             out[target] = data[key]
 
-    fallback = out.get(ATTR_FALLBACK_IMAGE)
-    if fallback is not None and hass is not None:
-        out[ATTR_FALLBACK_IMAGE] = render_template(hass, fallback)
     return out
 
 
@@ -621,6 +587,5 @@ __all__ = [
     "SourceKind",
     "classify_source",
     "extract_image_kwargs",
-    "render_template",
     "resolve_image_bytes",
 ]

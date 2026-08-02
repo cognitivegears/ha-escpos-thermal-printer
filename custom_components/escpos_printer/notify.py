@@ -21,7 +21,7 @@ from .const import (
     CONNECTION_TYPE_USB,
     DOMAIN,
 )
-from .image_sources import extract_image_kwargs, render_template
+from .image_sources import extract_image_kwargs
 from .security import sanitize_log_message
 from .services.schemas import PRINT_MESSAGE_FIELDS
 from .text_utils import transcode_to_codepage
@@ -161,13 +161,9 @@ class EscposNotifyEntity(NotifyEntity):
                 )
                 return
 
-            image_source = render_template(self._hass, image_source_raw)
-            image_kwargs = extract_image_kwargs(
-                {**kwargs, "image": image_source},
-                defaults,
-                prefix="image_",
-                hass=self._hass,
-            )
+            # ``image_source_raw`` is exactly ``kwargs["image"]`` (read a
+            # few lines up, unmodified since) -- no need to re-spread it.
+            image_kwargs = extract_image_kwargs(kwargs, defaults, prefix="image_")
             await adapter.print_text_with_image(
                 self._hass,
                 text_kwargs=text_kwargs,

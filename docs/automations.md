@@ -137,8 +137,8 @@ automation:
         to: "on"
     action:
       - service: escpos_printer.print_text
-        # No target = all printers
         data:
+          broadcast: true  # explicitly send to every configured printer
           text: |
             ****************************
             *    EMERGENCY ALERT       *

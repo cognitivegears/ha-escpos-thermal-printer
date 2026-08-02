@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Reconfigure flow** for all four connection types (**Settings** →
+  **Devices & services** → printer → **Reconfigure**). A printer whose IP
+  address, serial port, USB device, or Bluetooth MAC changes can now be
+  updated in place — previously the only option was delete and re-add,
+  which broke every automation targeting the device. Network/serial
+  reconfiguration updates the entry identity (the address *is* the
+  identity); USB/Bluetooth abort if re-pointed at a different physical
+  device.
+- **Explicit `broadcast` option** on all printer-targeting services.
+  Omitting `device_id` still prints to all configured printers (kept for
+  backward compatibility), but now logs a warning when more than one
+  printer is configured; set `broadcast: true` to fan out intentionally
+  (mutually exclusive with `device_id`).
+
+### Fixed
+
+- **The "Online" connectivity sensor could latch on and never report
+  offline.** Failed print operations now mark the printer offline
+  immediately, and `print_barcode`, `feed`, `cut`, and `beep` now mark it
+  online on success (previously only text/QR/image prints did).
+  Paper-status probes and invalid barcode payloads deliberately do *not*
+  affect connectivity state — only real transport failures do.
+- **USB printers that don't report a serial number now get a stable
+  unique ID** (`usb:VID:PID`), preventing the same printer from being
+  added twice. This includes manual VID:PID entry, where custom
+  endpoints are folded into the ID so distinct same-model setups still
+  coexist.
+
+### Security
+
+- **Image source fields (`image`, `fallback_image`) are no longer
+  rendered as Jinja templates inside the integration.** Server-side
+  rendering ran without Home Assistant's per-user state-read permission
+  checks. Templates in automations and scripts are unaffected — Home
+  Assistant renders those before the service is called. Only raw
+  `{{ ... }}` strings typed directly into Developer Tools → Actions are
+  now treated as literal text instead of being evaluated.
+
+### Changed
+
+- Now available in the HACS default store — installation docs updated to
+  drop the custom-repository steps.
+- Dropped `Pillow` and `dbus-fast` from `manifest.json` requirements: both
+  are provided by Home Assistant core, and pinning them from a custom
+  integration can conflict with core's own constraints on upgrade (HACS
+  default-store review feedback). Pillow is still installed transitively
+  via `python-escpos`; Bluetooth discovery already degrades gracefully if
+  `dbus-fast` is unavailable.
+
 ## [0.8.0] - 2026-07-20
 
 ### Breaking changes

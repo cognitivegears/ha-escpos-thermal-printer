@@ -43,7 +43,7 @@ rules:
   # Gold
   devices: done
   diagnostics: done
-  discovery-update-info: todo  # blocks on reconfiguration-flow
+  discovery-update-info: todo  # USB/BT discovery doesn't push updates into reconfigure yet
   discovery: done  # USB vendor IDs in manifest; Bluetooth uses manual MAC entry
   docs-data-update: todo
   docs-examples: done
@@ -61,7 +61,7 @@ rules:
   entity-translations: todo
   exception-translations: done  # `no_target_found` wired up in strings.json + translations/en.json
   icon-translations: done
-  reconfiguration-flow: todo  # only options-flow exists; no async_step_reconfigure. Blocks discovery-update-info.
+  reconfiguration-flow: done  # async_step_reconfigure per transport (network/serial/usb/bluetooth) in main_flow.py + mixins
   repair-issues: done  # profile_width_fallback issue raised in printer/base_adapter.py
   stale-devices:
     status: exempt

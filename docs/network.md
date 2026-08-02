@@ -21,7 +21,7 @@ Most thermal printers can print a network status page:
 
 Alternatively, check your router's DHCP client list.
 
-**Tip**: assign a static IP (or DHCP reservation). Otherwise the printer may move IPs and the entry will go offline silently until reconfigured.
+**Tip**: assign a static IP (or DHCP reservation). If the printer's address does change, update it in place via **Settings → Devices & services → ESC/POS Thermal Printer → your printer → Reconfigure** — your entities and automations survive intact (no need to delete and re-add).
 
 ## Paper status sensor
 

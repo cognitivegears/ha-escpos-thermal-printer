@@ -42,6 +42,10 @@ class ControlOperationsMixin:
         """Close a printer instance if owned by the caller."""
         raise NotImplementedError
 
+    async def _mark_success(self) -> None:
+        """Mark a successful operation (implemented in base)."""
+        raise NotImplementedError
+
     async def feed(self, hass: HomeAssistant, *, lines: int) -> None:
         """Feed paper by a number of lines."""
         try:
@@ -78,6 +82,7 @@ class ControlOperationsMixin:
                 failed = False
             finally:
                 await self._release_printer(hass, printer, owned=owned, failed=failed)
+        await self._mark_success()
 
     async def cut(self, hass: HomeAssistant, *, mode: str) -> None:
         """Cut the paper."""
@@ -93,6 +98,7 @@ class ControlOperationsMixin:
                 failed = False
             finally:
                 await self._release_printer(hass, printer, owned=owned, failed=failed)
+        await self._mark_success()
 
     async def beep(self, hass: HomeAssistant, *, times: int = 2, duration: int = 4) -> None:
         """Trigger the printer buzzer."""
@@ -126,3 +132,4 @@ class ControlOperationsMixin:
                 failed = False
             finally:
                 await self._release_printer(hass, printer, owned=owned, failed=failed)
+        await self._mark_success()

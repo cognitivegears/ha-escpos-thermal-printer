@@ -57,20 +57,31 @@ async def test_print_image_service_base64_data_uri(hass):  # type: ignore[no-unt
     assert fake.image.called
 
 
-async def test_print_image_service_template_renders(hass, tmp_path):  # type: ignore[no-untyped-def]
+async def test_print_image_service_jinja_looking_string_not_rendered(
+    hass, tmp_path
+):  # type: ignore[no-untyped-def]
+    """Security fix: the handler no longer renders Jinja server-side.
+
+    A raw `{{ ... }}` string is treated as a literal local-file path (it
+    doesn't match any other source form), which doesn't exist on disk, so
+    the call fails instead of silently executing the template.
+    """
     img_path = tmp_path / "tpl.png"
     Image.new("RGB", (10, 10)).save(img_path)
     await _setup(hass)
 
     fake = MagicMock()
-    with patch("escpos.printer.Network", return_value=fake):
+    with (
+        patch("escpos.printer.Network", return_value=fake),
+        pytest.raises(HomeAssistantError),
+    ):
         await hass.services.async_call(
             DOMAIN,
             "print_image",
             {"image": "{{ '" + str(img_path) + "' }}"},
             blocking=True,
         )
-    assert fake.image.called
+    assert not fake.image.called
 
 
 async def test_print_image_service_rotation_passes_through(hass, tmp_path):  # type: ignore[no-untyped-def]
@@ -197,10 +208,8 @@ async def test_print_image_legacy_literal_path_with_inline_options(hass, tmp_pat
 
     Beyond the bare-string case already covered by ``test_print_image_service_local``,
     real-world legacy automations also passed options alongside the literal path
-    (``image: /config/x.png`` + ``rotation: 90``). The selector swap from
-    ``text:`` to ``template:`` must preserve that calling shape — the template
-    editor accepts plain strings AND surrounding option keys validate the same
-    way they did before.
+    (``image: /config/x.png`` + ``rotation: 90``). Confirms the plain-string
+    ``image`` field and its surrounding option keys still validate together.
     """
     img_path = tmp_path / "legacy.png"
     Image.new("L", (10, 20), color=0).save(img_path)

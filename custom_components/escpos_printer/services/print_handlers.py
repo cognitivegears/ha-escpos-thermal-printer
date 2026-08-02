@@ -69,7 +69,7 @@ from ..const import (
     SERVICE_PRINT_TABLE,
     SERVICE_PRINT_TEXT_IMAGE,
 )
-from ..image_sources import extract_image_kwargs, render_template
+from ..image_sources import extract_image_kwargs
 from ..security import (
     sanitise_kv_items,
     validate_font_path_with_fonts_dir,
@@ -438,7 +438,7 @@ async def handle_preview_box(call: ServiceCall) -> ServiceResponse:
     rendered text is transcoded to the printer's codepage with ASCII
     fallbacks so the file reflects what would actually print.
     """
-    target_entries = await _async_get_target_entries(call)
+    target_entries = await _async_get_target_entries(call, warn_implicit_broadcast=False)
     if not target_entries:
         raise HomeAssistantError("preview_box requires at least one printer target")
     if len(target_entries) > 1:
@@ -477,7 +477,7 @@ async def handle_preview_box(call: ServiceCall) -> ServiceResponse:
 
 async def handle_preview_table(call: ServiceCall) -> ServiceResponse:
     """Render a ``print_table`` layout to a ``.txt`` file (no printing)."""
-    target_entries = await _async_get_target_entries(call)
+    target_entries = await _async_get_target_entries(call, warn_implicit_broadcast=False)
     if not target_entries:
         raise HomeAssistantError("preview_table requires at least one printer target")
     if len(target_entries) > 1:
@@ -654,7 +654,6 @@ async def _prepare_text_image_kwargs(
         },
         defaults,
         prefix="image_",
-        hass=call.hass,
     )
     cut = call.data.get(ATTR_CUT) or defaults.get("cut")
     feed = call.data.get(ATTR_FEED)
@@ -704,9 +703,10 @@ async def _dispatch_print_image(call: ServiceCall, *, image_value: str, service_
     """Shared logic for print_image and convenience services.
 
     The convenience services (print_camera_snapshot etc.) pass a single
-    fully-resolved source string; the generic print_image runs the
-    template renderer first. Both then funnel into the same kwarg
-    extraction + adapter dispatch.
+    fully-resolved source string; the generic print_image passes its
+    ``image`` field as-is (no template rendering — see
+    ``schemas._image_source_validator``). Both then funnel into the same
+    kwarg extraction + adapter dispatch.
     """
 
     async def _body(entry: Any, adapter: Any, defaults: Any, _config: Any) -> None:
@@ -714,7 +714,6 @@ async def _dispatch_print_image(call: ServiceCall, *, image_value: str, service_
             {**call.data, ATTR_IMAGE: image_value},
             defaults,
             prefix="",
-            hass=call.hass,
         )
         await adapter.print_image(
             call.hass,
@@ -729,8 +728,9 @@ async def _dispatch_print_image(call: ServiceCall, *, image_value: str, service_
 
 async def handle_print_image(call: ServiceCall) -> None:
     """Handle print_image service call."""
-    image_value = render_template(call.hass, call.data[ATTR_IMAGE])
-    await _dispatch_print_image(call, image_value=image_value, service_name=SERVICE_PRINT_IMAGE)
+    await _dispatch_print_image(
+        call, image_value=call.data[ATTR_IMAGE], service_name=SERVICE_PRINT_IMAGE
+    )
 
 
 async def handle_print_camera_snapshot(call: ServiceCall) -> None:
@@ -777,7 +777,7 @@ async def handle_preview_image(call: ServiceCall) -> ServiceResponse:
     response so automations / scripts can chain a media player or send
     the preview through a notification without re-running the pipeline.
     """
-    target_entries = await _async_get_target_entries(call)
+    target_entries = await _async_get_target_entries(call, warn_implicit_broadcast=False)
     if not target_entries:
         raise HomeAssistantError("preview_image requires at least one printer target")
     if len(target_entries) > 1:
@@ -797,7 +797,7 @@ async def handle_preview_image(call: ServiceCall) -> ServiceResponse:
             "preview_image ignoring printer-only keys (no effect on PNG): %s",
             sorted(passed_printer_only),
         )
-    image_value = render_template(call.hass, call.data[ATTR_IMAGE])
+    image_value = call.data[ATTR_IMAGE]
 
     from ..image_sources import resolve_image_bytes  # noqa: PLC0415
     from ..printer.image_operations import (  # noqa: PLC0415
@@ -809,7 +809,7 @@ async def handle_preview_image(call: ServiceCall) -> ServiceResponse:
     # bytes twice (once in prepare_image_for_print, once here for
     # source_kind) in exchange for code reuse.
     image_kwargs = extract_image_kwargs(
-        {**call.data, ATTR_IMAGE: image_value}, defaults, prefix="", hass=call.hass
+        {**call.data, ATTR_IMAGE: image_value}, defaults, prefix=""
     )
     image_kwargs.pop(ATTR_IMAGE, None)
     prepared = await prepare_image_for_print(

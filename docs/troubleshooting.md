@@ -195,7 +195,8 @@ See [serial.md](serial.md) for the full setup guide, ESPHome YAML, and detailed 
 ## Service errors
 
 - **"Service not found"** — restart HA; verify the integration loaded.
-- **"No valid ESC/POS printer targets found"** — wrong device ID, or entry not loaded. Omit `target:` to broadcast.
+- **"No valid ESC/POS printer targets found"** — wrong device ID, or entry not loaded. Use `broadcast: true` to send to all printers.
+- **"no device_id specified — printing to all N configured printers" warning** — a service call with multiple printers configured named no target. Add a `device_id` to target one printer, or set `broadcast: true` if printing everywhere is intended.
 - **"Printer configuration not found"** — entry was removed. Restart HA or re-add.
 - **Timeout errors during printing** — increase timeout, reduce image size, check network.
 

@@ -51,7 +51,13 @@ class _PrinterHost(Protocol):
         """Acquire the underlying connection (returns ``(printer, owned)``)."""
 
     async def _release_printer(
-        self, hass: HomeAssistant, printer: Any, *, owned: bool, failed: bool = False
+        self,
+        hass: HomeAssistant,
+        printer: Any,
+        *,
+        owned: bool,
+        failed: bool = False,
+        notify_status: bool = True,
     ) -> None:
         """Release the connection acquired via :meth:`_acquire_printer`."""
 

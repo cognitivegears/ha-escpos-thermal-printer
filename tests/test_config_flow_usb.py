@@ -331,8 +331,14 @@ class TestUsbUniqueId:
     """Tests for USB unique ID generation."""
 
     @pytest.mark.asyncio
-    async def test_no_unique_id_without_serial_number(self, hass, mock_usb_printers):
-        """Test that no unique ID is set for USB devices without serial numbers."""
+    async def test_unique_id_falls_back_to_vid_pid_without_serial_number(
+        self, hass, mock_usb_printers
+    ):
+        """USB devices without a serial number still get a usb:vid:pid unique ID.
+
+        Prevents the same serial-less printer (most cheap POS-58/80
+        hardware) from being added twice.
+        """
         flow = EscposConfigFlow()
         flow.hass = hass
         flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB}
@@ -359,8 +365,8 @@ class TestUsbUniqueId:
                 }
             )
 
-        # Without serial number, no unique_id should be set (allows duplicates)
-        assert len(unique_id_calls) == 0
+        # Without a serial number, the vid:pid fallback unique ID is used.
+        assert unique_id_calls == ["usb:04b8:0202"]
 
     @pytest.mark.asyncio
     async def test_unique_id_with_serial_number(self, hass):
@@ -407,8 +413,14 @@ class TestUsbUniqueId:
         assert unique_id_set == "usb:04b8:0202:ABC123"
 
     @pytest.mark.asyncio
-    async def test_manual_entry_no_unique_id(self, hass):
-        """Test that manual USB entry allows duplicates (no unique_id)."""
+    async def test_manual_entry_default_endpoints_sets_plain_unique_id(self, hass):
+        """A manual USB entry at the default endpoints gets a vid:pid unique_id.
+
+        B3: manual entry used to set no unique_id at all, letting the same
+        printer be added an unbounded number of times and making it
+        impossible to reconfigure. Default in_ep/out_ep is the common case,
+        so it dedupes against the plain ``usb:vid:pid`` id.
+        """
         flow = EscposConfigFlow()
         flow.hass = hass
         flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB}
@@ -437,8 +449,41 @@ class TestUsbUniqueId:
                 }
             )
 
-        # Manual entry should not set unique_id
-        assert len(unique_id_calls) == 0
+        assert unique_id_calls == ["usb:04b8:0202"]
+
+    @pytest.mark.asyncio
+    async def test_manual_entry_custom_endpoints_appends_to_unique_id(self, hass):
+        """Non-default endpoints fold into the unique_id so a second, real
+        entry at the same VID:PID but different endpoints can coexist."""
+        flow = EscposConfigFlow()
+        flow.hass = hass
+        flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB}
+
+        unique_id_calls = []
+
+        async def capture_unique_id(uid):
+            unique_id_calls.append(uid)
+
+        with (
+            patch(
+                "custom_components.escpos_printer._config_flow.usb_steps._can_connect_usb",
+                return_value=(True, None, None),
+            ),
+            patch.object(flow, "async_set_unique_id", side_effect=capture_unique_id),
+            patch.object(flow, "_abort_if_unique_id_configured"),
+        ):
+            await flow.async_step_usb_manual(
+                {
+                    CONF_VENDOR_ID: 0x04B8,
+                    CONF_PRODUCT_ID: 0x0202,
+                    CONF_IN_EP: 0x83,
+                    CONF_OUT_EP: 0x02,
+                    "timeout": 4.0,
+                    "profile": "",
+                }
+            )
+
+        assert unique_id_calls == ["usb:04b8:0202:83:02"]
 
 
 class TestUsbYamlImport:
@@ -1048,6 +1093,8 @@ class TestBrowseAllUsbDevices:
                 "custom_components.escpos_printer._config_flow.usb_steps._can_connect_usb",
                 return_value=(False, "permission_denied", 13),
             ),
+            patch.object(flow, "async_set_unique_id", return_value=None),
+            patch.object(flow, "_abort_if_unique_id_configured"),
         ):
             result = await flow.async_step_usb_all_devices(
                 {

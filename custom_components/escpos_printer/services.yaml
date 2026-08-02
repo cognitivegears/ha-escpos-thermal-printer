@@ -9,6 +9,17 @@ print_text_utf8:
       selector:
         device:
           integration: escpos_printer
+    broadcast:
+      name: Broadcast
+      description: >
+        Explicitly print to every configured printer. Mutually exclusive
+        with device_id. Omitting both device_id and broadcast also targets
+        all printers (kept for backward compatibility), but logs a warning
+        when more than one printer is configured — set broadcast: true to
+        make the intent explicit and silence it.
+      default: false
+      selector:
+        boolean: {}
     text:
       name: Text
       description: The text to print (UTF-8 characters will be converted to printer-compatible encoding)
@@ -109,6 +120,17 @@ print_text:
       selector:
         device:
           integration: escpos_printer
+    broadcast:
+      name: Broadcast
+      description: >
+        Explicitly print to every configured printer. Mutually exclusive
+        with device_id. Omitting both device_id and broadcast also targets
+        all printers (kept for backward compatibility), but logs a warning
+        when more than one printer is configured — set broadcast: true to
+        make the intent explicit and silence it.
+      default: false
+      selector:
+        boolean: {}
     text:
       name: Text
       description: The text to print
@@ -218,6 +240,17 @@ print_qr:
       selector:
         device:
           integration: escpos_printer
+    broadcast:
+      name: Broadcast
+      description: >
+        Explicitly print to every configured printer. Mutually exclusive
+        with device_id. Omitting both device_id and broadcast also targets
+        all printers (kept for backward compatibility), but logs a warning
+        when more than one printer is configured — set broadcast: true to
+        make the intent explicit and silence it.
+      default: false
+      selector:
+        boolean: {}
     data:
       name: Data
       description: Data to encode in the QR code
@@ -276,13 +309,14 @@ print_qr:
           mode: slider
 
 print_image:
-  name: Print Image (template / mixed source)
+  name: Print Image (mixed source)
   description: >
-    Print an image from a URL, file path, camera.<id>, image.<id>, base64
-    data URI — or a Jinja template producing any of those. Existing
-    automations using a literal URL or path keep working unchanged. For
-    a friendlier UI, prefer the focused services (Print Image from URL,
-    from Path, Camera Snapshot, Image Entity) — see docs/images.md.
+    Print an image from a URL, file path, camera.<id>, image.<id>, or base64
+    data URI. Automations can still use a Jinja template for this field — HA
+    renders it before the service call is dispatched — but the field itself
+    is a plain string, not evaluated server-side. For a friendlier UI, prefer
+    the focused services (Print Image from URL, from Path, Camera Snapshot,
+    Image Entity) — see docs/images.md.
   fields:
     device_id:
       name: Device
@@ -291,17 +325,27 @@ print_image:
       selector:
         device:
           integration: escpos_printer
+    broadcast:
+      name: Broadcast
+      description: >
+        Explicitly print to every configured printer. Mutually exclusive
+        with device_id. Omitting both device_id and broadcast also targets
+        all printers (kept for backward compatibility), but logs a warning
+        when more than one printer is configured — set broadcast: true to
+        make the intent explicit and silence it.
+      default: false
+      selector:
+        boolean: {}
     image:
       name: Image
       description: >
         URL (http/https), local file path, camera.<entity>, image.<entity>,
-        data:image/...;base64,..., or a Jinja template producing any of
-        these. A literal string (e.g. "/config/www/logo.png") works the
-        same as it did before — the template editor accepts plain text.
+        or data:image/...;base64,.... A literal string (e.g.
+        "/config/www/logo.png") works the same as it did before.
       required: true
       example: /config/www/logo.png
       selector:
-        template: {}
+        text: {}
     image_width:
       name: Width (pixels)
       description: >
@@ -466,7 +510,7 @@ print_image:
         fails to resolve. The same processing options apply to both.
       example: /config/www/placeholder.png
       selector:
-        template: {}
+        text: {}
 
 print_image_url:
   name: Print Image from URL
@@ -481,6 +525,17 @@ print_image_url:
       selector:
         device:
           integration: escpos_printer
+    broadcast:
+      name: Broadcast
+      description: >
+        Explicitly print to every configured printer. Mutually exclusive
+        with device_id. Omitting both device_id and broadcast also targets
+        all printers (kept for backward compatibility), but logs a warning
+        when more than one printer is configured — set broadcast: true to
+        make the intent explicit and silence it.
+      default: false
+      selector:
+        boolean: {}
     url:
       name: URL
       description: HTTP(S) URL of the image (10 MB max, 40 MB with auto_resize).
@@ -652,7 +707,7 @@ print_image_url:
         fails to resolve. The same processing options apply to both.
       example: /config/www/placeholder.png
       selector:
-        template: {}
+        text: {}
 
 print_image_path:
   name: Print Image from Path
@@ -669,6 +724,17 @@ print_image_path:
       selector:
         device:
           integration: escpos_printer
+    broadcast:
+      name: Broadcast
+      description: >
+        Explicitly print to every configured printer. Mutually exclusive
+        with device_id. Omitting both device_id and broadcast also targets
+        all printers (kept for backward compatibility), but logs a warning
+        when more than one printer is configured — set broadcast: true to
+        make the intent explicit and silence it.
+      default: false
+      selector:
+        boolean: {}
     path:
       name: Path
       description: Local file path to the image (must be inside allowlist_external_dirs, e.g. /config or /media).
@@ -840,7 +906,7 @@ print_image_path:
         fails to resolve. The same processing options apply to both.
       example: /config/www/placeholder.png
       selector:
-        template: {}
+        text: {}
 
 print_camera_snapshot:
   name: Print Camera Snapshot
@@ -855,6 +921,17 @@ print_camera_snapshot:
       selector:
         device:
           integration: escpos_printer
+    broadcast:
+      name: Broadcast
+      description: >
+        Explicitly print to every configured printer. Mutually exclusive
+        with device_id. Omitting both device_id and broadcast also targets
+        all printers (kept for backward compatibility), but logs a warning
+        when more than one printer is configured — set broadcast: true to
+        make the intent explicit and silence it.
+      default: false
+      selector:
+        boolean: {}
     camera_entity:
       name: Camera
       description: Camera entity to snapshot.
@@ -1027,7 +1104,7 @@ print_camera_snapshot:
         fails to resolve. The same processing options apply to both.
       example: /config/www/placeholder.png
       selector:
-        template: {}
+        text: {}
 
 print_image_entity:
   name: Print Image Entity
@@ -1042,6 +1119,17 @@ print_image_entity:
       selector:
         device:
           integration: escpos_printer
+    broadcast:
+      name: Broadcast
+      description: >
+        Explicitly print to every configured printer. Mutually exclusive
+        with device_id. Omitting both device_id and broadcast also targets
+        all printers (kept for backward compatibility), but logs a warning
+        when more than one printer is configured — set broadcast: true to
+        make the intent explicit and silence it.
+      default: false
+      selector:
+        boolean: {}
     image_entity:
       name: Image Entity
       description: Image entity to print.
@@ -1214,7 +1302,7 @@ print_image_entity:
         fails to resolve. The same processing options apply to both.
       example: /config/www/placeholder.png
       selector:
-        template: {}
+        text: {}
 
 preview_image:
   name: Preview Image (no paper)
@@ -1237,11 +1325,11 @@ preview_image:
       name: Image
       description: >
         Same source forms as print_image — URL, file path, camera.<id>,
-        image.<id>, base64 data URI, or a Jinja template.
+        image.<id>, or base64 data URI.
       required: true
       example: /config/www/logo.png
       selector:
-        template: {}
+        text: {}
     output_path:
       name: Output Path
       description: >
@@ -1342,7 +1430,7 @@ preview_image:
         fails to resolve. The same processing options apply to both.
       example: /config/www/placeholder.png
       selector:
-        template: {}
+        text: {}
 
 calibration_print:
   name: Calibration Print
@@ -1358,6 +1446,17 @@ calibration_print:
       selector:
         device:
           integration: escpos_printer
+    broadcast:
+      name: Broadcast
+      description: >
+        Explicitly print to every configured printer. Mutually exclusive
+        with device_id. Omitting both device_id and broadcast also targets
+        all printers (kept for backward compatibility), but logs a warning
+        when more than one printer is configured — set broadcast: true to
+        make the intent explicit and silence it.
+      default: false
+      selector:
+        boolean: {}
     cut:
       name: Cut
       description: Paper cutting mode after printing (defaults to the printer's configured cut mode).
@@ -1389,6 +1488,17 @@ print_barcode:
       selector:
         device:
           integration: escpos_printer
+    broadcast:
+      name: Broadcast
+      description: >
+        Explicitly print to every configured printer. Mutually exclusive
+        with device_id. Omitting both device_id and broadcast also targets
+        all printers (kept for backward compatibility), but logs a warning
+        when more than one printer is configured — set broadcast: true to
+        make the intent explicit and silence it.
+      default: false
+      selector:
+        boolean: {}
     code:
       name: Code
       description: Barcode data
@@ -1527,6 +1637,17 @@ feed:
       selector:
         device:
           integration: escpos_printer
+    broadcast:
+      name: Broadcast
+      description: >
+        Explicitly print to every configured printer. Mutually exclusive
+        with device_id. Omitting both device_id and broadcast also targets
+        all printers (kept for backward compatibility), but logs a warning
+        when more than one printer is configured — set broadcast: true to
+        make the intent explicit and silence it.
+      default: false
+      selector:
+        boolean: {}
     lines:
       name: Lines
       description: Number of lines to feed
@@ -1549,6 +1670,17 @@ cut:
       selector:
         device:
           integration: escpos_printer
+    broadcast:
+      name: Broadcast
+      description: >
+        Explicitly print to every configured printer. Mutually exclusive
+        with device_id. Omitting both device_id and broadcast also targets
+        all printers (kept for backward compatibility), but logs a warning
+        when more than one printer is configured — set broadcast: true to
+        make the intent explicit and silence it.
+      default: false
+      selector:
+        boolean: {}
     mode:
       name: Mode
       description: Cut type (full or partial)
@@ -1570,6 +1702,17 @@ beep:
       selector:
         device:
           integration: escpos_printer
+    broadcast:
+      name: Broadcast
+      description: >
+        Explicitly print to every configured printer. Mutually exclusive
+        with device_id. Omitting both device_id and broadcast also targets
+        all printers (kept for backward compatibility), but logs a warning
+        when more than one printer is configured — set broadcast: true to
+        make the intent explicit and silence it.
+      default: false
+      selector:
+        boolean: {}
     times:
       name: Times
       description: Number of beeps
@@ -1695,10 +1838,10 @@ print_message:
       name: Image
       description: >
         Optional image printed after the message. Accepts the same source
-        forms as print_image (URL, file path, camera.<id>, image.<id>,
-        base64 data URI, or template). See docs/images.md.
+        forms as print_image (URL, file path, camera.<id>, image.<id>, or
+        base64 data URI). See docs/images.md.
       selector:
-        template: {}
+        text: {}
     image_width:
       name: Image Width (pixels)
       description: Target image width; defaults to printer profile width.
@@ -1787,7 +1930,7 @@ print_message:
       description: Optional fallback image source if the primary fails.
       example: "/config/www/placeholder.png"
       selector:
-        template: {}
+        text: {}
     image_threshold:
       name: Image Threshold
       description: Threshold value (1-254) when image_dither is "threshold".
@@ -1848,6 +1991,17 @@ print_box:
       selector:
         device:
           integration: escpos_printer
+    broadcast:
+      name: Broadcast
+      description: >
+        Explicitly print to every configured printer. Mutually exclusive
+        with device_id. Omitting both device_id and broadcast also targets
+        all printers (kept for backward compatibility), but logs a warning
+        when more than one printer is configured — set broadcast: true to
+        make the intent explicit and silence it.
+      default: false
+      selector:
+        boolean: {}
     text:
       name: Text
       description: >
@@ -1937,6 +2091,17 @@ print_table:
       selector:
         device:
           integration: escpos_printer
+    broadcast:
+      name: Broadcast
+      description: >
+        Explicitly print to every configured printer. Mutually exclusive
+        with device_id. Omitting both device_id and broadcast also targets
+        all printers (kept for backward compatibility), but logs a warning
+        when more than one printer is configured — set broadcast: true to
+        make the intent explicit and silence it.
+      default: false
+      selector:
+        boolean: {}
     rows:
       name: Rows
       description: >
@@ -2038,6 +2203,17 @@ print_text_image:
       selector:
         device:
           integration: escpos_printer
+    broadcast:
+      name: Broadcast
+      description: >
+        Explicitly print to every configured printer. Mutually exclusive
+        with device_id. Omitting both device_id and broadcast also targets
+        all printers (kept for backward compatibility), but logs a warning
+        when more than one printer is configured — set broadcast: true to
+        make the intent explicit and silence it.
+      default: false
+      selector:
+        boolean: {}
     # --- Content / typography (the fields you usually set) ---
     text:
       name: Text
@@ -2222,6 +2398,17 @@ print_separator:
       selector:
         device:
           integration: escpos_printer
+    broadcast:
+      name: Broadcast
+      description: >
+        Explicitly print to every configured printer. Mutually exclusive
+        with device_id. Omitting both device_id and broadcast also targets
+        all printers (kept for backward compatibility), but logs a warning
+        when more than one printer is configured — set broadcast: true to
+        make the intent explicit and silence it.
+      default: false
+      selector:
+        boolean: {}
     char:
       name: Character
       description: Single printable ASCII character to repeat. Defaults to "-".
@@ -2281,6 +2468,17 @@ print_kvtable:
       selector:
         device:
           integration: escpos_printer
+    broadcast:
+      name: Broadcast
+      description: >
+        Explicitly print to every configured printer. Mutually exclusive
+        with device_id. Omitting both device_id and broadcast also targets
+        all printers (kept for backward compatibility), but logs a warning
+        when more than one printer is configured — set broadcast: true to
+        make the intent explicit and silence it.
+      default: false
+      selector:
+        boolean: {}
     items:
       name: Items
       description: >

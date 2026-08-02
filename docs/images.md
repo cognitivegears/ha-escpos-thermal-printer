@@ -181,13 +181,18 @@ XML attack surface isn't worth it). The 10 MB cap applies to the
 **decoded** bytes; the base64 string itself is also length-capped
 before regex/decoding so a 200 MB string can't OOM the process.
 
-### Jinja template
+### Jinja template (in automations/scripts)
 
-The `image` field is rendered as a template when it contains `{{` or
-`{%`. That means you can pick a daily logo, pull a URL from a sensor,
-or compute a path from a date. Templates are honored by both the
-`escpos_printer.print_image` service and the `notify.<printer>` /
-`escpos_printer.print_message` action's `image` field.
+The `image` field itself is a plain string — the integration does not
+evaluate Jinja. Automations and scripts can still compute the value with
+a template, because Home Assistant's automation/script engine renders
+`{{ ... }}` in service-call data *before* the service is called. That
+means you can pick a daily logo, pull a URL from a sensor, or compute a
+path from a date, as long as the template lives in the calling
+automation/script (not typed as a raw `{{ ... }}` string via a direct
+service call, which is now passed through literally). This applies to
+both the `escpos_printer.print_image` service and the `notify.<printer>`
+/ `escpos_printer.print_message` action's `image` field.
 
 ```yaml
 service: escpos_printer.print_image
@@ -315,7 +320,7 @@ data:
   image: /config/www/logo.png
 ```
 
-The `image` field now uses a template editor in the UI, so you may see your literal path inside a code-style box the next time you edit the automation. That's expected — the editor accepts plain text alongside Jinja templates.
+The `image` field uses a plain text selector in the UI, so a literal path or a template computed by the calling automation both display and work exactly as before.
 
 For new automations (and if you'd like a friendlier form), switch to the focused service that matches your source:
 

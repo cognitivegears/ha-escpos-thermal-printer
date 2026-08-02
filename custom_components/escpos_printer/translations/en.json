@@ -208,6 +208,74 @@
           "timeout": "Connection timeout in seconds.",
           "profile": "Select your printer model or Auto-detect. Choose 'Custom' to enter a profile name manually."
         }
+      },
+      "reconfigure_network": {
+        "title": "Update network printer connection",
+        "description": "Update the connection details for your ESC/POS network printer.",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "timeout": "Timeout (seconds)"
+        },
+        "data_description": {
+          "host": "IP address or hostname of the printer.",
+          "port": "Network port (usually 9100).",
+          "timeout": "Connection timeout in seconds."
+        }
+      },
+      "reconfigure_serial": {
+        "title": "Update serial printer connection",
+        "description": "Update your printer's serial port and connection settings.",
+        "data": {
+          "serial_port": "Serial port",
+          "baudrate": "Baud rate",
+          "timeout": "Timeout (seconds)"
+        },
+        "data_description": {
+          "serial_port": "Serial port path (e.g. /dev/ttyUSB0, /dev/ttyACM0, COM3) or URL (e.g. esphome://host:6053?port_name=Name, rfc2217://host:2217, socket://host:9100).",
+          "baudrate": "Baud rate for the serial connection.",
+          "timeout": "Connection timeout in seconds."
+        }
+      },
+      "reconfigure_bluetooth": {
+        "title": "Update Bluetooth printer connection",
+        "description": "Update the Bluetooth MAC address and connection settings for your printer.",
+        "data": {
+          "bt_mac": "MAC address",
+          "rfcomm_channel": "RFCOMM channel",
+          "timeout": "Timeout (seconds)"
+        },
+        "data_description": {
+          "bt_mac": "Bluetooth MAC address in AA:BB:CC:DD:EE:FF format.",
+          "rfcomm_channel": "RFCOMM channel (almost always 1 for ESC/POS printers).",
+          "timeout": "Connection timeout in seconds."
+        }
+      },
+      "reconfigure_usb": {
+        "title": "Update USB printer connection",
+        "description": "Re-select your USB thermal printer from the list of detected devices.",
+        "data": {
+          "usb_device": "USB Device",
+          "timeout": "Timeout (seconds)"
+        },
+        "data_description": {
+          "usb_device": "Select your printer from the detected USB devices.",
+          "timeout": "Connection timeout in seconds."
+        }
+      },
+      "reconfigure_usb_manual": {
+        "title": "Manual USB configuration",
+        "description": "Enter the USB Vendor ID and Product ID for your printer. These can be found using 'lsusb' on Linux or Device Manager on Windows.",
+        "data": {
+          "vendor_id": "Vendor ID",
+          "product_id": "Product ID",
+          "timeout": "Timeout (seconds)"
+        },
+        "data_description": {
+          "vendor_id": "USB Vendor ID. Use the 0x-prefixed hex form shown by lsusb / discovery, e.g. 0x04B8 (recommended). A plain decimal number is also accepted.",
+          "product_id": "USB Product ID. Use the 0x-prefixed hex form, e.g. 0x0E03. A plain decimal number is also accepted.",
+          "timeout": "Connection timeout in seconds."
+        }
       }
     },
     "error": {
@@ -244,7 +312,9 @@
     "abort": {
       "already_configured": "This printer is already configured.",
       "invalid_discovery_info": "Invalid USB discovery information.",
-      "invalid_usb_device": "Invalid USB device configuration. Vendor ID and Product ID are required."
+      "invalid_usb_device": "Invalid USB device configuration. Vendor ID and Product ID are required.",
+      "unique_id_mismatch": "This connection detail belongs to a different printer than the one being reconfigured. Remove and re-add the integration if you want to switch to a different physical printer.",
+      "reconfigure_successful": "Printer connection updated successfully."
     }
   },
   "options": {

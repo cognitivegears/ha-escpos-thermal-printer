@@ -105,7 +105,13 @@ class SerialPrinterAdapter(EscposPrinterAdapterBase):
         raise last_exc
 
     async def _release_printer(
-        self, hass: HomeAssistant, printer: Any, *, owned: bool, failed: bool = False
+        self,
+        hass: HomeAssistant,
+        printer: Any,
+        *,
+        owned: bool,
+        failed: bool = False,
+        notify_status: bool = True,
     ) -> None:
         """Flush coalesced output (errors propagate) before the base close.
 
@@ -132,7 +138,9 @@ class SerialPrinterAdapter(EscposPrinterAdapterBase):
                 flush_exc = exc
                 failed = True
 
-        await super()._release_printer(hass, printer, owned=owned, failed=failed)
+        await super()._release_printer(
+            hass, printer, owned=owned, failed=failed, notify_status=notify_status
+        )
         if flush_exc is not None:
             raise flush_exc
 

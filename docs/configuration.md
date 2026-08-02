@@ -68,3 +68,13 @@ Off by default. When enabled, `print_image_url` (and the other image services) m
 Cloud-metadata (`169.254.169.254` and AWS IMDSv6 `fd00:ec2::254`), link-local, multicast, reserved, and unspecified addresses stay blocked even when this is on. The fetch carries no auth token, so only unauthenticated endpoints work.
 
 The option is **per-printer** and is evaluated against the printer you print to. Because `print_image_url` has no per-user authorization, enabling it lets any HA user/automation reach LAN hosts/ports through that printer (an SSRF / port-scan oracle) — only enable it where callers are trusted, and prefer camera/image entity sources where possible. See the [Images guide](images.md#allowing-local--lan-urls).
+
+## Reconfiguring a printer's connection
+
+If a printer's connection details change — a new IP address or port, a moved serial device path, a different USB port, or a re-paired Bluetooth adapter — update the existing entry instead of deleting and re-adding it:
+
+1. **Settings → Devices & services → ESC/POS Thermal Printer**
+2. Click your printer, then **Reconfigure** (in the three-dot menu of the integration entry)
+3. Enter the new connection details
+
+The entry keeps its identity, so entities, automations, blueprints, and device actions keep working. Reconfigure is for *connection* settings; print settings (profile, codepage, line width, timeouts, etc.) live under **Configure** (the options flow) as documented above. Note: USB and Bluetooth reconfiguration must point at the *same physical printer* — re-pointing at a different device is rejected; add a new entry for a new printer.
