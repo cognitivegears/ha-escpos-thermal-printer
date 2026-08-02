@@ -395,6 +395,23 @@
       "beep": "Beep"
     }
   },
+  "entity": {
+    "binary_sensor": {
+      "online": {"name": "Online"}
+    },
+    "sensor": {
+      "last_image_print": {"name": "Last image print"},
+      "battery": {"name": "Battery"},
+      "paper_status": {
+        "name": "Paper status",
+        "state": {
+          "ok": "OK",
+          "low": "Low",
+          "out": "Out"
+        }
+      }
+    }
+  },
   "issues": {
     "profile_width_fallback": {
       "title": "Printer profile is missing the pixel width",

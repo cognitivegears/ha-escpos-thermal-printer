@@ -22,8 +22,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   backward compatibility), but now logs a warning when more than one
   printer is configured; set `broadcast: true` to fan out intentionally
   (mutually exclusive with `device_id`).
+- **`serial_number` on the device entry for USB printers**, when the
+  device reported one during setup — visible in **Settings** → **Devices
+  & services** → device page. Network/Bluetooth/serial transports are
+  unaffected.
 
 ### Fixed
+
+- **The "Battery" sensor's static `mdi:battery` icon has been removed** so
+  Home Assistant's built-in dynamic battery-level icon (which reflects the
+  actual charge percentage) is used instead. `icons.json` also dropped a
+  dead `binary_sensor.status` key left over from a since-renamed entity.
+- **Diagnostic-only attributes (connection probe timestamps/latency, last
+  image-print stats) no longer get written to the recorder database** on
+  every state change — they're excluded via `_unrecorded_attributes`,
+  cutting needless history-table churn. The stable `connection_type`
+  attribute is still recorded.
 
 - **The "Online" connectivity sensor could latch on and never report
   offline.** Failed print operations now mark the printer offline

@@ -13,14 +13,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity import DeviceInfo
 
-from .const import (
-    CONF_CONNECTION_TYPE,
-    CONNECTION_TYPE_BLUETOOTH,
-    CONNECTION_TYPE_NETWORK,
-    CONNECTION_TYPE_SERIAL,
-    CONNECTION_TYPE_USB,
-    DOMAIN,
-)
+from .device import build_device_info
 from .image_sources import extract_image_kwargs
 from .security import sanitize_log_message
 from .services.schemas import PRINT_MESSAGE_FIELDS
@@ -82,22 +75,7 @@ class EscposNotifyEntity(NotifyEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        connection_type = self._entry.data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
-        if connection_type == CONNECTION_TYPE_USB:
-            model = "USB Printer"
-        elif connection_type == CONNECTION_TYPE_BLUETOOTH:
-            model = "Bluetooth Printer"
-        elif connection_type == CONNECTION_TYPE_SERIAL:
-            model = "Serial Printer"
-        else:
-            model = "Network Printer"
-
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._entry.entry_id)},
-            name=f"ESC/POS Printer {self._entry.title}",
-            manufacturer="ESC/POS",
-            model=model,
-        )
+        return build_device_info(self._entry)
 
     async def async_send_message(self, message: str, title: str | None = None) -> None:
         """Send a notification message to the thermal printer."""

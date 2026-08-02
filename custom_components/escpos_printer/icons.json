@@ -1,10 +1,11 @@
 {
   "entity": {
     "binary_sensor": {
-      "status": {"default": "mdi:printer"}
+      "online": {"default": "mdi:printer"}
     },
     "sensor": {
-      "battery": {"default": "mdi:battery"}
+      "last_image_print": {"default": "mdi:image-outline"},
+      "paper_status": {"default": "mdi:paper-roll-outline"}
     }
   },
   "services": {

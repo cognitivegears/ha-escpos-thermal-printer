@@ -10,14 +10,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 
-from .const import (
-    CONF_CONNECTION_TYPE,
-    CONNECTION_TYPE_BLUETOOTH,
-    CONNECTION_TYPE_NETWORK,
-    CONNECTION_TYPE_SERIAL,
-    CONNECTION_TYPE_USB,
-    DOMAIN,
-)
+from .const import CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK
+from .device import build_device_info
 
 if TYPE_CHECKING:
     from . import EscposConfigEntry
@@ -38,9 +32,19 @@ async def async_setup_entry(  # type: ignore[no-untyped-def]
 
 class EscposOnlineSensor(BinarySensorEntity):
     _attr_has_entity_name = True
-    _attr_name = "Online"
+    _attr_translation_key = "online"
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _unrecorded_attributes = frozenset(
+        {
+            "last_check",
+            "last_ok",
+            "last_error",
+            "last_latency_ms",
+            "last_error_reason",
+            "connection_info",
+        }
+    )
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, adapter: Any) -> None:
         self._hass = hass
@@ -55,26 +59,7 @@ class EscposOnlineSensor(BinarySensorEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        connection_type = self._entry.data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
-        # B-L7: pre-fix this picked "Network Printer" for Bluetooth entries
-        # because the Bluetooth transport landed after binary_sensor was
-        # written. Now a four-way branch — keep in sync with notify.py /
-        # sensor.py when adding new connection types.
-        if connection_type == CONNECTION_TYPE_USB:
-            model = "USB Printer"
-        elif connection_type == CONNECTION_TYPE_BLUETOOTH:
-            model = "Bluetooth Printer"
-        elif connection_type == CONNECTION_TYPE_SERIAL:
-            model = "Serial Printer"
-        else:
-            model = "Network Printer"
-
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._entry.entry_id)},
-            name=f"ESC/POS Printer {self._entry.title}",
-            manufacturer="ESC/POS",
-            model=model,
-        )
+        return build_device_info(self._entry)
 
     async def async_added_to_hass(self) -> None:
         # Subscribe to adapter status updates
