@@ -35,6 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **"Translation error: UNCLOSED_TAG" shown instead of several field
+  descriptions in the service UI** (e.g. the Image field on Print
+  Formatted). The frontend parses translation strings as ICU messages, so
+  angle-bracket placeholders like `camera.<id>` or `<config>/fonts/` were
+  read as unclosed rich-text tags. All such placeholders now use square
+  brackets (`camera.[id]`), and a test guards against reintroducing
+  tag-like `<` in `services.yaml`, `strings.json`, or `en.json`.
 - **The "Battery" sensor's static `mdi:battery` icon has been removed** so
   Home Assistant's built-in dynamic battery-level icon (which reflects the
   actual charge percentage) is used instead. `icons.json` also dropped a

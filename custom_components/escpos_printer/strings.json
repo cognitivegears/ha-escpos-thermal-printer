@@ -483,7 +483,7 @@
       "message": "The base64 image is too large (maximum ~{max_mb}MB decoded)."
     },
     "base64_invalid_format": {
-      "message": "The base64 image must be a data:image/<subtype>;base64,... URI."
+      "message": "The base64 image must be a data:image/[subtype];base64,... URI."
     },
     "base64_decode_error": {
       "message": "The base64 image data is invalid: {error}"
@@ -501,7 +501,7 @@
       "message": "Image source must be a non-empty string."
     },
     "image_source_bad_data_uri": {
-      "message": "Only data:image/<subtype>;base64,... data URIs are supported."
+      "message": "Only data:image/[subtype];base64,... data URIs are supported."
     },
     "image_too_large": {
       "message": "The image is too large (maximum {max_mb}MB)."
@@ -615,7 +615,7 @@
           "name": "Device"
         },
         "output_path": {
-          "description": "Where to save the rendered text. Must be inside the system temp directory (typically /tmp). Defaults to /tmp/escpos_preview_box_<entry>.txt. To persist the preview elsewhere, copy the returned `path` in a follow-up step.\n",
+          "description": "Where to save the rendered text. Must be inside the system temp directory (typically /tmp). Defaults to /tmp/escpos_preview_box_[entry].txt. To persist the preview elsewhere, copy the returned `path` in a follow-up step.\n",
           "name": "Output Path"
         },
         "padding": {
@@ -665,7 +665,7 @@
           "name": "Fallback Image"
         },
         "image": {
-          "description": "Same source forms as print_image — URL, file path, camera.<id>, image.<id>, or base64 data URI.\n",
+          "description": "Same source forms as print_image — URL, file path, camera.[id], image.[id], or base64 data URI.\n",
           "name": "Image"
         },
         "image_width": {
@@ -681,7 +681,7 @@
           "name": "Mirror Horizontally"
         },
         "output_path": {
-          "description": "Where to save the PNG. Must be inside the system temp directory (typically /tmp). Defaults to /tmp/escpos_preview_<entry>.png. To stage the preview into /config/www/ for a Lovelace card, add a follow-up automation step that copies the returned `path`.\n",
+          "description": "Where to save the PNG. Must be inside the system temp directory (typically /tmp). Defaults to /tmp/escpos_preview_[entry].png. To stage the preview into /config/www/ for a Lovelace card, add a follow-up automation step that copies the returned `path`.\n",
           "name": "Output Path"
         },
         "rotation": {
@@ -725,7 +725,7 @@
           "name": "Header Row"
         },
         "output_path": {
-          "description": "Where to save the rendered text. Must be inside the system temp directory (typically /tmp). Defaults to /tmp/escpos_preview_table_<entry>.txt. To persist the preview elsewhere, copy the returned `path` in a follow-up step.\n",
+          "description": "Where to save the rendered text. Must be inside the system temp directory (typically /tmp). Defaults to /tmp/escpos_preview_table_[entry].txt. To persist the preview elsewhere, copy the returned `path` in a follow-up step.\n",
           "name": "Output Path"
         },
         "row_separators": {
@@ -950,7 +950,7 @@
       }
     },
     "print_image": {
-      "description": "Print an image from a URL, file path, camera.<id>, image.<id>, or base64 data URI. Automations can still use a Jinja template for this field — HA renders it before the service call is dispatched — but the field itself is a plain string, not evaluated server-side. For a friendlier UI, prefer the focused services (Print Image from URL, from Path, Camera Snapshot, Image Entity) — see docs/images.md.\n",
+      "description": "Print an image from a URL, file path, camera.[id], image.[id], or base64 data URI. Automations can still use a Jinja template for this field — HA renders it before the service call is dispatched — but the field itself is a plain string, not evaluated server-side. For a friendlier UI, prefer the focused services (Print Image from URL, from Path, Camera Snapshot, Image Entity) — see docs/images.md.\n",
       "fields": {
         "align": {
           "description": "Image alignment on the paper.",
@@ -1001,7 +1001,7 @@
           "name": "High Density"
         },
         "image": {
-          "description": "URL (http/https), local file path, camera.<entity>, image.<entity>, or data:image/...;base64,.... A literal string (e.g. \"/config/www/logo.png\") works the same as it did before.\n",
+          "description": "URL (http/https), local file path, camera.[entity], image.[entity], or data:image/...;base64,.... A literal string (e.g. \"/config/www/logo.png\") works the same as it did before.\n",
           "name": "Image"
         },
         "image_width": {
@@ -1387,7 +1387,7 @@
           "name": "Height"
         },
         "image": {
-          "description": "Optional image printed after the message. Accepts the same source forms as print_image (URL, file path, camera.<id>, image.<id>, or base64 data URI). See docs/images.md.\n",
+          "description": "Optional image printed after the message. Accepts the same source forms as print_image (URL, file path, camera.[id], image.[id], or base64 data URI). See docs/images.md.\n",
           "name": "Image"
         },
         "image_align": {
@@ -1675,7 +1675,7 @@
           "name": "Font"
         },
         "font_path": {
-          "description": "Drop a .ttf or .otf file in <config>/fonts/ and reference it here. Paths under allowlist_external_dirs also work. Overrides the bundled \"font\" field when provided.\n",
+          "description": "Drop a .ttf or .otf file in /config/fonts/ and reference it here. Paths under allowlist_external_dirs also work. Overrides the bundled \"font\" field when provided.\n",
           "name": "Custom Font Path"
         },
         "font_size": {

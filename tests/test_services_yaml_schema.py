@@ -14,6 +14,7 @@ Covers:
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 from homeassistant.helpers.service import _SERVICES_SCHEMA
 from homeassistant.util.yaml import load_yaml_dict
@@ -489,6 +490,30 @@ def test_image_services_no_truncated_descriptions() -> None:
                 desc = field_def.get("description")
                 if desc is not None:
                     _assert_description_not_truncated(svc, field_name, desc)
+
+
+def test_no_icu_tag_like_angle_brackets_in_user_visible_strings() -> None:
+    """Regression guard for 'Translation error: UNCLOSED_TAG' in the HA UI.
+
+    The frontend parses translation strings as ICU messages, where ``<word``
+    opens a rich-text tag; an unclosed one (e.g. ``camera.<id>`` or
+    ``<config>/fonts/``) makes the whole description render as
+    'Translation error: UNCLOSED_TAG'. Use ``[placeholder]`` instead.
+    """
+    root = Path(__file__).resolve().parents[1] / "custom_components" / "escpos_printer"
+    tag_open = re.compile(r"<[A-Za-z/]")
+    offenders = [
+        f"{rel}:{lineno}: {line.strip()[:100]}"
+        for rel in ("services.yaml", "strings.json", "translations/en.json")
+        for lineno, line in enumerate(
+            (root / rel).read_text(encoding="utf-8").splitlines(), start=1
+        )
+        if tag_open.search(line)
+    ]
+    assert not offenders, (
+        "ICU-tag-like '<' in user-visible strings (frontend raises UNCLOSED_TAG):\n  "
+        + "\n  ".join(offenders)
+    )
 
 
 def _assert_description_not_truncated(svc: str, fname: str, desc: object) -> None:
