@@ -29,6 +29,7 @@ from ..const import (
 from .usb_helpers import (
     _build_usb_device_choices,
     _can_connect_usb,
+    _default_usb_choice_key,
     _discover_all_usb_devices,
     _discover_usb_printers,
     _generate_usb_unique_id,
@@ -550,18 +551,27 @@ class UsbFlowMixin:
         device_choices = _build_usb_device_choices(
             self._discovered_printers, include_browse_all=False
         )
-        default_device = next(iter(device_choices.keys()))
+        reconfigure_entry = self._get_reconfigure_entry()  # type: ignore[attr-defined]
+        # reconfigure_entry.data has no "usb_device" key (that's a UI-only
+        # choice-dict key, never stored) -- match on the entry's stored
+        # vendor/product ID so the dropdown preselects the configured
+        # device. Falls back to the first discovered device when the
+        # configured one isn't present (e.g. unplugged).
+        default_device = _default_usb_choice_key(
+            self._discovered_printers, reconfigure_entry.data
+        ) or next(iter(device_choices.keys()))
         data_schema = vol.Schema(
             {
                 vol.Required("usb_device", default=default_device): vol.In(device_choices),
                 vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
             }
         )
-        reconfigure_entry = self._get_reconfigure_entry()  # type: ignore[attr-defined]
+        suggested_values: dict[str, Any] = dict(user_input or reconfigure_entry.data)
+        suggested_values.setdefault("usb_device", default_device)
         return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
             step_id="reconfigure_usb",
             data_schema=self.add_suggested_values_to_schema(  # type: ignore[attr-defined]
-                data_schema, user_input or reconfigure_entry.data
+                data_schema, suggested_values
             ),
             errors=errors,
         )

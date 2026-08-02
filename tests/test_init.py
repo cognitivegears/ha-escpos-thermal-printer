@@ -1,6 +1,6 @@
 """Tests for integration setup and unload lifecycle."""
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.const import CONF_HOST, CONF_PORT
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -9,7 +9,15 @@ from custom_components.escpos_printer import (
     DATA_SERVICES_REGISTERED,
     EscposRuntimeData,
 )
-from custom_components.escpos_printer.const import DOMAIN
+from custom_components.escpos_printer.const import (
+    CONF_BT_MAC,
+    CONF_CONNECTION_TYPE,
+    CONF_SERIAL_PORT,
+    CONF_STATUS_INTERVAL,
+    CONNECTION_TYPE_BLUETOOTH,
+    CONNECTION_TYPE_SERIAL,
+    DOMAIN,
+)
 
 
 def _make_entry(host: str = "1.2.3.4", port: int = 9100) -> MockConfigEntry:
@@ -158,3 +166,105 @@ async def test_unload_logs_adapter_stop_failure(hass, caplog):  # type: ignore[n
     assert any(
         "Adapter stop failed" in rec.message and "boom" in rec.message for rec in caplog.records
     )
+
+
+async def test_setup_serial_status_interval_defaults_to_300(hass):  # type: ignore[no-untyped-def]
+    """A serial entry with no stored status_interval option gets a 300s default.
+
+    Serial/Bluetooth printers get no implicit health check from the paper
+    poll (network/USB only), so an unplugged printer would otherwise stay
+    "Online" forever with the old always-0 default.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Serial Printer",
+        data={
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_SERIAL,
+            CONF_SERIAL_PORT: "/dev/ttyUSB0",
+        },
+        unique_id="serial:/dev/ttyUSB0",
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert entry.runtime_data.adapter._status_interval == 300
+
+    # Explicit teardown so the recurring status-check timer this test
+    # schedules (status_interval=300) doesn't outlive the test.
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+
+
+async def test_setup_serial_status_interval_explicit_zero_respected(hass):  # type: ignore[no-untyped-def]
+    """An explicit status_interval=0 option overrides the serial/BT default."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Serial Printer",
+        data={
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_SERIAL,
+            CONF_SERIAL_PORT: "/dev/ttyUSB0",
+        },
+        options={CONF_STATUS_INTERVAL: 0},
+        unique_id="serial:/dev/ttyUSB0",
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert entry.runtime_data.adapter._status_interval == 0
+
+
+async def test_setup_bluetooth_status_interval_still_defaults_to_0(hass):  # type: ignore[no-untyped-def]
+    """A Bluetooth entry with no stored status_interval option stays at 0.
+
+    Unlike serial, Bluetooth status checks open a real RFCOMM connection and
+    many cheap printers audibly beep on every connect, so polling stays
+    opt-in rather than defaulting on.
+
+    The adapter factory is mocked out here (rather than doing a full
+    real-transport setup like the serial test above) so this only exercises
+    the connection-type default computation in async_setup_entry. The
+    battery sensor's bluez lookup is also mocked -- it otherwise attempts a
+    real D-Bus system-bus connect during platform forwarding (harmlessly
+    caught by bluez.py, but pytest-socket still flags the blocked attempt).
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Bluetooth Printer",
+        data={
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH,
+            CONF_BT_MAC: "AA:BB:CC:DD:EE:FF",
+        },
+        unique_id="bt:AA:BB:CC:DD:EE:FF",
+    )
+    entry.add_to_hass(hass)
+    fake_adapter = MagicMock()
+    fake_adapter.start = AsyncMock()
+    fake_adapter.stop = AsyncMock()
+
+    with (
+        patch(
+            "custom_components.escpos_printer.create_printer_adapter", return_value=fake_adapter
+        ),
+        patch(
+            "custom_components.escpos_printer.sensor.query_bt_battery_percentage",
+            AsyncMock(return_value=None),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    fake_adapter.start.assert_called_once()
+    assert fake_adapter.start.call_args.kwargs["status_interval"] == 0
+
+
+async def test_setup_network_status_interval_still_defaults_to_0(hass):  # type: ignore[no-untyped-def]
+    """Network/USB printers keep the old 0 (disabled) default -- unaffected."""
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    with patch("escpos.printer.Network"):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    assert entry.runtime_data.adapter._status_interval == 0

@@ -61,7 +61,7 @@ class SerialPrinterAdapter(EscposPrinterAdapterBase):
 
     def _connect(self) -> Any:
         """Open a serial transport and wrap it in a python-escpos printer."""
-        profile_obj = self._get_profile_obj()
+        profile_name = self._profile_for_constructor()
         last_exc: Exception | None = None
         port = self._serial_config.serial_port
         baudrate = self._serial_config.baudrate
@@ -100,7 +100,7 @@ class SerialPrinterAdapter(EscposPrinterAdapterBase):
                 time.sleep(self._CONNECT_RETRY_DELAY_S)
                 continue
             else:
-                return make_serial_escpos(transport, profile_obj)
+                return make_serial_escpos(transport, profile_name)
 
         assert last_exc is not None  # pragma: no cover
         raise last_exc

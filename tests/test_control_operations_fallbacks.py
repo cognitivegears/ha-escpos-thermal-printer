@@ -118,7 +118,7 @@ async def test_cut_invalid_mode_defaults_to_full(hass: Any, caplog: Any) -> None
     with patch("escpos.printer.Network", return_value=fake):
         adapter = _make_adapter()
         await adapter.cut(hass, mode="this-is-not-a-cut-mode")
-    fake.cut.assert_called_once_with(mode="FULL")
+    fake.cut.assert_called_once_with(mode="FULL", feed=True)
     assert any("Invalid cut mode" in rec.message for rec in caplog.records)
 
 

@@ -427,7 +427,7 @@ Symptoms-to-knob mapping:
 
 ## Diagnostics sensor
 
-`sensor.<printer>_last_image_print` is created for every printer, regardless of connection type. Its state is the count of successful image prints since Home Assistant started; the attributes carry details of the most recent print so you can tune `dither`, `fragment_height`, and the other knobs above without downloading diagnostics:
+`sensor.<printer>_last_image_print` is created for every printer, regardless of connection type. It's a diagnostic sensor and **disabled by default** — enable it from the entity's settings in the entity registry. Its state is the count of successful image prints since Home Assistant started; the attributes carry details of the most recent print so you can tune `dither`, `fragment_height`, and the other knobs above without downloading diagnostics:
 
 - `total_failures` — count of failed image prints since startup
 - `last_source_kind` — `data`, `camera`, `image`, `http`, or `local`

@@ -174,7 +174,9 @@ def _line_width_for(config: object) -> int:
 _WARNED_TOTAL_WIDTH_CLAMP = [False]
 
 
-def _clamp_total_width_to_line_width(total_width: int, config: object) -> int:
+def _clamp_total_width_to_line_width(
+    total_width: int, config: object, field_name: str = "total_width"
+) -> int:
     """Clamp ``total_width`` to the printer's configured line width.
 
     ``total_width`` is schema-bounded to ``MAX_BOX_WIDTH`` (200) independent
@@ -182,14 +184,18 @@ def _clamp_total_width_to_line_width(total_width: int, config: object) -> int:
     at ``line_width`` afterward, and a layout rendered wider than that gets
     shredded on re-wrap (broken box borders, misaligned table columns).
     Clamping here keeps the renderer and the eventual wrap in agreement.
+
+    ``field_name`` names the caller's field in the warning (``total_width``
+    for box/table, ``width`` for ``print_separator``).
     """
     line_width = _line_width_for(config)
     if total_width > line_width:
         if not _WARNED_TOTAL_WIDTH_CLAMP[0]:
             _LOGGER.warning(
-                "total_width %d exceeds printer line_width %d; clamping to %d to avoid "
+                "%s %d exceeds printer line_width %d; clamping to %d to avoid "
                 "the printer re-wrapping (and corrupting) the rendered layout "
                 "(this warning fires once per process)",
+                field_name,
                 total_width,
                 line_width,
                 line_width,
@@ -354,6 +360,7 @@ async def handle_print_separator(call: ServiceCall) -> None:
     async def _body(entry: Any, adapter: Any, defaults: Any, config: Any) -> None:
         char = call.data.get(ATTR_CHAR, "-")
         width = int(call.data.get(ATTR_WIDTH) or _line_width_for(config))
+        width = _clamp_total_width_to_line_width(width, config, field_name="width")
         repeat = int(call.data.get(ATTR_REPEAT, 1))
         line = char * width
         text = "\n".join([line] * repeat)

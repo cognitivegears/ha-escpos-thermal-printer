@@ -11,6 +11,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`feed_before_cut` option on the `cut` service.** ESC/POS cuts always
+  feed ~6 lines of paper before cutting; set `feed_before_cut: false` to
+  skip that feed and save paper when you've already positioned the cut
+  point. Defaults to `true` (previous behavior). The selected cut mode
+  (full/partial) is honored either way — the integration emits the
+  `GS V` function-B opcode directly when skipping the feed, since
+  python-escpos's own `feed=False` path always cuts partial.
+- **Six more hardware barcode types on `print_barcode`**: NW7, GS1-128,
+  and the four GS1 DataBar variants (Omnidirectional, Truncated, Limited,
+  Expanded), for printers whose firmware supports them.
+- **Serial printers now default to a 5-minute connectivity check**
+  (`status_interval: 300`). Previously the "Online" sensor for serial
+  printers only updated when something printed, so an unplugged printer
+  could read Online indefinitely; the serial probe is a silent `os.stat`
+  of the device node, so the check is free. Network/USB printers are
+  unaffected (their paper-status poll already doubles as a health
+  check). Bluetooth deliberately stays opt-in (`0`): each BT status
+  check opens a real RFCOMM connection, and many cheap printers audibly
+  beep on every connect. An explicitly configured `status_interval` is
+  respected as before.
 - **Reconfigure flow** for all four connection types (**Settings** →
   **Devices & services** → printer → **Reconfigure**). A printer whose IP
   address, serial port, USB device, or Bluetooth MAC changes can now be
@@ -42,6 +62,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Serial printers with an explicitly selected profile failed on every
+  print.** The serial adapter passed the resolved profile *object* into
+  python-escpos, whose profile lookup only accepts the profile *name*, so
+  any real profile (e.g. TM-T20II) raised `KeyError` on connect. Setup
+  appeared to succeed — the failure only surfaced when printing. The
+  default `profile: auto` was unaffected.
+- **Reconfiguring a serial printer silently reset its baudrate to 9600.**
+  The stored baudrate (an integer) never matched the reconfigure form's
+  string-keyed dropdown, so the current value didn't preselect and an
+  untouched submit fell back to the default.
+- **`print_barcode` with type `ITF14` failed on every print.** The type
+  passed validation but python-escpos has no `ITF14` entry in its barcode
+  name maps, so the library raised `BarcodeTypeError`. ITF-14 is a
+  14-digit ITF (there is no separate hardware opcode), so it is now
+  printed as `ITF`. A test now checks every type offered in the service
+  selector resolves to a printable python-escpos type.
+- **Reconfiguring a USB printer now preselects the currently configured
+  device** in the device dropdown instead of the first discovered one.
+  (Submitting the wrong preselection was already rejected — this fixes
+  the confusing form state, not a data-loss path.)
+- **`print_separator` now clamps its width to the printer's line width**,
+  matching `print_box`/`print_table`/`print_kvtable`. Previously a width
+  above the configured line width re-wrapped into multiple lines of
+  separator characters.
 - **"Translation error: UNCLOSED_TAG" shown instead of several field
   descriptions in the service UI** (e.g. the Image field on Print
   Formatted). The frontend parses translation strings as ICU messages, so
@@ -210,6 +254,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **The "Last image print" diagnostic sensor and the Bluetooth "Battery"
+  sensor are now disabled by default.** Both are niche diagnostics (the
+  battery sensor only reports on the rare printers exposing BlueZ
+  `Battery1`); enable them from the entity registry if wanted. Existing
+  registry entries keep their current enabled state.
 - **`print_text_image` no longer accepts `image_rotation` /
   `image_align`** — both were silently discarded (the service's own
   alignment and orientation apply), so passing them is now a validation

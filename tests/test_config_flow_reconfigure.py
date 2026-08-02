@@ -474,6 +474,106 @@ async def test_reconfigure_usb_seeds_stored_timeout(hass):  # type: ignore[no-un
     assert suggested[CONF_TIMEOUT] == 9.5
 
 
+async def test_reconfigure_usb_preselects_configured_device(hass):  # type: ignore[no-untyped-def]
+    """The reconfigure_usb dropdown must preselect the entry's configured
+    device, not just default to the first discovered one.
+
+    Regression test: ``reconfigure_entry.data`` has no ``usb_device`` key
+    (that's a UI-only choice-dict key, never stored), so
+    ``add_suggested_values_to_schema`` had nothing to suggest for that
+    field and it silently fell back to ``next(iter(device_choices))`` --
+    whichever device ``usb.core.find()`` happened to enumerate first.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="USB Printer 04B8:0E28",
+        data={
+            CONF_VENDOR_ID: 0x04B8,
+            CONF_PRODUCT_ID: 0x0E28,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+        },
+        unique_id="usb:04b8:0e28",
+    )
+    entry.add_to_hass(hass)
+
+    # Two devices discovered; the configured one (04B8:0E28) is NOT first.
+    discovered = [
+        {
+            "vendor_id": 0x04B8,
+            "product_id": 0x0202,
+            "manufacturer": "Epson",
+            "product": "TM-T88V",
+            "serial_number": None,
+            "label": "Epson TM-T88V (04B8:0202)",
+        },
+        {
+            "vendor_id": 0x04B8,
+            "product_id": 0x0E28,
+            "manufacturer": "Epson",
+            "product": "TM-T20II",
+            "serial_number": None,
+            "label": "Epson TM-T20II (04B8:0E28)",
+        },
+    ]
+    with patch(
+        "custom_components.escpos_printer._config_flow.usb_steps._discover_usb_printers",
+        return_value=discovered,
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+
+    assert result["step_id"] == "reconfigure_usb"
+    suggested = {
+        key.schema: key.description["suggested_value"]
+        for key in result["data_schema"].schema
+        if isinstance(key, vol.Marker) and key.description
+    }
+    assert suggested["usb_device"] == "04B8:0E28#0"
+
+
+async def test_reconfigure_usb_falls_back_when_configured_device_missing(hass):  # type: ignore[no-untyped-def]
+    """If the configured device isn't among the discovered ones (e.g.
+    unplugged), fall back to the first discovered device -- today's
+    behaviour -- rather than erroring.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="USB Printer 04B8:FFFF",
+        data={
+            CONF_VENDOR_ID: 0x04B8,
+            CONF_PRODUCT_ID: 0xFFFF,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+        },
+        unique_id="usb:04b8:ffff",
+    )
+    entry.add_to_hass(hass)
+
+    discovered = [
+        {
+            "vendor_id": 0x04B8,
+            "product_id": 0x0202,
+            "manufacturer": "Epson",
+            "product": "TM-T88V",
+            "serial_number": None,
+            "label": "Epson TM-T88V (04B8:0202)",
+        },
+    ]
+    with patch(
+        "custom_components.escpos_printer._config_flow.usb_steps._discover_usb_printers",
+        return_value=discovered,
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+
+    assert result["step_id"] == "reconfigure_usb"
+    suggested = {
+        key.schema: key.description["suggested_value"]
+        for key in result["data_schema"].schema
+        if isinstance(key, vol.Marker) and key.description
+    }
+    assert suggested["usb_device"] == "04B8:0202#0"
+
+
 async def test_reconfigure_network_case_insensitive_collision_aborts(hass):  # type: ignore[no-untyped-def]
     """Reconfiguring to a host that only differs in case from another entry aborts.
 
@@ -942,6 +1042,55 @@ async def test_reconfigure_serial_happy_path(hass):  # type: ignore[no-untyped-d
     assert updated.data[CONF_BAUDRATE] == 19200
     assert updated.unique_id == "serial:/dev/ttyusb1"
     assert updated.title == "Serial /dev/ttyUSB1"  # auto-generated title follows the new port
+
+
+async def test_reconfigure_serial_suggests_stored_baudrate_as_string(hass):  # type: ignore[no-untyped-def]
+    """CONF_BAUDRATE is stored as int, but the dropdown's choices are string
+    keys -- the suggested value must be normalised to str or the field
+    fails to preselect and an untouched submit silently falls back to the
+    schema default (9600) instead of the entry's real (non-default) rate.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Serial /dev/ttyUSB0",
+        data={
+            CONF_SERIAL_PORT: "/dev/ttyUSB0",
+            CONF_BAUDRATE: 19200,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_SERIAL,
+        },
+        unique_id="serial:/dev/ttyusb0",
+    )
+    entry.add_to_hass(hass)
+    entry_id = entry.entry_id
+
+    result = await entry.start_reconfigure_flow(hass)
+    assert result["step_id"] == "reconfigure_serial"
+    suggested = {
+        key.schema: key.description["suggested_value"]
+        for key in result["data_schema"].schema
+        if isinstance(key, vol.Marker) and key.description
+    }
+    assert suggested[CONF_BAUDRATE] == "19200"
+
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.serial_steps._can_connect_serial",
+            return_value=(True, None, None),
+        ),
+        patch("custom_components.escpos_printer.async_setup_entry", return_value=True),
+    ):
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_SERIAL_PORT: "/dev/ttyUSB0", CONF_BAUDRATE: suggested[CONF_BAUDRATE]},
+        )
+        await hass.async_block_till_done()
+
+    assert result2["type"] == "abort"
+    assert result2["reason"] == "reconfigure_successful"
+    updated = hass.config_entries.async_get_entry(entry_id)
+    assert updated is not None
+    assert updated.data[CONF_BAUDRATE] == 19200  # preserved, not reset to 9600
 
 
 async def test_reconfigure_serial_preserves_manual_rename(hass):  # type: ignore[no-untyped-def]

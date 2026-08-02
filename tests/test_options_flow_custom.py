@@ -172,6 +172,51 @@ async def test_options_flow_bluetooth_reliability_defaults_to_auto(hass):  # typ
     assert defaults[CONF_RELIABILITY_PROFILE] == RELIABILITY_PROFILE_AUTO
 
 
+async def test_options_flow_bluetooth_status_interval_still_defaults_to_0(hass):  # type: ignore[no-untyped-def]
+    """The options form for a Bluetooth entry with no stored status_interval
+    must default to 0 -- the same runtime default __init__.py applies.
+    Bluetooth status checks open a real RFCOMM connection and many cheap
+    printers beep on every connect, so polling stays opt-in.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Bluetooth Printer AA:BB:CC:DD:EE:FF",
+        data={
+            CONF_BT_MAC: "AA:BB:CC:DD:EE:FF",
+            CONF_RFCOMM_CHANNEL: 1,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH,
+        },
+        unique_id="bt:aa:bb:cc:dd:ee:ff",
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] == "form"
+
+    defaults = {
+        key.schema: key.default()
+        for key in result["data_schema"].schema
+        if isinstance(key, vol.Optional) and not isinstance(key.default, vol.Undefined)
+    }
+    assert defaults[CONF_STATUS_INTERVAL] == 0
+
+
+async def test_options_flow_network_status_interval_still_defaults_to_0(hass):  # type: ignore[no-untyped-def]
+    """A network entry's status_interval default is unaffected (stays 0)."""
+    entry = await _setup_entry(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] == "form"
+
+    defaults = {
+        key.schema: key.default()
+        for key in result["data_schema"].schema
+        if isinstance(key, vol.Optional) and not isinstance(key.default, vol.Undefined)
+    }
+    assert defaults[CONF_STATUS_INTERVAL] == 0
+
+
 async def test_options_flow_custom_codepage_invalid(hass):  # type: ignore[no-untyped-def]
     """An invalid custom codepage should error."""
     entry = await _setup_entry(hass)

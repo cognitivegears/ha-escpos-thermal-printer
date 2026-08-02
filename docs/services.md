@@ -56,7 +56,7 @@ Entity service for the notify platform. Targets a notify entity and supports all
 
 ## escpos_printer.print_barcode
 
-Supported types: `EAN13`, `EAN8`, `UPC-A`, `UPC-E`, `CODE39`, `CODE93`, `CODE128`, `ITF`, `ITF14`, `CODABAR`, `JAN`, `JAN13`, `JAN8`.
+Supported types: `EAN13`, `EAN8`, `UPC-A`, `UPC-E`, `CODE39`, `CODE93`, `CODE128`, `ITF`, `ITF14` (printed as `ITF`), `CODABAR`, `NW7` (alias of `CODABAR`), `JAN`, `JAN13`, `JAN8` (printed as `EAN13`/`EAN8` — identical symbologies), `GS1-128`, `GS1 DATABAR OMNIDIRECTIONAL`, `GS1 DATABAR TRUNCATED`, `GS1 DATABAR LIMITED`, `GS1 DATABAR EXPANDED`.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -178,7 +178,7 @@ Print a single decorative rule by repeating one character to fill the line width
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | char | string | Single printable ASCII character to repeat (default `-`) |
-| width | int | Repeat count (1–200); defaults to the printer's line width |
+| width | int | Repeat count (1–200); defaults to the printer's line width. Clamped down to the printer's line width if it exceeds it, so the printer doesn't re-wrap (and corrupt) the rule. |
 | repeat | int | Number of consecutive lines (1–10, default 1). Use `2` for a double rule. |
 | cut | string | `none`, `partial`, `full` |
 | feed | int | Lines to feed (0–50) |
@@ -230,6 +230,7 @@ Response shape: `{path, width, line_count, codepage}`.
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | mode | string | `full` or `partial` (required) |
+| feed_before_cut | boolean | Force-feed a few lines before cutting (default `true`, the printer's own behavior). Set `false` if you've already fed enough paper and want the cut right where it currently sits — `mode` is still honored (a full cut stays a full cut) when the feed is skipped. |
 
 ## escpos_printer.beep
 

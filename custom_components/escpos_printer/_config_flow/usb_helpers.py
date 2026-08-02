@@ -5,7 +5,13 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from ..const import DEFAULT_IN_EP, DEFAULT_OUT_EP, THERMAL_PRINTER_VIDS
+from ..const import (
+    CONF_PRODUCT_ID,
+    CONF_VENDOR_ID,
+    DEFAULT_IN_EP,
+    DEFAULT_OUT_EP,
+    THERMAL_PRINTER_VIDS,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -174,6 +180,30 @@ def _generate_usb_unique_id(
         # Include serial for uniqueness when multiple identical printers exist
         return f"{base_id}:{serial_number}"
     return base_id
+
+
+def _default_usb_choice_key(
+    printers: list[dict[str, Any]], entry_data: dict[str, Any]
+) -> str | None:
+    """Match a reconfigure entry's stored vendor/product ID to a discovered
+    printer's ``_choice_key`` (set by :func:`_build_usb_device_choices`).
+
+    ``entry_data`` (a config entry's ``data``) has no ``usb_device`` key --
+    that's a UI-only choice-dict key, never stored -- so the reconfigure
+    dropdown needs this lookup to preselect the configured device instead of
+    always falling back to the first discovered one. Returns ``None`` when
+    the configured device isn't among the freshly discovered printers (e.g.
+    it's unplugged), leaving the caller to fall back to its own default.
+    """
+    vendor_id = entry_data.get(CONF_VENDOR_ID)
+    product_id = entry_data.get(CONF_PRODUCT_ID)
+    if vendor_id is None or product_id is None:
+        return None
+    for printer in printers:
+        if printer.get("vendor_id") == vendor_id and printer.get("product_id") == product_id:
+            key = printer.get("_choice_key")
+            return key if isinstance(key, str) else None
+    return None
 
 
 def _usb_error_to_key(error_code: str | None) -> str:

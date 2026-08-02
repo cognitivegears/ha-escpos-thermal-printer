@@ -53,6 +53,16 @@ DEFAULT_PORT = 9100
 DEFAULT_TIMEOUT = 4.0
 DEFAULT_ALIGN = "left"
 DEFAULT_CUT = "none"
+# Serial printers get no implicit health check from the paper-status poll
+# (network/USB only -- see sensor.py), so an unplugged printer would
+# otherwise stay "Online" forever. The serial probe is a silent os.stat, so
+# it's safe to default on. Network/USB keep the 0 (disabled) default.
+#
+# Bluetooth deliberately does NOT get this default: a status check opens a
+# real RFCOMM connection, and many cheap BT printers audibly beep on every
+# connect -- default-on polling would beep every 5 minutes (see
+# _config_flow/options_flow.py). Bluetooth stays opt-in at 0.
+DEFAULT_STATUS_INTERVAL_SERIAL = 300
 DEFAULT_LINE_WIDTH = 48
 DEFAULT_CODEPAGE = "CP437"
 DEFAULT_ALLOW_LOCAL_IMAGE_URLS = False
@@ -143,6 +153,7 @@ ATTR_IMAGE = "image"
 ATTR_HIGH_DENSITY = "high_density"
 ATTR_LINES = "lines"
 ATTR_MODE = "mode"
+ATTR_FEED_BEFORE_CUT = "feed_before_cut"
 
 # Barcode-related
 ATTR_CODE = "code"

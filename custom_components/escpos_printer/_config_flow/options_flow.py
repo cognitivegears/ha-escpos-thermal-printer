@@ -44,6 +44,7 @@ from ..const import (
     DEFAULT_LINE_WIDTH,
     DEFAULT_SERIAL_WRITE_CHUNK_DELAY_MS,
     DEFAULT_SERIAL_WRITE_CHUNK_SIZE,
+    DEFAULT_STATUS_INTERVAL_SERIAL,
     DEFAULT_TIMEOUT,
     RELIABILITY_PROFILE_AUTO,
     RELIABILITY_PROFILE_BALANCED,
@@ -291,7 +292,15 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
             vol.Optional(CONF_RELIABILITY_PROFILE, default=current_reliability): vol.In(
                 reliability_choices
             ),
-            vol.Optional(CONF_STATUS_INTERVAL, default=opts.get(CONF_STATUS_INTERVAL, 0)): int,
+            vol.Optional(
+                CONF_STATUS_INTERVAL,
+                default=opts.get(
+                    CONF_STATUS_INTERVAL,
+                    DEFAULT_STATUS_INTERVAL_SERIAL
+                    if connection_type == CONNECTION_TYPE_SERIAL
+                    else 0,
+                ),
+            ): int,
             vol.Optional(
                 CONF_ALLOW_LOCAL_IMAGE_URLS,
                 default=opts.get(CONF_ALLOW_LOCAL_IMAGE_URLS, DEFAULT_ALLOW_LOCAL_IMAGE_URLS),

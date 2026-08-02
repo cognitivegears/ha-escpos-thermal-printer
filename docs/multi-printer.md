@@ -1,6 +1,6 @@
 # Multiple Printers
 
-Add the integration once per printer. Each gets its own device, binary sensor, notify entity, and battery sensor (BT only). Connection types can mix freely (e.g. one Network printer + one Bluetooth).
+Add the integration once per printer. Each gets its own device, binary sensor, notify entity, and battery sensor (BT only, disabled by default). Connection types can mix freely (e.g. one Network printer + one Bluetooth).
 
 ## Targeting in service calls
 

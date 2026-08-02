@@ -161,8 +161,38 @@ class TestSerialPrinterAdapter:
             write_chunk_size=0,
             write_chunk_delay_ms=0,
         )
-        mock_make.assert_called_once_with(mock_transport, serial_adapter._get_profile_obj())
+        # Must be the profile *name*, not the resolved object -- python-escpos's
+        # get_profile() only accepts a name (see _profile_for_constructor's
+        # docstring in base_adapter.py).
+        mock_make.assert_called_once_with(mock_transport, serial_adapter._profile_for_constructor())
         assert result is mock_escpos
+
+    def test_connect_passes_profile_name_not_object(self):
+        """Regression test: a named profile must construct successfully.
+
+        Passing the resolved profile *object* into ``make_serial_escpos``
+        (which round-trips it through ``escpos.capabilities.get_profile``)
+        raises ``KeyError`` for any profile other than the library default --
+        this exercises the real (non-mocked) ``make_serial_escpos`` with a
+        fake transport and a real named profile to prove the fix.
+        """
+        config = SerialPrinterConfig(
+            serial_port="/dev/ttyUSB0",
+            baudrate=9600,
+            timeout=4.0,
+            profile="TM-T20II",
+        )
+        adapter = SerialPrinterAdapter(config)
+        mock_transport = MagicMock()
+        with patch(
+            "custom_components.escpos_printer.printer.serial_adapter.serial_transport"
+            ".open_serial_transport",
+            return_value=mock_transport,
+        ):
+            result = adapter._connect()
+
+        assert result is not None
+        assert result.profile.name == "TM-T20II"
 
     def test_connect_retries_on_ebusy(self, serial_adapter):
         import errno as _errno

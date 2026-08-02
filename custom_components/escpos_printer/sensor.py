@@ -88,6 +88,7 @@ class LastImagePrintSensor(SensorEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "last_image_print"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
     _attr_should_poll = True
     _unrecorded_attributes = frozenset(
         {
@@ -139,6 +140,7 @@ class BluetoothPrinterBatterySensor(SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = PERCENTAGE
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
     # Battery level changes slowly; HA's default 30s isn't worth the D-Bus
     # round-trip cost. Update every 5 minutes.
     _attr_should_poll = True

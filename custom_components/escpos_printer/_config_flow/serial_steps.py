@@ -203,10 +203,17 @@ class SerialFlowMixin:
                 vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
             }
         )
+        suggested_values: dict[str, Any] = dict(user_input or reconfigure_entry.data)
+        # CONF_BAUDRATE is stored as int, but the dropdown's options are the
+        # string keys in _BAUDRATE_CHOICES -- an unconverted int suggestion
+        # fails to preselect and a untouched submit silently falls back to
+        # the schema default (9600) instead of the entry's real baudrate.
+        if CONF_BAUDRATE in suggested_values:
+            suggested_values[CONF_BAUDRATE] = str(suggested_values[CONF_BAUDRATE])
         return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
             step_id="reconfigure_serial",
             data_schema=self.add_suggested_values_to_schema(  # type: ignore[attr-defined]
-                data_schema, user_input or reconfigure_entry.data
+                data_schema, suggested_values
             ),
             errors=errors,
         )

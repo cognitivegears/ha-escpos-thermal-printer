@@ -164,7 +164,7 @@ Add the printer in HA as a network printer at `127.0.0.1:9100`.
 
 ## Battery sensor
 
-For BT printers that expose `org.bluez.Battery1`, a `sensor.<printer>_battery` entity is created reporting % charge. Most cheap thermal printers don't expose this and the sensor stays unavailable; portable models (Phomemo M02, newer Netum firmware, some Cashino models) do.
+For BT printers that expose `org.bluez.Battery1`, a `sensor.<printer>_battery` entity is created reporting % charge. Most cheap thermal printers don't expose this and the sensor stays unavailable; portable models (Phomemo M02, newer Netum firmware, some Cashino models) do. The entity is **disabled by default** (diagnostic-style, since most printers won't populate it) — enable it from the entity's settings in the entity registry if your printer supports it.
 
 ## Security considerations
 

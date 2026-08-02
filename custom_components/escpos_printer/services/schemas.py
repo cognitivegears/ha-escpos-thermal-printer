@@ -40,6 +40,7 @@ from ..const import (
     ATTR_ENCODING,
     ATTR_FALLBACK_IMAGE,
     ATTR_FEED,
+    ATTR_FEED_BEFORE_CUT,
     ATTR_FONT,
     ATTR_FONT_NAME,
     ATTR_FONT_PATH,
@@ -769,6 +770,7 @@ CUT_SCHEMA = _with_target_validation(
     {
         **_TARGET_FIELDS,
         vol.Required(ATTR_MODE): vol.In(["full", "partial"]),
+        vol.Optional(ATTR_FEED_BEFORE_CUT, default=True): cv.boolean,
     }
 )
 

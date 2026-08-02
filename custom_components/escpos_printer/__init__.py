@@ -49,6 +49,7 @@ from .const import (
     DEFAULT_RFCOMM_CHANNEL,
     DEFAULT_SERIAL_WRITE_CHUNK_DELAY_MS,
     DEFAULT_SERIAL_WRITE_CHUNK_SIZE,
+    DEFAULT_STATUS_INTERVAL_SERIAL,
     DOMAIN,
     RELIABILITY_PROFILE_AUTO,
     RELIABILITY_PROFILE_PRESETS,
@@ -272,11 +273,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bo
 
     # Start adapter background tasks (keepalive/status)
     # Note: USB printers don't support keepalive, but the adapter handles this
+    # Serial defaults to a non-zero status_interval (see
+    # DEFAULT_STATUS_INTERVAL_SERIAL); network/USB/Bluetooth stay at 0.
+    # Network/USB already get an implicit health check from the paper-status
+    # poll; Bluetooth's status check opens a real RFCOMM connection and many
+    # cheap printers beep on every connect, so it stays opt-in. Only applied
+    # when the user hasn't set the option themselves.
+    default_status_interval = (
+        DEFAULT_STATUS_INTERVAL_SERIAL if connection_type == CONNECTION_TYPE_SERIAL else 0
+    )
     try:
         await adapter.start(
             hass,
             keepalive=bool(entry.options.get(CONF_KEEPALIVE, False)),
-            status_interval=int(entry.options.get(CONF_STATUS_INTERVAL, 0)),
+            status_interval=int(
+                entry.options.get(CONF_STATUS_INTERVAL, default_status_interval)
+            ),
         )
     except Exception as err:
         # The only blocking work in start() is the initial keepalive

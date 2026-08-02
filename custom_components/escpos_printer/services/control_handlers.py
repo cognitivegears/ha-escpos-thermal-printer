@@ -10,6 +10,7 @@ from homeassistant.helpers import config_validation as cv
 
 from ..const import (
     ATTR_DURATION,
+    ATTR_FEED_BEFORE_CUT,
     ATTR_LINES,
     ATTR_MODE,
     ATTR_TIMES,
@@ -32,7 +33,11 @@ async def handle_cut(call: ServiceCall) -> None:
     """Handle cut service call."""
 
     async def _body(entry: Any, adapter: Any, _defaults: Any, _config: Any) -> None:
-        await adapter.cut(call.hass, mode=cv.string(call.data[ATTR_MODE]))
+        await adapter.cut(
+            call.hass,
+            mode=cv.string(call.data[ATTR_MODE]),
+            feed_before_cut=bool(call.data.get(ATTR_FEED_BEFORE_CUT, True)),
+        )
 
     await _for_each_target(call, "cut", _body)
 

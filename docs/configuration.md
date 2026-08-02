@@ -56,10 +56,12 @@ Maintains a persistent TCP connection. Reduces print latency at the cost of misb
 
 ## Status Interval
 
-How often to probe the printer (seconds). Default is `0` (disabled) for every connection type. A one-shot status probe still runs at startup regardless of this setting, so the binary sensor doesn't stay unknown even with periodic polling off.
+How often to probe the printer (seconds). Default is `0` (disabled) for network, USB, and Bluetooth; **serial defaults to `300`**. A one-shot status probe still runs at startup regardless of this setting, so the binary sensor doesn't stay unknown even with periodic polling off.
 
 - **Network**: any value works; `0` is fine for most setups since print success/failure already updates the sensor.
-- **Bluetooth**: `0` disables polling, `60` or higher is accepted, and `1`–`59` is rejected with a form error. RFCOMM accepts only one client at a time, and many cheap BT printers beep on every connect. The integration auto-skips probes during prints, so aggressive polling has no benefit.
+- **USB**: same as network — `0` is fine, since the status sensor is backed by USB device enumeration rather than a live connection.
+- **Serial**: defaults to `300` seconds. Serial has no implicit health check from a paper-status poll the way network/USB do, so without periodic polling an unplugged printer would stay "Online" forever. The probe is a silent `os.stat` on the device path, so polling by default costs nothing.
+- **Bluetooth**: defaults to `0` (disabled) — deliberately *not* the serial default, even though Bluetooth also lacks an implicit health check. A status check opens a real RFCOMM connection, and many cheap BT printers audibly beep on every connect; default-on polling would beep every 5 minutes. `60` or higher is accepted, and `1`–`59` is rejected with a form error. The integration auto-skips probes during prints, so aggressive polling has no benefit.
 
 ## Allow Local Image URLs
 

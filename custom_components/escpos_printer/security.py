@@ -262,6 +262,9 @@ def validate_barcode_data(code: str, bc_type: str) -> tuple[str, str]:
         "JAN": "EAN13",
         "JAN13": "EAN13",
         "JAN8": "EAN8",
+        # ITF-14 is a 14-digit ITF; python-escpos has no ITF14 entry in its
+        # hw/sw name maps, so the unaliased name raises BarcodeTypeError.
+        "ITF14": "ITF",
     }
     valid_types = {
         "EAN13",
@@ -279,6 +282,11 @@ def validate_barcode_data(code: str, bc_type: str) -> tuple[str, str]:
         "JAN",
         "JAN13",
         "JAN8",
+        "GS1-128",
+        "GS1 DATABAR OMNIDIRECTIONAL",
+        "GS1 DATABAR TRUNCATED",
+        "GS1 DATABAR LIMITED",
+        "GS1 DATABAR EXPANDED",
     }
     bc_upper = bc_type.upper()
     if bc_upper not in valid_types:

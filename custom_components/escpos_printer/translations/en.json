@@ -591,6 +591,10 @@
           "description": "Select one or more printer devices (if omitted, broadcasts to all printers)",
           "name": "Device"
         },
+        "feed_before_cut": {
+          "description": "Force-feed a few lines before cutting (the printer's own behavior). Disable if you've already fed enough paper and want the cut right where the paper currently sits.",
+          "name": "Feed Before Cut"
+        },
         "mode": {
           "description": "Cut type (full or partial)",
           "name": "Mode"

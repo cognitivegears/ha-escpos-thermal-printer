@@ -1535,6 +1535,12 @@ print_barcode:
             - "ITF"
             - "ITF14"
             - "CODABAR"
+            - "NW7"
+            - "GS1-128"
+            - "GS1 DATABAR OMNIDIRECTIONAL"
+            - "GS1 DATABAR TRUNCATED"
+            - "GS1 DATABAR LIMITED"
+            - "GS1 DATABAR EXPANDED"
     align:
       name: Alignment
       description: Barcode alignment
@@ -1703,6 +1709,15 @@ cut:
           options:
             - "full"
             - "partial"
+    feed_before_cut:
+      name: Feed Before Cut
+      description: >-
+        Force-feed a few lines before cutting (the printer's own
+        behavior). Disable if you've already fed enough paper and want
+        the cut right where the paper currently sits.
+      default: true
+      selector:
+        boolean: {}
 
 beep:
   name: Beep
