@@ -93,7 +93,9 @@ class SerialPrinterConfig(BasePrinterConfig):
 
 
 # Type alias for config union (use for type hints)
-PrinterConfigTypes = NetworkPrinterConfig | UsbPrinterConfig | BluetoothPrinterConfig | SerialPrinterConfig
+PrinterConfigTypes = (
+    NetworkPrinterConfig | UsbPrinterConfig | BluetoothPrinterConfig | SerialPrinterConfig
+)
 
 # Backward-compatible alias: PrinterConfig(...) still works and creates NetworkPrinterConfig
 # This maintains API compatibility for existing code that instantiates PrinterConfig directly

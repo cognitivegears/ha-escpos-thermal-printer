@@ -215,9 +215,7 @@ async def test_get_profile_pixel_width_auto_profile_silent_fallback(hass, caplog
     # warning and no repair issue (it's expected, not a misconfiguration).
     adapter._get_profile_obj = lambda: None  # type: ignore[attr-defined,method-assign]
     assert adapter.get_profile_pixel_width(hass) is None
-    assert not any(
-        "does not expose media.width.pixels" in rec.message for rec in caplog.records
-    )
+    assert not any("does not expose media.width.pixels" in rec.message for rec in caplog.records)
 
 
 async def test_get_connection_info(hass):  # type: ignore[no-untyped-def]

@@ -141,7 +141,8 @@ class NetworkFlowMixin:
             # normalised unique_id instead, excluding this entry itself.
             new_unique_id = f"{host.lower()}:{port}"
             colliding = self.hass.config_entries.async_entry_for_domain_unique_id(
-                self.handler, new_unique_id  # type: ignore[attr-defined]
+                self.handler,  # type: ignore[attr-defined]
+                new_unique_id,
             )
             if colliding is not None and colliding.entry_id != reconfigure_entry.entry_id:
                 return self.async_abort(reason="already_configured")  # type: ignore[attr-defined,no-any-return]

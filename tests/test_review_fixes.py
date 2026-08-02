@@ -28,9 +28,7 @@ from custom_components.escpos_printer.printer.mapping_utils import cleanup_cut
 
 
 def _network_adapter():  # type: ignore[no-untyped-def]
-    return create_printer_adapter(
-        NetworkPrinterConfig(host="1.2.3.4", port=9100, timeout=4.0)
-    )
+    return create_printer_adapter(NetworkPrinterConfig(host="1.2.3.4", port=9100, timeout=4.0))
 
 
 # ---------------------------------------------------------------------------
@@ -270,9 +268,7 @@ async def test_for_each_target_aggregates_partial_failure(hass):  # type: ignore
 
     with (
         patch.object(hu, "_async_get_target_entries", AsyncMock(return_value=[e1, e2])),
-        patch.object(
-            hu, "_get_adapter_and_defaults", return_value=(MagicMock(), {}, MagicMock())
-        ),
+        patch.object(hu, "_get_adapter_and_defaults", return_value=(MagicMock(), {}, MagicMock())),
     ):
         with pytest.raises(HomeAssistantError, match="Printer A"):
             await hu._for_each_target(call, "print_text", _body)
@@ -295,9 +291,7 @@ async def test_for_each_target_single_target_propagates_exact_error(hass):  # ty
 
     with (
         patch.object(hu, "_async_get_target_entries", AsyncMock(return_value=[e1])),
-        patch.object(
-            hu, "_get_adapter_and_defaults", return_value=(MagicMock(), {}, MagicMock())
-        ),
+        patch.object(hu, "_get_adapter_and_defaults", return_value=(MagicMock(), {}, MagicMock())),
     ):
         # Single-target: the original ServiceValidationError (with its
         # translation/status context) must propagate untouched.
@@ -326,9 +320,7 @@ async def test_for_each_target_reraises_unauthorized_in_multi(hass):  # type: ig
 
     with (
         patch.object(hu, "_async_get_target_entries", AsyncMock(return_value=[e1, e2])),
-        patch.object(
-            hu, "_get_adapter_and_defaults", return_value=(MagicMock(), {}, MagicMock())
-        ),
+        patch.object(hu, "_get_adapter_and_defaults", return_value=(MagicMock(), {}, MagicMock())),
     ):
         with pytest.raises(Unauthorized):
             await hu._for_each_target(call, "print_image", _body)
@@ -354,9 +346,7 @@ def test_auto_resize_permits_above_base_cap():
     Image.new("L", (5000, 5000), color=255).save(buf, format="PNG")  # 25M px
     # 25M > the 20M base cap, but auto_resize raises the ceiling to 40M and
     # downscales — so it must succeed, not raise.
-    out = process_image_from_bytes(
-        buf.getvalue(), ImageProcessOptions(width=384, auto_resize=True)
-    )
+    out = process_image_from_bytes(buf.getvalue(), ImageProcessOptions(width=384, auto_resize=True))
     assert out.width <= 384
 
 
@@ -374,6 +364,4 @@ def test_auto_resize_still_bounded():
     Image.new("L", (7000, 7000), color=255).save(buf, format="PNG")  # 49M px
     # Even with auto_resize the ceiling (40M) is enforced before load().
     with pytest.raises(ValueError, match="exceeds the maximum"):
-        process_image_from_bytes(
-            buf.getvalue(), ImageProcessOptions(width=384, auto_resize=True)
-        )
+        process_image_from_bytes(buf.getvalue(), ImageProcessOptions(width=384, auto_resize=True))

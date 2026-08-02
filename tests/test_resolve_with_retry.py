@@ -149,9 +149,7 @@ async def test_prepare_image_for_print_reads_adapter_allow_local(hass):  # type:
         return _png(), "image/png"
 
     with patch.object(image_operations, "_resolve_with_retry", side_effect=_capture):
-        await image_operations.prepare_image_for_print(
-            host, hass, "http://192.168.1.5/x.png"
-        )
+        await image_operations.prepare_image_for_print(host, hass, "http://192.168.1.5/x.png")
 
     assert seen.get("allow_local") is True
 

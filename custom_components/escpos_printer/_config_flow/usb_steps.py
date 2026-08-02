@@ -232,9 +232,7 @@ class UsbFlowMixin:
                 serial_number = selected_usb_device.get("serial_number")
 
             # Validate endpoint addresses (0x00-0xFF)
-            if not errors and (
-                not (0x00 <= in_ep <= 0xFF) or not (0x00 <= out_ep <= 0xFF)
-            ):
+            if not errors and (not (0x00 <= in_ep <= 0xFF) or not (0x00 <= out_ep <= 0xFF)):
                 errors["base"] = "invalid_endpoint"
 
             if not errors:
@@ -347,14 +345,12 @@ class UsbFlowMixin:
                 # VID/PID must be in range 0x0001-0xFFFF (1-65535)
                 if not (0x0001 <= vendor_id <= 0xFFFF) or not (0x0001 <= product_id <= 0xFFFF):
                     errors["base"] = "invalid_usb_device"
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 errors["base"] = "invalid_usb_device"
                 vendor_id, product_id = 0, 0
 
             # Validate endpoint addresses (0x00-0xFF)
-            if not errors and (
-                not (0x00 <= in_ep <= 0xFF) or not (0x00 <= out_ep <= 0xFF)
-            ):
+            if not errors and (not (0x00 <= in_ep <= 0xFF) or not (0x00 <= out_ep <= 0xFF)):
                 errors["base"] = "invalid_endpoint"
 
             if not errors:
@@ -447,7 +443,7 @@ class UsbFlowMixin:
         try:
             vendor_id = int(discovery_info.vid, 16) if discovery_info.vid else 0
             product_id = int(discovery_info.pid, 16) if discovery_info.pid else 0
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             vendor_id, product_id = 0, 0
 
         if not vendor_id or not product_id:
@@ -574,7 +570,7 @@ class UsbFlowMixin:
                 product_id = int(user_input.get(CONF_PRODUCT_ID, 0))
                 if not (0x0001 <= vendor_id <= 0xFFFF) or not (0x0001 <= product_id <= 0xFFFF):
                     errors["base"] = "invalid_usb_device"
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 errors["base"] = "invalid_usb_device"
                 vendor_id, product_id = 0, 0
 

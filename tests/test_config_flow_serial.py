@@ -87,7 +87,12 @@ class TestSerialStep:
             patch.object(flow, "_abort_if_unique_id_configured"),
         ):
             result = await flow.async_step_serial(
-                {CONF_SERIAL_PORT: "/dev/ttyUSB0", CONF_BAUDRATE: 9600, "timeout": 4.0, "profile": ""}
+                {
+                    CONF_SERIAL_PORT: "/dev/ttyUSB0",
+                    CONF_BAUDRATE: 9600,
+                    "timeout": 4.0,
+                    "profile": "",
+                }
             )
 
         assert result["type"] == "form"
@@ -138,7 +143,12 @@ class TestSerialStep:
             patch.object(flow, "_abort_if_unique_id_configured"),
         ):
             result = await flow.async_step_serial(
-                {CONF_SERIAL_PORT: "/dev/ttyUSB0", CONF_BAUDRATE: 9600, "timeout": 4.0, "profile": ""}
+                {
+                    CONF_SERIAL_PORT: "/dev/ttyUSB0",
+                    CONF_BAUDRATE: 9600,
+                    "timeout": 4.0,
+                    "profile": "",
+                }
             )
 
         assert result["type"] == "form"
@@ -159,7 +169,12 @@ class TestSerialStep:
             patch.object(flow, "_abort_if_unique_id_configured"),
         ):
             result = await flow.async_step_serial(
-                {CONF_SERIAL_PORT: "/dev/ttyUSB0", CONF_BAUDRATE: 9600, "timeout": 4.0, "profile": ""}
+                {
+                    CONF_SERIAL_PORT: "/dev/ttyUSB0",
+                    CONF_BAUDRATE: 9600,
+                    "timeout": 4.0,
+                    "profile": "",
+                }
             )
 
         assert result["type"] == "form"

@@ -389,7 +389,9 @@ class TestSerialTransportImpl:
     def test_flush_with_chunk_delay(self):
         transport, port = self._make_transport(write_chunk_size=4, write_chunk_delay_s=0.001)
         transport.write(b"01234567")  # 8 bytes → 2 chunks of 4
-        with patch("custom_components.escpos_printer.printer.serial_transport.time.sleep") as mock_sleep:
+        with patch(
+            "custom_components.escpos_printer.printer.serial_transport.time.sleep"
+        ) as mock_sleep:
             transport.close()
         assert port.write.call_count == 2
         mock_sleep.assert_called_once_with(0.001)

@@ -45,7 +45,16 @@ if TYPE_CHECKING:
 #   the MAC (Bluetooth), so it would otherwise re-leak the very
 #   identifiers the other keys redact. Diagnostics downloads are commonly
 #   attached to public issues.
-TO_REDACT = {CONF_HOST, "host", "mac", CONF_BT_MAC, CONF_SERIAL_PORT, "serial_port", "connection_info", "title"}
+TO_REDACT = {
+    CONF_HOST,
+    "host",
+    "mac",
+    CONF_BT_MAC,
+    CONF_SERIAL_PORT,
+    "serial_port",
+    "connection_info",
+    "title",
+}
 
 
 async def async_get_config_entry_diagnostics(

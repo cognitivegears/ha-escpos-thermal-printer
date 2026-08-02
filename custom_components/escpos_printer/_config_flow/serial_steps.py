@@ -58,9 +58,7 @@ class SerialFlowMixin:
     hass: Any
     _user_data: dict[str, Any]
 
-    async def async_step_serial(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_serial(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Configure serial port, baud rate, timeout, and profile in one step."""
         errors: dict[str, str] = {}
 
@@ -159,7 +157,8 @@ class SerialFlowMixin:
                 # "/dev/ttyUSB0" can't collide on unique_id undetected.
                 new_unique_id = f"serial:{port.lower()}"
                 colliding = self.hass.config_entries.async_entry_for_domain_unique_id(
-                    self.handler, new_unique_id  # type: ignore[attr-defined]
+                    self.handler,  # type: ignore[attr-defined]
+                    new_unique_id,
                 )
                 if colliding is not None and colliding.entry_id != reconfigure_entry.entry_id:
                     return self.async_abort(reason="already_configured")  # type: ignore[attr-defined,no-any-return]

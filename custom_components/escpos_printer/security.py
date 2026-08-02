@@ -396,12 +396,7 @@ def _is_allowed_address(addr: str, *, allow_local: bool) -> bool:
         return False
     # Permissive (LAN) mode — still refuse the always-dangerous ranges
     # (specific cloud-metadata hosts + link-local/multicast/unspecified).
-    if (
-        ip in _ALWAYS_BLOCKED_HOSTS
-        or ip.is_link_local
-        or ip.is_multicast
-        or ip.is_unspecified
-    ):
+    if ip in _ALWAYS_BLOCKED_HOSTS or ip.is_link_local or ip.is_multicast or ip.is_unspecified:
         return False
     if ip.is_loopback:
         return True

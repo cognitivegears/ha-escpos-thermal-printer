@@ -108,8 +108,6 @@ def _shared_print_config(entry: EscposConfigEntry) -> dict[str, Any]:
     }
 
 
-
-
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     """Set up the ESC/POS Printer integration.
 

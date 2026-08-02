@@ -94,9 +94,7 @@ async def test_capabilities_schema_per_action_type(
     assert isinstance(schema, vol.Schema)
 
     actual_required = {
-        marker.schema
-        for marker in schema.schema
-        if isinstance(marker, vol.Required)
+        marker.schema for marker in schema.schema if isinstance(marker, vol.Required)
     }
     assert actual_required == required_keys
 
@@ -119,5 +117,3 @@ async def test_capabilities_print_barcode_rejects_unknown_bc_value(hass: Any) ->
         schema({"code": "12345", "bc": "NOT_A_BARCODE_TYPE"})
     # And a valid one passes.
     schema({"code": "12345", "bc": "CODE128"})
-
-

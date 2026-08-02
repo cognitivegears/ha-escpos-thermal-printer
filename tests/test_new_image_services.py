@@ -104,9 +104,7 @@ async def test_calibration_print_service_dispatches_to_adapter(hass):  # type: i
         await hass.async_block_till_done()
 
     adapter = entry.runtime_data.adapter
-    with patch.object(
-        adapter, "print_image", new=AsyncMock(return_value=None)
-    ) as print_image_mock:
+    with patch.object(adapter, "print_image", new=AsyncMock(return_value=None)) as print_image_mock:
         await hass.services.async_call(
             DOMAIN,
             SERVICE_CALIBRATION_PRINT,
@@ -120,4 +118,3 @@ async def test_calibration_print_service_dispatches_to_adapter(hass):  # type: i
     # Defaults documented in the service: cut=full, feed=2.
     assert kwargs["cut"] == "full"
     assert kwargs["feed"] == 2
-

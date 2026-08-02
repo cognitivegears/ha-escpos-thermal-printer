@@ -189,9 +189,7 @@ class TestCompatibleVersionMembership:
     """``compatible()`` must use real version membership, not a probe list."""
 
     @pytest.fixture(autouse=True)
-    def _import_check_module(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
-    ) -> None:
+    def _import_check_module(self, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
         # The module evaluates ``ROOT = Path.cwd()`` at import; point it
         # at a benign empty project so the import doesn't read main's
         # files (or fail if run elsewhere).

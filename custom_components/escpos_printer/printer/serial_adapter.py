@@ -221,9 +221,7 @@ class SerialPrinterAdapter(EscposPrinterAdapterBase):
             self._last_error_errno = None
         else:
             self._last_error = now
-            self._last_error_reason = sanitize_log_message(
-                err or "Serial printer unreachable"
-            )
+            self._last_error_reason = sanitize_log_message(err or "Serial printer unreachable")
             self._last_error_errno = err_no
         if self._status != ok and not ok:
             _LOGGER.warning(

@@ -172,9 +172,7 @@ def test_render_text_image_rotation_90_rejects_oversize_stack() -> None:
     exceed the paper width must be rejected, otherwise the rotated
     image's printed width would overrun the paper."""
     with pytest.raises(ValueError, match="exceeds paper width"):
-        render_text_image(
-            "\n".join(["x"] * 30), font_size=24, max_width_px=80, rotation=90
-        )
+        render_text_image("\n".join(["x"] * 30), font_size=24, max_width_px=80, rotation=90)
 
 
 def test_render_text_image_180_keeps_dimensions() -> None:

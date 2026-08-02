@@ -123,7 +123,7 @@ def process_image(img: Image.Image, opts: ImageProcessOptions) -> Image.Image:
         oriented = ImageOps.exif_transpose(img)
         if oriented is not None:
             img = oriented
-    except (KeyError, AttributeError, TypeError, OSError):
+    except KeyError, AttributeError, TypeError, OSError:
         _LOGGER.debug("EXIF transpose failed; continuing with original")
 
     # auto_resize: knock huge phone snapshots down *before* the alpha
@@ -223,8 +223,7 @@ def process_image_from_bytes(raw: bytes, opts: ImageProcessOptions) -> Image.Ima
                 else "reduce the source resolution or enable auto_resize"
             )
             raise ValueError(
-                f"Image {width}x{height} ({pixels} px) exceeds the maximum of "
-                f"{cap} px; {hint}"
+                f"Image {width}x{height} ({pixels} px) exceeds the maximum of {cap} px; {hint}"
             )
         src.load()
         return process_image(src, opts)

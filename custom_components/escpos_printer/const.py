@@ -68,7 +68,7 @@ DEFAULT_RFCOMM_CHANNEL = 1
 DEFAULT_BAUDRATE = 9600
 CONF_SERIAL_WRITE_CHUNK_SIZE = "serial_write_chunk_size"
 CONF_SERIAL_WRITE_CHUNK_DELAY_MS = "serial_write_chunk_delay_ms"
-DEFAULT_SERIAL_WRITE_CHUNK_SIZE = 0   # 0 = no chunking (send all at once)
+DEFAULT_SERIAL_WRITE_CHUNK_SIZE = 0  # 0 = no chunking (send all at once)
 DEFAULT_SERIAL_WRITE_CHUNK_DELAY_MS = 0
 
 # Known thermal printer vendor IDs for auto-discovery.

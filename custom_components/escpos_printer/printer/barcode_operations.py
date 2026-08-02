@@ -130,7 +130,7 @@ class BarcodeOperationsMixin:
                 await hass.async_add_executor_job(_do_print, printer)
                 await self._apply_cut_and_feed(hass, printer, cut, feed)
                 failed = False
-            except (BarcodeTypeError, BarcodeCodeError, BarcodeSizeError):
+            except BarcodeTypeError, BarcodeCodeError, BarcodeSizeError:
                 # python-escpos validates the barcode type/payload/size
                 # before writing anything to the transport -- the
                 # connection is fine, only this payload is bad. Don't

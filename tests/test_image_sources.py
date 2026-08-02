@@ -481,7 +481,9 @@ async def test_resolve_http_follows_redirect(  # type: ignore[no-untyped-def]
 
     mock_pooled_aiohttp(
         _redirect_factory(
-            fake_aiohttp_response(status=302, headers={"Location": "https://example.com/final.png"}),
+            fake_aiohttp_response(
+                status=302, headers={"Location": "https://example.com/final.png"}
+            ),
             fake_aiohttp_response(
                 status=200, headers={"Content-Type": "image/png"}, chunks=[_png_bytes()]
             ),
@@ -535,9 +537,7 @@ async def test_resolve_http_redirect_revalidates_each_hop_under_allow_local(  # 
         )
     )
     # With the opt-in, the private redirect target is fetched.
-    raw, _ = await resolve_image_bytes(
-        hass, "https://start.example/start.png", allow_local=True
-    )
+    raw, _ = await resolve_image_bytes(hass, "https://start.example/start.png", allow_local=True)
     assert raw == _png_bytes()
 
 

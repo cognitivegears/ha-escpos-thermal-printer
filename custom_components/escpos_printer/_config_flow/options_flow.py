@@ -272,9 +272,9 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
             ): bool,
         }
         if connection_type not in (CONNECTION_TYPE_USB, CONNECTION_TYPE_SERIAL):
-            schema_fields[
-                vol.Optional(CONF_KEEPALIVE, default=opts.get(CONF_KEEPALIVE, False))
-            ] = bool
+            schema_fields[vol.Optional(CONF_KEEPALIVE, default=opts.get(CONF_KEEPALIVE, False))] = (
+                bool
+            )
         if connection_type == CONNECTION_TYPE_SERIAL:
             schema_fields[
                 vol.Optional(

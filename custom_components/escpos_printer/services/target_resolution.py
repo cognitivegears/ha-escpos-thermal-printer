@@ -120,9 +120,7 @@ async def _async_get_target_entries(
                 target_entry_ids.add(config_entry_id)
                 matched = True
         if not matched:
-            _LOGGER.warning(
-                "Targeted device %s is not an ESC/POS printer; skipping", device_id
-            )
+            _LOGGER.warning("Targeted device %s is not an ESC/POS printer; skipping", device_id)
 
     # Get the actual config entry objects
     loaded_entry_ids = {e.entry_id for e in hass.config_entries.async_loaded_entries(DOMAIN)}

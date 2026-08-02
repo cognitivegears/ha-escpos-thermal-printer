@@ -57,9 +57,7 @@ async def test_print_image_service_base64_data_uri(hass):  # type: ignore[no-unt
     assert fake.image.called
 
 
-async def test_print_image_service_jinja_looking_string_not_rendered(
-    hass, tmp_path
-):  # type: ignore[no-untyped-def]
+async def test_print_image_service_jinja_looking_string_not_rendered(hass, tmp_path):  # type: ignore[no-untyped-def]
     """Security fix: the handler no longer renders Jinja server-side.
 
     A raw `{{ ... }}` string is treated as a literal local-file path (it
