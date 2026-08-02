@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the security measures and best practices implemented in the HA ESCPOS Thermal Printer integration to ensure secure operation and protect against common vulnerabilities.
+This document describes the security measures in the HA ESCPOS Thermal Printer integration and how to report vulnerabilities.
 
 ## Security Features
 
@@ -28,8 +28,9 @@ schema (Bronze quality-scale `action-setup` rule):
   redirect target is re-validated. A per-printer **"Allow local image
   URLs"** opt-in (default off) relaxes the private/loopback block and the
   port allowlist for that printer; the always-dangerous ranges remain
-  blocked even when enabled — cloud-metadata (`169.254.169.254` and AWS
-  IMDSv6 `fd00:ec2::254`, the `_ALWAYS_BLOCKED_HOSTS` denylist),
+  blocked even when enabled — cloud-metadata (`169.254.169.254`, AWS
+  IMDSv6 `fd00:ec2::254`, and Alibaba Cloud `100.100.100.200`, the
+  `_ALWAYS_BLOCKED_HOSTS` denylist),
   link-local, multicast, reserved, and unspecified. Enabling it turns that
   printer's `print_image_url` into an unauthenticated LAN-reach primitive
   (the service has no per-user authorization), so enable it only where the
@@ -112,7 +113,7 @@ _LOGGER.debug(log_msg)
 - Maximum processed image height: 8192 px
 - Maximum image slices per print: 64 (avoids paper-DoS via tall ribbons)
 - Maximum feed lines: 50
-- Maximum beep repetitions: 10
+- Maximum beep repetitions: 9 (the cap python-escpos itself enforces)
 
 ## Threat Model & Mitigations
 
@@ -232,26 +233,6 @@ bandit -r custom_components/escpos_printer -lll
 pip-audit
 ```
 
-## Security Considerations
-
-### Network Security
-
-- All network communications use timeout limits
-- Image downloads are restricted to HTTP/HTTPS protocols
-- No sensitive data is transmitted in URLs or headers
-
-### File System Security
-
-- Local file access is restricted to allowed image formats
-- Path traversal attacks are prevented through validation
-- Temporary files are properly cleaned up
-
-### Resource Protection
-
-- Input size limits prevent resource exhaustion attacks
-- Rate limiting considerations for service calls
-- Memory usage is monitored and limited
-
 ## Vulnerability Reporting
 
 If you discover a security vulnerability in this integration:
@@ -261,76 +242,8 @@ If you discover a security vulnerability in this integration:
 3. Include detailed information about the vulnerability and a reproduction case.
 4. Allow reasonable time for response and a fix before public disclosure.
 
-## Security Best Practices for Users
-
-### Configuration Security
-
-- Use strong, unique passwords for printer access
-- Restrict network access to printers when possible
-- Regularly update printer firmware
-- Monitor printer access logs
-
-### Operational Security
-
-- Limit user access to printing services
-- Implement logging and monitoring
-- Regularly review and rotate credentials
-- Keep the integration and dependencies updated
-
-### Network Security
-
-- Use firewalls to restrict printer network access
-- Implement VPNs for remote printer access
-- Monitor network traffic for anomalies
-- Use HTTPS for web-based image sources
-
-## Security Testing
-
-### Unit Tests for Security
-
-```python
-def test_input_validation():
-    # Test input validation functions
-    with pytest.raises(HomeAssistantError):
-        validate_text_input("x" * 10001)  # Exceeds max length
-```
-
-### Integration Tests for Security
-
-```python
-def test_path_traversal_protection():
-    # Test path traversal protection via the read-side O_NOFOLLOW opener
-    # (`security.open_local_image_no_follow`), the same primitive used by
-    # `image_sources._resolve_local` to read user-supplied image paths.
-    with pytest.raises(HomeAssistantError):
-        validate_local_image_path("../../../etc/passwd")
-```
-
-## Compliance and Standards
-
-This integration follows security best practices aligned with:
-
-- **OWASP Top 10**: Protection against common web application vulnerabilities
-- **Python Security Best Practices**: Following PEP 508 and secure coding guidelines
-- **Home Assistant Security Guidelines**: Compliance with HA integration security requirements
-
-## Maintenance and Updates
-
-### Regular Security Updates
-
-- Dependencies are regularly updated to address security vulnerabilities
-- Security scans are run weekly to identify new issues
-- Critical security patches are applied promptly
-
-### Security Monitoring
-
-- Automated vulnerability scanning in CI/CD
-- Regular code reviews with security focus
-- Dependency monitoring for security advisories
-
 ## References
 
 - [OWASP Python Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Python_Security_Cheat_Sheet.html)
-- [Python Security Best Practices](https://bestpractices.coreinfrastructure.org/en/projects/221)
 - [Home Assistant Security Guidelines](https://developers.home-assistant.io/docs/development_security)
 - [Bandit Documentation](https://bandit.readthedocs.io/)
