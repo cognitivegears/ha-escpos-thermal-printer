@@ -29,7 +29,7 @@ from urllib.parse import urljoin, urlparse
 import aiohttp
 from homeassistant.auth.permissions.const import POLICY_READ
 from homeassistant.core import Context
-from homeassistant.exceptions import HomeAssistantError, Unauthorized
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError, Unauthorized
 from homeassistant.helpers.aiohttp_client import SERVER_SOFTWARE
 
 from .const import (
@@ -49,6 +49,7 @@ from .const import (
     ATTR_MIRROR,
     ATTR_ROTATION,
     ATTR_THRESHOLD,
+    DOMAIN,
 )
 from .security import (
     MAX_IMAGE_SIZE_MB,
@@ -118,7 +119,11 @@ def _classify(source: str) -> tuple[SourceKind, str]:
     lower = stripped.lower()
     if lower.startswith("data:"):
         if not lower.startswith("data:image/"):
-            raise HomeAssistantError("Only data:image/<subtype>;base64,... data URIs are supported")
+            raise ServiceValidationError(
+                "Only data:image/<subtype>;base64,... data URIs are supported",
+                translation_domain=DOMAIN,
+                translation_key="image_source_bad_data_uri",
+            )
         return "data", stripped
     if lower.startswith("camera."):
         return "camera", stripped
@@ -155,7 +160,11 @@ async def resolve_image_bytes(
     ranges (link-local metadata, multicast, reserved) stay blocked.
     """
     if not isinstance(source, str) or not source.strip():
-        raise HomeAssistantError("Image source must be a non-empty string")
+        raise ServiceValidationError(
+            "Image source must be a non-empty string",
+            translation_domain=DOMAIN,
+            translation_key="image_source_empty",
+        )
 
     kind, value = _classify(source)
     match kind:
@@ -259,9 +268,12 @@ async def _stream_to_buffer(aiter: Any, max_bytes: int) -> bytearray:
     async for chunk in aiter:
         buf.extend(chunk)
         if len(buf) > max_bytes:
-            raise HomeAssistantError(
+            raise ServiceValidationError(
                 f"Image too large (max {max_bytes // (1024 * 1024)}MB) — "
-                f"enable auto_resize to allow up to 4x this cap"
+                f"enable auto_resize to allow up to 4x this cap",
+                translation_domain=DOMAIN,
+                translation_key="image_too_large",
+                translation_placeholders={"max_mb": str(max_bytes // (1024 * 1024))},
             )
     return buf
 
@@ -275,10 +287,13 @@ def _check_content_length(headers: Mapping[str, str], max_bytes: int) -> None:
     except TypeError, ValueError:
         return
     if size > max_bytes:
-        raise HomeAssistantError(
+        raise ServiceValidationError(
             f"Image declared too-large Content-Length ({size}); "
             f"max {max_bytes // (1024 * 1024)}MB — enable auto_resize for "
-            f"larger payloads"
+            f"larger payloads",
+            translation_domain=DOMAIN,
+            translation_key="image_too_large",
+            translation_placeholders={"max_mb": str(max_bytes // (1024 * 1024))},
         )
 
 
@@ -388,7 +403,12 @@ async def _resolve_http_aiohttp(
         parsed = urlparse(validated)
         hostname = parsed.hostname
         if hostname is None:  # pragma: no cover — validator enforces it
-            raise HomeAssistantError("URL must include a valid hostname")
+            raise ServiceValidationError(
+                "URL must include a valid hostname",
+                translation_domain=DOMAIN,
+                translation_key="url_invalid",
+                translation_placeholders={"reason": "URL must include a valid hostname"},
+            )
         try:
             async with (
                 _build_pinned_session(hostname, addrs) as session,
@@ -465,8 +485,10 @@ async def _resolve_local(
         resolved = _validate_local_path_sync(path, max_bytes=max_bytes)
         is_allowed = hass.config.is_allowed_path
         if not is_allowed(str(resolved)):
-            raise HomeAssistantError(
-                "Image path is outside Home Assistant's allowlist_external_dirs"
+            raise ServiceValidationError(
+                "Image path is outside Home Assistant's allowlist_external_dirs",
+                translation_domain=DOMAIN,
+                translation_key="image_path_outside_allowlist",
             )
         return open_local_image_no_follow(resolved, max_bytes=max_bytes)
 
@@ -481,7 +503,12 @@ def _check_size(num_bytes: int, *, auto_resize: bool = False) -> None:
     if num_bytes > max_bytes:
         mb = max_bytes // (1024 * 1024)
         hint = "" if auto_resize else " — enable auto_resize to allow up to 4x this cap"
-        raise HomeAssistantError(f"Image too large ({num_bytes} bytes; max {mb}MB){hint}")
+        raise ServiceValidationError(
+            f"Image too large ({num_bytes} bytes; max {mb}MB){hint}",
+            translation_domain=DOMAIN,
+            translation_key="image_too_large",
+            translation_placeholders={"max_mb": str(mb)},
+        )
 
 
 # ---------------------------------------------------------------------------

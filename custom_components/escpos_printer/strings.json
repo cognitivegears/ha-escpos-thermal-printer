@@ -421,6 +421,99 @@
   "exceptions": {
     "no_target_found": {
       "message": "No valid ESC/POS printer targets found. Please select a printer device."
+    },
+    "must_be_string": {
+      "message": "{field} must be a string."
+    },
+    "must_be_integer": {
+      "message": "{field} must be an integer."
+    },
+    "text_too_long": {
+      "message": "{field} exceeds the maximum length of {max}."
+    },
+    "value_empty": {
+      "message": "{field} cannot be empty."
+    },
+    "barcode_control_chars": {
+      "message": "Barcode data contains disallowed control characters."
+    },
+    "url_invalid": {
+      "message": "The image URL is invalid: {reason}"
+    },
+    "path_not_found": {
+      "message": "The {kind} file does not exist or is not a regular file."
+    },
+    "path_access_error": {
+      "message": "Cannot access the {kind} file: {error}"
+    },
+    "path_not_regular_file": {
+      "message": "The {kind} path is not a regular file."
+    },
+    "path_too_large": {
+      "message": "The {kind} file is too large (maximum {max_mb}MB)."
+    },
+    "path_extension_not_allowed": {
+      "message": "The {kind} file extension is not allowed. Allowed extensions: {allowed}."
+    },
+    "font_path_outside_allowlist": {
+      "message": "Font path '{path}' is outside the allowed directories."
+    },
+    "font_path_symlink_rejected": {
+      "message": "Font path must not be a symlink."
+    },
+    "must_be_list": {
+      "message": "{field} must be a list."
+    },
+    "list_length_exceeds_max": {
+      "message": "{field} length {count} exceeds the maximum of {max}."
+    },
+    "list_empty": {
+      "message": "{field} must contain at least one entry."
+    },
+    "table_cell_too_long": {
+      "message": "A table cell exceeds the maximum length of {max}."
+    },
+    "base64_too_large": {
+      "message": "The base64 image is too large (maximum ~{max_mb}MB decoded)."
+    },
+    "base64_invalid_format": {
+      "message": "The base64 image must be a data:image/<subtype>;base64,... URI."
+    },
+    "base64_decode_error": {
+      "message": "The base64 image data is invalid: {error}"
+    },
+    "invalid_entity_id": {
+      "message": "'{value}' is not a valid entity_id for domain '{domain}'."
+    },
+    "choice_invalid": {
+      "message": "{field} must be one of {choices}; got '{value}'."
+    },
+    "numeric_out_of_range": {
+      "message": "{field} must be between {min} and {max}."
+    },
+    "image_source_empty": {
+      "message": "Image source must be a non-empty string."
+    },
+    "image_source_bad_data_uri": {
+      "message": "Only data:image/<subtype>;base64,... data URIs are supported."
+    },
+    "image_too_large": {
+      "message": "The image is too large (maximum {max_mb}MB)."
+    },
+    "image_path_outside_allowlist": {
+      "message": "The image path is outside Home Assistant's allowed external directories."
+    },
+    "preview_requires_target": {
+      "message": "{service} requires at least one printer target."
+    },
+    "preview_requires_single_target": {
+      "message": "{service} requires exactly one printer target; got {count}."
+    },
+    "invalid_output_path": {
+      "message": "The output_path '{path}' is invalid: {error}"
+    },
+    "output_path_outside_tempdir": {
+      "message": "The output_path '{path}' must be inside the system temp directory ({tempdir})."
     }
   }
 }

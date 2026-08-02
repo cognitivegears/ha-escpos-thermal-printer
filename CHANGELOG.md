@@ -69,6 +69,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Service-call validation failures (bad URLs/paths, invalid barcode or QR
+  data, oversized images, disallowed font paths, malformed options, etc.)
+  are now raised as `ServiceValidationError` with translation metadata
+  instead of a generic `HomeAssistantError`. Home Assistant now surfaces
+  these as user input errors (rather than integration faults) and they are
+  translatable; genuine printer/transport failures are unaffected.
 - Service forms group optional fields into collapsed "Image Options" /
   "Advanced Options" sections (`print_image` family, `preview_image`,
   `print_message`, `print_text_image`, `print_barcode`); UI-only, call

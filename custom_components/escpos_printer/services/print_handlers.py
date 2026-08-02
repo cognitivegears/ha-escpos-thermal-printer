@@ -11,7 +11,7 @@ import tempfile
 from typing import Any
 
 from homeassistant.core import ServiceCall, ServiceResponse
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import ServiceValidationError
 
 from ..const import (
     ATTR_ALIGN,
@@ -57,6 +57,7 @@ from ..const import (
     ATTR_WIDTH,
     DEFAULT_BORDER_STYLE,
     DEFAULT_LINE_WIDTH,
+    DOMAIN,
     SERVICE_PREVIEW_BOX,
     SERVICE_PREVIEW_TABLE,
     SERVICE_PRINT_BOX,
@@ -436,15 +437,26 @@ async def handle_preview_box(call: ServiceCall) -> ServiceResponse:
     """
     target_entries = await _async_get_target_entries(call, warn_implicit_broadcast=False)
     if not target_entries:
-        raise HomeAssistantError("preview_box requires at least one printer target")
+        raise ServiceValidationError(
+            "preview_box requires at least one printer target",
+            translation_domain=DOMAIN,
+            translation_key="preview_requires_target",
+            translation_placeholders={"service": "preview_box"},
+        )
     if len(target_entries) > 1:
         # The response shape is a single {path, width, line_count, codepage}
         # tuple, so silently picking the first target would write one file
         # with metadata that doesn't necessarily match what the caller
         # intended. Make the contract explicit.
-        raise HomeAssistantError(
+        raise ServiceValidationError(
             "preview_box requires exactly one printer target; "
-            f"got {len(target_entries)}. Call preview_box once per device."
+            f"got {len(target_entries)}. Call preview_box once per device.",
+            translation_domain=DOMAIN,
+            translation_key="preview_requires_single_target",
+            translation_placeholders={
+                "service": "preview_box",
+                "count": str(len(target_entries)),
+            },
         )
     entry = target_entries[0]
     _adapter, _defaults, config = _get_adapter_and_defaults(call.hass, entry.entry_id)
@@ -475,11 +487,22 @@ async def handle_preview_table(call: ServiceCall) -> ServiceResponse:
     """Render a ``print_table`` layout to a ``.txt`` file (no printing)."""
     target_entries = await _async_get_target_entries(call, warn_implicit_broadcast=False)
     if not target_entries:
-        raise HomeAssistantError("preview_table requires at least one printer target")
+        raise ServiceValidationError(
+            "preview_table requires at least one printer target",
+            translation_domain=DOMAIN,
+            translation_key="preview_requires_target",
+            translation_placeholders={"service": "preview_table"},
+        )
     if len(target_entries) > 1:
-        raise HomeAssistantError(
+        raise ServiceValidationError(
             "preview_table requires exactly one printer target; "
-            f"got {len(target_entries)}. Call preview_table once per device."
+            f"got {len(target_entries)}. Call preview_table once per device.",
+            translation_domain=DOMAIN,
+            translation_key="preview_requires_single_target",
+            translation_placeholders={
+                "service": "preview_table",
+                "count": str(len(target_entries)),
+            },
         )
     entry = target_entries[0]
     _adapter, _defaults, config = _get_adapter_and_defaults(call.hass, entry.entry_id)
@@ -541,15 +564,23 @@ def _resolve_preview_text_path(
     try:
         resolved = Path(requested).resolve()
     except (OSError, ValueError) as exc:
-        raise HomeAssistantError(f"Invalid output_path '{requested}': {exc}") from exc
+        raise ServiceValidationError(
+            f"Invalid output_path '{requested}': {exc}",
+            translation_domain=DOMAIN,
+            translation_key="invalid_output_path",
+            translation_placeholders={"path": requested, "error": str(exc)},
+        ) from exc
     try:
         in_tempdir = resolved.is_relative_to(tempdir)
     except OSError, ValueError:
         in_tempdir = False
     if not in_tempdir:
-        raise HomeAssistantError(
+        raise ServiceValidationError(
             f"output_path '{resolved}' must be inside the system temp directory "
-            f"({tempdir}); use a regular service / script to write elsewhere."
+            f"({tempdir}); use a regular service / script to write elsewhere.",
+            translation_domain=DOMAIN,
+            translation_key="output_path_outside_tempdir",
+            translation_placeholders={"path": str(resolved), "tempdir": str(tempdir)},
         )
     return str(resolved)
 
@@ -775,11 +806,22 @@ async def handle_preview_image(call: ServiceCall) -> ServiceResponse:
     """
     target_entries = await _async_get_target_entries(call, warn_implicit_broadcast=False)
     if not target_entries:
-        raise HomeAssistantError("preview_image requires at least one printer target")
+        raise ServiceValidationError(
+            "preview_image requires at least one printer target",
+            translation_domain=DOMAIN,
+            translation_key="preview_requires_target",
+            translation_placeholders={"service": "preview_image"},
+        )
     if len(target_entries) > 1:
-        raise HomeAssistantError(
+        raise ServiceValidationError(
             "preview_image requires exactly one printer target; "
-            f"got {len(target_entries)}. Call preview_image once per device."
+            f"got {len(target_entries)}. Call preview_image once per device.",
+            translation_domain=DOMAIN,
+            translation_key="preview_requires_single_target",
+            translation_placeholders={
+                "service": "preview_image",
+                "count": str(len(target_entries)),
+            },
         )
     entry = target_entries[0]
     adapter, defaults, _ = _get_adapter_and_defaults(call.hass, entry.entry_id)
@@ -824,7 +866,12 @@ async def handle_preview_image(call: ServiceCall) -> ServiceResponse:
         try:
             output_path = str(Path(str(raw_output_path)).resolve())
         except (OSError, ValueError) as exc:
-            raise HomeAssistantError(f"Invalid output_path '{raw_output_path}': {exc}") from exc
+            raise ServiceValidationError(
+                f"Invalid output_path '{raw_output_path}': {exc}",
+                translation_domain=DOMAIN,
+                translation_key="invalid_output_path",
+                translation_placeholders={"path": str(raw_output_path), "error": str(exc)},
+            ) from exc
     # S-M5: restrict user-supplied output_path to the system tempdir. A
     # non-admin HA user could otherwise call preview_image with
     # output_path=/config/configuration.yaml and clobber it with PNG
@@ -835,9 +882,12 @@ async def handle_preview_image(call: ServiceCall) -> ServiceResponse:
     except OSError, ValueError:
         in_tempdir = False
     if not in_tempdir:
-        raise HomeAssistantError(
+        raise ServiceValidationError(
             f"output_path '{output_path}' must be inside the system temp directory "
-            f"({tempdir}); use a regular service to write elsewhere."
+            f"({tempdir}); use a regular service to write elsewhere.",
+            translation_domain=DOMAIN,
+            translation_key="output_path_outside_tempdir",
+            translation_placeholders={"path": output_path, "tempdir": str(tempdir)},
         )
 
     def _save() -> None:
