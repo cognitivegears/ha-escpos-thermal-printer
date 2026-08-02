@@ -453,7 +453,7 @@
       "message": "The {kind} file is too large (maximum {max_mb}MB)."
     },
     "path_extension_not_allowed": {
-      "message": "The {kind} file extension is not allowed. Allowed extensions: {allowed}."
+      "message": "The {kind} file extension '{extension}' is not allowed. Allowed extensions: {allowed}."
     },
     "font_path_outside_allowlist": {
       "message": "Font path '{path}' is outside the allowed directories."
