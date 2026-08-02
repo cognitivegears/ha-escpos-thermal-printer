@@ -13,6 +13,12 @@ repos:
         language: python
         additional_dependencies: [packaging]
         pass_filenames: false
+      - id: check-service-translations-sync
+        name: Check service translations sync from services.yaml
+        entry: python scripts/sync_service_translations.py --check
+        language: python
+        additional_dependencies: [pyyaml]
+        pass_filenames: false
       - id: validate-blueprints
         name: Validate bundled HA blueprints
         entry: python scripts/validate_blueprints.py blueprints

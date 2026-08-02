@@ -44,7 +44,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   every state change — they're excluded via `_unrecorded_attributes`,
   cutting needless history-table churn. The stable `connection_type`
   attribute is still recorded.
-
 - **The "Online" connectivity sensor could latch on and never report
   offline.** Failed print operations now mark the printer offline
   immediately, and `print_barcode`, `feed`, `cut`, and `beep` now mark it

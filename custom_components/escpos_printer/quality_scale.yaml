@@ -59,7 +59,7 @@ rules:
   entity-device-class: done
   entity-disabled-by-default: todo
   entity-translations: done  # entity section in strings.json + translations/en.json
-  exception-translations: done  # `no_target_found` wired up in strings.json + translations/en.json
+  exception-translations: done  # 32 translation_key exceptions wired up in strings.json + translations/en.json
   icon-translations: done
   reconfiguration-flow: done  # async_step_reconfigure per transport (network/serial/usb/bluetooth) in main_flow.py + mixins
   repair-issues: done  # profile_width_fallback issue raised in printer/base_adapter.py

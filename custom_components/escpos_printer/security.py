@@ -993,10 +993,20 @@ def _read_no_follow(path: Path, *, max_bytes: int, kind: str) -> bytes:
     try:
         st = os.fstat(fd)
         if not stat.S_ISREG(st.st_mode):
-            raise HomeAssistantError(f"{kind} path is not a regular file")
+            raise ServiceValidationError(
+                f"{kind} path is not a regular file",
+                translation_domain=DOMAIN,
+                translation_key="path_not_regular_file",
+                translation_placeholders={"kind": kind},
+            )
         if st.st_size > max_bytes:
             mb = max_bytes // (1024 * 1024)
-            raise HomeAssistantError(f"{kind} file too large (max {mb}MB)")
+            raise ServiceValidationError(
+                f"{kind} file too large (max {mb}MB)",
+                translation_domain=DOMAIN,
+                translation_key="path_too_large",
+                translation_placeholders={"kind": kind, "max_mb": str(mb)},
+            )
         with os.fdopen(fd, "rb", closefd=True) as handle:
             fd = -1  # ownership transferred to the file object
             return handle.read(max_bytes + 1)
