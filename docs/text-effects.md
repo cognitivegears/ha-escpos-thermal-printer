@@ -296,7 +296,7 @@ and size is capped at 16 MB.
 The service also accepts every option from `print_image`, prefixed
 with `image_` so they line up one-to-one with `print_message`'s
 image-pipeline knobs: `image_width`, `image_dither`, `image_threshold`,
-`image_impl`, `image_center`, `image_autocontrast`, `image_invert`,
+`image_impl`, `image_center` (YAML-only), `image_autocontrast`, `image_invert`,
 `image_mirror`, `image_high_density`, `image_fragment_height`,
 `image_chunk_delay_ms`. Plus the top-level `cut` and `feed`. See the
 [Images guide](images.md) for what each one does. The two most

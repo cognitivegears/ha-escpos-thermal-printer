@@ -37,7 +37,7 @@ Entity service for the notify platform. Targets a notify entity and supports all
 | image_dither | string | `floyd-steinberg`, `none`, `threshold` |
 | image_rotation | int | `0`, `90`, `180`, `270` |
 | image_impl | string | `bitImageRaster`, `graphics`, `bitImageColumn` |
-| image_center | boolean | Horizontally center the image |
+| image_center | boolean | Horizontally center the image by padding the bitmap. No longer shown in the UI form — prefer `image_align: center`; still accepted in YAML |
 | image_autocontrast | boolean | Stretch contrast before B&W conversion |
 | image_threshold | int | 1–254 (used with `image_dither: threshold`) |
 | image_fragment_height | int | Pixels per chunk |
@@ -66,11 +66,13 @@ Supported types: `EAN13`, `EAN8`, `UPC-A`, `UPC-E`, `CODE39`, `CODE93`, `CODE128
 | width | int | Width multiplier (2–6) |
 | pos | string | Text position: `ABOVE`, `BELOW`, `BOTH`, `OFF` |
 | font | string | Text font: `A`, `B` |
-| align_ct | boolean | Center the barcode |
+| align | string | `left` / `center` / `right`; barcodes are centered by default |
 | check | boolean | Validate checksum |
 | force_software | string | Rendering mode |
 | cut | string | `none`, `partial`, `full` |
 | feed | int | Lines to feed (0–50) |
+
+`align_ct` (boolean, "center the barcode") is still accepted in service calls for backward compatibility, but is no longer shown in the UI form — use `align: center` instead.
 
 ## Image services
 
@@ -89,7 +91,7 @@ The integration ships six image-printing services. They all share the same image
 
 ### Shared image-processing options
 
-Every image service accepts the same option set. Rarely-used reliability knobs are marked **advanced** — they only appear in the HA UI form when Home Assistant's advanced mode is on, but YAML scripts can pass them any time.
+Every image service accepts the same option set. In the UI form, image-processing options live in a collapsed **Image Options** section and rarely-used reliability knobs in a collapsed **Advanced Options** section; YAML scripts can pass any of them any time.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -102,14 +104,14 @@ Every image service accepts the same option set. Rarely-used reliability knobs a
 | autocontrast | boolean | Stretch contrast before B&W conversion (helps photos). Default `false` (`true` for `print_camera_snapshot`). |
 | auto_resize | boolean | Allow source images up to 40 MB and downscale before processing. Default `false` (`true` for `print_image_url`, `print_image_path`, `print_camera_snapshot`). |
 | align | string | `left`, `center`, `right`. |
-| center | boolean | Horizontally center the image on the paper. Default `false`. |
+| center | boolean | Horizontally center the image by padding the bitmap to full paper width. Default `false`. No longer shown in the UI form — prefer `align: center`; still useful in YAML for printers that ignore alignment commands on raster images. |
 | high_density | boolean | High-density printing mode. Default `true`. |
 | cut | string | `none`, `partial`, `full`. Defaults to the printer's configured cut mode. |
 | feed | int | Lines to feed after printing (0–50). Default depends on the service: `print_image` = `0`; `print_image_url` / `print_image_path` / `print_image_entity` = `1`; `print_camera_snapshot` = `2`; `calibration_print` = `2`. The focused services pick friendlier defaults than `print_image` because their typical use-case prints once and you want a paper buffer for tearing off cleanly. |
-| impl | string | **advanced.** `bitImageRaster`, `graphics`, or `bitImageColumn`. Leave unset to honor the printer's Reliability profile. |
-| fragment_height | int | **advanced.** Rows per chunk when sending the image (range 16–1024). Leave unset to honor the printer's Reliability profile. |
-| chunk_delay_ms | int | **advanced.** Sleep between chunks in ms (range 0–5000). Leave unset to honor the printer's Reliability profile (0 ms on Network/USB, 50 ms on Bluetooth). |
-| fallback_image | string | **advanced.** Optional URL / path / camera entity to print if the primary source fails to resolve. |
+| impl | string | `bitImageRaster`, `graphics`, or `bitImageColumn`. Leave unset to honor the printer's Reliability profile. |
+| fragment_height | int | Rows per chunk when sending the image (range 16–1024). Leave unset to honor the printer's Reliability profile. |
+| chunk_delay_ms | int | Sleep between chunks in ms (range 0–5000). Leave unset to honor the printer's Reliability profile (0 ms on Network/USB, 50 ms on Bluetooth). |
+| fallback_image | string | Optional URL / path / camera entity to print if the primary source fails to resolve. |
 
 `preview_image` additionally accepts `output_path` (where to save the PNG; defaults to `/tmp/escpos_preview_<entry>.png`) and omits the printer-communication knobs (`high_density`, `impl`, `fragment_height`, `chunk_delay_ms`, `center`, `cut`, `feed`) because they have no effect on the file written to disk.
 
@@ -167,7 +169,7 @@ Render text to a bitmap with a TTF/OTF font, optionally rotated, then print thro
 | rotation | int | `0`, `90`, `180`, `270` (clockwise; applied to canvas before binarisation) |
 | cut | string | `none`, `partial`, `full` |
 | feed | int | Lines to feed (0–50) |
-| `image_*` knobs (advanced) | — | `image_width`, `image_dither`, `image_threshold`, `image_impl`, `image_center`, `image_autocontrast`, `image_invert`, `image_mirror`, `image_high_density`, `image_fragment_height`, `image_chunk_delay_ms` — same names and defaults as `print_message`'s image-pipeline knobs |
+| `image_*` knobs | — | `image_width`, `image_dither`, `image_threshold`, `image_impl`, `image_center` (YAML-only, prefer `align: center`), `image_autocontrast`, `image_invert`, `image_mirror`, `image_high_density`, `image_fragment_height`, `image_chunk_delay_ms` — same names and defaults as `print_message`'s image-pipeline knobs |
 
 ### escpos_printer.print_separator
 

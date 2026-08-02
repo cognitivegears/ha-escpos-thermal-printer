@@ -93,8 +93,24 @@ def _load_services_yaml(services_path: Path) -> dict[str, set[str]]:
         if not isinstance(fields, dict):
             services[svc] = set()
             continue
-        services[svc] = set(fields.keys())
+        services[svc] = _flatten_field_names(fields)
     return services
+
+
+def _flatten_field_names(fields: dict[str, Any]) -> set[str]:
+    """Return real field names, resolving HA's collapsed-section syntax.
+
+    A section is a fields-map entry that is itself a mapping containing a
+    nested ``fields`` key. Its own key (e.g. ``image_options``) is not a
+    real data field, so only the nested field names are collected.
+    """
+    names: set[str] = set()
+    for name, fdef in fields.items():
+        if isinstance(fdef, dict) and isinstance(fdef.get("fields"), dict):
+            names.update(_flatten_field_names(fdef["fields"]))
+        else:
+            names.add(name)
+    return names
 
 
 def _walk_service_calls(node: Any) -> list[tuple[str, dict[str, Any]]]:

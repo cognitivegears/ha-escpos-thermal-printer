@@ -36,6 +36,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   added twice. This includes manual VID:PID entry, where custom
   endpoints are folded into the ID so distinct same-model setups still
   coexist.
+- **`print_barcode`** — an explicit `align` was silently overridden by
+  the default center-align (`align_ct`); explicit `align` now wins
+  unless `align_ct` is also explicitly set (calls setting neither behave
+  exactly as before).
+- **`print_text_image`** — the `image_threshold` description wrongly
+  claimed it applies when `dither` is `"none"`.
 
 ### Security
 
@@ -49,6 +55,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Service forms group optional fields into collapsed "Image Options" /
+  "Advanced Options" sections (`print_image` family, `preview_image`,
+  `print_message`, `print_text_image`, `print_barcode`); UI-only, call
+  data is unchanged and existing automations are unaffected. Removed the
+  redundant `center` / `image_center` / `align_ct` toggles from the UI
+  forms — they're still accepted in service calls (use `align: center`
+  instead). Advanced transport knobs no longer require HA "advanced
+  mode" (now in the collapsed Advanced Options section).
 - Now available in the HACS default store — installation docs updated to
   drop the custom-repository steps.
 - Dropped `Pillow` and `dbus-fast` from `manifest.json` requirements: both

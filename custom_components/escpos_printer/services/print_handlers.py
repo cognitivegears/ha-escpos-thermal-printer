@@ -260,9 +260,7 @@ async def handle_print_table(call: ServiceCall) -> None:
     async def _body(entry: Any, adapter: Any, defaults: Any, config: Any) -> None:
         # Table rendering can be expensive (200x12 = ~400 ms at max);
         # keep it on the executor (P-M1 separates this from print_box).
-        laid_out, _ = await call.hass.async_add_executor_job(
-            _render_table_layout, call, config
-        )
+        laid_out, _ = await call.hass.async_add_executor_job(_render_table_layout, call, config)
         transcoded, _ = await _render_text_layout_for_codepage(
             call,
             laid_out,
@@ -329,9 +327,7 @@ async def handle_print_kvtable(call: ServiceCall) -> None:
     async def _body(entry: Any, adapter: Any, defaults: Any, config: Any) -> None:
         # P-H1: sanitise items on the executor (per-cell regex passes scale
         # with payload size and shouldn't run on the event loop).
-        items = await call.hass.async_add_executor_job(
-            sanitise_kv_items, call.data[ATTR_ITEMS]
-        )
+        items = await call.hass.async_add_executor_job(sanitise_kv_items, call.data[ATTR_ITEMS])
         style = call.data.get(ATTR_STYLE, "none")
         value_align = call.data.get(ATTR_VALUE_ALIGN, "right")
         total_width = int(call.data.get(ATTR_TOTAL_WIDTH) or _line_width_for(config))
@@ -548,7 +544,7 @@ def _resolve_preview_text_path(
         raise HomeAssistantError(f"Invalid output_path '{requested}': {exc}") from exc
     try:
         in_tempdir = resolved.is_relative_to(tempdir)
-    except (OSError, ValueError):
+    except OSError, ValueError:
         in_tempdir = False
     if not in_tempdir:
         raise HomeAssistantError(
@@ -808,9 +804,7 @@ async def handle_preview_image(call: ServiceCall) -> ServiceResponse:
     # actually print. We accept the slight overhead of resolving image
     # bytes twice (once in prepare_image_for_print, once here for
     # source_kind) in exchange for code reuse.
-    image_kwargs = extract_image_kwargs(
-        {**call.data, ATTR_IMAGE: image_value}, defaults, prefix=""
-    )
+    image_kwargs = extract_image_kwargs({**call.data, ATTR_IMAGE: image_value}, defaults, prefix="")
     image_kwargs.pop(ATTR_IMAGE, None)
     prepared = await prepare_image_for_print(
         adapter,
@@ -838,7 +832,7 @@ async def handle_preview_image(call: ServiceCall) -> ServiceResponse:
     # persistent output belongs in a regular automation step.
     try:
         in_tempdir = Path(output_path).is_relative_to(tempdir)
-    except (OSError, ValueError):
+    except OSError, ValueError:
         in_tempdir = False
     if not in_tempdir:
         raise HomeAssistantError(
@@ -935,6 +929,12 @@ async def handle_print_barcode(call: ServiceCall) -> None:
         # normalize the string-bool form here.
         if isinstance(fs, str) and fs.lower() in ("true", "false"):
             fs = fs.lower() == "true"
+        explicit_align = call.data.get(ATTR_ALIGN)
+        align_ct = call.data.get(ATTR_ALIGN_CT)
+        if align_ct is None:
+            # An explicit align must win: python-escpos re-centers the
+            # barcode after printer.set(align=...) when align_ct is true.
+            align_ct = explicit_align is None
         await adapter.print_barcode(
             call.hass,
             code=call.data[ATTR_CODE],
@@ -943,10 +943,10 @@ async def handle_print_barcode(call: ServiceCall) -> None:
             width=call.data.get(ATTR_BARCODE_WIDTH, 3),
             pos=call.data.get(ATTR_POS, "BELOW"),
             font=call.data.get(ATTR_FONT, "A"),
-            align_ct=call.data.get(ATTR_ALIGN_CT, True),
+            align_ct=align_ct,
             check=call.data.get(ATTR_CHECK, False),
             force_software=fs,
-            align=call.data.get(ATTR_ALIGN) or defaults.get("align"),
+            align=explicit_align or defaults.get("align"),
             cut=call.data.get(ATTR_CUT) or defaults.get("cut"),
             feed=call.data.get(ATTR_FEED),
         )

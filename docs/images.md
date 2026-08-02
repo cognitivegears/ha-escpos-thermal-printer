@@ -257,7 +257,7 @@ data:
   image_width: 384
   dither: threshold
   threshold: 140
-  center: true
+  align: center
   feed: 1
   cut: full
 ```
@@ -300,7 +300,7 @@ data:
 
 ## Convenience services
 
-When the source type is fixed, use the focused services for a friendlier UI (entity pickers, plain text fields) — they all funnel into the same pipeline as `print_image` and expose the same image-processing options (rotation, mirror, threshold, dither, etc.). Rarely-used knobs (`impl`, `fragment_height`, `chunk_delay_ms`, `fallback_image`) are marked **advanced** and only appear when Home Assistant's advanced mode is on.
+When the source type is fixed, use the focused services for a friendlier UI (entity pickers, plain text fields) — they all funnel into the same pipeline as `print_image` and expose the same image-processing options (rotation, mirror, threshold, dither, etc.). In the UI form these live in a collapsed **Image Options** section; rarely-used knobs (`impl`, `fragment_height`, `chunk_delay_ms`, `fallback_image`) sit in a collapsed **Advanced Options** section.
 
 | Service                                | Source field    | Selector        |
 |----------------------------------------|-----------------|-----------------|

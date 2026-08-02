@@ -367,7 +367,6 @@ _PARITY_FIELDS = (
     "invert",
     "autocontrast",
     "align",
-    "center",
     "high_density",
     "impl",
     "fragment_height",
@@ -392,20 +391,47 @@ def _load_services_yaml() -> dict:
     return load_yaml_dict(str(services_yaml))
 
 
+def _flatten_fields(svc_def: dict) -> dict[str, tuple[str | None, dict]]:
+    """Flatten a service's ``fields`` map, resolving collapsed sections.
+
+    A section is a fields-map entry that is itself a mapping containing a
+    nested ``fields`` key (HA's collapsed-section syntax). Returns
+    ``{field_name: (section_id_or_None, field_def)}`` so callers can check
+    both a field's own metadata and which section (if any) it lives under.
+    """
+    flat: dict[str, tuple[str | None, dict]] = {}
+    for name, fdef in (svc_def.get("fields") or {}).items():
+        if isinstance(fdef, dict) and isinstance(fdef.get("fields"), dict):
+            for child_name, child_def in fdef["fields"].items():
+                flat[child_name] = (name, child_def)
+        else:
+            flat[name] = (None, fdef)
+    return flat
+
+
 def test_image_services_share_common_field_metadata() -> None:
     """All focused image services must expose the same field metadata as print_image."""
     services = _load_services_yaml()
-    canonical = services["print_image"]["fields"]
+    canonical_fields = services["print_image"]["fields"]
+    canonical = _flatten_fields(services["print_image"])
     mismatches: list[str] = []
     for svc in _FOCUSED_IMAGE_SERVICES:
-        svc_fields = services[svc]["fields"]
+        svc_def = services[svc]
+        svc_fields = _flatten_fields(svc_def)
         for f in _PARITY_FIELDS:
             if f not in svc_fields:
                 mismatches.append(f"{svc}.{f} missing entirely")
                 continue
+            expected_section, expected_def = canonical[f]
+            actual_section, actual_def = svc_fields[f]
+            if expected_section != actual_section:
+                mismatches.append(
+                    f"{svc}.{f} section mismatch: expected {expected_section!r}, "
+                    f"got {actual_section!r}"
+                )
             for attr in ("name", "description", "selector"):
-                expected = canonical[f].get(attr)
-                actual = svc_fields[f].get(attr)
+                expected = expected_def.get(attr)
+                actual = actual_def.get(attr)
                 if expected != actual:
                     mismatches.append(
                         f"{svc}.{f}.{attr} mismatch:\n"
@@ -414,13 +440,31 @@ def test_image_services_share_common_field_metadata() -> None:
                     )
             # Defaults: must match canonical *unless* listed in _DEFAULT_MAY_VARY.
             if f not in _DEFAULT_MAY_VARY:
-                expected_default = canonical[f].get("default")
-                actual_default = svc_fields[f].get("default")
+                expected_default = expected_def.get("default")
+                actual_default = actual_def.get("default")
                 if expected_default != actual_default:
                     mismatches.append(
                         f"{svc}.{f}.default mismatch (not in _DEFAULT_MAY_VARY):\n"
                         f"  expected: {expected_default!r}\n"
                         f"  actual:   {actual_default!r}"
+                    )
+        # Every section print_image declares must exist on this service with
+        # identical name/description/collapsed.
+        for section_id, section_def in canonical_fields.items():
+            if not (isinstance(section_def, dict) and isinstance(section_def.get("fields"), dict)):
+                continue
+            actual_section_def = svc_def["fields"].get(section_id)
+            if not isinstance(actual_section_def, dict):
+                mismatches.append(f"{svc} missing section {section_id!r}")
+                continue
+            for attr in ("name", "description", "collapsed"):
+                expected = section_def.get(attr)
+                actual = actual_section_def.get(attr)
+                if expected != actual:
+                    mismatches.append(
+                        f"{svc}.{section_id}.{attr} mismatch:\n"
+                        f"  expected: {expected!r}\n"
+                        f"  actual:   {actual!r}"
                     )
     assert not mismatches, "services.yaml image-service field parity drift:\n  " + "\n  ".join(
         mismatches
@@ -431,16 +475,29 @@ def test_image_services_no_truncated_descriptions() -> None:
     """Regression guard for unquoted YAML descriptions containing `#`."""
     services = _load_services_yaml()
     for svc in ("print_image", *_FOCUSED_IMAGE_SERVICES):
-        for fname, fdef in services[svc]["fields"].items():
+        svc_def = services[svc]
+        for fname, (_section, fdef) in _flatten_fields(svc_def).items():
             desc = fdef.get("description")
-            if desc is None:
-                continue
-            # Description should end with sentence-terminating punctuation
-            # or be a single short phrase. The bug we're guarding against
-            # left tooltips ending mid-word (e.g. ending in "(issue").
-            assert isinstance(desc, str), f"{svc}.{fname} description not a string"
-            assert desc.strip(), f"{svc}.{fname} description is empty"
-            stripped = desc.rstrip().rstrip("\n")
-            assert stripped[-1] in ".)>!?\"'", (
-                f"{svc}.{fname} description appears truncated; ends with: {stripped[-30:]!r}"
-            )
+            if desc is not None:
+                _assert_description_not_truncated(svc, fname, desc)
+    # Sections carry their own tooltip description too — check them on every
+    # service, not just the image family (print_barcode, print_message and
+    # print_text_image have sections as well).
+    for svc, svc_def in services.items():
+        for field_name, field_def in svc_def.get("fields", {}).items():
+            if isinstance(field_def, dict) and isinstance(field_def.get("fields"), dict):
+                desc = field_def.get("description")
+                if desc is not None:
+                    _assert_description_not_truncated(svc, field_name, desc)
+
+
+def _assert_description_not_truncated(svc: str, fname: str, desc: object) -> None:
+    # Description should end with sentence-terminating punctuation or be a
+    # single short phrase. The bug we're guarding against left tooltips
+    # ending mid-word (e.g. ending in "(issue").
+    assert isinstance(desc, str), f"{svc}.{fname} description not a string"
+    assert desc.strip(), f"{svc}.{fname} description is empty"
+    stripped = desc.rstrip().rstrip("\n")
+    assert stripped[-1] in ".)>!?\"'", (
+        f"{svc}.{fname} description appears truncated; ends with: {stripped[-30:]!r}"
+    )
