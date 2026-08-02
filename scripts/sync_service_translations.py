@@ -16,12 +16,12 @@ import pathlib
 import sys
 from typing import Any
 
+import yaml
+
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8")
-
-from homeassistant.util.yaml import load_yaml_dict
 
 # See `scripts/sync_manifest_requirements.py` for the invocation-directory
 # rationale (dependabot-auto-sync.yml runs scripts from a working directory
@@ -55,8 +55,9 @@ def build_services_section(services_yaml: dict[str, Any]) -> dict[str, Any]:
     - service ``name``/``description`` -> ``services.<service>.{name,description}``.
     - top-level fields -> ``services.<service>.fields.<field>``.
     - collapsed section groups (fields carrying their own nested ``fields:``)
-      -> the group's own name goes to ``services.<service>.sections.<key>.name``;
-      its inner fields join the same flat ``fields`` namespace as top-level
+      -> the group's own name/description go to
+      ``services.<service>.sections.<key>.{name,description}``; its inner
+      fields join the same flat ``fields`` namespace as top-level
       fields, since HA keys field translations by field name regardless of
       section (confirmed against installed HA core components, e.g. mqtt).
     """
@@ -70,8 +71,9 @@ def build_services_section(services_yaml: dict[str, Any]) -> dict[str, Any]:
             if not isinstance(field_body, dict):
                 continue
             if "fields" in field_body:
-                if "name" in field_body:
-                    sections[field_key] = {"name": str(field_body["name"])}
+                section_entry = _field_entry(field_body)
+                if section_entry:
+                    sections[field_key] = section_entry
                 for inner_key, inner_body in field_body["fields"].items():
                     if not isinstance(inner_body, dict):
                         continue
@@ -117,7 +119,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    services_yaml = load_yaml_dict(str(SERVICES_YAML))
+    services_yaml = yaml.safe_load(SERVICES_YAML.read_text(encoding="utf-8"))
     services_section = build_services_section(services_yaml)
     desired = render(build_strings_json(services_section))
 

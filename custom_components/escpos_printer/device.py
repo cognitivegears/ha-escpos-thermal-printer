@@ -42,7 +42,7 @@ def _usb_serial_number(entry: ConfigEntry) -> str | None:
     if not unique_id:
         return None
     parts = unique_id.split(":")
-    if len(parts) >= 4 and parts[0] == "usb":
+    if len(parts) == 4 and parts[0] == "usb":
         return parts[3] or None
     return None
 

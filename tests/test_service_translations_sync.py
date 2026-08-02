@@ -42,7 +42,7 @@ def _import_sync_module(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
 def test_strings_json_services_matches_services_yaml(monkeypatch: pytest.MonkeyPatch) -> None:
     """Any services.yaml edit without a re-run of the sync script fails CI."""
     mod = _import_sync_module(monkeypatch)
-    services_yaml = mod.load_yaml_dict(str(mod.SERVICES_YAML))
+    services_yaml = mod.yaml.safe_load(mod.SERVICES_YAML.read_text(encoding="utf-8"))
     regenerated = mod.build_services_section(services_yaml)
 
     committed = json.loads(STRINGS_JSON.read_text(encoding="utf-8"))

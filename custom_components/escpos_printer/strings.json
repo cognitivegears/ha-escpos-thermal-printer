@@ -696,9 +696,11 @@
       "name": "Preview Image (no paper)",
       "sections": {
         "advanced_options": {
+          "description": "Transport and reliability tuning. Leave unset to honor the printer's Reliability profile.",
           "name": "Advanced Options"
         },
         "image_options": {
+          "description": "Optional processing applied before the image is printed.",
           "name": "Image Options"
         }
       }
@@ -804,9 +806,11 @@
       "name": "Print Barcode",
       "sections": {
         "advanced_options": {
+          "description": "Rendering fallbacks for printers whose native barcode output is wrong.",
           "name": "Advanced Options"
         },
         "barcode_options": {
+          "description": "Symbol size and human-readable text options.",
           "name": "Barcode Options"
         }
       }
@@ -936,9 +940,11 @@
       "name": "Print Camera Snapshot",
       "sections": {
         "advanced_options": {
+          "description": "Transport and reliability tuning. Leave unset to honor the printer's Reliability profile.",
           "name": "Advanced Options"
         },
         "image_options": {
+          "description": "Optional processing applied before the image is printed.",
           "name": "Image Options"
         }
       }
@@ -1026,9 +1032,11 @@
       "name": "Print Image (mixed source)",
       "sections": {
         "advanced_options": {
+          "description": "Transport and reliability tuning. Leave unset to honor the printer's Reliability profile.",
           "name": "Advanced Options"
         },
         "image_options": {
+          "description": "Optional processing applied before the image is printed.",
           "name": "Image Options"
         }
       }
@@ -1116,9 +1124,11 @@
       "name": "Print Image Entity",
       "sections": {
         "advanced_options": {
+          "description": "Transport and reliability tuning. Leave unset to honor the printer's Reliability profile.",
           "name": "Advanced Options"
         },
         "image_options": {
+          "description": "Optional processing applied before the image is printed.",
           "name": "Image Options"
         }
       }
@@ -1206,9 +1216,11 @@
       "name": "Print Image from Path",
       "sections": {
         "advanced_options": {
+          "description": "Transport and reliability tuning. Leave unset to honor the printer's Reliability profile.",
           "name": "Advanced Options"
         },
         "image_options": {
+          "description": "Optional processing applied before the image is printed.",
           "name": "Image Options"
         }
       }
@@ -1296,9 +1308,11 @@
       "name": "Print Image from URL",
       "sections": {
         "advanced_options": {
+          "description": "Transport and reliability tuning. Leave unset to honor the printer's Reliability profile.",
           "name": "Advanced Options"
         },
         "image_options": {
+          "description": "Optional processing applied before the image is printed.",
           "name": "Image Options"
         }
       }
@@ -1452,9 +1466,11 @@
       "name": "Print Formatted Message",
       "sections": {
         "advanced_options": {
+          "description": "Transport and reliability tuning. Leave unset to honor the printer's Reliability profile.",
           "name": "Advanced Options"
         },
         "image_options": {
+          "description": "Optional image printed after the message, plus its processing options.",
           "name": "Image Attachment"
         }
       }
@@ -1722,9 +1738,11 @@
       "name": "Print Text as Image",
       "sections": {
         "advanced_options": {
+          "description": "Transport and reliability tuning. Leave unset to honor the printer's Reliability profile.",
           "name": "Advanced Options"
         },
         "image_options": {
+          "description": "Optional processing applied before the image is printed.",
           "name": "Image Options"
         }
       }

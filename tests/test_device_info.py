@@ -67,6 +67,26 @@ def test_usb_serial_number_absent_when_unique_id_has_no_serial() -> None:
     assert "serial_number" not in info
 
 
+def test_usb_serial_number_absent_when_unique_id_has_endpoint_suffix() -> None:
+    """Endpoint-folded unique_ids (usb:VID:PID:in_ep:out_ep) have no serial segment.
+
+    Regression test: parts[3] used to be returned as a "serial" here, but
+    it's actually the in-endpoint hex from _generate_usb_unique_id's
+    endpoint-folding (see _config_flow/usb_steps.py).
+    """
+    entry = _FakeEntry(
+        data={CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB}, unique_id="usb:04b8:0e03:81:03"
+    )
+    info = build_device_info(entry)  # type: ignore[arg-type]
+    assert "serial_number" not in info
+
+
+def test_usb_serial_number_absent_when_unique_id_has_empty_trailing_segment() -> None:
+    entry = _FakeEntry(data={CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB}, unique_id="usb:04b8:0e03:")
+    info = build_device_info(entry)  # type: ignore[arg-type]
+    assert "serial_number" not in info
+
+
 def test_non_usb_transports_never_get_serial_number() -> None:
     entry = _FakeEntry(
         data={CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK, "serial_number": "ignored"}
