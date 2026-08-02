@@ -3,6 +3,7 @@
 [![Validate](https://github.com/cognitivegears/ha-escpos-thermal-printer/actions/workflows/validate.yml/badge.svg)](https://github.com/cognitivegears/ha-escpos-thermal-printer/actions/workflows/validate.yml)
 [![Hassfest](https://github.com/cognitivegears/ha-escpos-thermal-printer/actions/workflows/hassfest.yml/badge.svg)](https://github.com/cognitivegears/ha-escpos-thermal-printer/actions/workflows/hassfest.yml)
 [![HACS Validation](https://github.com/cognitivegears/ha-escpos-thermal-printer/actions/workflows/hacs.yml/badge.svg)](https://github.com/cognitivegears/ha-escpos-thermal-printer/actions/workflows/hacs.yml)
+[![HACS Default](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=cognitivegears&repository=ha-escpos-thermal-printer&category=integration)
 
 Print receipts, labels, QR codes, and more from Home Assistant automations.
 Connect any ESC/POS capable network, USB, bluetooth, or serial thermal printer and
@@ -57,12 +58,13 @@ individually or broadcast to all
 
 ### Install via HACS
 
-1. Open HACS in Home Assistant
-2. Go to **Integrations** and click the menu (three dots)
-3. Select **Custom repositories**
-4. Add `https://github.com/cognitivegears/ha-escpos-thermal-printer` as an Integration
-5. Search for "ESC/POS Thermal Printer" and install it
-6. Restart Home Assistant
+This integration is in the HACS default store — no custom repository needed.
+
+[![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=cognitivegears&repository=ha-escpos-thermal-printer&category=integration)
+
+1. Open **HACS** in Home Assistant
+2. Search for "ESC/POS Thermal Printer" and install it
+3. Restart Home Assistant
 
 ### Configure Your Printer
 
@@ -113,7 +115,7 @@ data:
   cut: partial
 ```
 
-Omit `target` to broadcast to all configured printers.
+To print to every configured printer at once, set `broadcast: true` in `data`. (Omitting the target entirely also broadcasts — kept for backward compatibility — but logs a warning when more than one printer is configured.)
 
 ### Print a Bordered Header
 

@@ -2,10 +2,13 @@
 
 ## Via HACS (recommended)
 
-1. **HACS** → **Integrations** → **⋮** → **Custom repositories**
-2. Add `https://github.com/cognitivegears/ha-escpos-thermal-printer` as an Integration
-3. Install **ESC/POS Thermal Printer** and restart Home Assistant
-4. **Settings** → **Devices & services** → **Add Integration** → search "ESC/POS Thermal Printer"
+This integration is in the HACS default store — no custom repository needed.
+
+[![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=cognitivegears&repository=ha-escpos-thermal-printer&category=integration)
+
+1. Open **HACS** and search for "ESC/POS Thermal Printer"
+2. Install it and restart Home Assistant
+3. **Settings** → **Devices & services** → **Add Integration** → search "ESC/POS Thermal Printer"
 
 ## Manual install
 
