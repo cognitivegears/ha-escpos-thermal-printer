@@ -311,6 +311,7 @@
     },
     "abort": {
       "already_configured": "This printer is already configured.",
+      "already_in_progress": "Configuration flow is already in progress.",
       "invalid_discovery_info": "Invalid USB discovery information.",
       "invalid_usb_device": "Invalid USB device configuration. Vendor ID and Product ID are required.",
       "unique_id_mismatch": "This connection detail belongs to a different printer than the one being reconfigured. Remove and re-add the integration if you want to switch to a different physical printer.",
@@ -318,6 +319,11 @@
     }
   },
   "options": {
+    "error": {
+      "invalid_profile": "Invalid printer profile name.",
+      "invalid_codepage": "Invalid codepage/encoding.",
+      "invalid_line_width": "Invalid line width. Must be a positive number."
+    },
     "step": {
       "init": {
         "title": "Printer options",
@@ -520,6 +526,12 @@
     },
     "output_path_outside_tempdir": {
       "message": "The output_path '{path}' must be inside the system temp directory ({tempdir})."
+    },
+    "kvtable_width_too_small": {
+      "message": "total_width {total_width} is too small for a 2-column kvtable with style {style}; minimum usable total_width is {minimum}."
+    },
+    "table_columns_exceed_width": {
+      "message": "Column widths plus separators need {needed} characters, but only {available} are available (printer line width {line_width}). Reduce the column widths or total_width."
     }
   },
   "services": {
@@ -1418,6 +1430,10 @@
           "description": "Rows per chunk when sending the image. Leave unset to honor the printer's Reliability profile. See print_image notes.\n",
           "name": "Image Fragment Height"
         },
+        "image_high_density": {
+          "description": "Use high-density printing mode if supported.",
+          "name": "Image High Density"
+        },
         "image_impl": {
           "description": "ESC/POS image command (see print_image). Leave unset to honor the printer's Reliability profile.\n",
           "name": "Image Implementation"
@@ -1681,6 +1697,10 @@
         "font_size": {
           "description": "Point size for the rendered text (8 to 96).",
           "name": "Font Size (pt)"
+        },
+        "image_auto_resize": {
+          "description": "Allow an oversized rendered canvas to be downscaled instead of erroring out.",
+          "name": "Auto-Resize"
         },
         "image_autocontrast": {
           "description": "Stretch tonal range before binarisation (rarely useful for text).",

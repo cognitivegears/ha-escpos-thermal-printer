@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 from dataclasses import dataclass
+import inspect
 import logging
 from typing import TYPE_CHECKING, Any, NamedTuple
 
@@ -118,9 +119,6 @@ async def prepare_image_for_print(
     chunk_delay_ms = validate_numeric_input(chunk_delay_ms, 0, 5000, "chunk_delay_ms")
 
     stats = getattr(host, "_image_stats", None)
-    if stats is not None:
-        kind, _ = classify_source(image)
-        stats.last_source_kind = kind
 
     process_opts = ImageProcessOptions(
         width=width,
@@ -135,6 +133,9 @@ async def prepare_image_for_print(
     )
     allow_local = bool(getattr(host, "allow_local_image_urls", False))
     try:
+        if stats is not None:
+            kind, _ = classify_source(image)
+            stats.last_source_kind = kind
         raw, content_type = await _resolve_with_retry(
             hass,
             image,
@@ -416,6 +417,41 @@ async def _process_bytes(
     return await hass.async_add_executor_job(_go)
 
 
+# Cache of ``printer.image`` supported kwarg names, keyed by printer class.
+# ``None`` means "accepts arbitrary kwargs" (a ``**kwargs`` parameter, or a
+# signature we couldn't introspect — e.g. a test double), so the full kwarg
+# set is passed through unfiltered.
+_IMAGE_KWARGS_CACHE: dict[type, frozenset[str] | None] = {}
+
+
+def _supported_image_kwargs(printer: Any) -> frozenset[str] | None:
+    """Return the keyword-argument names ``printer.image`` accepts (cached).
+
+    Older python-escpos releases lack ``impl``/``fragment_height``/``center``
+    on ``Escpos.image``. Probing the signature up front — instead of calling
+    with the full kwarg set and retrying on ``TypeError`` — means a
+    signature mismatch can never risk sending the image bytes twice (the
+    ``TypeError`` could originate deeper in python-escpos *after* some bytes
+    were already written to the transport).
+    """
+    cls = type(printer)
+    if cls in _IMAGE_KWARGS_CACHE:
+        return _IMAGE_KWARGS_CACHE[cls]
+    try:
+        params = inspect.signature(printer.image).parameters.values()
+    except TypeError, ValueError:
+        supported: frozenset[str] | None = None
+    else:
+        if any(p.kind is p.VAR_KEYWORD for p in params):
+            supported = None
+        else:
+            supported = frozenset(
+                p.name for p in params if p.kind in (p.POSITIONAL_OR_KEYWORD, p.KEYWORD_ONLY)
+            )
+    _IMAGE_KWARGS_CACHE[cls] = supported
+    return supported
+
+
 async def _send_image_slice(
     hass: HomeAssistant,
     printer: Any,
@@ -438,21 +474,17 @@ async def _send_image_slice(
         # ``fragment_height = height + 1`` tells python-escpos "don't
         # re-split this chunk" — we've already sliced at the desired
         # boundary (issues #45 / #43).
-        try:
-            p.image(
-                fragment,
-                high_density_vertical=high_density,
-                high_density_horizontal=high_density,
-                impl=impl,
-                fragment_height=fragment.height + 1,
-                center=center,
-            )
-        except TypeError:
-            p.image(
-                fragment,
-                high_density_vertical=high_density,
-                high_density_horizontal=high_density,
-            )
+        kwargs = {
+            "high_density_vertical": high_density,
+            "high_density_horizontal": high_density,
+            "impl": impl,
+            "fragment_height": fragment.height + 1,
+            "center": center,
+        }
+        supported = _supported_image_kwargs(p)
+        if supported is not None:
+            kwargs = {k: v for k, v in kwargs.items() if k in supported}
+        p.image(fragment, **kwargs)
 
     await hass.async_add_executor_job(_do, printer)
 

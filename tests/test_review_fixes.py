@@ -81,14 +81,42 @@ async def test_release_printer_keeps_keepalive_on_success(hass):  # type: ignore
 
 
 # ---------------------------------------------------------------------------
-# A1: a paper-status probe failure must not flap the connectivity sensor,
-# but a real transport-level print failure still must.
+# A1: a paper-status probe is a reachability signal PaperStatusSensor
+# already fetches every ~30s -- base_adapter.get_paper_status now feeds it
+# to status listeners instead of discarding it, split by failure layer:
+#   - can't even connect            -> notify offline (unambiguous)
+#   - connect ok, DLE EOT ignored   -> notify online, no offline flap
+#     (some printers just don't answer this query -- connecting proved
+#     reachability already; the original A1 guarantee)
+#   - connect ok, query ok          -> notify online
 # ---------------------------------------------------------------------------
 
 
-async def test_paper_status_probe_failure_does_not_flap_connectivity(hass):  # type: ignore[no-untyped-def]
+async def test_paper_status_connect_failure_notifies_offline(hass):  # type: ignore[no-untyped-def]
     adapter = _network_adapter()
     adapter._status = True  # printer was already known online
+    received: list[bool] = []
+    adapter.add_status_listener(received.append)
+
+    def _boom():
+        raise OSError("connection refused")
+
+    adapter._connect = _boom  # type: ignore[method-assign]
+
+    assert await adapter.get_paper_status(hass) is None
+
+    assert adapter.get_status() is False
+    assert received == [False]
+
+
+async def test_paper_status_query_failure_after_connect_does_not_flap_offline(hass):  # type: ignore[no-untyped-def]
+    """A printer that ignores/times out on DLE EOT must not flap offline.
+
+    Connecting already proved reachability; the query itself failing
+    (common -- not every printer answers paper-status) must not undo that.
+    """
+    adapter = _network_adapter()
+    adapter._status = False  # printer was previously known offline
     received: list[bool] = []
     adapter.add_status_listener(received.append)
 
@@ -98,10 +126,27 @@ async def test_paper_status_probe_failure_does_not_flap_connectivity(hass):  # t
 
     assert await adapter.get_paper_status(hass) is None
 
-    assert adapter.get_status() is True  # unchanged
-    assert received == []  # no notification fired
-    assert adapter._last_error_reason is None
-    assert adapter._last_check is None
+    assert adapter.get_status() is True
+    assert received == [True]
+    assert adapter._last_ok is not None
+
+
+async def test_paper_status_probe_success_marks_online(hass):  # type: ignore[no-untyped-def]
+    """A successful paper-status poll is itself a fresh reachability signal."""
+    adapter = _network_adapter()
+    adapter._status = False  # printer was previously known offline
+    received: list[bool] = []
+    adapter.add_status_listener(received.append)
+
+    fake = MagicMock()
+    fake.paper_status.return_value = 2
+    adapter._connect = lambda: fake  # type: ignore[method-assign]
+
+    assert await adapter.get_paper_status(hass) == 2
+
+    assert adapter.get_status() is True
+    assert received == [True]
+    assert adapter._last_ok is not None
 
 
 async def test_transport_failure_still_flips_connectivity(hass):  # type: ignore[no-untyped-def]

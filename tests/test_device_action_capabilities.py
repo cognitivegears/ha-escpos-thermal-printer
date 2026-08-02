@@ -40,6 +40,36 @@ async def _make_device(hass: Any, identifiers: set[tuple[str, str]]) -> str:
     return device.id
 
 
+async def _setup_device_with_profile(hass: Any, profile: str) -> str:
+    """Set up a real config entry (with runtime_data) pinned to ``profile``."""
+    from unittest.mock import patch
+
+    from homeassistant.const import CONF_HOST, CONF_PORT
+    from homeassistant.helpers import device_registry as dr
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from custom_components.escpos_printer.const import CONF_PROFILE
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=f"profile-{profile}",
+        data={CONF_HOST: "1.2.3.4", CONF_PORT: 9100, CONF_PROFILE: profile},
+        unique_id=f"1.2.3.4:9100:{profile}",
+    )
+    entry.add_to_hass(hass)
+    with patch("escpos.printer.Network"):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    device_registry = dr.async_get(hass)
+    device = next(
+        (d for d in device_registry.devices.values() if entry.entry_id in d.config_entries),
+        None,
+    )
+    assert device is not None, "Expected a device entry for the printer"
+    return device.id
+
+
 async def test_async_get_actions_returns_eight_for_our_device(hass: Any) -> None:
     """A device with our DOMAIN identifier exposes exactly the 8 action types."""
     device_id = await _make_device(hass, {(DOMAIN, "1.2.3.4:9100")})
@@ -117,3 +147,60 @@ async def test_capabilities_print_barcode_rejects_unknown_bc_value(hass: Any) ->
         schema({"code": "12345", "bc": "NOT_A_BARCODE_TYPE"})
     # And a valid one passes.
     schema({"code": "12345", "bc": "CODE128"})
+
+
+async def test_capabilities_cut_action_mode_gated_by_profile(hass: Any) -> None:
+    """A profile without paperFullCut must not offer "full" as a cut mode."""
+    device_id = await _setup_device_with_profile(hass, "TM-U220B")  # partial only, no full
+
+    caps = await async_get_action_capabilities(
+        hass, {CONF_TYPE: ACTION_CUT, CONF_DEVICE_ID: device_id, CONF_DOMAIN: DOMAIN}
+    )
+    schema = caps["extra_fields"]
+
+    schema({"mode": "partial"})
+    with pytest.raises(vol.Invalid):
+        schema({"mode": "full"})
+
+
+async def test_capabilities_cut_action_falls_back_when_profile_has_no_cutter(
+    hass: Any,
+) -> None:
+    """A profile with neither paperPartCut nor paperFullCut still offers a usable schema."""
+    device_id = await _setup_device_with_profile(hass, "TM-U220")  # no cutter at all
+
+    caps = await async_get_action_capabilities(
+        hass, {CONF_TYPE: ACTION_CUT, CONF_DEVICE_ID: device_id, CONF_DOMAIN: DOMAIN}
+    )
+    schema = caps["extra_fields"]
+
+    # Falls back to "partial" rather than an empty (unsatisfiable) choice set.
+    schema({"mode": "partial"})
+    with pytest.raises(vol.Invalid):
+        schema({"mode": "full"})
+
+
+async def test_capabilities_print_text_cut_field_gated_by_profile(hass: Any) -> None:
+    """The optional ``cut`` field on print actions is capped by the profile too."""
+    device_id = await _setup_device_with_profile(hass, "TM-U220B")  # partial only, no full
+
+    caps = await async_get_action_capabilities(
+        hass, {CONF_TYPE: ACTION_PRINT_TEXT, CONF_DEVICE_ID: device_id, CONF_DOMAIN: DOMAIN}
+    )
+    schema = caps["extra_fields"]
+
+    schema({"text": "hi", "cut": "none"})
+    schema({"text": "hi", "cut": "partial"})
+    with pytest.raises(vol.Invalid):
+        schema({"text": "hi", "cut": "full"})
+
+
+async def test_capabilities_cut_mode_unrestricted_for_unknown_device(hass: Any) -> None:
+    """An unresolvable device_id falls back to the unrestricted default (no crash)."""
+    caps = await async_get_action_capabilities(
+        hass, {CONF_TYPE: ACTION_CUT, CONF_DEVICE_ID: "does_not_exist", CONF_DOMAIN: DOMAIN}
+    )
+    schema = caps["extra_fields"]
+
+    schema({"mode": "partial"})
+    schema({"mode": "full"})

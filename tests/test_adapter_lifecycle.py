@@ -131,16 +131,28 @@ async def test_unsubscribe_twice_is_safe(hass):  # type: ignore[no-untyped-def]
     unsub()  # Should be a no-op, not raise
 
 
-async def test_diagnostics_pre_setup_returns_initial_state(hass):  # type: ignore[no-untyped-def]
-    """Adapter diagnostics before any status check returns None for all fields."""
+async def test_setup_runs_initial_probe_regardless_of_status_interval(hass):  # type: ignore[no-untyped-def]
+    """start() always runs a one-shot probe, even with status_interval=0 (the default).
+
+    Without this, entities that read get_status() at construction (the
+    connectivity binary_sensor) saw ``None``/"unknown" until the first
+    print. ``_setup_entry`` here uses the default status_interval=0, and
+    the `fake_network_status_probe` fixture makes the network probe fail
+    (no real socket access in unit tests) -- so diagnostics are already
+    populated immediately after setup instead of sitting at "no probe has
+    run yet". get_status() itself is no longer None (the point of this
+    fix); its exact True/False value also reflects the paper-status
+    sensor's own initial poll, so it isn't pinned down here.
+    """
     entry = await _setup_entry(hass)
     adapter = entry.runtime_data.adapter
 
     diag = adapter.get_diagnostics()
-    # No probe has run yet -> all timestamps are None
-    assert diag["last_check"] is None
-    assert diag["last_ok"] is None
-    assert diag["last_error"] is None
+    assert diag["last_check"] is not None
+    assert diag["last_error"] is not None
+    assert adapter.get_status() is not None
+    # The recurring timer itself is still gated by status_interval (0 here).
+    assert adapter._cancel_status is None  # type: ignore[attr-defined]
 
 
 async def test_wrap_text_respects_line_width(hass):  # type: ignore[no-untyped-def]
@@ -216,6 +228,103 @@ async def test_get_profile_pixel_width_auto_profile_silent_fallback(hass, caplog
     adapter._get_profile_obj = lambda: None  # type: ignore[attr-defined,method-assign]
     assert adapter.get_profile_pixel_width(hass) is None
     assert not any("does not expose media.width.pixels" in rec.message for rec in caplog.records)
+
+
+async def test_profile_width_repair_issue_is_scoped_per_entry(hass):  # type: ignore[no-untyped-def]
+    """Two entries with the same broken profile must not share one issue id.
+
+    Regression: the issue id used to be keyed by profile *name* only, so
+    entry A "fixing" its profile would delete entry B's still-broken
+    warning too.
+    """
+    from homeassistant.helpers import issue_registry as ir
+
+    from custom_components.escpos_printer.const import DOMAIN
+
+    class _BrokenProfile:
+        profile_data: dict = {}
+
+    entry_a = await _setup_entry(hass)
+    adapter_a = entry_a.runtime_data.adapter
+    adapter_a._get_profile_obj = _BrokenProfile  # type: ignore[attr-defined,method-assign]
+    adapter_a.get_profile_pixel_width(hass)
+
+    entry_b = MockConfigEntry(
+        domain=DOMAIN,
+        title="5.6.7.8:9100",
+        data={CONF_HOST: "5.6.7.8", CONF_PORT: 9100},
+        unique_id="5.6.7.8:9100",
+    )
+    entry_b.add_to_hass(hass)
+    with patch("escpos.printer.Network"):
+        assert await hass.config_entries.async_setup(entry_b.entry_id)
+        await hass.async_block_till_done()
+    adapter_b = entry_b.runtime_data.adapter
+    adapter_b._get_profile_obj = _BrokenProfile  # type: ignore[attr-defined,method-assign]
+    adapter_b.get_profile_pixel_width(hass)
+
+    registry = ir.async_get(hass)
+    assert (
+        registry.async_get_issue(DOMAIN, f"profile_width_fallback_{entry_a.entry_id}") is not None
+    )
+    assert (
+        registry.async_get_issue(DOMAIN, f"profile_width_fallback_{entry_b.entry_id}") is not None
+    )
+
+
+async def test_profile_width_repair_issue_cleared_once_profile_resolves(hass):  # type: ignore[no-untyped-def]
+    """The fallback issue must not outlive a profile fix (reload)."""
+    from homeassistant.helpers import issue_registry as ir
+
+    from custom_components.escpos_printer.const import DOMAIN
+
+    class _BrokenProfile:
+        profile_data: dict = {}
+
+    class _GoodProfile:
+        profile_data = {"media": {"width": {"pixels": 576}}}
+
+    entry = await _setup_entry(hass)
+    adapter = entry.runtime_data.adapter
+    adapter._get_profile_obj = _BrokenProfile  # type: ignore[attr-defined,method-assign]
+    adapter.get_profile_pixel_width(hass)
+
+    registry = ir.async_get(hass)
+    issue_id = f"profile_width_fallback_{entry.entry_id}"
+    assert registry.async_get_issue(DOMAIN, issue_id) is not None
+
+    # Simulate a reload with a fresh adapter instance (real reload behavior)
+    # whose profile now resolves cleanly.
+    new_adapter = entry.runtime_data.adapter.__class__(adapter.config)
+    new_adapter.entry_id = entry.entry_id
+    new_adapter._get_profile_obj = _GoodProfile  # type: ignore[attr-defined,method-assign]
+    assert new_adapter.get_profile_pixel_width(hass) == 576
+
+    assert registry.async_get_issue(DOMAIN, issue_id) is None
+
+
+async def test_async_remove_entry_deletes_repair_issue(hass):  # type: ignore[no-untyped-def]
+    """Removing the config entry must clean up its repair issue too."""
+    from homeassistant.helpers import issue_registry as ir
+
+    from custom_components.escpos_printer import async_remove_entry
+    from custom_components.escpos_printer.const import DOMAIN
+
+    class _BrokenProfile:
+        profile_data: dict = {}
+
+    entry = await _setup_entry(hass)
+    adapter = entry.runtime_data.adapter
+    adapter._get_profile_obj = _BrokenProfile  # type: ignore[attr-defined,method-assign]
+    adapter.get_profile_pixel_width(hass)
+
+    registry = ir.async_get(hass)
+    issue_id = f"profile_width_fallback_{entry.entry_id}"
+    assert registry.async_get_issue(DOMAIN, issue_id) is not None
+
+    await async_remove_entry(hass, entry)
+
+    assert registry.async_get_issue(DOMAIN, issue_id) is None
 
 
 async def test_get_connection_info(hass):  # type: ignore[no-untyped-def]

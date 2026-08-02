@@ -56,6 +56,7 @@ from ..const import (
     ATTR_VALUE_ALIGN,
     ATTR_WIDTH,
     DEFAULT_BORDER_STYLE,
+    DEFAULT_CODEPAGE,
     DEFAULT_LINE_WIDTH,
     DOMAIN,
     SERVICE_PREVIEW_BOX,
@@ -71,6 +72,7 @@ from ..const import (
     SERVICE_PRINT_TEXT_IMAGE,
 )
 from ..image_sources import extract_image_kwargs
+from ..printer.image_processor import FALLBACK_PROFILE_WIDTH
 from ..security import (
     sanitise_kv_items,
     validate_font_path_with_fonts_dir,
@@ -111,7 +113,7 @@ async def handle_print_text_utf8(call: ServiceCall) -> None:
 
     async def _body(entry: Any, adapter: Any, defaults: Any, config: Any) -> None:
         text = call.data[ATTR_TEXT]
-        codepage = config.codepage or "CP437"
+        codepage = config.codepage or DEFAULT_CODEPAGE
         transcoded_text = await call.hass.async_add_executor_job(
             transcode_to_codepage, text, codepage
         )
@@ -149,7 +151,7 @@ async def _render_text_layout_for_codepage(
     map for box-drawing glyphs is a single-char replacement).
     """
     _adapter, _defaults, config = _get_adapter_and_defaults(call.hass, entry_id)
-    codepage = config.codepage or "CP437"
+    codepage = config.codepage or DEFAULT_CODEPAGE
     transcoded = await call.hass.async_add_executor_job(
         transcode_to_codepage, layout_text, codepage
     )
@@ -168,6 +170,35 @@ def _line_width_for(config: object) -> int:
     return int(getattr(config, "line_width", DEFAULT_LINE_WIDTH) or DEFAULT_LINE_WIDTH)
 
 
+# Once-per-process throttle, matching _WARNED_WIDE_CHARS_* in text_effects.
+_WARNED_TOTAL_WIDTH_CLAMP = [False]
+
+
+def _clamp_total_width_to_line_width(total_width: int, config: object) -> int:
+    """Clamp ``total_width`` to the printer's configured line width.
+
+    ``total_width`` is schema-bounded to ``MAX_BOX_WIDTH`` (200) independent
+    of the printer's actual character width. ``adapter.print_text`` re-wraps
+    at ``line_width`` afterward, and a layout rendered wider than that gets
+    shredded on re-wrap (broken box borders, misaligned table columns).
+    Clamping here keeps the renderer and the eventual wrap in agreement.
+    """
+    line_width = _line_width_for(config)
+    if total_width > line_width:
+        if not _WARNED_TOTAL_WIDTH_CLAMP[0]:
+            _LOGGER.warning(
+                "total_width %d exceeds printer line_width %d; clamping to %d to avoid "
+                "the printer re-wrapping (and corrupting) the rendered layout "
+                "(this warning fires once per process)",
+                total_width,
+                line_width,
+                line_width,
+            )
+            _WARNED_TOTAL_WIDTH_CLAMP[0] = True
+        return line_width
+    return total_width
+
+
 def _render_box_layout(call: ServiceCall, config: object) -> tuple[str, str]:
     """Sanitise + run ``render_box``. Returns ``(laid_out_text, codepage)``.
 
@@ -179,8 +210,9 @@ def _render_box_layout(call: ServiceCall, config: object) -> tuple[str, str]:
     style = call.data.get(ATTR_STYLE, DEFAULT_BORDER_STYLE)
     padding = int(call.data.get(ATTR_PADDING, 0))
     align = call.data.get(ATTR_ALIGN, "left")
-    codepage = getattr(config, "codepage", None) or "CP437"
+    codepage = getattr(config, "codepage", None) or DEFAULT_CODEPAGE
     outer_width = int(call.data.get(ATTR_TOTAL_WIDTH) or _line_width_for(config))
+    outer_width = _clamp_total_width_to_line_width(outer_width, config)
     # The renderer draws ``v`` + content + ``v`` on each row when the
     # resolved style emits side borders; with ``style="none"`` no border
     # glyphs are drawn, so the user-facing total width *is* the inner
@@ -212,11 +244,36 @@ def _render_table_layout(call: ServiceCall, config: object) -> tuple[str, str]:
     header = bool(call.data.get(ATTR_HEADER, False))
     row_separators = bool(call.data.get(ATTR_ROW_SEPARATORS, False))
     total_width = int(call.data.get(ATTR_TOTAL_WIDTH) or _line_width_for(config))
-    codepage = getattr(config, "codepage", None) or "CP437"
+    total_width = _clamp_total_width_to_line_width(total_width, config)
+    codepage = getattr(config, "codepage", None) or DEFAULT_CODEPAGE
+    column_widths = call.data.get(ATTR_COLUMN_WIDTHS)
+    if column_widths:
+        # Pre-validate explicit column widths against the (possibly clamped)
+        # total width so the caller gets a ServiceValidationError naming the
+        # real constraint instead of render_table's internal ValueError —
+        # which, post-clamp, would reference a total_width the caller never
+        # typed.
+        bordered = resolve_style(style, codepage) != "none"
+        n_cols = len(column_widths)
+        separator_count = n_cols + 1 if bordered else max(0, n_cols - 1)
+        needed = sum(int(w) for w in column_widths) + separator_count
+        if needed > total_width:
+            raise ServiceValidationError(
+                f"column_widths {list(column_widths)} plus {separator_count} border/"
+                f"separator columns need {needed} characters, but only {total_width} "
+                f"are available (printer line_width {_line_width_for(config)})",
+                translation_domain=DOMAIN,
+                translation_key="table_columns_exceed_width",
+                translation_placeholders={
+                    "needed": str(needed),
+                    "available": str(total_width),
+                    "line_width": str(_line_width_for(config)),
+                },
+            )
     laid_out = render_table(
         sanitised_rows,
         total_width=total_width,
-        column_widths=call.data.get(ATTR_COLUMN_WIDTHS),
+        column_widths=column_widths,
         column_aligns=call.data.get(ATTR_COLUMN_ALIGNS),
         style=style,
         codepage=codepage,
@@ -332,7 +389,8 @@ async def handle_print_kvtable(call: ServiceCall) -> None:
         style = call.data.get(ATTR_STYLE, "none")
         value_align = call.data.get(ATTR_VALUE_ALIGN, "right")
         total_width = int(call.data.get(ATTR_TOTAL_WIDTH) or _line_width_for(config))
-        codepage = getattr(config, "codepage", None) or "CP437"
+        total_width = _clamp_total_width_to_line_width(total_width, config)
+        codepage = getattr(config, "codepage", None) or DEFAULT_CODEPAGE
         label_width = call.data.get(ATTR_LABEL_WIDTH)
         column_widths = _kvtable_widths(
             items=items,
@@ -413,10 +471,31 @@ def _kvtable_widths(
     value column gets the remainder. With auto-sizing, the label
     column matches the longest label, capped at ~60% of total width
     (and at least 1) so the value column still has room.
+
+    Raises :class:`ServiceValidationError` if ``total_width`` is too
+    small to fit two 1-column-wide cells plus the style's overhead —
+    without this check ``max(2, ...)`` would floor ``usable`` to 2
+    regardless of how small ``total_width`` actually is, and
+    ``render_table`` would then raise a raw ``ValueError`` deep inside
+    the renderer for a condition the caller could have been told about
+    up front.
     """
     bordered = style != "none"
     overhead = 3 if bordered else 1
-    usable = max(2, total_width - overhead)
+    minimum_width = overhead + 2  # two 1-column cells, minimum
+    if total_width < minimum_width:
+        raise ServiceValidationError(
+            f"total_width {total_width} is too small for a 2-column kvtable "
+            f"with style={style!r}; minimum usable total_width is {minimum_width}",
+            translation_domain=DOMAIN,
+            translation_key="kvtable_width_too_small",
+            translation_placeholders={
+                "total_width": str(total_width),
+                "style": style,
+                "minimum": str(minimum_width),
+            },
+        )
+    usable = total_width - overhead
     if label_width is not None:
         lw = min(int(label_width), usable - 1)
         lw = max(1, lw)
@@ -651,7 +730,7 @@ async def _prepare_text_image_kwargs(
     rotation = int(call.data.get(ATTR_ROTATION, 0))
     align = call.data.get(ATTR_ALIGN) or defaults.get("align") or "left"
     profile_width = adapter.get_profile_pixel_width(call.hass)
-    max_width_px = int(profile_width or 384)
+    max_width_px = int(profile_width or FALLBACK_PROFILE_WIDTH)
 
     png_bytes = await call.hass.async_add_executor_job(
         partial(
@@ -796,6 +875,34 @@ _PREVIEW_IGNORED_KEYS = frozenset(
     {"high_density", "impl", "fragment_height", "chunk_delay_ms", "center", "cut", "feed"}
 )
 
+# Schema defaults for the subset of ``_PREVIEW_IGNORED_KEYS`` that voluptuous
+# fills in unconditionally (see ``_image_option_fragment`` /
+# ``PREVIEW_IMAGE_SCHEMA``). Keys with no schema default (``impl``,
+# ``fragment_height``, ``chunk_delay_ms``, ``cut``, ``feed``) only ever
+# appear in ``call.data`` when the caller actually passed them, so plain
+# membership already answers "was this passed"; a sentinel default value
+# forces those into the "passed" bucket unconditionally below.
+_NO_SCHEMA_DEFAULT = object()
+_PREVIEW_KEY_DEFAULTS: dict[str, Any] = {"high_density": True, "center": False}
+
+
+def _preview_ignored_keys_passed(data: dict[str, Any]) -> list[str]:
+    """Keys in ``_PREVIEW_IGNORED_KEYS`` the caller actually passed.
+
+    Voluptuous fills in schema defaults (e.g. ``high_density=True``)
+    before the handler runs, so a plain ``key in data`` membership check
+    would flag every default-bearing key as "passed" on every single
+    call. Comparing against the known default is a cheap proxy for
+    "the caller actually passed this" — a caller who explicitly repeats
+    the default value is indistinguishable from one who omitted it,
+    which is acceptable for a diagnostic-only log line.
+    """
+    return sorted(
+        key
+        for key in _PREVIEW_IGNORED_KEYS
+        if key in data and data[key] != _PREVIEW_KEY_DEFAULTS.get(key, _NO_SCHEMA_DEFAULT)
+    )
+
 
 async def handle_preview_image(call: ServiceCall) -> ServiceResponse:
     """Run the image pipeline and write the 1-bit PNG to disk.
@@ -829,11 +936,11 @@ async def handle_preview_image(call: ServiceCall) -> ServiceResponse:
     # passed. preview_image silently ignores them (they don't affect the
     # PNG written to disk); the log line helps users diagnose "I set
     # fragment_height but the preview looks the same" confusion.
-    passed_printer_only = _PREVIEW_IGNORED_KEYS & call.data.keys()
+    passed_printer_only = _preview_ignored_keys_passed(call.data)
     if passed_printer_only:
         _LOGGER.debug(
             "preview_image ignoring printer-only keys (no effect on PNG): %s",
-            sorted(passed_printer_only),
+            passed_printer_only,
         )
     image_value = call.data[ATTR_IMAGE]
 
@@ -955,7 +1062,7 @@ async def handle_calibration_print(call: ServiceCall) -> None:
     """
 
     async def _body(entry: Any, adapter: Any, _defaults: Any, _config: Any) -> None:
-        width = adapter.get_profile_pixel_width(call.hass) or 384
+        width = adapter.get_profile_pixel_width(call.hass) or FALLBACK_PROFILE_WIDTH
         raw = await call.hass.async_add_executor_job(_build_calibration_png, width)
         data_uri = "data:image/png;base64," + base64.b64encode(raw).decode("ascii")
         await adapter.print_image(

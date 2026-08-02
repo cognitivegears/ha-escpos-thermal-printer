@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -16,7 +17,21 @@ from custom_components.escpos_printer.const import (
 )
 from custom_components.escpos_printer.printer.config import NetworkPrinterConfig
 from custom_components.escpos_printer.printer.network_adapter import NetworkPrinterAdapter
-from custom_components.escpos_printer.sensor import PaperStatusSensor, async_setup_entry
+from custom_components.escpos_printer.sensor import (
+    SCAN_INTERVAL,
+    PaperStatusSensor,
+    async_setup_entry,
+)
+
+
+def test_scan_interval_is_five_minutes():
+    """Both should_poll sensors were documented as 5-minute polls but had no SCAN_INTERVAL.
+
+    HA's entity-component default is 30s, so battery (D-Bus round-trip)
+    and paper-status (fresh printer connection) polls were 10x more
+    frequent than intended.
+    """
+    assert timedelta(minutes=5) == SCAN_INTERVAL
 
 
 class _FakeEntry:

@@ -16,6 +16,7 @@ from custom_components.escpos_printer.const import (
     CONNECTION_TYPE_USB,
     DEFAULT_IN_EP,
     DEFAULT_OUT_EP,
+    DOMAIN,
 )
 
 
@@ -278,6 +279,83 @@ class TestUsbManualStep:
         assert result["type"] == "form"
         assert result["step_id"] == "codepage"
 
+    @pytest.mark.asyncio
+    async def test_step_usb_manual_hex_form_through_real_schema(self, hass):
+        """B3: the manual form's own help text recommends "0x04B8", and the
+        voluptuous schema (not just the handler) must accept it.
+
+        Driving the flow through ``hass.config_entries.flow`` (rather than
+        calling the step method directly) exercises HA's schema validation
+        layer, which used to reject "0x04B8" with "expected int" before the
+        handler ever ran.
+        """
+        with (
+            patch(
+                "custom_components.escpos_printer._config_flow.usb_steps._discover_usb_printers",
+                return_value=[],
+            ),
+            patch(
+                "custom_components.escpos_printer._config_flow.usb_steps._can_connect_usb",
+                return_value=(True, None, None),
+            ),
+        ):
+            result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+            result2 = await hass.config_entries.flow.async_configure(
+                result["flow_id"], {CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB}
+            )
+            assert result2["step_id"] == "usb_select"
+            result3 = await hass.config_entries.flow.async_configure(
+                result2["flow_id"], {"usb_device": "__manual__"}
+            )
+            assert result3["step_id"] == "usb_manual"
+
+            result4 = await hass.config_entries.flow.async_configure(
+                result3["flow_id"],
+                {
+                    CONF_VENDOR_ID: "0x04B8",
+                    CONF_PRODUCT_ID: "0x0202",
+                    "timeout": 4.0,
+                    "profile": "",
+                },
+            )
+
+        assert result4["type"] == "form"
+        assert result4["step_id"] == "codepage"
+
+    @pytest.mark.asyncio
+    async def test_step_usb_manual_bad_hex_through_real_schema_shows_friendly_error(self, hass):
+        """B3: unparseable VID/PID text surfaces the translated
+        "invalid_usb_device" error (via the handler's _parse_vid_pid try/
+        except) instead of a raw voluptuous schema error.
+        """
+        with patch(
+            "custom_components.escpos_printer._config_flow.usb_steps._discover_usb_printers",
+            return_value=[],
+        ):
+            result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+            result2 = await hass.config_entries.flow.async_configure(
+                result["flow_id"], {CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB}
+            )
+            assert result2["step_id"] == "usb_select"
+            result3 = await hass.config_entries.flow.async_configure(
+                result2["flow_id"], {"usb_device": "__manual__"}
+            )
+            assert result3["step_id"] == "usb_manual"
+
+            result4 = await hass.config_entries.flow.async_configure(
+                result3["flow_id"],
+                {
+                    CONF_VENDOR_ID: "not_hex_or_decimal",
+                    CONF_PRODUCT_ID: "0x0202",
+                    "timeout": 4.0,
+                    "profile": "",
+                },
+            )
+
+        assert result4["type"] == "form"
+        assert result4["step_id"] == "usb_manual"
+        assert result4["errors"]["base"] == "invalid_usb_device"
+
 
 class TestUsbDiscoveryStep:
     """Tests for USB discovery integration."""
@@ -305,6 +383,56 @@ class TestUsbDiscoveryStep:
 
         assert result["type"] == "form"
         assert result["step_id"] == "usb_confirm"
+
+    @pytest.mark.asyncio
+    async def test_step_usb_discovery_already_in_progress_aborts(self, hass):
+        """B6: a second flow for a device already parked in a discovery flow
+        aborts with the translated "already_in_progress" reason.
+
+        Drives both flows through the real ``hass.config_entries.flow``
+        manager (not direct step calls) so HA's own
+        ``async_set_unique_id(raise_on_progress=True)`` duplicate-flow guard
+        actually fires.
+        """
+        discovery_info = MockUsbServiceInfo(
+            device="/dev/usb/001",
+            vid="04B8",
+            pid="0202",
+            serial_number=None,
+            manufacturer="Epson",
+            description="Epson TM-T88V",
+        )
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": "usb"}, data=discovery_info
+        )
+        assert result["type"] == "form"
+        assert result["step_id"] == "usb_confirm"
+
+        no_serial_device = {
+            "vendor_id": 0x04B8,
+            "product_id": 0x0202,
+            "manufacturer": "Epson",
+            "product": "TM-T88V",
+            "serial_number": None,
+            "label": "Epson TM-T88V (04B8:0202)",
+            "_choice_key": "04B8:0202#0",
+        }
+        with patch(
+            "custom_components.escpos_printer._config_flow.usb_steps._discover_usb_printers",
+            return_value=[no_serial_device],
+        ):
+            result2 = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+            result3 = await hass.config_entries.flow.async_configure(
+                result2["flow_id"], {CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB}
+            )
+            assert result3["step_id"] == "usb_select"
+            result4 = await hass.config_entries.flow.async_configure(
+                result3["flow_id"],
+                {"usb_device": "04B8:0202#0", "timeout": 4.0, "profile": ""},
+            )
+
+        assert result4["type"] == "abort"
+        assert result4["reason"] == "already_in_progress"
 
     @pytest.mark.asyncio
     async def test_step_usb_discovery_invalid(self, hass):

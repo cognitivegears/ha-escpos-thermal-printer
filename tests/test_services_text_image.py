@@ -203,3 +203,25 @@ async def test_print_text_image_rejects_font_outside_trusted_dirs(hass, tmp_path
             {"text": "X", "font_path": str(elsewhere)},
             blocking=True,
         )
+
+
+async def test_print_text_image_rejects_image_rotation_and_image_align(hass) -> None:  # type: ignore[no-untyped-def]
+    """image_rotation/image_align are dead fields the handler always overrides.
+
+    Before this fix they were silently accepted then discarded (the
+    handler forces ``image_rotation=0`` and ``image_align=<align>`` before
+    dispatch); passing either must now be a validation error at the schema
+    layer instead of a silent no-op.
+    """
+    import pytest
+    import voluptuous as vol
+
+    await _setup_entry(hass)
+    for bad_field, value in (("image_rotation", 90), ("image_align", "center")):
+        with pytest.raises(vol.Invalid):
+            await hass.services.async_call(
+                DOMAIN,
+                "print_text_image",
+                {"text": "X", bad_field: value},
+                blocking=True,
+            )

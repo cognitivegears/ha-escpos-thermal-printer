@@ -31,10 +31,11 @@ from ..security import (
 
 _LOGGER = logging.getLogger(__name__)
 
-# Fallback when the printer profile reports no usable pixel width. 512 px
-# is a worst-case-safe default for 58 mm thermals; 80 mm printers should
-# override with their actual width (576) via the adapter base.
-FALLBACK_PROFILE_WIDTH = 512
+# Fallback when the printer profile reports no usable pixel width. 384 px
+# is the worst-case-safe default (58 mm @ 203 dpi); 512 would clip a 58 mm
+# head. 80 mm printers should override with their actual width (576) via
+# the adapter base / profile.
+FALLBACK_PROFILE_WIDTH = 384
 
 # NOTE: we deliberately do NOT set ``PIL.Image.MAX_IMAGE_PIXELS`` — that
 # is a process-global shared with every other Pillow consumer in the HA

@@ -11,6 +11,7 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
+from ..const import DEFAULT_CHUNK_DELAY_MS_BLUETOOTH
 from ..security import sanitize_log_message
 from . import bluetooth_transport
 from ._escpos_bluetooth import make_bluetooth_escpos
@@ -40,7 +41,7 @@ class BluetoothPrinterAdapter(EscposPrinterAdapterBase):
 
     # Slow serial-over-RFCOMM links need a small inter-slice delay to
     # avoid buffer overruns (issue #43). Network/USB don't.
-    default_chunk_delay_ms = 50
+    default_chunk_delay_ms = DEFAULT_CHUNK_DELAY_MS_BLUETOOTH
 
     def __init__(self, config: BluetoothPrinterConfig) -> None:
         super().__init__(config)

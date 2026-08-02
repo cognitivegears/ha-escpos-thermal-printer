@@ -32,6 +32,7 @@ from ..const import (
     ATTR_TIMES,
     ATTR_UNDERLINE,
     ATTR_WIDTH,
+    DEFAULT_CODEPAGE,
     DOMAIN,
 )
 from ..text_utils import transcode_to_codepage
@@ -93,7 +94,7 @@ async def async_call_action_from_config(
     elif action_type == ACTION_PRINT_QR:
         await _call_print_qr(hass, adapter, defaults, config)
     elif action_type == ACTION_PRINT_IMAGE:
-        await _call_print_image(hass, adapter, defaults, config)
+        await _call_print_image(hass, adapter, defaults, config, context)
     elif action_type == ACTION_PRINT_BARCODE:
         await _call_print_barcode(hass, adapter, defaults, config)
     elif action_type == ACTION_FEED:
@@ -119,7 +120,7 @@ async def _call_print_text_utf8(
 
     # Get the configured codepage for transcoding
     adapter_config = adapter._config
-    codepage = adapter_config.codepage or "CP437"
+    codepage = adapter_config.codepage or DEFAULT_CODEPAGE
 
     # Transcode UTF-8 text to the target codepage
     transcoded_text = await hass.async_add_executor_job(transcode_to_codepage, text, codepage)
@@ -182,8 +183,14 @@ async def _call_print_image(
     adapter: Any,
     defaults: dict[str, Any],
     config: ConfigType,
+    context: Context | None,
 ) -> None:
-    """Execute print_image action."""
+    """Execute print_image action.
+
+    ``context`` is forwarded to ``adapter.print_image`` so camera/image
+    entity reads go through the same per-user ACL check as the
+    ``print_image`` service call (see ``image_sources._check_user_can_read_entity``).
+    """
     await adapter.print_image(
         hass,
         image=config[ATTR_IMAGE],
@@ -191,6 +198,7 @@ async def _call_print_image(
         align=config.get(ATTR_ALIGN, defaults.get("align")),
         cut=config.get(ATTR_CUT, defaults.get("cut")),
         feed=config.get(ATTR_FEED),
+        context=context,
     )
 
 

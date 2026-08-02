@@ -34,7 +34,6 @@ from ..const import (
     CONF_SERIAL_WRITE_CHUNK_SIZE,
     CONF_STATUS_INTERVAL,
     CONF_TIMEOUT,
-    CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
     CONNECTION_TYPE_SERIAL,
     CONNECTION_TYPE_USB,
@@ -122,7 +121,7 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
                 )
                 user_input[CONF_CODEPAGE] = ""
                 codepage = ""
-                # Line width and cut mode will be reset to profile defaults
+                # Encoding options are reset to profile defaults.
 
             # Handle custom profile
             if profile == PROFILE_CUSTOM:
@@ -202,15 +201,14 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
         # Check connection type to show appropriate options
         connection_type = self.config_entry.data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
 
-        # Reliability profile: defaults to "auto" for new entries.
-        # Bluetooth defaults to "bluetooth_safe" since SPP transports
-        # need the throttle on first use; the user can still pick auto
-        # if their hardware is fast enough.
+        # Reliability profile: the runtime (__init__.py) always falls back
+        # to "auto" when nothing is stored in options, regardless of
+        # connection type -- so the form must display that same default,
+        # not "bluetooth_safe", or opening options and pressing Submit
+        # with no changes would silently switch a Bluetooth entry's
+        # runtime behaviour.
         current_reliability = self.config_entry.options.get(
-            CONF_RELIABILITY_PROFILE,
-            RELIABILITY_PROFILE_BLUETOOTH
-            if connection_type == CONNECTION_TYPE_BLUETOOTH
-            else RELIABILITY_PROFILE_AUTO,
+            CONF_RELIABILITY_PROFILE, RELIABILITY_PROFILE_AUTO
         )
         reliability_choices = dict(_RELIABILITY_LABELS)
 

@@ -60,6 +60,7 @@ from .printer import (
     SerialPrinterConfig,
     UsbPrinterConfig,
     create_printer_adapter,
+    profile_width_issue_id,
 )
 from .security import sanitize_log_message
 from .services import async_setup_services, async_unload_services
@@ -254,6 +255,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bo
         )
 
     adapter = create_printer_adapter(config)
+    adapter.entry_id = entry.entry_id
 
     reliability_profile = entry.options.get(CONF_RELIABILITY_PROFILE, RELIABILITY_PROFILE_AUTO)
     adapter.reliability_profile_defaults = dict(
@@ -307,8 +309,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> b
         try:
             adapter = entry.runtime_data.adapter
             await adapter.stop(hass)
-        except Exception:  # best effort on unload
-            pass
+        except Exception as err:  # best effort on unload
+            _LOGGER.debug(
+                "Adapter stop failed for entry %s: %s",
+                entry.entry_id,
+                sanitize_log_message(str(err)),
+            )
         _LOGGER.debug("Unloaded entry %s", entry.entry_id)
 
         # If this was the last loaded config entry, tear down global services.
@@ -324,3 +330,23 @@ async def async_unload_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> b
             _LOGGER.debug("Unloaded global services for %s", DOMAIN)
 
     return unload_ok
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> None:
+    """Clean up entry-scoped repair issues when the entry is deleted.
+
+    Without this, a profile_width_fallback issue filed for this entry
+    (see EscposPrinterAdapterBase._raise_profile_width_repair_issue) would
+    linger in the repairs UI forever, even after the printer itself is
+    removed from Home Assistant.
+    """
+    try:
+        from homeassistant.helpers import issue_registry as ir  # noqa: PLC0415
+
+        ir.async_delete_issue(hass, DOMAIN, profile_width_issue_id(entry.entry_id))
+    except Exception as err:  # best effort
+        _LOGGER.debug(
+            "Could not clean up repair issues for entry %s: %s",
+            entry.entry_id,
+            sanitize_log_message(str(err)),
+        )

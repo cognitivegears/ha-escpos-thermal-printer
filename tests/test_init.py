@@ -131,3 +131,30 @@ async def test_unload_calls_adapter_stop(hass):  # type: ignore[no-untyped-def]
             assert await hass.config_entries.async_unload(entry.entry_id)
             await hass.async_block_till_done()
             stop_spy.assert_called_once()
+
+
+async def test_unload_logs_adapter_stop_failure(hass, caplog):  # type: ignore[no-untyped-def]
+    """A failing adapter.stop() during unload must leave a debug-level trace.
+
+    Regression: async_unload_entry used to silently `pass` on any
+    exception from adapter.stop(), leaving no trace of a hung close.
+    """
+    import logging
+
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    with patch("escpos.printer.Network"):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+        adapter = entry.runtime_data.adapter
+        with (
+            patch.object(adapter, "stop", side_effect=RuntimeError("boom")),
+            caplog.at_level(logging.DEBUG, logger="custom_components.escpos_printer"),
+        ):
+            assert await hass.config_entries.async_unload(entry.entry_id)
+            await hass.async_block_till_done()
+
+    assert any(
+        "Adapter stop failed" in rec.message and "boom" in rec.message for rec in caplog.records
+    )

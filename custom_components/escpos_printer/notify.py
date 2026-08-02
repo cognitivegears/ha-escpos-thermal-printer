@@ -13,6 +13,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity import DeviceInfo
 
+from .const import DEFAULT_CODEPAGE
 from .device import build_device_info
 from .image_sources import extract_image_kwargs
 from .security import sanitize_log_message
@@ -109,7 +110,7 @@ class EscposNotifyEntity(NotifyEntity):
         use_utf8 = kwargs.get("utf8", False)
         encoding = kwargs.get("encoding")
         if use_utf8:
-            codepage = adapter.config.codepage or "CP437"
+            codepage = adapter.config.codepage or DEFAULT_CODEPAGE
             text = await self._hass.async_add_executor_job(transcode_to_codepage, text, codepage)
             encoding = None  # Let printer use configured codepage
 

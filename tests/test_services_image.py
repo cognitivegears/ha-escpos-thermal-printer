@@ -266,6 +266,77 @@ async def test_preview_image_writes_png_and_returns_path(hass, tmp_path):  # typ
     assert saved.mode == "1"
 
 
+async def test_preview_image_accepts_cut_and_feed(hass, tmp_path):  # type: ignore[no-untyped-def]
+    """cut/feed are printer-only knobs but must be accepted, not rejected.
+
+    CLAUDE.md documents that preview_image accepts the printer-communication
+    knobs (they have no effect on the PNG) so programmatic callers sharing
+    kwargs with print_image don't break. Before this fix, cut/feed were
+    missing from PREVIEW_IMAGE_SCHEMA and voluptuous rejected them as
+    "extra keys not allowed".
+    """
+    img_path = tmp_path / "src.png"
+    Image.new("L", (40, 40), color=128).save(img_path)
+    hass.config.allowlist_external_dirs = {str(tmp_path)}
+    await _setup(hass)
+
+    fake = MagicMock()
+    with patch("escpos.printer.Network", return_value=fake):
+        result = await hass.services.async_call(
+            DOMAIN,
+            "preview_image",
+            {"image": str(img_path), "cut": "full", "feed": 2},
+            blocking=True,
+            return_response=True,
+        )
+    assert isinstance(result, dict)
+
+
+async def test_preview_image_debug_log_only_when_printer_only_keys_passed(hass, tmp_path, caplog):  # type: ignore[no-untyped-def]
+    """The "ignoring printer-only keys" debug line only fires when a caller
+    actually supplied one of those keys — not on every call, even though
+    voluptuous fills in schema defaults like high_density=True/center=False
+    before the handler runs.
+    """
+    import logging
+
+    img_path = tmp_path / "src.png"
+    Image.new("L", (40, 40), color=128).save(img_path)
+    hass.config.allowlist_external_dirs = {str(tmp_path)}
+    await _setup(hass)
+
+    fake = MagicMock()
+    log_name = "custom_components.escpos_printer.services.print_handlers"
+    with (
+        patch("escpos.printer.Network", return_value=fake),
+        caplog.at_level(logging.DEBUG, logger=log_name),
+    ):
+        caplog.clear()
+        await hass.services.async_call(
+            DOMAIN,
+            "preview_image",
+            {"image": str(img_path)},
+            blocking=True,
+            return_response=True,
+        )
+    assert "ignoring printer-only keys" not in caplog.text
+
+    with (
+        patch("escpos.printer.Network", return_value=fake),
+        caplog.at_level(logging.DEBUG, logger=log_name),
+    ):
+        caplog.clear()
+        await hass.services.async_call(
+            DOMAIN,
+            "preview_image",
+            {"image": str(img_path), "fragment_height": 128},
+            blocking=True,
+            return_response=True,
+        )
+    assert "ignoring printer-only keys" in caplog.text
+    assert "fragment_height" in caplog.text
+
+
 async def test_preview_image_rejects_output_path_outside_tempdir(hass, tmp_path):  # type: ignore[no-untyped-def]
     """S-M5/T-H2: user-supplied output_path must be inside the system tempdir.
 

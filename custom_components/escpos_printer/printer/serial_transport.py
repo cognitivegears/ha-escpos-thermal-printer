@@ -130,7 +130,15 @@ def open_serial_transport(
     )
     # serialx does not auto-open on construction (unlike pyserial); _fileno
     # remains None until open() is called, causing AssertionError on write().
-    port.open()
+    try:
+        port.open()
+    except Exception:
+        # The connect path retries up to 3x on failure (base_adapter); leaving
+        # this port's fd/handle open across retries would leak one per
+        # attempt.
+        with contextlib.suppress(Exception):
+            port.close()
+        raise
     return _SerialTransportImpl(
         port,
         write_chunk_size=write_chunk_size,

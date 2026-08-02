@@ -8,6 +8,7 @@ gives users a real "low battery" signal they can automate on.
 
 from __future__ import annotations
 
+from datetime import timedelta
 import logging
 from typing import Any
 
@@ -35,6 +36,13 @@ _LOGGER = logging.getLogger(__name__)
 
 # Battery polling cadence is set by _attr_should_poll on the entity.
 PARALLEL_UPDATES = 0
+
+# Both polling sensors below were documented as "every 5 minutes" but
+# nothing enforced it -- HA's entity-component default poll interval is
+# 30s, so a full D-Bus GetManagedObjects round-trip (battery) or a fresh
+# printer connection (paper status) was happening 10x more often than
+# intended.
+SCAN_INTERVAL = timedelta(minutes=5)
 
 # python-escpos paper_status() return codes → enum sensor options.
 _PAPER_STATUS_OPTIONS = {2: "ok", 1: "low", 0: "out"}

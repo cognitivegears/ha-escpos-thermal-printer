@@ -226,6 +226,33 @@ def fake_bluetooth_module(request: Any) -> Generator[None]:
 
 
 @pytest.fixture(autouse=True)
+def fake_network_status_probe(request: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stub the network adapter's raw socket probe for unit tests.
+
+    ``EscposPrinterAdapterBase.start()`` now always runs a one-shot status
+    probe (see base_adapter.py), and NetworkPrinterAdapter._status_check
+    calls ``socket.create_connection`` directly -- unlike the escpos/usb/
+    bluetooth transports, that's not covered by any of the fakes above.
+    pytest-homeassistant-custom-component blocks all real sockets, and
+    raises ``pytest_socket.SocketBlockedError`` (a ``RuntimeError``, not
+    ``OSError``), which the adapter's ``except OSError`` doesn't catch --
+    every network-entry test would otherwise fail at teardown with "the
+    test opens sockets". Raising OSError here instead keeps the probe on
+    its normal "unreachable" path. Tests that want to exercise a specific
+    probe outcome already monkeypatch this same target themselves (see
+    test_adapter_lifecycle.py), which takes precedence within its scope.
+    """
+    if request.node.get_closest_marker("integration"):
+        return
+    from custom_components.escpos_printer.printer import network_adapter
+
+    def _blocked_create_connection(*_args: Any, **_kwargs: Any) -> Any:
+        raise OSError("unit test: no real network access")
+
+    monkeypatch.setattr(network_adapter.socket, "create_connection", _blocked_create_connection)
+
+
+@pytest.fixture(autouse=True)
 def disable_platform_forwarding_for_unit_tests(monkeypatch: Any, request: Any) -> None:
     """Avoid starting HA http/notify stack in unit tests.
 

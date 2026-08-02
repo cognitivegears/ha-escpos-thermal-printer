@@ -270,7 +270,9 @@ _IMAGE_OPTION_FRAGMENT_NOTIFY = MappingProxyType(
 )
 
 
-def _image_pipeline_knobs(prefix: str = "") -> dict[Any, Any]:
+def _image_pipeline_knobs(
+    prefix: str = "", *, exclude: frozenset[str] = frozenset()
+) -> dict[Any, Any]:
     """Pipeline-only knobs (dither/threshold/impl/rotation/...) without ``fallback_image``.
 
     Services that *produce* their own image bytes (currently
@@ -286,12 +288,19 @@ def _image_pipeline_knobs(prefix: str = "") -> dict[Any, Any]:
     image keys (``dither``, ``invert``, …) from the surrounding service
     options. ``print_text_image`` uses ``"image_"`` so its UI fields
     line up with ``print_message``'s ``image_*`` knobs.
+
+    ``exclude`` additionally drops unprefixed attribute names (e.g.
+    ``{ATTR_ROTATION, ATTR_ALIGN}``) — for a service whose handler
+    unconditionally overrides those fields before dispatch, accepting
+    them at the schema layer would let a caller pass a value that is
+    then silently discarded.
     """
-    fallback_key = f"{prefix}{ATTR_FALLBACK_IMAGE}" if prefix else ATTR_FALLBACK_IMAGE
+    drop_keys = {f"{prefix}{ATTR_FALLBACK_IMAGE}" if prefix else ATTR_FALLBACK_IMAGE}
+    drop_keys.update(f"{prefix}{name}" if prefix else name for name in exclude)
     return {
         k: v
         for k, v in _image_option_fragment(prefix).items()
-        if not (isinstance(k, vol.Optional) and k.schema == fallback_key)
+        if not (isinstance(k, vol.Optional) and k.schema in drop_keys)
     }
 
 
@@ -440,6 +449,13 @@ PREVIEW_IMAGE_SCHEMA = vol.Schema(
         vol.Required(ATTR_IMAGE): _IMAGE_SOURCE,
         vol.Optional("output_path"): cv.string,
         **_IMAGE_OPTION_FRAGMENT_PLAIN,
+        # Printer-communication knobs have no effect on the PNG written to
+        # disk (see CLAUDE.md), but are accepted here — not rejected as
+        # "extra keys" — so programmatic callers sharing kwargs with
+        # print_image don't break. handle_preview_image() logs a debug line
+        # when they're actually passed.
+        vol.Optional(ATTR_CUT): _CUT,
+        vol.Optional(ATTR_FEED): _FEED,
     }
 )
 
@@ -689,7 +705,9 @@ PRINT_TEXT_IMAGE_SCHEMA = _with_target_validation(
         ),
         # Text-canvas controls: applied to the PIL canvas before binarisation,
         # so the printed orientation/alignment matches what the user typed.
-        # The image-side ``image_rotation`` is forced to 0 at dispatch.
+        # The image-side ``image_rotation`` is forced to 0 and ``image_align``
+        # to this ``align`` at dispatch, so those two image-pipeline knobs are
+        # excluded below rather than silently accepted-then-overridden.
         vol.Optional(ATTR_ALIGN, default="left"): _ALIGN,
         vol.Optional(ATTR_ROTATION, default=0): vol.All(vol.Coerce(int), vol.In(ROTATION_VALUES)),
         vol.Optional(ATTR_CUT): _CUT,
@@ -697,8 +715,10 @@ PRINT_TEXT_IMAGE_SCHEMA = _with_target_validation(
         # Pipeline knobs prefixed with ``image_`` so the UI fields line up
         # one-to-one with ``print_message``'s ``image_*`` knobs.
         # ``fallback_image`` is intentionally excluded because this service
-        # renders its own bytes (see :func:`_image_pipeline_knobs`).
-        **_image_pipeline_knobs("image_"),
+        # renders its own bytes; ``image_rotation``/``image_align`` are
+        # excluded because the handler always overrides them (see
+        # :func:`_image_pipeline_knobs`).
+        **_image_pipeline_knobs("image_", exclude=frozenset({ATTR_ROTATION, ATTR_ALIGN})),
     }
 )
 

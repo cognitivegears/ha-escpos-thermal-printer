@@ -154,6 +154,36 @@ async def test_prepare_image_for_print_reads_adapter_allow_local(hass):  # type:
     assert seen.get("allow_local") is True
 
 
+async def test_prepare_image_records_failure_when_classify_source_raises(hass):  # type: ignore[no-untyped-def]
+    """A malformed source string must still update ``_image_stats``.
+
+    ``classify_source`` (called to populate ``last_source_kind``) can itself
+    raise on a malformed ``data:`` URI. Before this fix that call ran
+    outside the try/except that maintains ``total_failures`` /
+    ``last_error_class``, so this failure mode skipped the diagnostics
+    bookkeeping entirely.
+    """
+    from homeassistant.exceptions import ServiceValidationError
+
+    from custom_components.escpos_printer.printer import image_operations
+    from custom_components.escpos_printer.printer.image_operations import ImageStats
+
+    host = MagicMock()
+    host.allow_local_image_urls = False
+    host.get_profile_pixel_width.return_value = 384
+    host.reliability_profile_defaults = {}
+    host.default_chunk_delay_ms = 0
+    host._image_stats = ImageStats()
+
+    with pytest.raises(ServiceValidationError):
+        await image_operations.prepare_image_for_print(
+            host, hass, "data:text/plain;base64,not-an-image"
+        )
+
+    assert host._image_stats.total_failures == 1
+    assert host._image_stats.last_error_class == "ServiceValidationError"
+
+
 def test_is_timeout_cause_walks_chain():  # type: ignore[no-untyped-def]
     """The helper must recognise a wrapped TimeoutError anywhere in the chain."""
     from custom_components.escpos_printer.printer.image_operations import (

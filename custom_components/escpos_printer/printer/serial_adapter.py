@@ -13,6 +13,7 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
+from ..const import DEFAULT_CHUNK_DELAY_MS_NETWORK
 from ..security import sanitize_log_message
 from . import serial_transport
 from ._escpos_serial import make_serial_escpos
@@ -43,7 +44,7 @@ class SerialPrinterAdapter(EscposPrinterAdapterBase):
     _CONNECT_RETRIES = 2
     _CONNECT_RETRY_DELAY_S = 0.3
 
-    default_chunk_delay_ms = 0
+    default_chunk_delay_ms = DEFAULT_CHUNK_DELAY_MS_NETWORK
 
     def __init__(self, config: SerialPrinterConfig) -> None:
         super().__init__(config)

@@ -28,11 +28,42 @@ class FakePrinterAcceptFS:
 
 
 class FakePrinterRejectFS(FakePrinterAcceptFS):
-    def barcode(self, code: str, bc: str, **kwargs: Any) -> None:
-        if "force_software" in kwargs:
-            # Simulate older python-escpos rejecting the kwarg
-            raise TypeError("unexpected keyword argument 'force_software'")
-        self.calls.append((code, bc, kwargs))
+    """Simulates an older python-escpos with no ``force_software`` parameter.
+
+    Explicit named parameters (no ``**kwargs`` catch-all) mirror the real
+    ``Escpos.barcode`` signature shape, so
+    ``barcode_operations._supported_barcode_kwargs`` — which decides support
+    via ``inspect.signature`` up front rather than retrying after a
+    ``TypeError`` — correctly identifies ``force_software`` as unsupported
+    and omits it before ever calling ``barcode()``.
+    """
+
+    def barcode(
+        self,
+        code: str,
+        bc: str,
+        *,
+        height: int = 64,
+        width: int = 3,
+        pos: str = "BELOW",
+        font: str = "A",
+        align_ct: bool = True,
+        check: bool = True,
+    ) -> None:
+        self.calls.append(
+            (
+                code,
+                bc,
+                {
+                    "height": height,
+                    "width": width,
+                    "pos": pos,
+                    "font": font,
+                    "align_ct": align_ct,
+                    "check": check,
+                },
+            )
+        )
 
 
 @pytest.mark.asyncio
@@ -74,7 +105,7 @@ async def test_barcode_passes_force_software(monkeypatch: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_barcode_retries_without_force_software(monkeypatch: Any) -> None:
+async def test_barcode_omits_unsupported_force_software(monkeypatch: Any) -> None:
     created: list[FakePrinterRejectFS] = []
 
     def fake_network() -> Any:
@@ -99,7 +130,7 @@ async def test_barcode_retries_without_force_software(monkeypatch: Any) -> None:
         force_software="graphics",
     )
 
-    # Verify that after TypeError, a successful call without force_software occurred
+    # Verify force_software was omitted up front (no TypeError/retry involved)
     assert created, "No printer instances were created"
     target = None
     for inst in created:

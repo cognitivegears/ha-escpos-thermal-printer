@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from homeassistant.const import CONF_HOST, CONF_PORT
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+import voluptuous as vol
 
 from custom_components.escpos_printer.const import (
     CONF_BAUDRATE,
@@ -227,6 +228,181 @@ async def test_reconfigure_usb_backfills_unique_id_when_none(hass):  # type: ign
     assert updated.unique_id == "usb:04b8:0202"
 
 
+async def test_reconfigure_usb_manual_keeps_serial_suffixed_unique_id(hass):  # type: ignore[no-untyped-def]
+    """B4: reconfiguring via the manual VID:PID fallback keeps a
+    serial-suffixed unique_id instead of dead-ending on a mismatch.
+
+    reconfigure_usb_manual never asks for a serial number, so it always
+    recomputes a bare "usb:vid:pid" id. That must not mismatch against an
+    entry whose original unique_id was serial-suffixed -- the vid:pid base
+    still matches, so the entry's existing (serial-suffixed) unique_id is
+    kept.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="USB Printer 04B8:0202",
+        data={
+            CONF_VENDOR_ID: 0x04B8,
+            CONF_PRODUCT_ID: 0x0202,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+        },
+        unique_id="usb:04b8:0202:SN12345",
+    )
+    entry.add_to_hass(hass)
+    entry_id = entry.entry_id
+
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.usb_steps._discover_usb_printers",
+            return_value=[],  # nothing discovered -> forces the manual fallback
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.usb_steps._can_connect_usb",
+            return_value=(True, None, None),
+        ),
+        patch("custom_components.escpos_printer.async_setup_entry", return_value=True),
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        assert result["type"] == "form"
+        assert result["step_id"] == "reconfigure_usb"
+
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"usb_device": "__manual__"}
+        )
+        assert result2["step_id"] == "reconfigure_usb_manual"
+
+        result3 = await hass.config_entries.flow.async_configure(
+            result2["flow_id"],
+            {CONF_VENDOR_ID: "0x04B8", CONF_PRODUCT_ID: "0x0202", "timeout": 4.0},
+        )
+        await hass.async_block_till_done()
+
+    assert result3["type"] == "abort"
+    assert result3["reason"] == "reconfigure_successful"
+
+    updated = hass.config_entries.async_get_entry(entry_id)
+    assert updated is not None
+    assert updated.unique_id == "usb:04b8:0202:SN12345"  # kept, not dropped
+
+
+async def test_reconfigure_usb_manual_different_vid_pid_still_aborts(hass):  # type: ignore[no-untyped-def]
+    """A genuinely different vid:pid base must still trip the mismatch guard."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="USB Printer 04B8:0202",
+        data={
+            CONF_VENDOR_ID: 0x04B8,
+            CONF_PRODUCT_ID: 0x0202,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+        },
+        unique_id="usb:04b8:0202:SN12345",
+    )
+    entry.add_to_hass(hass)
+
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.usb_steps._discover_usb_printers",
+            return_value=[],
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.usb_steps._can_connect_usb"
+        ) as mock_can_connect,
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"usb_device": "__manual__"}
+        )
+        assert result2["step_id"] == "reconfigure_usb_manual"
+
+        result3 = await hass.config_entries.flow.async_configure(
+            result2["flow_id"],
+            {CONF_VENDOR_ID: "0x0483", CONF_PRODUCT_ID: "0x5720", "timeout": 4.0},
+        )
+
+    assert result3["type"] == "abort"
+    assert result3["reason"] == "unique_id_mismatch"
+    mock_can_connect.assert_not_called()  # mismatch guard fires before any probe
+    assert entry.unique_id == "usb:04b8:0202:SN12345"  # untouched
+
+
+async def test_reconfigure_usb_manual_seeds_stored_timeout(hass):  # type: ignore[no-untyped-def]
+    """B5: opening the manual USB reconfigure form suggests the entry's
+    stored timeout instead of silently defaulting to DEFAULT_TIMEOUT on
+    the next submit (unlike network/serial/bluetooth reconfigure, this
+    form didn't call ``add_suggested_values_to_schema``).
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="USB Printer 04B8:0202",
+        data={
+            CONF_VENDOR_ID: 0x04B8,
+            CONF_PRODUCT_ID: 0x0202,
+            CONF_TIMEOUT: 12.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+        },
+        unique_id="usb:04b8:0202",
+    )
+    entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.escpos_printer._config_flow.usb_steps._discover_usb_printers",
+        return_value=[],
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"usb_device": "__manual__"}
+        )
+
+    assert result2["step_id"] == "reconfigure_usb_manual"
+    suggested = {
+        key.schema: key.description["suggested_value"]
+        for key in result2["data_schema"].schema
+        if isinstance(key, vol.Marker) and key.description
+    }
+    assert suggested[CONF_TIMEOUT] == 12.0
+
+
+async def test_reconfigure_usb_seeds_stored_timeout(hass):  # type: ignore[no-untyped-def]
+    """B5: same guard as above, for the discovery-backed reconfigure_usb form."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="USB Printer 04B8:0202",
+        data={
+            CONF_VENDOR_ID: 0x04B8,
+            CONF_PRODUCT_ID: 0x0202,
+            CONF_TIMEOUT: 9.5,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB,
+        },
+        unique_id="usb:04b8:0202",
+    )
+    entry.add_to_hass(hass)
+
+    discovered = {
+        "vendor_id": 0x04B8,
+        "product_id": 0x0202,
+        "manufacturer": "Epson",
+        "product": "TM-T88V",
+        "serial_number": None,
+        "label": "Epson TM-T88V (04B8:0202)",
+        "_choice_key": "04B8:0202#0",
+    }
+    with patch(
+        "custom_components.escpos_printer._config_flow.usb_steps._discover_usb_printers",
+        return_value=[discovered],
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+
+    assert result["step_id"] == "reconfigure_usb"
+    suggested = {
+        key.schema: key.description["suggested_value"]
+        for key in result["data_schema"].schema
+        if isinstance(key, vol.Marker) and key.description
+    }
+    assert suggested[CONF_TIMEOUT] == 9.5
+
+
 async def test_reconfigure_network_case_insensitive_collision_aborts(hass):  # type: ignore[no-untyped-def]
     """Reconfiguring to a host that only differs in case from another entry aborts.
 
@@ -343,7 +519,7 @@ async def _run_usb_manual_flow(hass, **overrides):  # type: ignore[no-untyped-de
         result2["flow_id"], {"usb_device": "__manual__"}
     )
     assert result3["step_id"] == "usb_manual"
-    data = {CONF_VENDOR_ID: 0x04B8, CONF_PRODUCT_ID: 0x0202, "timeout": 4.0, "profile": ""}
+    data = {CONF_VENDOR_ID: "0x04B8", CONF_PRODUCT_ID: "0x0202", "timeout": 4.0, "profile": ""}
     data.update(overrides)
     return await hass.config_entries.flow.async_configure(result3["flow_id"], data)
 

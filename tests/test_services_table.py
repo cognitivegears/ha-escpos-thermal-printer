@@ -126,3 +126,27 @@ async def test_print_table_with_style_none(hass) -> None:  # type: ignore[no-unt
     # No border characters anywhere.
     for ch in "+-|┌─│":
         assert ch not in printed
+
+
+async def test_print_table_explicit_column_widths_exceeding_line_width_raises(hass) -> None:  # type: ignore[no-untyped-def]
+    """Explicit column_widths that can't fit the printer raise a validation error.
+
+    Regression guard: the total_width clamp used to leave column_widths
+    untouched, so ``render_table`` raised a raw ``ValueError`` referencing
+    the clamped total_width — a number the caller never typed.
+    """
+    from homeassistant.exceptions import ServiceValidationError
+    import pytest
+
+    await _setup_entry(hass)
+    with patch("escpos.printer.Network"), pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN,
+            "print_table",
+            {
+                "rows": [["a", "b"]],
+                "total_width": 80,
+                "column_widths": [38, 38],
+            },
+            blocking=True,
+        )

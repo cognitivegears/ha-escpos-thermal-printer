@@ -95,7 +95,7 @@ Every image service accepts the same option set. In the UI form, image-processin
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| image_width | int | Target width in pixels. Defaults to the printer profile's max width (or 512 if unknown). Never upscales. Range 16–2048. |
+| image_width | int | Target width in pixels. Defaults to the printer profile's max width (or 384 if unknown). Never upscales. Range 16–2048. |
 | rotation | int | `0`, `90`, `180`, `270` (clockwise). EXIF orientation is auto-corrected. Default `0`. |
 | dither | string | `floyd-steinberg` (default), `none`, or `threshold`. |
 | threshold | int | 1–254 (default 128). Only used when `dither: threshold`. 100-180 typical for line art. |

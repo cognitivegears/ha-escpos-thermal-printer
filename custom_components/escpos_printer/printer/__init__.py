@@ -6,7 +6,7 @@ over network (TCP/IP), USB, Bluetooth Classic / RFCOMM, and serial connections.
 
 from __future__ import annotations
 
-from .base_adapter import EscposPrinterAdapterBase
+from .base_adapter import EscposPrinterAdapterBase, profile_width_issue_id
 from .bluetooth_adapter import BluetoothPrinterAdapter
 from .config import (
     BasePrinterConfig,
@@ -40,4 +40,5 @@ __all__ = [
     "UsbPrinterAdapter",
     "UsbPrinterConfig",
     "create_printer_adapter",
+    "profile_width_issue_id",
 ]

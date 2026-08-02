@@ -12,14 +12,12 @@ from .const import (
     CONF_CODEPAGE,
     CONF_CONNECTION_TYPE,
     CONF_IN_EP,
-    CONF_KEEPALIVE,
     CONF_LINE_WIDTH,
     CONF_OUT_EP,
     CONF_PRODUCT_ID,
     CONF_PROFILE,
     CONF_RFCOMM_CHANNEL,
     CONF_SERIAL_PORT,
-    CONF_STATUS_INTERVAL,
     CONF_VENDOR_ID,
     CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
@@ -154,13 +152,14 @@ async def async_get_config_entry_diagnostics(
         "entry": {
             "title": entry.title,
             "data": entry_data,
-            "options": {
-                CONF_CODEPAGE: options.get(CONF_CODEPAGE),
-                CONF_PROFILE: options.get(CONF_PROFILE),
-                CONF_LINE_WIDTH: options.get(CONF_LINE_WIDTH),
-                CONF_KEEPALIVE: options.get(CONF_KEEPALIVE),
-                CONF_STATUS_INTERVAL: options.get(CONF_STATUS_INTERVAL),
-            },
+            # Dump every option rather than hand-picking keys: the options
+            # flow writes several triage-relevant fields (serial chunk
+            # size/delay, allow_local_image_urls, default_align/cut,
+            # reliability_profile, ...) that a hand-picked subset kept
+            # missing. async_redact_data below still strips anything
+            # matching TO_REDACT (recursively), so this doesn't leak more
+            # than the previous subset did.
+            "options": options,
         },
         "runtime": runtime,
     }

@@ -212,7 +212,7 @@ Every option in one place.
 
 | Option           | Default            | Description                                                                                                            |
 |------------------|--------------------|------------------------------------------------------------------------------------------------------------------------|
-| `image_width`    | profile max / 512  | Target width in pixels. Aspect ratio preserved. Never upscales.                                                        |
+| `image_width`    | profile max / 384  | Target width in pixels. Aspect ratio preserved. Never upscales. See [How the target width is chosen](#how-the-target-width-is-chosen). |
 | `rotation`       | `0`                | Degrees clockwise: `0`, `90`, `180`, `270`. EXIF orientation is fixed before this is applied.                          |
 | `dither`         | `floyd-steinberg`  | B&W conversion mode. `none` / `threshold` are alternatives.                                                            |
 | `threshold`      | `128`              | Threshold value (1–254). Only used when `dither: threshold`.                                                           |
@@ -229,6 +229,26 @@ Every option in one place.
 | `chunk_delay_ms` | reliability profile | Inter-chunk sleep (issue #43). Default depends on the printer's profile and transport. Raise if the printer freezes.  |
 | `cut`            | printer's `default_cut` | `none` / `partial` / `full` after printing                                                                       |
 | `feed`           | `0`                | Lines to feed after printing (0–50)                                                                                    |
+
+### How the target width is chosen
+
+Images wider than the target are downscaled to fit (never upscaled). The
+target is resolved in this order:
+
+1. **`image_width` on the service call** — always wins.
+2. **The selected printer profile's declared width** (`media.width.pixels`).
+3. **384 px fallback** — used when no profile is selected (the auto/default
+   profile) or the selected profile doesn't declare a pixel width.
+
+384 px is the full head width of a 58 mm printer at 203 dpi, chosen because
+it's the only value safe on every printer — the previous 512 px fallback
+overflowed 58 mm heads and corrupted output. The tradeoff: on an **80 mm
+printer (576-dot head) with no profile selected**, images print at about
+two-thirds of the paper width. If your prints look narrower than expected,
+either select your printer's profile in the integration options (best — it
+fixes text width and cut modes too) or set `image_width: 576` on the call.
+`calibration_print` prints a pixel ruler at the same resolved width, so the
+sheet you measure always matches what images will actually do.
 
 ### Reliability profile
 

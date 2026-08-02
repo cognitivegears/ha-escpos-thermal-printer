@@ -461,3 +461,31 @@ class TestSerialReleasePrinterFlush:
         await serial_adapter._release_printer(hass, printer, owned=True, failed=True)
         printer.flush.assert_not_called()
         printer.close.assert_called_once()
+
+
+class TestOpenSerialTransportOpenFailure:
+    """A failed ``port.open()`` must close the port, not leak its fd/handle."""
+
+    def test_port_closed_when_open_raises(self):
+        from custom_components.escpos_printer.printer.serial_transport import (
+            open_serial_transport,
+        )
+
+        port = MagicMock()
+        port.open.side_effect = OSError("device busy")
+        with patch("serialx.serial_for_url", return_value=port):
+            with pytest.raises(OSError, match="device busy"):
+                open_serial_transport("/dev/ttyUSB0", 9600, 1.0)
+        port.close.assert_called_once()
+
+    def test_port_close_error_does_not_mask_open_error(self):
+        from custom_components.escpos_printer.printer.serial_transport import (
+            open_serial_transport,
+        )
+
+        port = MagicMock()
+        port.open.side_effect = OSError("device busy")
+        port.close.side_effect = OSError("close also failed")
+        with patch("serialx.serial_for_url", return_value=port):
+            with pytest.raises(OSError, match="device busy"):
+                open_serial_transport("/dev/ttyUSB0", 9600, 1.0)

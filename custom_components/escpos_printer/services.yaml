@@ -1956,6 +1956,12 @@ print_message:
       description: Transport and reliability tuning. Leave unset to honor the printer's Reliability profile.
       collapsed: true
       fields:
+        image_high_density:
+          name: Image High Density
+          description: Use high-density printing mode if supported.
+          default: true
+          selector:
+            boolean: {}
         image_impl:
           name: Image Implementation
           description: >
@@ -2362,6 +2368,12 @@ print_text_image:
         image_mirror:
           name: Mirror
           description: Mirror the canvas horizontally.
+          default: false
+          selector:
+            boolean: {}
+        image_auto_resize:
+          name: Auto-Resize
+          description: Allow an oversized rendered canvas to be downscaled instead of erroring out.
           default: false
           selector:
             boolean: {}

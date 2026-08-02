@@ -68,7 +68,10 @@ class EscposOnlineSensor(BinarySensorEntity):
             self.async_write_ha_state()
 
         self._unsubscribe = self._adapter.add_status_listener(_on_status)
-        # Do not trigger a network probe automatically to keep unit tests offline
+        # No probe triggered here: the adapter already ran a one-shot
+        # initial probe during EscposPrinterAdapterBase.start() (before
+        # this entity was even constructed), so __init__ above already
+        # picked up a real status via adapter.get_status().
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

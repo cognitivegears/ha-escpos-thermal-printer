@@ -4,14 +4,22 @@ from unittest.mock import patch
 
 from homeassistant.const import CONF_HOST, CONF_PORT
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+import voluptuous as vol
 
 from custom_components.escpos_printer.const import (
+    CONF_BT_MAC,
     CONF_CODEPAGE,
+    CONF_CONNECTION_TYPE,
     CONF_LINE_WIDTH,
     CONF_PROFILE,
+    CONF_RELIABILITY_PROFILE,
+    CONF_RFCOMM_CHANNEL,
+    CONF_TIMEOUT,
+    CONNECTION_TYPE_BLUETOOTH,
     DOMAIN,
     OPTION_CUSTOM,
     PROFILE_CUSTOM,
+    RELIABILITY_PROFILE_AUTO,
 )
 
 
@@ -131,6 +139,36 @@ async def test_options_flow_custom_line_width_valid(hass):  # type: ignore[no-un
         await hass.async_block_till_done()
     assert result["type"] == "create_entry"
     assert result["data"][CONF_LINE_WIDTH] == 64
+
+
+async def test_options_flow_bluetooth_reliability_defaults_to_auto(hass):  # type: ignore[no-untyped-def]
+    """B7: the options form for a Bluetooth entry with no stored reliability
+    profile must default to "auto" -- the same fallback __init__.py uses at
+    runtime -- not "bluetooth_safe". Otherwise opening options and pressing
+    Submit with no changes silently switches the entry's print throttling.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Bluetooth Printer AA:BB:CC:DD:EE:FF",
+        data={
+            CONF_BT_MAC: "AA:BB:CC:DD:EE:FF",
+            CONF_RFCOMM_CHANNEL: 1,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH,
+        },
+        unique_id="bt:aa:bb:cc:dd:ee:ff",
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] == "form"
+
+    defaults = {
+        key.schema: key.default()
+        for key in result["data_schema"].schema
+        if isinstance(key, vol.Optional) and not isinstance(key.default, vol.Undefined)
+    }
+    assert defaults[CONF_RELIABILITY_PROFILE] == RELIABILITY_PROFILE_AUTO
 
 
 async def test_options_flow_custom_codepage_invalid(hass):  # type: ignore[no-untyped-def]

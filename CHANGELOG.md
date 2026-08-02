@@ -32,6 +32,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   Options" section groups — now have entries under strings.json's new
   `services` key, generated from `services.yaml` by
   `scripts/sync_service_translations.py` so the two can never drift.
+- **Every service now has an icon** in the automation action picker — 13
+  of the 22 were missing one.
+- **`print_message`'s High Density and `print_text_image`'s Auto-Resize
+  options are now visible in the UI forms** (previously accepted in
+  service calls but absent from the form).
 
 ### Fixed
 
@@ -54,14 +59,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **The "Online" connectivity sensor could latch on and never report
   offline.** Failed print operations now mark the printer offline
   immediately, and `print_barcode`, `feed`, `cut`, and `beep` now mark it
-  online on success (previously only text/QR/image prints did).
-  Paper-status probes and invalid barcode payloads deliberately do *not*
-  affect connectivity state — only real transport failures do.
+  online on success (previously only text/QR/image prints did). Invalid
+  barcode payloads deliberately do *not* affect connectivity state — only
+  real transport failures do.
+- **The "Online" connectivity sensor stayed "unknown" until the first
+  print** on a default install, because status polling is off by default
+  (`status_interval: 0`) and no probe ran before then. The adapter now
+  always runs a one-shot status probe at startup regardless of
+  `status_interval` (the option still only controls the *recurring*
+  probe). The paper-status sensor's periodic poll (network/USB only) now
+  also feeds the connectivity sensor, so it gets free updates between
+  prints instead of only on a failed paper-status query being silently
+  discarded.
+- **The "printer profile is missing pixel width" repair issue could
+  persist forever**, and two printers sharing the same profile name
+  could clobber each other's issue. It's now scoped per config entry,
+  cleared automatically once the profile resolves (or the printer is
+  removed), instead of only ever being created and never deleted.
+- **Diagnostics downloads omitted several options** (serial write
+  chunk size/delay, `allow_local_image_urls`, default align/cut,
+  reliability profile) needed for triage — only a hand-picked subset was
+  reported. The full options dict is now included (still redacted).
+- Both `should_poll` sensors (Bluetooth battery, paper status) were
+  documented as polling every 5 minutes but had no `SCAN_INTERVAL` set,
+  so they used Home Assistant's 30-second default — 10x more D-Bus
+  round-trips / printer connections than intended.
 - **USB printers that don't report a serial number now get a stable
   unique ID** (`usb:VID:PID`), preventing the same printer from being
   added twice. This includes manual VID:PID entry, where custom
   endpoints are folded into the ID so distinct same-model setups still
   coexist.
+- **USB reconfigure could dead-end with "Unique ID mismatch"** for
+  printers originally added with a serial number (or custom endpoints),
+  because the flow recomputed the ID without the suffix the reconfigure
+  form couldn't know. Reconfigure now keeps the entry's identity when
+  the VID:PID matches; pointing at a genuinely different device still
+  aborts. The form also no longer silently resets a tuned timeout back
+  to the default on submit.
+- **USB manual setup rejected the 0x-prefixed hex VID/PID format its own
+  help text recommends** — the fields only accepted bare integers. Hex
+  (`0x04B8`), decimal strings, and plain integers all work now.
+- **Options-flow validation errors displayed as raw keys** (e.g.
+  `invalid_profile`) instead of readable messages — the translations
+  existed only under the config-flow namespace. The `already_in_progress`
+  abort message was also missing.
+- **Opening Options on a Bluetooth printer and pressing Submit silently
+  changed print behavior**: the form displayed `bluetooth_safe` as the
+  reliability profile while runtime actually used `auto`. The form now
+  shows the value runtime uses.
+- **Calibration sheets printed at a different width than real images**
+  when no printer profile is configured: the image pipeline fell back to
+  512 px while `calibration_print`/`print_text_image` used 384. Unified
+  on 384 (58 mm-safe at 203 dpi; 512 clipped 58 mm heads). Note for 80 mm
+  printers without a profile selected: images now print at ~2/3 paper
+  width instead of ~89% — select your printer's profile or set
+  `image_width: 576` for full width (see the Images guide, "How the
+  target width is chosen").
+- **`print_kvtable` with a tiny `total_width` (3–4) raised a raw internal
+  error**; it's now a proper validation error naming the minimum for the
+  chosen border style.
+- **Box/table/kvtable layouts wider than the printer's line width were
+  shredded by re-wrapping**; `total_width` is now clamped to the
+  configured line width, with a warning naming both numbers. Explicit
+  `print_table` `column_widths` that can't fit the printer now raise a
+  clear validation error instead of an internal one.
+- **`preview_image` rejected `cut`/`feed`**, so a working `print_image`
+  call couldn't be pasted into it unchanged; they're now accepted (and
+  ignored, like the other printer-communication knobs).
+- **Serial connection retries leaked a port handle** each time opening
+  the port failed.
+- **A python-escpos keyword-signature mismatch could print duplicate
+  image/barcode fragments**: unsupported keywords were detected by
+  catching the error and re-sending, which duplicated any bytes already
+  written. Capability detection now happens up front via signature
+  inspection.
+- **Device actions offered cut modes the printer's profile doesn't
+  support** (e.g. full cut on partial-only cutters); the choices are now
+  profile-gated, matching the config flow.
 - **`print_barcode`** — an explicit `align` was silently overridden by
   the default center-align (`align_ct`); explicit `align` now wins
   unless `align_ct` is also explicitly set (calls setting neither behave
@@ -85,9 +159,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   Assistant renders those before the service is called. Only raw
   `{{ ... }}` strings typed directly into Developer Tools → Actions are
   now treated as literal text instead of being evaluated.
+- **The Print Image device action bypassed per-user camera/image entity
+  permission checks**: it invoked the printer without the calling user's
+  context, so a non-admin could print camera frames a direct service call
+  would refuse with `Unauthorized`. The action now passes the context
+  through, enforcing the same entity ACL on both paths.
 
 ### Changed
 
+- **`print_text_image` no longer accepts `image_rotation` /
+  `image_align`** — both were silently discarded (the service's own
+  alignment and orientation apply), so passing them is now a validation
+  error instead of a no-op.
 - Service-call validation failures (bad URLs/paths, invalid barcode or QR
   data, oversized images, disallowed font paths, malformed options, etc.)
   are now raised as `ServiceValidationError` with translation metadata
