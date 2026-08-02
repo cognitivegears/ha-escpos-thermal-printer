@@ -36,6 +36,9 @@ python scripts/check_requirements_sync.py
 # Auto-fix manifest.json from pyproject.toml
 python scripts/sync_manifest_requirements.py
 
+# Regenerate strings.json/translations/en.json 'services' key from services.yaml (add --check to only detect drift)
+python scripts/sync_service_translations.py
+
 # Run local Home Assistant with integration mounted (http://localhost:8123)
 docker compose up -d
 docker compose down  # to stop

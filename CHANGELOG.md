@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   device reported one during setup — visible in **Settings** → **Devices
   & services** → device page. Network/Bluetooth/serial transports are
   unaffected.
+- **Service and field names/descriptions are now translatable.** Every
+  service (`print_text_utf8`, `print_image`, `print_barcode`, etc.) and
+  their fields — including the collapsed "Image Options"/"Advanced
+  Options" section groups — now have entries under strings.json's new
+  `services` key, generated from `services.yaml` by
+  `scripts/sync_service_translations.py` so the two can never drift.
 
 ### Fixed
 
