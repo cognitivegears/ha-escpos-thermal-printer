@@ -111,9 +111,14 @@ async def _async_get_target_entries(
             _LOGGER.warning("Targeted device %s not found in registry; skipping", device_id)
             continue
 
-        # Get config entry IDs from the device
+        # Get config entry IDs from the device.
+        # DeviceEntry.config_entries is deprecated in HA 2026.8 (removal 2027.8)
+        # in favour of config_entry_id; our floor (2026.5) predates that
+        # attribute, so prefer it only when present.
+        entry_id = getattr(device, "config_entry_id", None)
+        entry_ids = [entry_id] if entry_id else device.config_entries
         matched = False
-        for config_entry_id in device.config_entries:
+        for config_entry_id in entry_ids:
             # Check if this config entry is for our domain
             entry = hass.config_entries.async_get_entry(config_entry_id)
             if entry and entry.domain == DOMAIN:

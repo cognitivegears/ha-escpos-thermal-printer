@@ -128,9 +128,10 @@ class TestMigrationV3NoOp:
 
     @pytest.mark.asyncio
     async def test_v3_entry_no_migration(self, hass):
-        """Test that v3 entries don't trigger migration."""
+        """Test that v3/minor1 entries don't trigger migration."""
         mock_entry = MagicMock()
         mock_entry.version = 3
+        mock_entry.minor_version = 1
         mock_entry.entry_id = "test_entry_v3"
         mock_entry.data = {
             CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK,
@@ -143,6 +144,29 @@ class TestMigrationV3NoOp:
 
         assert result is True
         mock_update.assert_not_called()
+
+
+class TestMigrationV3MinorVersionNormalization:
+    """Tests for normalizing v3 entries stuck at minor_version 0."""
+
+    @pytest.mark.asyncio
+    async def test_v3_minor0_entry_normalized_to_minor1(self, hass):
+        """A v3 entry with minor_version 0 gets bumped to minor_version 1."""
+        mock_entry = MagicMock()
+        mock_entry.version = 3
+        mock_entry.minor_version = 0
+        mock_entry.entry_id = "test_entry_v3_minor0"
+        mock_entry.data = {
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK,
+            "host": "192.168.1.100",
+            "port": 9100,
+        }
+
+        with patch.object(hass.config_entries, "async_update_entry") as mock_update:
+            result = await async_migrate_entry(hass, mock_entry)
+
+        assert result is True
+        mock_update.assert_called_once_with(mock_entry, minor_version=1)
 
 
 class TestMigrationDoesNotOverwrite:

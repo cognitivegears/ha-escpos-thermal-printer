@@ -167,7 +167,7 @@ async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) ->
             config_entry,
             data=new_data,
             version=2,
-            minor_version=0,
+            minor_version=1,
         )
 
         _LOGGER.info("Migration to v2 complete for entry %s", config_entry.entry_id)
@@ -185,11 +185,16 @@ async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) ->
             config_entry,
             data=new_data,
             version=3,
-            minor_version=0,
+            minor_version=1,
         )
 
         _LOGGER.info("Migration to v3 complete for entry %s", config_entry.entry_id)
         return True
+
+    # Normalize entries already at version 3 created before MINOR_VERSION existed
+    # (or otherwise left at minor_version 0) so they match the flow's MINOR_VERSION.
+    if config_entry.version == 3 and config_entry.minor_version < 1:
+        hass.config_entries.async_update_entry(config_entry, minor_version=1)
 
     return True
 

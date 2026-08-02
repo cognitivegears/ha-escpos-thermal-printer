@@ -62,6 +62,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   exactly as before).
 - **`print_text_image`** — the `image_threshold` description wrongly
   claimed it applies when `dither` is `"none"`.
+- (internal) Config entries now declare `MINOR_VERSION = 1`; existing v3
+  entries left at minor version 0 are normalized on load so future
+  minor-version migrations aren't skipped.
+- (internal) Device-to-config-entry resolution now prefers
+  `DeviceEntry.config_entry_id` when present, falling back to the
+  deprecated `config_entries` set — forward-compat with HA 2026.8+ ahead
+  of that attribute's 2027.8 removal.
 
 ### Security
 

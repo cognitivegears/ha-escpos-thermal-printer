@@ -41,6 +41,7 @@ class EscposConfigFlow(
     """Config flow for ESC/POS Thermal Printer."""
 
     VERSION = 3
+    MINOR_VERSION = 1
 
     def __init__(self) -> None:
         """Initialize config flow."""
