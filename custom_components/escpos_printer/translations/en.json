@@ -466,10 +466,10 @@
       "message": "The {kind} file is too large (maximum {max_mb}MB)."
     },
     "path_extension_not_allowed": {
-      "message": "The {kind} file extension '{extension}' is not allowed. Allowed extensions: {allowed}."
+      "message": "The {kind} file extension \"{extension}\" is not allowed. Allowed extensions: {allowed}."
     },
     "font_path_outside_allowlist": {
-      "message": "Font path '{path}' is outside the allowed directories."
+      "message": "Font path \"{path}\" is outside the allowed directories."
     },
     "font_path_symlink_rejected": {
       "message": "Font path must not be a symlink."
@@ -496,10 +496,10 @@
       "message": "The base64 image data is invalid: {error}"
     },
     "invalid_entity_id": {
-      "message": "'{value}' is not a valid entity_id for domain '{domain}'."
+      "message": "\"{value}\" is not a valid entity_id for domain \"{domain}\"."
     },
     "choice_invalid": {
-      "message": "{field} must be one of {choices}; got '{value}'."
+      "message": "{field} must be one of {choices}; got \"{value}\"."
     },
     "numeric_out_of_range": {
       "message": "{field} must be between {min} and {max}."
@@ -523,10 +523,10 @@
       "message": "{service} requires exactly one printer target; got {count}."
     },
     "invalid_output_path": {
-      "message": "The output_path '{path}' is invalid: {error}"
+      "message": "The output_path \"{path}\" is invalid: {error}"
     },
     "output_path_outside_tempdir": {
-      "message": "The output_path '{path}' must be inside the system temp directory ({tempdir})."
+      "message": "The output_path \"{path}\" must be inside the system temp directory ({tempdir})."
     },
     "kvtable_width_too_small": {
       "message": "total_width {total_width} is too small for a 2-column kvtable with style {style}; minimum usable total_width is {minimum}."
@@ -621,7 +621,7 @@
       "name": "Feed Paper"
     },
     "preview_box": {
-      "description": "Run the print_box layout pipeline and write the rendered text to a .txt file WITHOUT printing it. Lets you iterate on borders, padding, and width without burning paper. The cut/feed fields are deliberately omitted — a text file has no paper. Returns {path, width, line_count, codepage} as service response data — enable \"Return response data\" in Developer Tools to see the values.\n",
+      "description": "Run the print_box layout pipeline and write the rendered text to a .txt file WITHOUT printing it. Lets you iterate on borders, padding, and width without burning paper. The cut/feed fields are deliberately omitted — a text file has no paper. Returns path, width, line_count, and codepage as service response data — enable \"Return response data\" in Developer Tools to see the values.\n",
       "fields": {
         "align": {
           "description": "Text alignment inside the box.",
@@ -723,7 +723,7 @@
       }
     },
     "preview_table": {
-      "description": "Run the print_table layout pipeline and write the rendered text to a .txt file WITHOUT printing it. Lets you iterate on column widths, alignment, and borders without burning paper. The cut/feed fields are deliberately omitted — a text file has no paper. Returns {path, width, line_count, codepage} as service response data — enable \"Return response data\" in Developer Tools to see the values.\n",
+      "description": "Run the print_table layout pipeline and write the rendered text to a .txt file WITHOUT printing it. Lets you iterate on column widths, alignment, and borders without burning paper. The cut/feed fields are deliberately omitted — a text file has no paper. Returns path, width, line_count, and codepage as service response data — enable \"Return response data\" in Developer Tools to see the values.\n",
       "fields": {
         "column_aligns": {
           "description": "Optional list of per-column alignments (left/center/right).",

@@ -2606,9 +2606,9 @@ preview_box:
     Run the print_box layout pipeline and write the rendered text to a
     .txt file WITHOUT printing it. Lets you iterate on borders, padding,
     and width without burning paper. The cut/feed fields are deliberately
-    omitted — a text file has no paper. Returns {path, width, line_count,
-    codepage} as service response data — enable "Return response data" in
-    Developer Tools to see the values.
+    omitted — a text file has no paper. Returns path, width, line_count,
+    and codepage as service response data — enable "Return response data"
+    in Developer Tools to see the values.
   fields:
     device_id:
       name: Device
@@ -2686,7 +2686,7 @@ preview_table:
     a .txt file WITHOUT printing it. Lets you iterate on column widths,
     alignment, and borders without burning paper. The cut/feed fields
     are deliberately omitted — a text file has no paper. Returns
-    {path, width, line_count, codepage} as service response data —
+    path, width, line_count, and codepage as service response data —
     enable "Return response data" in Developer Tools to see the values.
   fields:
     device_id:

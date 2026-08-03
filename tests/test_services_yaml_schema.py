@@ -581,6 +581,52 @@ def test_no_icu_tag_like_angle_brackets_in_user_visible_strings() -> None:
     )
 
 
+def test_no_icu_invalid_braces_in_user_visible_strings() -> None:
+    """Regression guard for 'Translation error: INVALID_ARGUMENT_TYPE'.
+
+    The frontend parses translation strings as ICU messages, where ``{...}``
+    is a placeholder. Literal brace text like ``{path, width, line_count}``
+    parses as a placeholder with a bogus argument type and the whole string
+    renders as 'Translation error: INVALID_ARGUMENT_TYPE'. Only simple
+    ``{identifier}`` placeholders are allowed; spell out literal lists
+    without braces.
+
+    Also rejects an apostrophe directly before ``{`` or ``<``: ICU quoting
+    rules turn ``'{value}'`` into the literal text ``{value}``, silently
+    skipping placeholder substitution. Quote values with ``"`` instead.
+    """
+    root = Path(__file__).resolve().parents[1] / "custom_components" / "escpos_printer"
+    simple_placeholder = re.compile(r"^\{[A-Za-z0-9_]+\}$")
+    offenders: list[str] = []
+
+    def check(value: object, where: str) -> None:
+        if isinstance(value, str):
+            offenders.extend(
+                f"{where}: {match}"
+                for match in re.findall(r"\{[^{}]*\}", value)
+                if not simple_placeholder.match(match)
+            )
+            if value.count("{") != value.count("}"):
+                offenders.append(f"{where}: unbalanced braces")
+            if re.search(r"'[{<]", value):
+                offenders.append(f"{where}: ICU apostrophe-escape before {{ or <")
+        elif isinstance(value, dict):
+            for key, sub in value.items():
+                check(sub, f"{where}.{key}")
+        elif isinstance(value, list):
+            for index, sub in enumerate(value):
+                check(sub, f"{where}[{index}]")
+
+    check(_load_services_yaml(), "services.yaml")
+    for rel in ("strings.json", "translations/en.json"):
+        check(json.loads((root / rel).read_text(encoding="utf-8")), rel)
+
+    assert not offenders, (
+        "Non-{identifier} braces in user-visible strings "
+        "(frontend raises INVALID_ARGUMENT_TYPE):\n  " + "\n  ".join(offenders)
+    )
+
+
 def test_no_unquoted_hash_in_plain_scalar_descriptions() -> None:
     """Regression guard for the YAML `#`-comment-truncation bug class,
     scanned across every service in services.yaml (not just the image
