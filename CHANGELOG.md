@@ -7,30 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Changed
-
-- Documentation punctuation pass: replaced em-dashes across the README,
-  docs/, blueprints/, and repo-root markdown with conventional punctuation.
-
-### Fixed
-
-- **`preview_box` / `preview_table` showed "Translation error:
-  INVALID_ARGUMENT_TYPE" in the service UI.** Their descriptions contained
-  literal `{path, width, line_count, codepage}` text, which the frontend's
-  ICU message parser read as a malformed placeholder. Reworded without
-  braces; a regression test now rejects any non-`{identifier}` braces in
-  user-visible strings.
-- **`print_table` / `preview_table` "Rows" tooltip showed a garbled
-  example.** The description used a YAML block list, which the frontend
-  flattens onto one line (`- ["Item", ...] - ["Coffee", ...]`). The
-  examples now use flow syntax (`[["Item", "Qty", "Price"], ...]`) that
-  reads correctly inline and can be pasted as-is.
-- **Seven exception messages showed literal `{placeholder}` text instead
-  of the actual value.** ICU quoting rules treat an apostrophe before `{`
-  as an escape, so `'{value}'` rendered as the literal text `{value}` in
-  the frontend. Those messages now quote values with `"` instead, and the
-  same regression test rejects `'{`/`'<` sequences.
-
 ## [1.0.0] - 2026-08-02
 
 ### Added
@@ -86,6 +62,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **`preview_box` / `preview_table` showed "Translation error:
+  INVALID_ARGUMENT_TYPE" in the service UI.** Their descriptions contained
+  literal `{path, width, line_count, codepage}` text, which the frontend's
+  ICU message parser read as a malformed placeholder. Reworded without
+  braces; a regression test now rejects any non-`{identifier}` braces in
+  user-visible strings.
+- **`print_table` / `preview_table` "Rows" tooltip showed a garbled
+  example.** The description used a YAML block list, which the frontend
+  flattens onto one line (`- ["Item", ...] - ["Coffee", ...]`). The
+  examples now use flow syntax (`[["Item", "Qty", "Price"], ...]`) that
+  reads correctly inline and can be pasted as-is.
+- **Seven exception messages showed literal `{placeholder}` text instead
+  of the actual value.** ICU quoting rules treat an apostrophe before `{`
+  as an escape, so `'{value}'` rendered as the literal text `{value}` in
+  the frontend. Those messages now quote values with `"` instead, and the
+  same regression test rejects `'{`/`'<` sequences.
 - **Serial printers with an explicitly selected profile failed on every
   print.** The serial adapter passed the resolved profile *object* into
   python-escpos, whose profile lookup only accepts the profile *name*, so
@@ -278,6 +270,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Documentation punctuation pass: replaced em-dashes across the README,
+  docs/, blueprints/, and repo-root markdown with conventional punctuation.
 - **The "Last image print" diagnostic sensor and the Bluetooth "Battery"
   sensor are now disabled by default.** Both are niche diagnostics (the
   battery sensor only reports on the rare printers exposing BlueZ
