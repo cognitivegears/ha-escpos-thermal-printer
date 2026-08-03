@@ -139,6 +139,23 @@ Multi-column rows. Each row is a list of cell strings. Cells that
 exceed their column width word-wrap and the row grows to the tallest
 cell.
 
+Both YAML list styles are equivalent — use whichever fits your editor.
+Block style (used in the examples below):
+
+```yaml
+rows:
+  - ["Item", "Qty", "Price"]
+  - ["Coffee", "2", "$6.00"]
+```
+
+or inline flow style, handy for one-line fields in the UI:
+
+```yaml
+rows: [["Item", "Qty", "Price"], ["Coffee", "2", "$6.00"]]
+```
+
+The same applies to `print_kvtable`'s `items` field.
+
 ### Parameters
 
 | Field | Type | Default | Description |

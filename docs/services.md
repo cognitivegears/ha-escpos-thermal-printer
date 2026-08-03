@@ -144,7 +144,7 @@ Multi-column rows with optional borders, header, and inner separators.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| rows | list of lists of strings | The grid (required, up to 200×12) |
+| rows | list of lists of strings | The grid (required, up to 200×12). Block style (`- ["Item", "Qty"]` per line) and inline flow style (`[["Item", "Qty"], ["Coffee", "2"]]`) are both valid YAML |
 | style | string | Same options as `print_box` |
 | column_widths | list of ints | Per-column widths in characters |
 | column_aligns | list of strings | Per-column alignment (`left`/`center`/`right`) |
@@ -189,7 +189,7 @@ Two-column label/value table for receipt totals, sensor readings, ingredient lis
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| items | list of `[label, value]` pairs | The grid (required, up to 200 rows) |
+| items | list of `[label, value]` pairs | The grid (required, up to 200 rows). Block style (`- ["Subtotal", "$10.00"]` per line) and inline flow style (`[["Subtotal", "$10.00"], ["Tax", "$0.80"]]`) are both valid YAML |
 | style | string | Same options as `print_table`; default `none` (borderless) |
 | total_width | int | Total printed width (3–200); defaults to printer line width |
 | label_width | int | Characters reserved for the label column; auto-sized from the longest label up to ~60% of `total_width` |

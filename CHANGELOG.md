@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   ICU message parser read as a malformed placeholder. Reworded without
   braces; a regression test now rejects any non-`{identifier}` braces in
   user-visible strings.
+- **`print_table` / `preview_table` "Rows" tooltip showed a garbled
+  example.** The description used a YAML block list, which the frontend
+  flattens onto one line (`- ["Item", ...] - ["Coffee", ...]`). The
+  examples now use flow syntax (`[["Item", "Qty", "Price"], ...]`) that
+  reads correctly inline and can be pasted as-is.
 - **Seven exception messages showed literal `{placeholder}` text instead
   of the actual value.** ICU quoting rules treat an apostrophe before `{`
   as an escape, so `'{value}'` rendered as the literal text `{value}` in

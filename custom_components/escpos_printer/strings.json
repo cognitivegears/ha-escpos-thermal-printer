@@ -750,7 +750,7 @@
           "name": "Row Separators"
         },
         "rows": {
-          "description": "A YAML list where each entry is a list of cell strings (one per column). Example: - [\"Item\", \"Qty\", \"Price\"] - [\"Apple\", \"2\", \"$1.00\"] - [\"Bread\", \"1\", \"$3.50\"] Every row should have the same number of cells. When \"Header Row\" is enabled, the first row is rendered as the header.\n",
+          "description": "A YAML list where each entry is a list of cell strings (one per column). Example: [[\"Item\", \"Qty\", \"Price\"], [\"Apple\", \"2\", \"$1.00\"], [\"Bread\", \"1\", \"$3.50\"]]. Every row should have the same number of cells. When \"Header Row\" is enabled, the first row is rendered as the header.\n",
           "name": "Rows"
         },
         "style": {
@@ -1604,7 +1604,7 @@
           "name": "Row Separators"
         },
         "rows": {
-          "description": "A YAML list where each entry is a list of cell strings (one per column). Example: - [\"Item\", \"Qty\", \"Price\"] - [\"Coffee\", \"2\", \"$6.00\"] - [\"Bagel\", \"1\", \"$3.50\"] Every row should have the same number of cells. When \"Header Row\" is enabled, the first row is rendered as the header.\n",
+          "description": "A YAML list where each entry is a list of cell strings (one per column). Example: [[\"Item\", \"Qty\", \"Price\"], [\"Coffee\", \"2\", \"$6.00\"], [\"Bagel\", \"1\", \"$3.50\"]]. Every row should have the same number of cells. When \"Header Row\" is enabled, the first row is rendered as the header.\n",
           "name": "Rows"
         },
         "style": {
