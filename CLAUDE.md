@@ -36,81 +36,15 @@ python scripts/check_requirements_sync.py
 # Auto-fix manifest.json from pyproject.toml
 python scripts/sync_manifest_requirements.py
 
+# Regenerate strings.json/translations/en.json 'services' key from services.yaml (add --check to only detect drift)
+python scripts/sync_service_translations.py
+
 # Run local Home Assistant with integration mounted (http://localhost:8123)
 docker compose up -d
 docker compose down  # to stop
 ```
 
 ## Architecture
-
-### Core Components (`custom_components/escpos_printer/`)
-
-- **Entry point** — `__init__.py` initialises `EscposRuntimeData` on
-  `entry.runtime_data`, forwards platforms, and delegates service
-  registration to `services/registration.py::async_setup_services`
-  (21 services across text / text-effects / image / preview / control
-  / calibration / barcode families).
-
-- **`printer/`** — adapter subpackage. `base_adapter.py` defines the
-  abstract adapter and composes four operation mixins
-  (`print_operations`, `image_operations`, `barcode_operations`,
-  `control_operations`) through the shared `_PrinterHost` Protocol in
-  `_host.py`. Three transports: `network_adapter.py`, `usb_adapter.py`,
-  `bluetooth_adapter.py` (+ `_escpos_bluetooth.py` for the raw RFCOMM
-  python-escpos subclass and `bluetooth_transport.py` for the socket
-  layer). `factory.py` / `config.py` instantiate the right adapter per
-  config type. `image_processor.py` handles dither / threshold / slice;
-  `mapping_utils.py` normalises codepage / profile lookups.
-
-- **`text_effects/`** — pure-Python layout subpackage (no HA, no
-  printer imports). `box.py` / `table.py` for character-cell layouts;
-  `font_render.py` for PIL bitmap rendering with bundled DejaVu fonts;
-  `borders.py` + `width.py` for the glyph palette and visual-column
-  measurement (using `wcwidth`).
-
-- **`services/`** — handler subpackage. `registration.py` registers
-  all 21 services and forwards `supports_response=ONLY` on the three
-  preview services. `schemas.py` defines voluptuous schemas (sharing
-  `_image_option_fragment()` across the six image services).
-  `print_handlers.py` + `control_handlers.py` implement service bodies,
-  all routed through the `_for_each_target` helper in
-  `_handler_utils.py` for consistent per-target loop + error wrapping +
-  sanitised exception messages. `target_resolution.py` resolves
-  `device_id` selectors to config entries.
-
-- **`image_sources.py`** — HA-aware fetcher. Resolves any
-  `print_image` source string (data URI, camera/image entity, HTTP
-  URL, local file) into `(bytes, content_type)`. Builds a per-request
-  `aiohttp` session pinned via `_StaticResolver` so DNS rebinding
-  cannot swap public → private between validation and fetch.
-
-- **`security.py`** — single source of truth for `MAX_*` bounds, input
-  validation, log sanitisation, and the `O_NOFOLLOW` read/write
-  primitives (`open_local_image_no_follow`, `open_local_font_no_follow`,
-  `write_file_no_follow`) shared by image / font / preview paths.
-  `validate_font_path_with_fonts_dir` centralises the `<config>/fonts/`
-  narrowed-trust decision.
-
-- **`_config_flow/`** — UI config-flow subpackage. `main_flow.py` is
-  the top-level `ConfigFlow`; per-transport step modules
-  (`network_steps.py`, `usb_steps.py`, `bluetooth_steps.py`) +
-  shared helpers (`network_helpers.py`, `usb_helpers.py`,
-  `bluetooth_helpers.py`). Settings + custom-profile +
-  options-flow paths live in `settings_steps.py` / `options_flow.py`.
-  `import_steps.py` handles legacy YAML import.
-
-- **Platforms** — `notify.py` (entity-based notify), `binary_sensor.py`
-  (reachability), `sensor.py` (image-pipeline diagnostics + BT
-  battery + paper status for network/USB), `diagnostics.py`
-  (download-diagnostics with
-  `CONF_HOST` redaction).
-
-- **Other** — `bluez.py` (paired-device discovery via D-Bus),
-  `text_utils/` (codepage transcoder), `capabilities/` (profile
-  capability lookups), `device_action/` (device-automation actions),
-  `fonts/` (bundled DejaVu trio + LICENSE), `quality_scale.yaml`,
-  `icons.json`, `const.py` (domain name, service names, attribute
-  keys, defaults, USB / Bluetooth constants, `THERMAL_PRINTER_VIDS`).
 
 ### Testing (`tests/`)
 
@@ -126,21 +60,15 @@ docker compose down  # to stop
 - Dependabot auto-updates pyproject.toml (see `.github/dependabot.yml`); a post-upgrade task syncs manifest.json.
 - Pre-commit hooks block commits if files drift.
 - **Always use pinned versions** (`==`) for all dependencies, not ranges (`>=`). This ensures reproducible builds and better security.
-- **`pytest` is pinned by `pytest-homeassistant-custom-component`** (currently `pytest==9.0.3`). Dependabot is configured to ignore standalone `pytest` bumps (see `.github/dependabot.yml`). When upgrading the HA test harness (`pytest-homeassistant-custom-component`), check whether the new version pins a different `pytest` and bump `pytest` in `pyproject.toml` to match. If upstream ever loosens the pin, remove the `pytest` ignore rule from `dependabot.yml`.
-- **`mypy` is capped by `pytest-homeassistant-custom-component`** — mypy 2.2+ needs `ast-serialize>=0.6` while the harness (0.13.339) hard-pins `ast-serialize==0.3.0`, so newer mypy is unresolvable in the dev environment. Dependabot is configured to ignore standalone `mypy` bumps (see `.github/dependabot.yml`). When upgrading the HA test harness, check whether a newer mypy now resolves and bump it in `pyproject.toml`.
-- **`dbus-fast` is pinned by Home Assistant core** (`package_constraints.txt`) and the HA bluetooth integration manifest. Bumping ahead of HA breaks installs. Dependabot is configured to ignore `dbus-fast` (see `.github/dependabot.yml`). When upgrading HA itself, check HA's current `dbus-fast` pin and bump it in `pyproject.toml` + `manifest.json` to match.
-- **`Pillow` is pinned to match Home Assistant core's bundled Pillow** (HA ships its own at runtime; `manifest.json` carries a range so we don't fight HA's pin). Dependabot is configured to ignore standalone `pillow` bumps (see `.github/dependabot.yml`). When upgrading HA, check HA core's current Pillow pin and bump `Pillow` in `pyproject.toml` to match.
-- **`respx` is pinned by `pytest-homeassistant-custom-component`** (currently `respx==0.23.1`). Dependabot is configured to ignore standalone `respx` bumps (see `.github/dependabot.yml`). When upgrading the HA test harness, check whether the new version pins a different `respx` and bump it in `pyproject.toml` to match.
-- **`serialx` is pinned by HA core** (`package_constraints.txt`): `==1.7.0` (HA 2026.5.0), `==1.7.3` (HA 2026.5.4), `==1.8.0` (HA 2026.6.0). HA installs manifest requirements with `-c package_constraints.txt`, so an exact pin in `manifest.json` is unsatisfiable on any HA version that carries a different pin. `manifest.json` carries `>=1.7.0,<2`; this is safe because the 1.7→1.8 change only touched the async write API and this integration uses the sync API throughout. `pyproject.toml` pins `==1.8.0` to match the HA version used by the CI test harness (`pytest-homeassistant-custom-component==0.13.339` → HA 2026.6.3). Dependabot is configured to ignore standalone `serialx` bumps (see `.github/dependabot.yml`). When upgrading the HA test harness, check `package_constraints.txt` for the new HA version and bump the dev pin in `pyproject.toml` to match.
-- **After HA version bumps, re-check Dependabot security alerts** (`https://github.com/cognitivegears/ha-escpos-thermal-printer/security/dependabot`). Most open alerts are against the HA-pinned packages above — direct (`pyproject.toml` Pillow) or `uv.lock` transitives (aiohttp, pyOpenSSL, PyJWT, orjson, requests, uv, cryptography, etc.). They only affect dev/CI environments — end users install via `manifest.json` — and auto-clear when HA releases a version with patched pins. After a HA bump (i.e. once `pytest-homeassistant-custom-component` points to the new HA), run `uv lock --upgrade` and verify which alerts close.
-- **The `ignore:` block in `dependabot.yml` only suppresses *version* updates** — it does not suppress *security* updates (which trigger the Dependabot Updates worker independently and will fail noisily when the bump conflicts with an HA pin). For HA-pinned packages, dismiss the security alert as `tolerable_risk` with a note pointing at the HA pin; the alert will re-surface if a new advisory lands against the still-current pinned version.
+- **`pytest`, `mypy`, `dbus-fast`, `Pillow`, `respx`, and `serialx` are constrained by HA core or the test harness** — before bumping any of them, upgrading `pytest-homeassistant-custom-component`, or triaging Dependabot security alerts, load the `dependency-pins` skill (`.claude/skills/dependency-pins/SKILL.md`) for the per-package rules.
 
 ## Key Patterns
 
 - All printer I/O runs on executor threads via `hass.async_add_executor_job()`.
 - Printer adapters use an `asyncio.Lock` to serialize print operations.
 - Late import of `escpos.printer.Network` and `escpos.printer.Usb` avoids import errors during HA startup.
-- Security validation happens before any printer operation (see `security.py`).
+- Security validation happens before any printer operation (see `security.py` — single source of truth for `MAX_*` bounds, log sanitisation, and `O_NOFOLLOW` file primitives).
+- `image_sources.py` builds a per-request `aiohttp` session pinned via `_StaticResolver` so DNS rebinding cannot swap public → private between validation and fetch.
 - **Network printers:** Status checking uses non-blocking TCP probes.
 - **USB printers:** Status checking uses USB device enumeration via `usb.core.find()`. Keepalive is always disabled (reconnect-per-operation model).
 - USB printers are auto-discovered by matching vendor IDs in `THERMAL_PRINTER_VIDS`.
@@ -155,7 +83,7 @@ All six image-printing services (`print_image`, `print_image_url`, `print_image_
 
 `test_image_services_no_truncated_descriptions` is the regression guard for the YAML `#` comment-truncation class of bug (an unquoted plain-scalar description containing `#` silently terminated mid-sentence in the rendered HA tooltip). Quote any single-line description that contains `#`, or use a `>` folded scalar.
 
-`preview_image` deliberately omits the printer-communication knobs (`high_density`, `impl`, `fragment_height`, `chunk_delay_ms`, `center`, `cut`, `feed`) because they have no effect on the PNG written to disk. The schema still accepts them so programmatic callers don't break; `handle_preview_image()` logs a debug line when they're passed.
+`preview_image` deliberately omits the printer-communication knobs (`high_density`, `impl`, `fragment_height`, `chunk_delay_ms`, `cut`, `feed`) because they have no effect on the PNG written to disk. It also omits `broadcast`, since a preview writes to a single file and has no multi-printer target to broadcast to. The schema still accepts all of these so programmatic callers don't break; `handle_preview_image()` logs a debug line when they're passed.
 
 ### Per-service source-type validators
 

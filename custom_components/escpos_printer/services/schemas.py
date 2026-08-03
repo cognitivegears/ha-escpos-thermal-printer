@@ -40,6 +40,7 @@ from ..const import (
     ATTR_ENCODING,
     ATTR_FALLBACK_IMAGE,
     ATTR_FEED,
+    ATTR_FEED_BEFORE_CUT,
     ATTR_FONT,
     ATTR_FONT_NAME,
     ATTR_FONT_PATH,
@@ -98,6 +99,8 @@ from ..security import (
     IMAGE_WIDTH_MIN,
     MAX_BARCODE_LENGTH,
     MAX_BASE64_INPUT_BYTES,
+    MAX_BEEP_DURATION,
+    MAX_BEEP_TIMES,
     MAX_BOX_WIDTH,
     MAX_FEED_LINES,
     MAX_FONT_PATH_LENGTH,
@@ -117,6 +120,35 @@ from ..security import (
 # `selector: device:` and `selector: device: multiple: true` UI shapes.
 _DEVICE_ID = vol.Any(cv.string, [cv.string])
 
+# Explicit opt-in to broadcast to every loaded printer. Omitting both
+# `device_id` and `broadcast` still broadcasts (backward compatible —
+# see `target_resolution._async_get_target_entries`), but that implicit
+# form logs a warning; `broadcast: true` is the silent, explicit way to
+# say the same thing.
+_TARGET_FIELDS: dict[Any, Any] = {
+    vol.Optional("device_id"): _DEVICE_ID,
+    vol.Optional("broadcast", default=False): cv.boolean,
+}
+
+
+def _reject_broadcast_with_device_id(value: dict[Any, Any]) -> dict[Any, Any]:
+    """Reject `broadcast: true` combined with an explicit `device_id`.
+
+    Voluptuous validates each key independently, so this cross-field rule
+    can't live inside ``_TARGET_FIELDS`` itself — every schema below runs
+    it as a second pass (via :func:`_with_target_validation`) over the
+    already-coerced dict.
+    """
+    if value.get("broadcast") and value.get("device_id"):
+        raise vol.Invalid("'broadcast' and 'device_id' are mutually exclusive")
+    return value
+
+
+def _with_target_validation(schema_dict: dict[Any, Any]) -> vol.All:
+    """Wrap a global-service schema dict with the broadcast/device_id mutex check."""
+    return vol.All(vol.Schema(schema_dict), _reject_broadcast_with_device_id)
+
+
 # Alignment / underline / cut / size enums shared across services.
 _ALIGN = vol.In(["left", "center", "right"])
 _UNDERLINE = vol.In(["none", "single", "double"])
@@ -133,17 +165,25 @@ _TEXT_SIZE = vol.Any(
 _FEED = vol.All(vol.Coerce(int), vol.Range(min=0, max=MAX_FEED_LINES))
 
 
-def _image_source_validator(value: Any) -> Any:
-    """Length-cap an image source string before delegating to ``cv.template``.
+def _image_source_validator(value: Any) -> str:
+    """Validate an image source string. No template rendering.
 
-    ``cv.template`` happily accepts megabyte strings (it constructs a
-    Template object), which would defeat the pre-decode size cap in
-    ``security.validate_base64_image``. Enforce the cap up front so a
-    200 MB base64 string fails at the schema layer.
+    Image source strings are used as-is — server-side Jinja rendering was
+    removed because the template environment reads all HA states with no
+    per-entity permission check, letting a non-admin caller read arbitrary
+    sensor state via a crafted ``image:`` value. HA's automation/script
+    engine already renders ``{{ ... }}`` in service call data before the
+    service is dispatched, so templated automations are unaffected; only
+    hand-typed raw-template calls (e.g. Developer Tools) change behaviour.
+
+    The length cap runs here (rather than only in
+    ``security.validate_base64_image``) so a 200 MB base64 string fails at
+    the schema layer instead of being fully parsed first.
     """
-    if isinstance(value, str) and len(value) > MAX_BASE64_INPUT_BYTES:
+    s = cv.string(value)
+    if len(s) > MAX_BASE64_INPUT_BYTES:
         raise vol.Invalid(f"image source too large (max ~{MAX_BASE64_INPUT_BYTES} chars)")
-    return cv.template(value)
+    return s
 
 
 _IMAGE_SOURCE = _image_source_validator
@@ -233,7 +273,9 @@ _IMAGE_OPTION_FRAGMENT_NOTIFY = MappingProxyType(
 )
 
 
-def _image_pipeline_knobs(prefix: str = "") -> dict[Any, Any]:
+def _image_pipeline_knobs(
+    prefix: str = "", *, exclude: frozenset[str] = frozenset()
+) -> dict[Any, Any]:
     """Pipeline-only knobs (dither/threshold/impl/rotation/...) without ``fallback_image``.
 
     Services that *produce* their own image bytes (currently
@@ -249,18 +291,25 @@ def _image_pipeline_knobs(prefix: str = "") -> dict[Any, Any]:
     image keys (``dither``, ``invert``, …) from the surrounding service
     options. ``print_text_image`` uses ``"image_"`` so its UI fields
     line up with ``print_message``'s ``image_*`` knobs.
+
+    ``exclude`` additionally drops unprefixed attribute names (e.g.
+    ``{ATTR_ROTATION, ATTR_ALIGN}``) — for a service whose handler
+    unconditionally overrides those fields before dispatch, accepting
+    them at the schema layer would let a caller pass a value that is
+    then silently discarded.
     """
-    fallback_key = f"{prefix}{ATTR_FALLBACK_IMAGE}" if prefix else ATTR_FALLBACK_IMAGE
+    drop_keys = {f"{prefix}{ATTR_FALLBACK_IMAGE}" if prefix else ATTR_FALLBACK_IMAGE}
+    drop_keys.update(f"{prefix}{name}" if prefix else name for name in exclude)
     return {
         k: v
         for k, v in _image_option_fragment(prefix).items()
-        if not (isinstance(k, vol.Optional) and k.schema == fallback_key)
+        if not (isinstance(k, vol.Optional) and k.schema in drop_keys)
     }
 
 
-PRINT_TEXT_SCHEMA = vol.Schema(
+PRINT_TEXT_SCHEMA = _with_target_validation(
     {
-        vol.Optional("device_id"): _DEVICE_ID,
+        **_TARGET_FIELDS,
         vol.Required(ATTR_TEXT): vol.All(cv.string, vol.Length(max=MAX_TEXT_LENGTH)),
         vol.Optional(ATTR_ALIGN): _ALIGN,
         vol.Optional(ATTR_BOLD): cv.boolean,
@@ -274,9 +323,9 @@ PRINT_TEXT_SCHEMA = vol.Schema(
 )
 
 
-PRINT_TEXT_UTF8_SCHEMA = vol.Schema(
+PRINT_TEXT_UTF8_SCHEMA = _with_target_validation(
     {
-        vol.Optional("device_id"): _DEVICE_ID,
+        **_TARGET_FIELDS,
         vol.Required(ATTR_TEXT): vol.All(cv.string, vol.Length(max=MAX_TEXT_LENGTH)),
         vol.Optional(ATTR_ALIGN): _ALIGN,
         vol.Optional(ATTR_BOLD): cv.boolean,
@@ -289,9 +338,9 @@ PRINT_TEXT_UTF8_SCHEMA = vol.Schema(
 )
 
 
-PRINT_QR_SCHEMA = vol.Schema(
+PRINT_QR_SCHEMA = _with_target_validation(
     {
-        vol.Optional("device_id"): _DEVICE_ID,
+        **_TARGET_FIELDS,
         vol.Required(ATTR_DATA): vol.All(cv.string, vol.Length(min=1, max=MAX_QR_DATA_LENGTH)),
         vol.Optional(ATTR_SIZE): vol.All(vol.Coerce(int), vol.Range(min=1, max=16)),
         vol.Optional(ATTR_EC): vol.In(["L", "M", "Q", "H"]),
@@ -303,13 +352,13 @@ PRINT_QR_SCHEMA = vol.Schema(
 
 
 _PRINT_IMAGE_SCHEMA_DICT: dict[Any, Any] = {
-    vol.Optional("device_id"): _DEVICE_ID,
+    **_TARGET_FIELDS,
     vol.Required(ATTR_IMAGE): _IMAGE_SOURCE,
     **_IMAGE_OPTION_FRAGMENT_PLAIN,
     vol.Optional(ATTR_CUT): _CUT,
     vol.Optional(ATTR_FEED): _FEED,
 }
-PRINT_IMAGE_SCHEMA = vol.Schema(_PRINT_IMAGE_SCHEMA_DICT)
+PRINT_IMAGE_SCHEMA = _with_target_validation(_PRINT_IMAGE_SCHEMA_DICT)
 
 
 # Focused convenience-service schemas — the source field constrains the
@@ -335,14 +384,20 @@ def _entity_id_in_domain(domain: str):  # type: ignore[no-untyped-def]
 # entity ACL) still apply — these are defense-in-depth so the schema
 # matches the documented intent.
 def _url_only(value: Any) -> str:
-    s = cv.string(value)
+    # Strip before checking (and return the stripped value) so this guard
+    # sees the same string `_classify()` will: `_classify()` strips first,
+    # so a leading/trailing-whitespace value like " camera.front_door"
+    # would otherwise slip past both prefix checks here as an unmatched
+    # (non-URL, non-local-path) shape while still classifying as a camera
+    # entity downstream.
+    s = cv.string(value).strip()
     if not s.lower().startswith(("http://", "https://")):
         raise vol.Invalid("URL must start with http:// or https://")
     return s
 
 
 def _local_path_only(value: Any) -> str:
-    s = cv.string(value)
+    s = cv.string(value).strip()
     if s.lower().startswith(("http://", "https://", "data:", "camera.", "image.")):
         raise vol.Invalid("Path must be a local filesystem path")
     return s
@@ -355,9 +410,9 @@ def _local_path_only(value: Any) -> str:
 # voluptuous never injects the key and the handler's
 # ``call.data.get(ATTR_FEED)`` returns None (→ 0 lines). The generic
 # ``print_image`` keeps no default (services.yaml advertises 0).
-PRINT_CAMERA_SNAPSHOT_SCHEMA = vol.Schema(
+PRINT_CAMERA_SNAPSHOT_SCHEMA = _with_target_validation(
     {
-        vol.Optional("device_id"): _DEVICE_ID,
+        **_TARGET_FIELDS,
         vol.Required("camera_entity"): _entity_id_in_domain("camera"),
         **_IMAGE_OPTION_FRAGMENT_CAMERA,
         vol.Optional(ATTR_CUT): _CUT,
@@ -365,9 +420,9 @@ PRINT_CAMERA_SNAPSHOT_SCHEMA = vol.Schema(
     }
 )
 
-PRINT_IMAGE_ENTITY_SCHEMA = vol.Schema(
+PRINT_IMAGE_ENTITY_SCHEMA = _with_target_validation(
     {
-        vol.Optional("device_id"): _DEVICE_ID,
+        **_TARGET_FIELDS,
         vol.Required("image_entity"): _entity_id_in_domain("image"),
         **_IMAGE_OPTION_FRAGMENT_PLAIN,
         vol.Optional(ATTR_CUT): _CUT,
@@ -375,9 +430,9 @@ PRINT_IMAGE_ENTITY_SCHEMA = vol.Schema(
     }
 )
 
-PRINT_IMAGE_URL_SCHEMA = vol.Schema(
+PRINT_IMAGE_URL_SCHEMA = _with_target_validation(
     {
-        vol.Optional("device_id"): _DEVICE_ID,
+        **_TARGET_FIELDS,
         vol.Required("url"): vol.All(_url_only, vol.Length(min=1, max=MAX_URL_LENGTH)),
         **_IMAGE_OPTION_FRAGMENT_URL,
         vol.Optional(ATTR_CUT): _CUT,
@@ -385,9 +440,9 @@ PRINT_IMAGE_URL_SCHEMA = vol.Schema(
     }
 )
 
-PRINT_IMAGE_PATH_SCHEMA = vol.Schema(
+PRINT_IMAGE_PATH_SCHEMA = _with_target_validation(
     {
-        vol.Optional("device_id"): _DEVICE_ID,
+        **_TARGET_FIELDS,
         vol.Required("path"): vol.All(
             _local_path_only, vol.Length(min=1, max=MAX_IMAGE_PATH_LENGTH)
         ),
@@ -403,12 +458,19 @@ PREVIEW_IMAGE_SCHEMA = vol.Schema(
         vol.Required(ATTR_IMAGE): _IMAGE_SOURCE,
         vol.Optional("output_path"): cv.string,
         **_IMAGE_OPTION_FRAGMENT_PLAIN,
+        # Printer-communication knobs have no effect on the PNG written to
+        # disk (see CLAUDE.md), but are accepted here — not rejected as
+        # "extra keys" — so programmatic callers sharing kwargs with
+        # print_image don't break. handle_preview_image() logs a debug line
+        # when they're actually passed.
+        vol.Optional(ATTR_CUT): _CUT,
+        vol.Optional(ATTR_FEED): _FEED,
     }
 )
 
-CALIBRATION_PRINT_SCHEMA = vol.Schema(
+CALIBRATION_PRINT_SCHEMA = _with_target_validation(
     {
-        vol.Optional("device_id"): _DEVICE_ID,
+        **_TARGET_FIELDS,
         vol.Optional(ATTR_CUT, default="full"): _CUT,
         vol.Optional(ATTR_FEED, default=2): _FEED,
     }
@@ -483,9 +545,9 @@ def _validate_column_widths(value: Any) -> list[int]:
     return out
 
 
-PRINT_BOX_SCHEMA = vol.Schema(
+PRINT_BOX_SCHEMA = _with_target_validation(
     {
-        vol.Optional("device_id"): _DEVICE_ID,
+        **_TARGET_FIELDS,
         vol.Required(ATTR_TEXT): vol.All(cv.string, vol.Length(max=MAX_TEXT_LENGTH)),
         vol.Optional(ATTR_STYLE, default=DEFAULT_BORDER_STYLE): _BORDER_STYLE,
         vol.Optional(ATTR_PADDING, default=0): vol.All(vol.Coerce(int), vol.Range(min=0, max=4)),
@@ -499,9 +561,9 @@ PRINT_BOX_SCHEMA = vol.Schema(
 )
 
 
-PRINT_TABLE_SCHEMA = vol.Schema(
+PRINT_TABLE_SCHEMA = _with_target_validation(
     {
-        vol.Optional("device_id"): _DEVICE_ID,
+        **_TARGET_FIELDS,
         vol.Required(ATTR_ROWS): _validate_rows_shape,
         vol.Optional(ATTR_STYLE, default=DEFAULT_BORDER_STYLE): _BORDER_STYLE,
         vol.Optional(ATTR_COLUMN_WIDTHS): _validate_column_widths,
@@ -534,9 +596,9 @@ def _validate_separator_char(value: Any) -> str:
     return value
 
 
-PRINT_SEPARATOR_SCHEMA = vol.Schema(
+PRINT_SEPARATOR_SCHEMA = _with_target_validation(
     {
-        vol.Optional("device_id"): _DEVICE_ID,
+        **_TARGET_FIELDS,
         vol.Optional(ATTR_CHAR, default="-"): _validate_separator_char,
         vol.Optional(ATTR_WIDTH): vol.All(vol.Coerce(int), vol.Range(min=1, max=MAX_BOX_WIDTH)),
         vol.Optional(ATTR_REPEAT, default=1): vol.All(
@@ -579,9 +641,9 @@ def _validate_kv_items(value: Any) -> list[list[Any]]:
     return out
 
 
-PRINT_KVTABLE_SCHEMA = vol.Schema(
+PRINT_KVTABLE_SCHEMA = _with_target_validation(
     {
-        vol.Optional("device_id"): _DEVICE_ID,
+        **_TARGET_FIELDS,
         vol.Required(ATTR_ITEMS): _validate_kv_items,
         vol.Optional(ATTR_STYLE, default="none"): _BORDER_STYLE,
         vol.Optional(ATTR_TOTAL_WIDTH): vol.All(
@@ -634,9 +696,9 @@ PREVIEW_TABLE_SCHEMA = vol.Schema(
 # already carries ``rotation`` (0/90/180/270) — the text-side handler
 # applies it to the PIL canvas BEFORE binarisation, so the user-facing
 # meaning ("rotate the text") matches.
-PRINT_TEXT_IMAGE_SCHEMA = vol.Schema(
+PRINT_TEXT_IMAGE_SCHEMA = _with_target_validation(
     {
-        vol.Optional("device_id"): _DEVICE_ID,
+        **_TARGET_FIELDS,
         vol.Required(ATTR_TEXT): vol.All(cv.string, vol.Length(max=MAX_TEXT_LENGTH)),
         vol.Optional(ATTR_FONT_NAME, default=DEFAULT_FONT_NAME): vol.In(
             sorted(BUILTIN_FONT_CHOICES)
@@ -652,7 +714,9 @@ PRINT_TEXT_IMAGE_SCHEMA = vol.Schema(
         ),
         # Text-canvas controls: applied to the PIL canvas before binarisation,
         # so the printed orientation/alignment matches what the user typed.
-        # The image-side ``image_rotation`` is forced to 0 at dispatch.
+        # The image-side ``image_rotation`` is forced to 0 and ``image_align``
+        # to this ``align`` at dispatch, so those two image-pipeline knobs are
+        # excluded below rather than silently accepted-then-overridden.
         vol.Optional(ATTR_ALIGN, default="left"): _ALIGN,
         vol.Optional(ATTR_ROTATION, default=0): vol.All(vol.Coerce(int), vol.In(ROTATION_VALUES)),
         vol.Optional(ATTR_CUT): _CUT,
@@ -660,15 +724,17 @@ PRINT_TEXT_IMAGE_SCHEMA = vol.Schema(
         # Pipeline knobs prefixed with ``image_`` so the UI fields line up
         # one-to-one with ``print_message``'s ``image_*`` knobs.
         # ``fallback_image`` is intentionally excluded because this service
-        # renders its own bytes (see :func:`_image_pipeline_knobs`).
-        **_image_pipeline_knobs("image_"),
+        # renders its own bytes; ``image_rotation``/``image_align`` are
+        # excluded because the handler always overrides them (see
+        # :func:`_image_pipeline_knobs`).
+        **_image_pipeline_knobs("image_", exclude=frozenset({ATTR_ROTATION, ATTR_ALIGN})),
     }
 )
 
 
-PRINT_BARCODE_SCHEMA = vol.Schema(
+PRINT_BARCODE_SCHEMA = _with_target_validation(
     {
-        vol.Optional("device_id"): _DEVICE_ID,
+        **_TARGET_FIELDS,
         vol.Required(ATTR_CODE): vol.All(cv.string, vol.Length(min=1, max=MAX_BARCODE_LENGTH)),
         vol.Required(ATTR_BC): cv.string,
         vol.Optional(ATTR_BARCODE_HEIGHT): vol.All(vol.Coerce(int), vol.Range(min=1, max=255)),
@@ -692,27 +758,28 @@ PRINT_BARCODE_SCHEMA = vol.Schema(
 )
 
 
-FEED_SCHEMA = vol.Schema(
+FEED_SCHEMA = _with_target_validation(
     {
-        vol.Optional("device_id"): _DEVICE_ID,
+        **_TARGET_FIELDS,
         vol.Required(ATTR_LINES): vol.All(vol.Coerce(int), vol.Range(min=1, max=MAX_FEED_LINES)),
     }
 )
 
 
-CUT_SCHEMA = vol.Schema(
+CUT_SCHEMA = _with_target_validation(
     {
-        vol.Optional("device_id"): _DEVICE_ID,
+        **_TARGET_FIELDS,
         vol.Required(ATTR_MODE): vol.In(["full", "partial"]),
+        vol.Optional(ATTR_FEED_BEFORE_CUT, default=True): cv.boolean,
     }
 )
 
 
-BEEP_SCHEMA = vol.Schema(
+BEEP_SCHEMA = _with_target_validation(
     {
-        vol.Optional("device_id"): _DEVICE_ID,
-        vol.Optional(ATTR_TIMES): vol.All(vol.Coerce(int), vol.Range(min=1, max=10)),
-        vol.Optional(ATTR_DURATION): vol.All(vol.Coerce(int), vol.Range(min=1, max=10)),
+        **_TARGET_FIELDS,
+        vol.Optional(ATTR_TIMES): vol.All(vol.Coerce(int), vol.Range(min=1, max=MAX_BEEP_TIMES)),
+        vol.Optional(ATTR_DURATION): vol.All(vol.Coerce(int), vol.Range(min=1, max=MAX_BEEP_DURATION)),
     }
 )
 

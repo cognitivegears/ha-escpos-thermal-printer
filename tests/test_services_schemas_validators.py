@@ -14,18 +14,38 @@ import pytest
 import voluptuous as vol
 
 from custom_components.escpos_printer.security import (
+    MAX_BEEP_DURATION,
+    MAX_BEEP_TIMES,
     MAX_BOX_WIDTH,
     MAX_TABLE_CELL_LENGTH,
     MAX_TABLE_COLS,
     MAX_TABLE_ROWS,
 )
 from custom_components.escpos_printer.services.schemas import (
+    BEEP_SCHEMA,
     _validate_column_aligns,
     _validate_column_widths,
     _validate_kv_items,
     _validate_rows_shape,
     _validate_separator_char,
 )
+
+
+def test_beep_schema_rejects_times_above_python_escpos_limit() -> None:
+    """python-escpos's Escpos.buzzer() raises for times/duration > 9."""
+    with pytest.raises(vol.Invalid):
+        BEEP_SCHEMA({"times": MAX_BEEP_TIMES + 1})
+
+
+def test_beep_schema_rejects_duration_above_python_escpos_limit() -> None:
+    with pytest.raises(vol.Invalid):
+        BEEP_SCHEMA({"duration": MAX_BEEP_DURATION + 1})
+
+
+def test_beep_schema_accepts_max_times_and_duration() -> None:
+    result = BEEP_SCHEMA({"times": MAX_BEEP_TIMES, "duration": MAX_BEEP_DURATION})
+    assert result["times"] == MAX_BEEP_TIMES
+    assert result["duration"] == MAX_BEEP_DURATION
 
 
 def test_validate_rows_shape_rejects_non_list_top_level() -> None:

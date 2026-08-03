@@ -13,10 +13,10 @@ What works well:
 
 What looks bad and how to fix it:
 
-- **Faded photos** — turn on `autocontrast: true`.
-- **Muddy logos with dotted edges** — switch from default dithering to `dither: threshold`.
-- **Garbled output, freezes, or printed gibberish after the image** — see [Reliability & speed](#reliability--speed).
-- **Sideways phone photos** — EXIF orientation is corrected automatically; you can additionally set `rotation: 90/180/270`.
+- **Faded photos**: turn on `autocontrast: true`.
+- **Muddy logos with dotted edges**: switch from default dithering to `dither: threshold`.
+- **Garbled output, freezes, or printed gibberish after the image**: see [Reliability & speed](#reliability--speed).
+- **Sideways phone photos**: EXIF orientation is corrected automatically; you can additionally set `rotation: 90/180/270`.
 
 ## Image sources
 
@@ -25,7 +25,7 @@ The `image` field accepts any of these forms. The integration auto-detects which
 ### Local file
 
 A path on the Home Assistant filesystem. The integration **enforces**
-HA's `allowlist_external_dirs` — paths outside it are rejected with
+HA's `allowlist_external_dirs`; paths outside it are rejected with
 `HomeAssistantError`. Symlinks are dereferenced during validation (a
 `.png` symlink pointing outside the allowlist is also rejected) and
 the file is opened with `O_NOFOLLOW` to defeat TOCTOU swaps. If you
@@ -66,8 +66,8 @@ URL validation enforces:
 
 The private-address block and the default-port allowlist are on by
 default so the integration can't be used as an SSRF proxy. If you need to
-print from a **local** image URL — a LAN camera, an NVR/Frigate proxy, a
-NAS, or your own Home Assistant instance — enable **Settings → Devices &
+print from a **local** image URL (a LAN camera, an NVR/Frigate proxy, a
+NAS, or your own Home Assistant instance), enable **Settings → Devices &
 Services → ESC/POS printer → Configure → "Allow local image URLs"**. With
 it on:
 
@@ -75,10 +75,10 @@ it on:
 - **non-standard ports** are accepted (e.g. Frigate on `:5000`, a camera
   on `:8080`, Home Assistant on `:8123`).
 
-The genuinely dangerous ranges stay blocked **even when enabled**:
-link-local/cloud-metadata (`169.254.0.0/16`, `fe80::/10`, and the AWS
-IMDSv6 endpoint `fd00:ec2::254`), multicast, reserved (`240.0.0.0/4`),
-and unspecified.
+The dangerous ranges stay blocked **even when enabled**:
+link-local/cloud-metadata (`169.254.0.0/16`, `fe80::/10`, the AWS
+IMDSv6 endpoint `fd00:ec2::254`, and the Alibaba Cloud IMDS endpoint
+`100.100.100.200`), multicast, reserved (`240.0.0.0/4`), and unspecified.
 
 The toggle is **per-printer**, and it's evaluated against the **printer
 you print to**, not the URL. In a multi-printer setup the same LAN URL
@@ -86,34 +86,34 @@ succeeds when sent to a printer that has the option enabled and is
 rejected when sent to one that doesn't.
 
 > **Note (auth).** The fetch sends no authentication token, so an
-> authenticated Home Assistant `/api/...` endpoint returns 401 — only
+> authenticated Home Assistant `/api/...` endpoint returns 401; only
 > **unauthenticated** endpoints (e.g. Frigate notification thumbnails)
 > succeed.
 >
 > **Note (who can reach your LAN).** `print_image_url` has no per-user
 > authorization. With this option on, *any* Home Assistant user or
 > automation that can call the service can make this printer fetch
-> arbitrary LAN hosts and ports — and the success/failure/timing of a
+> arbitrary LAN hosts and ports, and the success/failure/timing of a
 > fetch can reveal which internal hosts and ports are open (an SSRF /
 > port-scan oracle). Only enable it on printers whose service calls you
 > trust.
 
 If the source is a Home-Assistant-managed camera or image, prefer the
 [camera entity](#camera-entity) / [image entity](#image-entity) sources
-instead — they enforce per-user entity permissions and don't need this
+instead; they enforce per-user entity permissions and don't need this
 option.
 
 Max download size is 10 MB; the body is streamed and the read aborts
 mid-stream when the cap is hit. `Content-Length` is checked before
 reading. Each fetch builds a **per-request `aiohttp` session pinned via
-`_StaticResolver`** to the IP address(es) validated by `getaddrinfo` —
+`_StaticResolver`** to the IP address(es) validated by `getaddrinfo`,
 defeating DNS rebinding: a hostile 0-TTL DNS server cannot swap public
 → private between validation and connect. Redirects are followed
 manually (max 5); each hop is re-validated and gets a fresh DNS pin.
 
 The integration previously had an httpx fast-path that fell back to
 aiohttp on `ImportError`. That was removed (httpx 0.28 has no
-resolver-pin hook) — aiohttp is now the only path.
+resolver-pin hook). aiohttp is now the only path.
 
 ### Camera entity
 
@@ -130,7 +130,7 @@ data:
 integration verifies the user has `POLICY_READ` on the named camera
 before fetching. Users who can't view the camera in the frontend
 receive `Unauthorized` (HTTP 403). Admin users bypass entity
-permissions by design — that's HA's auth model, not specific to this
+permissions by design; that's HA's auth model, not specific to this
 integration. Internal/automation calls without a `user_id` (the
 common case) are unrestricted.
 
@@ -155,7 +155,7 @@ actions:
 
 ### Image entity
 
-Any HA `image.<id>` entity — weather maps, generated charts, ML overlays, etc.
+Any HA `image.<id>` entity: weather maps, generated charts, ML overlays, etc.
 
 ```yaml
 service: escpos_printer.print_image
@@ -181,13 +181,18 @@ XML attack surface isn't worth it). The 10 MB cap applies to the
 **decoded** bytes; the base64 string itself is also length-capped
 before regex/decoding so a 200 MB string can't OOM the process.
 
-### Jinja template
+### Jinja template (in automations/scripts)
 
-The `image` field is rendered as a template when it contains `{{` or
-`{%`. That means you can pick a daily logo, pull a URL from a sensor,
-or compute a path from a date. Templates are honored by both the
-`escpos_printer.print_image` service and the `notify.<printer>` /
-`escpos_printer.print_message` action's `image` field.
+The `image` field itself is a plain string; the integration does not
+evaluate Jinja. Automations and scripts can still compute the value with
+a template, because Home Assistant's automation/script engine renders
+`{{ ... }}` in service-call data *before* the service is called. That
+means you can pick a daily logo, pull a URL from a sensor, or compute a
+path from a date, as long as the template lives in the calling
+automation/script (not typed as a raw `{{ ... }}` string via a direct
+service call, which is now passed through literally). This applies to
+both the `escpos_printer.print_image` service and the `notify.<printer>`
+/ `escpos_printer.print_message` action's `image` field.
 
 ```yaml
 service: escpos_printer.print_image
@@ -207,13 +212,13 @@ Every option in one place.
 
 | Option           | Default            | Description                                                                                                            |
 |------------------|--------------------|------------------------------------------------------------------------------------------------------------------------|
-| `image_width`    | profile max / 512  | Target width in pixels. Aspect ratio preserved. Never upscales.                                                        |
+| `image_width`    | profile max / 384  | Target width in pixels. Aspect ratio preserved. Never upscales. See [How the target width is chosen](#how-the-target-width-is-chosen). |
 | `rotation`       | `0`                | Degrees clockwise: `0`, `90`, `180`, `270`. EXIF orientation is fixed before this is applied.                          |
 | `dither`         | `floyd-steinberg`  | B&W conversion mode. `none` / `threshold` are alternatives.                                                            |
 | `threshold`      | `128`              | Threshold value (1–254). Only used when `dither: threshold`.                                                           |
 | `impl`           | reliability profile | python-escpos image command. See [Implementation selector](#implementation-selector).                                 |
 | `center`         | `false`            | Horizontally center the image within the printer's paper width.                                                        |
-| `align`          | printer's `default_align` | `left` / `center` / `right` — alignment of the image block on the page.                                          |
+| `align`          | printer's `default_align` | `left` / `center` / `right`: alignment of the image block on the page.                                          |
 | `autocontrast`   | `false`            | Stretch the input's dynamic range before B&W conversion. Boost for photos.                                             |
 | `invert`         | `false`            | Swap black and white. Useful for white-on-black source art or dark-mode logos.                                         |
 | `mirror`         | `false`            | Flip horizontally. Useful for receipt-window displays read through the back of the paper.                              |
@@ -225,13 +230,33 @@ Every option in one place.
 | `cut`            | printer's `default_cut` | `none` / `partial` / `full` after printing                                                                       |
 | `feed`           | `0`                | Lines to feed after printing (0–50)                                                                                    |
 
+### How the target width is chosen
+
+Images wider than the target are downscaled to fit (never upscaled). The
+target is resolved in this order:
+
+1. **`image_width` on the service call**: always wins.
+2. **The selected printer profile's declared width** (`media.width.pixels`).
+3. **384 px fallback**: used when no profile is selected (the auto/default
+   profile) or the selected profile doesn't declare a pixel width.
+
+384 px is the full head width of a 58 mm printer at 203 dpi, chosen because
+it's the only value safe on every printer; the previous 512 px fallback
+overflowed 58 mm heads and corrupted output. The tradeoff: on an **80 mm
+printer (576-dot head) with no profile selected**, images print at about
+two-thirds of the paper width. If your prints look narrower than expected,
+either select your printer's profile in the integration options (best: it
+fixes text width and cut modes too) or set `image_width: 576` on the call.
+`calibration_print` prints a pixel ruler at the same resolved width, so the
+sheet you measure always matches what images will actually do.
+
 ### Reliability profile
 
 Pick one in the integration's **Options** flow. Each profile sets sensible defaults for `fragment_height`, `chunk_delay_ms`, and `impl`; service-call options always override.
 
 | Profile          | `fragment_height` | `chunk_delay_ms` | `impl`           | Use for                                  |
 |------------------|-------------------|------------------|------------------|------------------------------------------|
-| Auto             | (transport default) | (transport default) | `bitImageRaster` | Default — no preset                    |
+| Auto             | (transport default) | (transport default) | `bitImageRaster` | Default: no preset                    |
 | Fast LAN         | 512               | 0                | `bitImageRaster` | Epson TM-T20/T88 on Ethernet             |
 | Balanced         | 256               | 20               | `bitImageRaster` | Most USB and Star TSP printers           |
 | Conservative     | 128               | 100              | `bitImageRaster` | Cheap POS-58 / POS-80 clones             |
@@ -239,7 +264,7 @@ Pick one in the integration's **Options** flow. Each profile sets sensible defau
 
 ### Supported formats
 
-PNG, JPEG, GIF, BMP, TIFF, WebP out of the box. **HEIC / HEIF / AVIF** are unlocked when `pillow-heif` is installed (`pip install pillow-heif` in the HA container). iPhone-fed camera proxies emit HEIC natively — installing `pillow-heif` removes the "image too large / wrong format" friction.
+PNG, JPEG, GIF, BMP, TIFF, WebP out of the box. **HEIC / HEIF / AVIF** are unlocked when `pillow-heif` is installed (`pip install pillow-heif` in the HA container). iPhone-fed camera proxies emit HEIC natively; installing `pillow-heif` removes the "image too large / wrong format" friction.
 
 SVG is **not** supported (no sandboxed renderer ships with the integration; XML parsing is an attack surface).
 
@@ -252,7 +277,7 @@ data:
   image_width: 384
   dither: threshold
   threshold: 140
-  center: true
+  align: center
   feed: 1
   cut: full
 ```
@@ -295,7 +320,7 @@ data:
 
 ## Convenience services
 
-When the source type is fixed, use the focused services for a friendlier UI (entity pickers, plain text fields) — they all funnel into the same pipeline as `print_image` and expose the same image-processing options (rotation, mirror, threshold, dither, etc.). Rarely-used knobs (`impl`, `fragment_height`, `chunk_delay_ms`, `fallback_image`) are marked **advanced** and only appear when Home Assistant's advanced mode is on.
+When the source type is fixed, use the focused services for a friendlier UI (entity pickers, plain text fields); they all funnel into the same pipeline as `print_image` and expose the same image-processing options (rotation, mirror, threshold, dither, etc.). In the UI form these live in a collapsed **Image Options** section; rarely-used knobs (`impl`, `fragment_height`, `chunk_delay_ms`, `fallback_image`) sit in a collapsed **Advanced Options** section.
 
 | Service                                | Source field    | Selector        |
 |----------------------------------------|-----------------|-----------------|
@@ -306,7 +331,7 @@ When the source type is fixed, use the focused services for a friendlier UI (ent
 
 ### Upgrading from earlier versions
 
-If you already have an automation calling `escpos_printer.print_image` with a literal URL or local path, **it keeps working unchanged** — the field still accepts the same string you were passing before:
+If you already have an automation calling `escpos_printer.print_image` with a literal URL or local path, **it keeps working unchanged**; the field still accepts the same string you were passing before:
 
 ```yaml
 # This is the old way and it still works.
@@ -315,7 +340,7 @@ data:
   image: /config/www/logo.png
 ```
 
-The `image` field now uses a template editor in the UI, so you may see your literal path inside a code-style box the next time you edit the automation. That's expected — the editor accepts plain text alongside Jinja templates.
+The `image` field uses a plain text selector in the UI, so a literal path or a template computed by the calling automation both display and work exactly as before.
 
 For new automations (and if you'd like a friendlier form), switch to the focused service that matches your source:
 
@@ -331,11 +356,11 @@ data:
   url: https://example.com/receipt.png
 ```
 
-The generic `print_image` service is still fully supported — it's the right choice when the source is computed by a template (e.g. picking between a camera entity and a fallback URL based on time of day).
+The generic `print_image` service is still fully supported; it's the right choice when the source is computed by a template (e.g. picking between a camera entity and a fallback URL based on time of day).
 
 ## Preview without printing
 
-`escpos_printer.preview_image` runs the **exact same** processing pipeline as `print_image` and writes the resulting 1-bit PNG to disk — without burning paper. Use it from Developer Tools → Services to tune `dither` / `threshold` / `image_width` in seconds.
+`escpos_printer.preview_image` runs the **exact same** processing pipeline as `print_image` and writes the resulting 1-bit PNG to disk, without burning paper. Use it from Developer Tools → Services to tune `dither` / `threshold` / `image_width` in seconds.
 
 ```yaml
 service: escpos_printer.preview_image
@@ -360,7 +385,7 @@ The service returns `{path, width, height, slice_count}` so you can chain a noti
 
 If `output_path` is omitted, the preview lands at `/tmp/escpos_preview_<entry>.png`.
 
-> **Tempdir-only restriction** — user-supplied `output_path` must be inside
+> **Tempdir-only restriction**: user-supplied `output_path` must be inside
 > the system temp directory (typically `/tmp`). A non-admin Home Assistant
 > user could otherwise call `preview_image` with
 > `output_path: /config/configuration.yaml` and clobber it with rendered
@@ -370,7 +395,7 @@ If `output_path` is omitted, the preview lands at `/tmp/escpos_preview_<entry>.p
 
 ## Calibration print
 
-`escpos_printer.calibration_print` prints a one-page calibration sheet: a pixel ruler plus a horizontal-gradient strip at several threshold values. Look for the strip where black-to-white is sharpest — that's the threshold to use with `dither: threshold` for line art.
+`escpos_printer.calibration_print` prints a one-page calibration sheet: a pixel ruler plus a horizontal-gradient strip at several threshold values. Look for the strip where black-to-white is sharpest; that's the threshold to use with `dither: threshold` for line art.
 
 ## `image_*` prefix on the notify entity
 
@@ -378,7 +403,7 @@ The `escpos_printer.print_message` / `notify.<printer>` action accepts both the 
 
 ## Reliability & speed
 
-Issue [#45](https://github.com/cognitivegears/ha-escpos-thermal-printer/issues/45) reports that very tall images can overrun the printer's input buffer — the printer freezes, then dumps the remaining image bytes as garbled characters at the start of the next print. Issue [#43](https://github.com/cognitivegears/ha-escpos-thermal-printer/issues/43) asked for a way to throttle image printing on cheap clones. Both are addressed by chunked transmission with an optional inter-chunk sleep.
+Issue [#45](https://github.com/cognitivegears/ha-escpos-thermal-printer/issues/45) reports that very tall images can overrun the printer's input buffer: the printer freezes, then dumps the remaining image bytes as garbled characters at the start of the next print. Issue [#43](https://github.com/cognitivegears/ha-escpos-thermal-printer/issues/43) asked for a way to throttle image printing on cheap clones. Both are addressed by chunked transmission with an optional inter-chunk sleep.
 
 How it works: the integration crops the processed image into horizontal slices of `fragment_height` pixels and sends each slice as its own ESC/POS image command, sleeping `chunk_delay_ms` milliseconds between slices.
 
@@ -400,19 +425,30 @@ Symptoms-to-knob mapping:
 - **Prints are too fast / motor stalls** → raise `chunk_delay_ms` to throttle.
 - **Prints are reliable but slow** → raise `fragment_height` and drop `chunk_delay_ms` to 0.
 
+## Diagnostics sensor
+
+`sensor.<printer>_last_image_print` is created for every printer, regardless of connection type. It's a diagnostic sensor and **disabled by default**; enable it from the entity's settings in the entity registry. Its state is the count of successful image prints since Home Assistant started; the attributes carry details of the most recent print so you can tune `dither`, `fragment_height`, and the other knobs above without downloading diagnostics:
+
+- `total_failures`: count of failed image prints since startup
+- `last_source_kind`: `data`, `camera`, `image`, `http`, or `local`
+- `last_decoded_dims`: `[width, height]` of the decoded image
+- `last_decoded_bytes`: decoded image size in bytes
+- `last_slice_count`: number of `fragment_height` slices the last image was split into
+- `last_error_class`: exception class name of the last failure, if any
+
 ## Implementation selector
 
 `impl` controls which ESC/POS image command python-escpos emits:
 
-- `bitImageRaster` (default) — `GS v 0`. Best default for
+- `bitImageRaster` (default): `GS v 0`. Best default for
   Epson-compatible printers.
-- `graphics` — `GS ( L`. Newer ESC/POS graphics block. Try this if
+- `graphics`: `GS ( L`. Newer ESC/POS graphics block. Try this if
   `bitImageRaster` prints stretched or garbled.
-- `bitImageColumn` — `ESC *`. Older column-mode command. Try this if
+- `bitImageColumn`: `ESC *`. Older column-mode command. Try this if
   the chosen impl looks misaligned on a generic POS-58 / POS-80 clone.
 
 If a printer prints text fine but images look wrong, cycling through
-`impl` is the first thing to try — it's a pure protocol selector with
+`impl` is the first thing to try; it's a pure protocol selector with
 no other side effects.
 
 If the installed python-escpos version doesn't accept the chosen
@@ -426,7 +462,7 @@ suspect the fallback fired.
 The notify entity's `print_message` service accepts an optional
 `image` (plus `image_*` parameters mirroring `print_image`). Text and
 image print as a **single uninterrupted receipt** under one printer
-lock acquisition — concurrent callers can no longer interleave between
+lock acquisition; concurrent callers can no longer interleave between
 the text and image halves. Image bytes are resolved (URL fetch, file
 read, camera snapshot) *before* the lock is taken, so a slow camera
 doesn't monopolize the printer queue.

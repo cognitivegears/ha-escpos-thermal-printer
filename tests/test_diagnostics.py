@@ -118,6 +118,32 @@ async def test_diagnostics_bluetooth_entry_redacts_mac(hass):  # type: ignore[no
     assert entry_data[CONF_RFCOMM_CHANNEL] == 1
 
 
+async def test_diagnostics_options_dumps_full_options_dict(hass):  # type: ignore[no-untyped-def]
+    """Diagnostics must surface options beyond the old hand-picked subset.
+
+    Regression: only codepage/profile/line_width/keepalive/status_interval
+    were reported, silently omitting fields the options flow also writes
+    (e.g. allow_local_image_urls) that are relevant for triage.
+    """
+    from custom_components.escpos_printer.const import CONF_ALLOW_LOCAL_IMAGE_URLS
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="1.2.3.4:9100",
+        data={CONF_HOST: "1.2.3.4", CONF_PORT: 9100},
+        options={CONF_ALLOW_LOCAL_IMAGE_URLS: True},
+        unique_id="1.2.3.4:9100",
+    )
+    entry.add_to_hass(hass)
+    with patch("escpos.printer.Network"):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    diag = await async_get_config_entry_diagnostics(hass, entry)
+
+    assert diag["entry"]["options"][CONF_ALLOW_LOCAL_IMAGE_URLS] is True
+
+
 async def test_diagnostics_without_runtime_data(hass):  # type: ignore[no-untyped-def]
     """Diagnostics must work even when runtime_data hasn't been set (e.g. setup failed)."""
     entry = MockConfigEntry(

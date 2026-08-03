@@ -13,15 +13,9 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity import DeviceInfo
 
-from .const import (
-    CONF_CONNECTION_TYPE,
-    CONNECTION_TYPE_BLUETOOTH,
-    CONNECTION_TYPE_NETWORK,
-    CONNECTION_TYPE_SERIAL,
-    CONNECTION_TYPE_USB,
-    DOMAIN,
-)
-from .image_sources import extract_image_kwargs, render_template
+from .const import DEFAULT_CODEPAGE
+from .device import build_device_info
+from .image_sources import extract_image_kwargs
 from .security import sanitize_log_message
 from .services.schemas import PRINT_MESSAGE_FIELDS
 from .text_utils import transcode_to_codepage
@@ -82,22 +76,7 @@ class EscposNotifyEntity(NotifyEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        connection_type = self._entry.data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
-        if connection_type == CONNECTION_TYPE_USB:
-            model = "USB Printer"
-        elif connection_type == CONNECTION_TYPE_BLUETOOTH:
-            model = "Bluetooth Printer"
-        elif connection_type == CONNECTION_TYPE_SERIAL:
-            model = "Serial Printer"
-        else:
-            model = "Network Printer"
-
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._entry.entry_id)},
-            name=f"ESC/POS Printer {self._entry.title}",
-            manufacturer="ESC/POS",
-            model=model,
-        )
+        return build_device_info(self._entry)
 
     async def async_send_message(self, message: str, title: str | None = None) -> None:
         """Send a notification message to the thermal printer."""
@@ -131,7 +110,7 @@ class EscposNotifyEntity(NotifyEntity):
         use_utf8 = kwargs.get("utf8", False)
         encoding = kwargs.get("encoding")
         if use_utf8:
-            codepage = adapter.config.codepage or "CP437"
+            codepage = adapter.config.codepage or DEFAULT_CODEPAGE
             text = await self._hass.async_add_executor_job(transcode_to_codepage, text, codepage)
             encoding = None  # Let printer use configured codepage
 
@@ -161,13 +140,9 @@ class EscposNotifyEntity(NotifyEntity):
                 )
                 return
 
-            image_source = render_template(self._hass, image_source_raw)
-            image_kwargs = extract_image_kwargs(
-                {**kwargs, "image": image_source},
-                defaults,
-                prefix="image_",
-                hass=self._hass,
-            )
+            # ``image_source_raw`` is exactly ``kwargs["image"]`` (read a
+            # few lines up, unmodified since) -- no need to re-spread it.
+            image_kwargs = extract_image_kwargs(kwargs, defaults, prefix="image_")
             await adapter.print_text_with_image(
                 self._hass,
                 text_kwargs=text_kwargs,

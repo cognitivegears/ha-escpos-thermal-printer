@@ -18,7 +18,7 @@ def validate_custom_line_width(value: Any) -> tuple[int | None, str | None]:
     """
     try:
         width_int = int(value)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         _LOGGER.warning("Invalid line width (not a number): %s", value)
         return None, "invalid_line_width"
     if width_int < 1 or width_int > 255:

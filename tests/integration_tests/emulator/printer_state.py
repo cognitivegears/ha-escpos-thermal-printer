@@ -97,9 +97,8 @@ class PrinterState:
                     if isinstance(command.parameters, dict)
                     else False
                 )
-                is_mirror = (
-                    isinstance(command.parameters, dict)
-                    and bool(command.parameters.get("__mirrored__"))
+                is_mirror = isinstance(command.parameters, dict) and bool(
+                    command.parameters.get("__mirrored__")
                 )
                 # Mirror-then-network dedup: if a mirror text was recently
                 # appended for this same logical call, silently absorb the

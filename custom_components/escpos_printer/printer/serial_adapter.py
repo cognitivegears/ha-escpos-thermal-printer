@@ -13,6 +13,7 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
+from ..const import DEFAULT_CHUNK_DELAY_MS_NETWORK
 from ..security import sanitize_log_message
 from . import serial_transport
 from ._escpos_serial import make_serial_escpos
@@ -43,7 +44,7 @@ class SerialPrinterAdapter(EscposPrinterAdapterBase):
     _CONNECT_RETRIES = 2
     _CONNECT_RETRY_DELAY_S = 0.3
 
-    default_chunk_delay_ms = 0
+    default_chunk_delay_ms = DEFAULT_CHUNK_DELAY_MS_NETWORK
 
     def __init__(self, config: SerialPrinterConfig) -> None:
         super().__init__(config)
@@ -60,7 +61,7 @@ class SerialPrinterAdapter(EscposPrinterAdapterBase):
 
     def _connect(self) -> Any:
         """Open a serial transport and wrap it in a python-escpos printer."""
-        profile_obj = self._get_profile_obj()
+        profile_name = self._profile_for_constructor()
         last_exc: Exception | None = None
         port = self._serial_config.serial_port
         baudrate = self._serial_config.baudrate
@@ -99,13 +100,19 @@ class SerialPrinterAdapter(EscposPrinterAdapterBase):
                 time.sleep(self._CONNECT_RETRY_DELAY_S)
                 continue
             else:
-                return make_serial_escpos(transport, profile_obj)
+                return make_serial_escpos(transport, profile_name)
 
         assert last_exc is not None  # pragma: no cover
         raise last_exc
 
     async def _release_printer(
-        self, hass: HomeAssistant, printer: Any, *, owned: bool, failed: bool = False
+        self,
+        hass: HomeAssistant,
+        printer: Any,
+        *,
+        owned: bool,
+        failed: bool = False,
+        notify_status: bool = True,
     ) -> None:
         """Flush coalesced output (errors propagate) before the base close.
 
@@ -132,7 +139,9 @@ class SerialPrinterAdapter(EscposPrinterAdapterBase):
                 flush_exc = exc
                 failed = True
 
-        await super()._release_printer(hass, printer, owned=owned, failed=failed)
+        await super()._release_printer(
+            hass, printer, owned=owned, failed=failed, notify_status=notify_status
+        )
         if flush_exc is not None:
             raise flush_exc
 
@@ -213,9 +222,7 @@ class SerialPrinterAdapter(EscposPrinterAdapterBase):
             self._last_error_errno = None
         else:
             self._last_error = now
-            self._last_error_reason = sanitize_log_message(
-                err or "Serial printer unreachable"
-            )
+            self._last_error_reason = sanitize_log_message(err or "Serial printer unreachable")
             self._last_error_errno = err_no
         if self._status != ok and not ok:
             _LOGGER.warning(

@@ -409,7 +409,7 @@ class TestSecurityConstants:
         assert MAX_QR_DATA_LENGTH == 2000
         assert MAX_BARCODE_LENGTH == 100
         assert MAX_FEED_LINES == 50
-        assert MAX_BEEP_TIMES == 10
+        assert MAX_BEEP_TIMES == 9
 
     def test_text_effects_max_constants(self):  # type: ignore[no-untyped-def]
         """T-M3: pin the text-effects bounds added in the 0.7 branch.
@@ -536,6 +536,98 @@ class TestFontPathValidation:
         link_at_validated_path.symlink_to(decoy)
         with pytest.raises(OSError):
             open_local_font_no_follow(link_at_validated_path)
+
+    async def test_validate_font_path_allowlist_checked_before_existence(  # type: ignore[no-untyped-def]
+        self, hass, monkeypatch
+    ):
+        """A nonexistent path outside the allowlist must yield the allowlist error.
+
+        The ``hass`` allowlist decision runs before the existence check,
+        so a caller outside the allowlist can't use the distinct "does not
+        exist" error as an oracle for arbitrary host paths.
+        """
+        from custom_components.escpos_printer.security import validate_font_path
+
+        monkeypatch.setattr(hass.config, "is_allowed_path", lambda _p: False)
+        with pytest.raises(HomeAssistantError, match="allowlist"):
+            validate_font_path("/nonexistent/outside/font.ttf", hass=hass)
+
+    async def test_validate_font_path_allowlist_checked_before_oversize(  # type: ignore[no-untyped-def]
+        self, hass, monkeypatch, tmp_path
+    ):
+        """An oversized file outside the allowlist must yield the allowlist error, not 'too large'."""
+        from custom_components.escpos_printer.security import (
+            MAX_FONT_SIZE_BYTES,
+            validate_font_path,
+        )
+
+        monkeypatch.setattr(hass.config, "is_allowed_path", lambda _p: False)
+        big = tmp_path / "huge.ttf"
+        with open(big, "wb") as fh:
+            fh.seek(MAX_FONT_SIZE_BYTES + 1)
+            fh.write(b"\0")
+        with pytest.raises(HomeAssistantError, match="allowlist"):
+            validate_font_path(str(big), hass=hass)
+
+    async def test_validate_font_path_with_fonts_dir_rejects_sibling_dir(  # type: ignore[no-untyped-def]
+        self, hass, monkeypatch
+    ):
+        """A path under a sibling dir (``<config>/fonts-evil/``) must not be accepted.
+
+        Guards against a future ``startswith`` simplification of the
+        fonts-dir trust check, which would incorrectly treat
+        ``<config>/fonts-evil/...`` as if it were under ``<config>/fonts/``.
+        """
+        from pathlib import Path
+
+        from custom_components.escpos_printer.security import (
+            validate_font_path_with_fonts_dir,
+        )
+
+        monkeypatch.setattr(hass.config, "is_allowed_path", lambda _p: False)
+        evil_dir = Path(hass.config.path("fonts-evil"))
+        evil_dir.mkdir(parents=True, exist_ok=True)
+        bundled = (
+            Path(__file__).resolve().parents[1]
+            / "custom_components"
+            / "escpos_printer"
+            / "fonts"
+            / "DejaVuSansMono.ttf"
+        )
+        evil_font = evil_dir / "x.ttf"
+        evil_font.write_bytes(bundled.read_bytes())
+        with pytest.raises(HomeAssistantError, match="allowlist"):
+            validate_font_path_with_fonts_dir(str(evil_font), hass)
+
+    async def test_validate_font_path_with_fonts_dir_rechecks_after_second_resolve(  # type: ignore[no-untyped-def]
+        self, hass, monkeypatch, tmp_path
+    ):
+        """TOCTOU: a symlink swapped between the trust precheck and
+        ``validate_font_path``'s own resolve must still be rejected.
+
+        The precheck sees a path inside ``<config>/fonts/``; the second
+        resolve (``validate_font_path``'s internal ``Path.resolve``)
+        simulates the swap by returning a path outside any trusted
+        location. The trust decision must be re-checked against that
+        second-resolve result.
+        """
+        from pathlib import Path
+
+        from custom_components.escpos_printer import security
+        from custom_components.escpos_printer.security import (
+            validate_font_path_with_fonts_dir,
+        )
+
+        fonts_dir = Path(hass.config.path("fonts"))
+        fonts_dir.mkdir(parents=True, exist_ok=True)
+        good = fonts_dir / "trusted.ttf"
+        good.write_bytes(b"OTTO")
+        outside = tmp_path / "outside" / "evil.ttf"
+
+        monkeypatch.setattr(hass.config, "is_allowed_path", lambda p: False)
+        monkeypatch.setattr(security, "validate_font_path", lambda *a, **kw: outside)
+        with pytest.raises(HomeAssistantError, match="allowlist"):
+            validate_font_path_with_fonts_dir(str(good), hass)
 
 
 class TestWriteFileNoFollow:
@@ -683,3 +775,269 @@ class TestIsAllowedAddress:
         from custom_components.escpos_printer.security import _is_allowed_address
 
         assert _is_allowed_address("not-an-ip", allow_local=True) is False
+
+
+# ---------------------------------------------------------------------------
+# Diff-coverage top-up: non-string / edge-case branches on the small
+# validators that were otherwise only exercised via their happy paths.
+# ---------------------------------------------------------------------------
+
+
+class TestNonStringGuards:
+    """Every ``if not isinstance(value, str): raise`` guard, hit directly."""
+
+    def test_validate_qr_data_rejects_non_string(self):  # type: ignore[no-untyped-def]
+        with pytest.raises(HomeAssistantError, match="must be a string"):
+            validate_qr_data(123)  # type: ignore[arg-type]
+
+    def test_validate_barcode_data_rejects_non_string_code(self):  # type: ignore[no-untyped-def]
+        with pytest.raises(HomeAssistantError, match="must be strings"):
+            validate_barcode_data(123, "CODE128")  # type: ignore[arg-type]
+
+    def test_validate_barcode_data_rejects_whitespace_only(self):  # type: ignore[no-untyped-def]
+        with pytest.raises(HomeAssistantError, match="cannot be empty"):
+            validate_barcode_data("   ", "CODE128")
+
+    def test_validate_image_url_rejects_non_string(self):  # type: ignore[no-untyped-def]
+        with pytest.raises(HomeAssistantError, match="must be a string"):
+            validate_image_url(123)  # type: ignore[arg-type]
+
+    def test_validate_base64_image_rejects_non_string(self):  # type: ignore[no-untyped-def]
+        with pytest.raises(HomeAssistantError, match="must be a string"):
+            validate_base64_image(None)  # type: ignore[arg-type]
+
+    def test_validate_entity_id_for_domain_rejects_non_string(self):  # type: ignore[no-untyped-def]
+        with pytest.raises(HomeAssistantError, match="must be a string"):
+            validate_entity_id_for_domain(None, "camera")  # type: ignore[arg-type]
+
+    def test_validate_dither_mode_rejects_non_string(self):  # type: ignore[no-untyped-def]
+        with pytest.raises(HomeAssistantError, match="must be a string"):
+            validate_dither_mode(123)  # type: ignore[arg-type]
+
+    def test_validate_impl_mode_rejects_non_string(self):  # type: ignore[no-untyped-def]
+        with pytest.raises(HomeAssistantError, match="must be a string"):
+            validate_impl_mode(123)  # type: ignore[arg-type]
+
+    def test_validate_local_path_sync_rejects_non_string(self):  # type: ignore[no-untyped-def]
+        with pytest.raises(HomeAssistantError, match="must be a string"):
+            _validate_local_path_sync(123)  # type: ignore[arg-type]
+
+    def test_validate_font_path_rejects_too_long(self):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import (
+            MAX_FONT_PATH_LENGTH,
+            validate_font_path,
+        )
+
+        with pytest.raises(HomeAssistantError, match="exceeds maximum length"):
+            validate_font_path("/" + "x" * (MAX_FONT_PATH_LENGTH + 1) + ".ttf")
+
+    def test_validate_font_path_with_fonts_dir_rejects_non_string(self, hass):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import validate_font_path_with_fonts_dir
+
+        with pytest.raises(HomeAssistantError, match="must be a string"):
+            validate_font_path_with_fonts_dir(123, hass)  # type: ignore[arg-type]
+
+
+class TestUrlValidationEdgeCases:
+    """Branches of ``validate_image_url`` not covered by the happy-path tests."""
+
+    def test_rejects_malformed_ipv6_netloc(self):  # type: ignore[no-untyped-def]
+        # A truncated IPv6 literal in the host makes `urlparse` itself raise
+        # ValueError (before scheme/hostname checks even run).
+        with pytest.raises(HomeAssistantError, match="Invalid URL format"):
+            validate_image_url("http://[::1:80/x.png")
+
+    def test_rejects_idn_hostname_that_fails_idna_encoding(self):  # type: ignore[no-untyped-def]
+        # A non-ASCII hostname that already starts with the ACE prefix is
+        # rejected by Python's idna codec with UnicodeError -- must surface
+        # as a clean ServiceValidationError, not a bare UnicodeError.
+        with pytest.raises(HomeAssistantError, match="Invalid IDN hostname"):
+            validate_image_url("https://xn--\xe9.com/x.png")
+
+
+class TestResolveHostnameSync:
+    def test_raises_service_validation_error_on_unresolvable_host(self, monkeypatch):  # type: ignore[no-untyped-def]
+        import socket
+
+        from custom_components.escpos_printer.security import _resolve_hostname_sync
+
+        def _boom(*_a, **_kw):  # type: ignore[no-untyped-def]
+            raise OSError("Name or service not known")
+
+        monkeypatch.setattr(socket, "getaddrinfo", _boom)
+        with pytest.raises(HomeAssistantError, match="Could not resolve"):
+            _resolve_hostname_sync("this-host-does-not-exist.invalid.example.", 80)
+
+
+class TestValidateLocalPathSyncEdgeCases:
+    def test_rejects_directory_masquerading_as_image(self, tmp_path):  # type: ignore[no-untyped-def]
+        # A directory named "*.png" passes the extension check but must be
+        # rejected once stat() reveals it isn't a regular file.
+        dirpath = tmp_path / "dir.png"
+        dirpath.mkdir()
+        with pytest.raises(HomeAssistantError, match="not a regular file"):
+            _validate_local_path_sync(str(dirpath))
+
+    def test_rejects_path_through_non_directory_component(self, tmp_path):  # type: ignore[no-untyped-def]
+        # Treating a regular file as if it were a directory component makes
+        # `Path.resolve(strict=True)` raise `NotADirectoryError` (an OSError
+        # subclass distinct from FileNotFoundError) -- must still surface as
+        # a clean ServiceValidationError.
+        regular = tmp_path / "not_a_dir.png"
+        regular.write_bytes(b"\x89PNG\r\n\x1a\n")
+        bogus = regular / "sub.png"
+        with pytest.raises(HomeAssistantError, match="Cannot access image file"):
+            _validate_local_path_sync(str(bogus))
+
+    def test_rejects_when_stat_raises(self, tmp_path, monkeypatch):  # type: ignore[no-untyped-def]
+        from pathlib import Path
+
+        path = tmp_path / "img.png"
+        path.write_bytes(b"\x89PNG\r\n\x1a\n")
+
+        def _boom(self):  # type: ignore[no-untyped-def]
+            raise OSError("permission denied")
+
+        monkeypatch.setattr(Path, "stat", _boom)
+        with pytest.raises(HomeAssistantError, match="Cannot access image file"):
+            _validate_local_path_sync(str(path))
+
+
+class TestBestEffortResolve:
+    def test_falls_back_to_raw_string_on_unresolvable_path(self):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import _best_effort_resolve
+
+        # An embedded NUL byte makes `Path.resolve()` raise ValueError.
+        raw = "bad\x00path"
+        assert _best_effort_resolve(raw) == raw
+
+
+class TestValidateFontPathEdgeCases:
+    def test_rejects_path_through_non_directory_component(self, tmp_path):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import validate_font_path
+
+        regular = tmp_path / "not_a_dir.ttf"
+        regular.write_bytes(b"OTTO")
+        bogus = regular / "sub.ttf"
+        with pytest.raises(HomeAssistantError, match="Cannot access font file"):
+            validate_font_path(str(bogus))
+
+    def test_rejects_directory_masquerading_as_font(self, tmp_path):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import validate_font_path
+
+        dirpath = tmp_path / "dir.ttf"
+        dirpath.mkdir()
+        with pytest.raises(HomeAssistantError, match="not a regular file"):
+            validate_font_path(str(dirpath))
+
+    def test_rejects_when_is_symlink_raises(self, tmp_path, monkeypatch):  # type: ignore[no-untyped-def]
+        from pathlib import Path
+
+        from custom_components.escpos_printer.security import validate_font_path
+
+        path = tmp_path / "font.ttf"
+        path.write_bytes(b"OTTO")
+
+        def _boom(self):  # type: ignore[no-untyped-def]
+            raise OSError("permission denied")
+
+        monkeypatch.setattr(Path, "is_symlink", _boom)
+        with pytest.raises(HomeAssistantError, match="Cannot access font file"):
+            validate_font_path(str(path))
+
+    def test_rejects_when_stat_raises(self, tmp_path, monkeypatch):  # type: ignore[no-untyped-def]
+        from pathlib import Path
+
+        from custom_components.escpos_printer.security import validate_font_path
+
+        path = tmp_path / "font.ttf"
+        path.write_bytes(b"OTTO")
+
+        orig_stat = Path.stat
+
+        def _boom(self):  # type: ignore[no-untyped-def]
+            if self == path.resolve():
+                raise OSError("permission denied")
+            return orig_stat(self)
+
+        monkeypatch.setattr(Path, "stat", _boom)
+        with pytest.raises(HomeAssistantError, match="Cannot access font file"):
+            validate_font_path(str(path))
+
+
+class TestIsTrustedFontLocation:
+    async def test_true_when_allowlisted(self, hass, monkeypatch):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import _is_trusted_font_location
+
+        monkeypatch.setattr(hass.config, "is_allowed_path", lambda _p: True)
+        assert _is_trusted_font_location("/anything", hass) is True
+
+    async def test_false_when_fonts_dir_unresolvable(self, hass, monkeypatch):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import _is_trusted_font_location
+
+        monkeypatch.setattr(hass.config, "is_allowed_path", lambda _p: False)
+        # An embedded NUL byte in the configured "fonts" path makes
+        # `Path(...).resolve()` raise ValueError.
+        monkeypatch.setattr(hass.config, "path", lambda *_a: "bad\x00fonts")
+        assert _is_trusted_font_location("/some/font.ttf", hass) is False
+
+
+class TestValidateRowsEdgeCases:
+    def test_rejects_non_list_row(self):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import validate_rows
+
+        with pytest.raises(HomeAssistantError, match="each row must be a list"):
+            validate_rows([1, 2])
+
+    def test_rejects_oversize_cell(self):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import MAX_TABLE_CELL_LENGTH, validate_rows
+
+        with pytest.raises(HomeAssistantError, match="cell length exceeds maximum"):
+            validate_rows([["x" * (MAX_TABLE_CELL_LENGTH + 1)]])
+
+
+class TestSanitiseKvItemsEdgeCases:
+    def test_rejects_oversize_cell(self):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import (
+            MAX_TABLE_CELL_LENGTH,
+            sanitise_kv_items,
+        )
+
+        with pytest.raises(HomeAssistantError, match="exceeds maximum"):
+            sanitise_kv_items([["key", "x" * (MAX_TABLE_CELL_LENGTH + 1)]])
+
+
+class TestReadNoFollowEdgeCases:
+    def test_open_local_image_no_follow_rejects_directory(self, tmp_path):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import open_local_image_no_follow
+
+        with pytest.raises(HomeAssistantError, match="not a regular file"):
+            open_local_image_no_follow(tmp_path)
+
+    def test_open_local_image_no_follow_rejects_oversize(self, tmp_path):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer.security import open_local_image_no_follow
+
+        path = tmp_path / "img.png"
+        path.write_bytes(b"\x89PNG\r\n\x1a\nEXTRA")
+        with pytest.raises(HomeAssistantError, match="too large"):
+            open_local_image_no_follow(path, max_bytes=4)
+
+
+class TestBase64ImageEdgeCases:
+    def test_rejects_invalid_padding(self):  # type: ignore[no-untyped-def]
+        # "A" matches the base64-alphabet regex but is not valid base64
+        # (wrong padding) -- must hit the binascii.Error decode branch.
+        with pytest.raises(HomeAssistantError, match="Invalid base64 data"):
+            validate_base64_image("data:image/png;base64,A")
+
+    def test_rejects_decoded_payload_over_cap(self, monkeypatch):  # type: ignore[no-untyped-def]
+        from custom_components.escpos_printer import security
+
+        # Shrink the post-decode cap (but not the pre-decode input cap,
+        # which is computed once at import time) so a ~2MB payload trips
+        # the "too large" check *after* successful decoding.
+        monkeypatch.setattr(security, "MAX_IMAGE_SIZE_MB", 1)
+        raw = b"\x00" * (2 * 1024 * 1024)
+        uri = "data:image/png;base64," + base64.b64encode(raw).decode()
+        with pytest.raises(HomeAssistantError, match="too large"):
+            security.validate_base64_image(uri)

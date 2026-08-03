@@ -88,8 +88,8 @@ def render_box(
     ``style`` may be ``"auto"`` — it is resolved against ``codepage`` so
     callers can pass the printer codepage and get the right glyph family
     without branching. ``padding`` is the count of blank rows added above
-    and below the content; horizontal padding is one space inside each
-    side glyph plus ``padding`` extra spaces. The returned string has no
+    and below the content; there is no horizontal padding — content sits
+    directly against the border glyphs. The returned string has no
     trailing newline.
     """
     if inner_width < 1:
@@ -105,7 +105,7 @@ def render_box(
             "Box content contains wide-width characters (CJK / fullwidth / "
             "emoji); the borders may misalign because textwrap wraps by "
             "code-point count, not display columns. Use print_text_image "
-            "for accurate layout — see docs/text-effects.md#cjk. "
+            "for accurate layout — see docs/text-effects.md#cjk--wide-character-content. "
             "(This warning fires once per process.)"
         )
         _WARNED_WIDE_CHARS_BOX[0] = True

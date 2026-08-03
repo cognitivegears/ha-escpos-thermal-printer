@@ -315,9 +315,7 @@ BLUEPRINT_CASES: dict[str, dict[str, Any]] = {
             "style": "double",
         },
         "context": {
-            "trigger": _trigger_namespace(
-                [{"uid": "old-uid", "summary": "Old task"}]
-            ),
+            "trigger": _trigger_namespace([{"uid": "old-uid", "summary": "Old task"}]),
             "repeat": _repeat_namespace(
                 {
                     "uid": "new-uid",
@@ -418,10 +416,7 @@ def test_blueprint_cases_cover_every_blueprint() -> None:
     violation simply by forgetting to add an entry to ``BLUEPRINT_CASES``
     — the parametrised test would silently not cover the new file.
     """
-    on_disk = {
-        str(p.relative_to(REPO_ROOT))
-        for p in sorted(BLUEPRINTS_DIR.rglob("*.yaml"))
-    }
+    on_disk = {str(p.relative_to(REPO_ROOT)) for p in sorted(BLUEPRINTS_DIR.rglob("*.yaml"))}
     registered = set(BLUEPRINT_CASES.keys())
     missing = on_disk - registered
     extra = registered - on_disk
@@ -429,9 +424,7 @@ def test_blueprint_cases_cover_every_blueprint() -> None:
         f"blueprints without a template-safety test case: {sorted(missing)} "
         f"— add them to BLUEPRINT_CASES in this file"
     )
-    assert not extra, (
-        f"BLUEPRINT_CASES references missing files: {sorted(extra)}"
-    )
+    assert not extra, f"BLUEPRINT_CASES references missing files: {sorted(extra)}"
 
 
 # ---- self-test: the harness must actually catch a regression -----------------

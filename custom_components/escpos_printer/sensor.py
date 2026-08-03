@@ -8,6 +8,7 @@ gives users a real "low battery" signal they can automate on.
 
 from __future__ import annotations
 
+from datetime import timedelta
 import logging
 from typing import Any
 
@@ -27,37 +28,24 @@ from .const import (
     CONF_CONNECTION_TYPE,
     CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
-    CONNECTION_TYPE_SERIAL,
     CONNECTION_TYPE_USB,
-    DOMAIN,
 )
+from .device import build_device_info
 
 _LOGGER = logging.getLogger(__name__)
 
 # Battery polling cadence is set by _attr_should_poll on the entity.
 PARALLEL_UPDATES = 0
 
+# Both polling sensors below were documented as "every 5 minutes" but
+# nothing enforced it -- HA's entity-component default poll interval is
+# 30s, so a full D-Bus GetManagedObjects round-trip (battery) or a fresh
+# printer connection (paper status) was happening 10x more often than
+# intended.
+SCAN_INTERVAL = timedelta(minutes=5)
+
 # python-escpos paper_status() return codes → enum sensor options.
 _PAPER_STATUS_OPTIONS = {2: "ok", 1: "low", 0: "out"}
-
-
-def _device_info(entry: ConfigEntry) -> DeviceInfo:
-    """Shared DeviceInfo — keep model names in sync with binary_sensor.py."""
-    connection_type = entry.data.get(CONF_CONNECTION_TYPE)
-    if connection_type == CONNECTION_TYPE_BLUETOOTH:
-        model = "Bluetooth Printer"
-    elif connection_type == CONNECTION_TYPE_USB:
-        model = "USB Printer"
-    elif connection_type == CONNECTION_TYPE_SERIAL:
-        model = "Serial Printer"
-    else:
-        model = "Network Printer"
-    return DeviceInfo(
-        identifiers={(DOMAIN, entry.entry_id)},
-        name=f"ESC/POS Printer {entry.title}",
-        manufacturer="ESC/POS",
-        model=model,
-    )
 
 
 async def async_setup_entry(
@@ -98,10 +86,20 @@ class LastImagePrintSensor(SensorEntity):
     """
 
     _attr_has_entity_name = True
-    _attr_name = "Last image print"
+    _attr_translation_key = "last_image_print"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
     _attr_should_poll = True
-    _attr_icon = "mdi:image-outline"
+    _unrecorded_attributes = frozenset(
+        {
+            "total_failures",
+            "last_source_kind",
+            "last_decoded_dims",
+            "last_decoded_bytes",
+            "last_slice_count",
+            "last_error_class",
+        }
+    )
 
     def __init__(self, entry: ConfigEntry) -> None:
         self._entry = entry
@@ -109,7 +107,7 @@ class LastImagePrintSensor(SensorEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        return _device_info(self._entry)
+        return build_device_info(self._entry)
 
     async def async_update(self) -> None:
         """Pull the in-memory ImageStats snapshot off the adapter."""
@@ -137,11 +135,12 @@ class BluetoothPrinterBatterySensor(SensorEntity):
     """Battery percentage for a paired BT printer (when bluez exposes it)."""
 
     _attr_has_entity_name = True
-    _attr_name = "Battery"
+    _attr_translation_key = "battery"
     _attr_device_class = SensorDeviceClass.BATTERY
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = PERCENTAGE
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
     # Battery level changes slowly; HA's default 30s isn't worth the D-Bus
     # round-trip cost. Update every 5 minutes.
     _attr_should_poll = True
@@ -154,7 +153,7 @@ class BluetoothPrinterBatterySensor(SensorEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        return _device_info(self._entry)
+        return build_device_info(self._entry)
 
     async def async_update(self) -> None:
         """Poll bluez for the current battery percentage."""
@@ -182,11 +181,10 @@ class PaperStatusSensor(SensorEntity):
     """
 
     _attr_has_entity_name = True
-    _attr_name = "Paper status"
+    _attr_translation_key = "paper_status"
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = ["ok", "low", "out"]
     _attr_should_poll = True
-    _attr_icon = "mdi:paper-roll-outline"
 
     def __init__(self, entry: ConfigEntry) -> None:
         self._entry = entry
@@ -195,7 +193,7 @@ class PaperStatusSensor(SensorEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        return _device_info(self._entry)
+        return build_device_info(self._entry)
 
     async def async_update(self) -> None:
         """Query the printer for its paper sensor state."""

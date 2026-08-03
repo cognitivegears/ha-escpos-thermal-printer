@@ -134,9 +134,7 @@ def test_enumerate_unfiltered_marks_unknown_vendors_as_non_printer(
 ) -> None:
     other_vid = 0xDEAD
     assert other_vid not in THERMAL_PRINTER_VIDS
-    _install_fake_usb(
-        monkeypatch, devices=[_FakeDevice(idVendor=other_vid, idProduct=0x0002)]
-    )
+    _install_fake_usb(monkeypatch, devices=[_FakeDevice(idVendor=other_vid, idProduct=0x0002)])
     out = usb_helpers._enumerate_usb_devices(None, default_product="USB Device")
     assert len(out) == 1
     assert out[0]["vendor_id"] == other_vid
@@ -196,9 +194,7 @@ def test_discover_usb_printers_strips_is_known_printer_flag(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     known_vid = next(iter(THERMAL_PRINTER_VIDS))
-    _install_fake_usb(
-        monkeypatch, devices=[_FakeDevice(idVendor=known_vid, idProduct=0x0001)]
-    )
+    _install_fake_usb(monkeypatch, devices=[_FakeDevice(idVendor=known_vid, idProduct=0x0001)])
     out = usb_helpers._discover_usb_printers()
     assert len(out) == 1
     # Printer-only listing intentionally drops the flag — every entry
@@ -211,9 +207,7 @@ def test_discover_all_usb_devices_keeps_is_known_printer_flag(
 ) -> None:
     other_vid = 0xDEAD
     assert other_vid not in THERMAL_PRINTER_VIDS
-    _install_fake_usb(
-        monkeypatch, devices=[_FakeDevice(idVendor=other_vid, idProduct=0x0002)]
-    )
+    _install_fake_usb(monkeypatch, devices=[_FakeDevice(idVendor=other_vid, idProduct=0x0002)])
     out = usb_helpers._discover_all_usb_devices()
     assert len(out) == 1
     assert out[0]["is_known_printer"] is False

@@ -14,6 +14,7 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+import voluptuous as vol
 
 from custom_components.escpos_printer.const import DOMAIN
 
@@ -274,3 +275,97 @@ async def test_print_barcode_adapter_error_raises_homeassistant_error(hass):  # 
                 {"code": "123", "bc": "CODE128"},
                 blocking=True,
             )
+
+
+# ---------------------------------------------------------------------------
+# broadcast: explicit multi-target flag, mutually exclusive with device_id.
+# ---------------------------------------------------------------------------
+
+
+async def test_broadcast_with_device_id_rejected_by_schema(hass):  # type: ignore[no-untyped-def]
+    """`broadcast: true` + `device_id` is a schema-layer validation error."""
+    entry = await _setup_entry(hass)
+    device_id = _get_device_id_for_entry(hass, entry)
+
+    with pytest.raises(vol.Invalid):
+        await hass.services.async_call(
+            DOMAIN,
+            "print_text",
+            {"text": "Hello", "device_id": device_id, "broadcast": True},
+            blocking=True,
+        )
+
+
+async def test_broadcast_true_resolves_to_all_entries(hass):  # type: ignore[no-untyped-def]
+    """`broadcast: true` targets every loaded printer, same as the implicit form."""
+    await _setup_entry(hass, "1.1.1.1")
+    await _setup_entry(hass, "2.2.2.2")
+
+    fake = MagicMock()
+    with patch("escpos.printer.Network", return_value=fake):
+        await hass.services.async_call(
+            DOMAIN,
+            "print_text",
+            {"text": "Hello", "broadcast": True},
+            blocking=True,
+        )
+    assert fake.text.call_count >= 2
+
+
+async def test_omitted_target_with_two_entries_warns_once(hass, caplog):  # type: ignore[no-untyped-def]
+    """Omitting device_id/broadcast with >1 printer logs a warning naming the count."""
+    await _setup_entry(hass, "1.1.1.1")
+    await _setup_entry(hass, "2.2.2.2")
+
+    with patch("escpos.printer.Network"):
+        with caplog.at_level("WARNING"):
+            await hass.services.async_call(
+                DOMAIN,
+                "print_text",
+                {"text": "Hello"},
+                blocking=True,
+            )
+    warnings = [r for r in caplog.records if "no device_id specified" in r.message]
+    assert len(warnings) == 1
+    assert "print_text" in warnings[0].message
+    assert "2" in warnings[0].message
+
+
+async def test_omitted_target_with_one_entry_does_not_warn(hass, caplog):  # type: ignore[no-untyped-def]
+    """A single configured printer is an unambiguous target — no warning."""
+    await _setup_entry(hass)
+
+    with patch("escpos.printer.Network"):
+        with caplog.at_level("WARNING"):
+            await hass.services.async_call(
+                DOMAIN,
+                "print_text",
+                {"text": "Hello"},
+                blocking=True,
+            )
+    warnings = [r for r in caplog.records if "no device_id specified" in r.message]
+    assert not warnings
+
+
+async def test_preview_omitted_target_with_two_entries_does_not_warn(hass, caplog):  # type: ignore[no-untyped-def]
+    """C1: preview_box errors on >1 implicit target without ever warning first.
+
+    Previously the broadcast warning logged unconditionally before the
+    "requires exactly one printer target" error was raised -- a warning
+    about a broadcast print that never actually happens.
+    """
+    await _setup_entry(hass, "1.1.1.1")
+    await _setup_entry(hass, "2.2.2.2")
+
+    with patch("escpos.printer.Network"):
+        with caplog.at_level("WARNING"):
+            with pytest.raises(HomeAssistantError, match="requires exactly one printer target"):
+                await hass.services.async_call(
+                    DOMAIN,
+                    "preview_box",
+                    {"text": "Hello"},
+                    blocking=True,
+                    return_response=True,
+                )
+    warnings = [r for r in caplog.records if "no device_id specified" in r.message]
+    assert not warnings

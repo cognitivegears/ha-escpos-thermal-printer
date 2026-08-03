@@ -3,7 +3,8 @@
 Each test pins a specific defect surfaced in the full-codebase review so
 it cannot silently regress:
 
-- C3: ``fallback_image`` template is rendered (was a dead Template object).
+- C3: ``fallback_image`` (and other image source strings) pass through
+  ``extract_image_kwargs`` unmodified — no server-side Jinja rendering.
 - H1: a keepalive connection is invalidated after a failed operation.
 - H3: the decompression-bomb guard is enforced per-decode (no process-global).
 - M-ssrf: ``allow_local`` only lifts the port allowlist for private targets.
@@ -15,7 +16,6 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.template import Template
 import pytest
 
 from custom_components.escpos_printer.const import ATTR_FALLBACK_IMAGE, ATTR_IMAGE
@@ -28,33 +28,27 @@ from custom_components.escpos_printer.printer.mapping_utils import cleanup_cut
 
 
 def _network_adapter():  # type: ignore[no-untyped-def]
-    return create_printer_adapter(
-        NetworkPrinterConfig(host="1.2.3.4", port=9100, timeout=4.0)
-    )
+    return create_printer_adapter(NetworkPrinterConfig(host="1.2.3.4", port=9100, timeout=4.0))
 
 
 # ---------------------------------------------------------------------------
-# C3: fallback_image must be rendered to a string, not left a Template object.
+# C3: image source strings (including fallback_image) pass through as-is.
+# Server-side Jinja rendering was removed (security fix): the template
+# environment reads all HA states with no per-entity permission check, so
+# a non-admin caller of the un-admin-gated print_image service could read
+# arbitrary sensor state via a crafted `image:` value. Automations still
+# work because HA's automation/script engine renders `{{ ... }}` in
+# service-call data before dispatch.
 # ---------------------------------------------------------------------------
 
 
-async def test_fallback_image_template_is_rendered(hass):  # type: ignore[no-untyped-def]
+def test_fallback_image_jinja_looking_string_is_passed_through_literally():
     data = {
         ATTR_IMAGE: "camera.front",
-        ATTR_FALLBACK_IMAGE: Template("http://host/fallback.png", hass),
+        ATTR_FALLBACK_IMAGE: "http://host/{{ 1 + 1 }}.png",
     }
-    out = extract_image_kwargs(data, {}, prefix="", hass=hass)
-    assert out[ATTR_FALLBACK_IMAGE] == "http://host/fallback.png"
-    assert isinstance(out[ATTR_FALLBACK_IMAGE], str)
-
-
-async def test_fallback_image_jinja_is_evaluated(hass):  # type: ignore[no-untyped-def]
-    data = {
-        ATTR_IMAGE: "camera.front",
-        ATTR_FALLBACK_IMAGE: Template("http://host/{{ 1 + 1 }}.png", hass),
-    }
-    out = extract_image_kwargs(data, {}, prefix="", hass=hass)
-    assert out[ATTR_FALLBACK_IMAGE] == "http://host/2.png"
+    out = extract_image_kwargs(data, {}, prefix="")
+    assert out[ATTR_FALLBACK_IMAGE] == "http://host/{{ 1 + 1 }}.png"
 
 
 # ---------------------------------------------------------------------------
@@ -84,6 +78,147 @@ async def test_release_printer_keeps_keepalive_on_success(hass):  # type: ignore
 
     assert adapter._printer is fake
     fake.close.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# A1: a paper-status probe is a reachability signal PaperStatusSensor
+# already fetches every ~30s -- base_adapter.get_paper_status now feeds it
+# to status listeners instead of discarding it, split by failure layer:
+#   - can't even connect            -> notify offline (unambiguous)
+#   - connect ok, DLE EOT ignored   -> notify online, no offline flap
+#     (some printers just don't answer this query -- connecting proved
+#     reachability already; the original A1 guarantee)
+#   - connect ok, query ok          -> notify online
+# ---------------------------------------------------------------------------
+
+
+async def test_paper_status_connect_failure_notifies_offline(hass):  # type: ignore[no-untyped-def]
+    adapter = _network_adapter()
+    adapter._status = True  # printer was already known online
+    received: list[bool] = []
+    adapter.add_status_listener(received.append)
+
+    def _boom():
+        raise OSError("connection refused")
+
+    adapter._connect = _boom  # type: ignore[method-assign]
+
+    assert await adapter.get_paper_status(hass) is None
+
+    assert adapter.get_status() is False
+    assert received == [False]
+
+
+async def test_paper_status_query_failure_after_connect_does_not_flap_offline(hass):  # type: ignore[no-untyped-def]
+    """A printer that ignores/times out on DLE EOT must not flap offline.
+
+    Connecting already proved reachability; the query itself failing
+    (common -- not every printer answers paper-status) must not undo that.
+    """
+    adapter = _network_adapter()
+    adapter._status = False  # printer was previously known offline
+    received: list[bool] = []
+    adapter.add_status_listener(received.append)
+
+    fake = MagicMock()
+    fake.paper_status = MagicMock(side_effect=RuntimeError("no response"))
+    adapter._connect = lambda: fake  # type: ignore[method-assign]
+
+    assert await adapter.get_paper_status(hass) is None
+
+    assert adapter.get_status() is True
+    assert received == [True]
+    assert adapter._last_ok is not None
+
+
+async def test_paper_status_probe_success_marks_online(hass):  # type: ignore[no-untyped-def]
+    """A successful paper-status poll is itself a fresh reachability signal."""
+    adapter = _network_adapter()
+    adapter._status = False  # printer was previously known offline
+    received: list[bool] = []
+    adapter.add_status_listener(received.append)
+
+    fake = MagicMock()
+    fake.paper_status.return_value = 2
+    adapter._connect = lambda: fake  # type: ignore[method-assign]
+
+    assert await adapter.get_paper_status(hass) == 2
+
+    assert adapter.get_status() is True
+    assert received == [True]
+    assert adapter._last_ok is not None
+
+
+async def test_transport_failure_still_flips_connectivity(hass):  # type: ignore[no-untyped-def]
+    adapter = _network_adapter()
+    fake = MagicMock()
+    fake.barcode = MagicMock(side_effect=OSError("broken pipe"))
+    adapter._connect = lambda: fake  # type: ignore[method-assign]
+
+    with pytest.raises(OSError, match="broken pipe"):
+        await adapter.print_barcode(hass, code="123456", bc="CODE128")
+
+    assert adapter.get_status() is False
+    assert adapter._last_error_reason == "print operation failed"
+
+
+async def test_connect_failure_through_print_text_flips_connectivity_offline(hass):  # type: ignore[no-untyped-def]
+    """A ``_connect()`` failure must reach the offline notification too.
+
+    Regression: every operation acquired its printer *before* entering
+    the try/finally that calls ``_release_printer`` on failure, so a
+    connect-time exception propagated straight out without ever
+    notifying listeners -- the connectivity sensor stayed latched
+    "Online" through repeated connect failures.
+    """
+    adapter = _network_adapter()
+    adapter._status = True  # printer was already known online
+    received: list[bool] = []
+    adapter.add_status_listener(received.append)
+
+    def _boom():
+        raise OSError("connection refused")
+
+    adapter._connect = _boom  # type: ignore[method-assign]
+
+    with pytest.raises(OSError, match="connection refused"):
+        await adapter.print_text(hass, text="hello")
+
+    assert adapter.get_status() is False
+    assert received == [False]
+
+
+async def test_connect_failure_through_feed_flips_connectivity_offline(hass):  # type: ignore[no-untyped-def]
+    adapter = _network_adapter()
+    adapter._status = True
+    received: list[bool] = []
+    adapter.add_status_listener(received.append)
+
+    def _boom():
+        raise OSError("connection refused")
+
+    adapter._connect = _boom  # type: ignore[method-assign]
+
+    with pytest.raises(OSError, match="connection refused"):
+        await adapter.feed(hass, lines=1)
+
+    assert adapter.get_status() is False
+    assert received == [False]
+
+
+async def test_barcode_validation_error_does_not_flip_connectivity(hass):  # type: ignore[no-untyped-def]
+    from escpos.exceptions import BarcodeTypeError
+
+    adapter = _network_adapter()
+    adapter._status = True
+    fake = MagicMock()
+    fake.barcode = MagicMock(side_effect=BarcodeTypeError("bad barcode type"))
+    adapter._connect = lambda: fake  # type: ignore[method-assign]
+
+    with pytest.raises(BarcodeTypeError):
+        await adapter.print_barcode(hass, code="123456", bc="CODE128")
+
+    assert adapter.get_status() is True  # unchanged -- not a transport failure
 
 
 # ---------------------------------------------------------------------------
@@ -222,9 +357,7 @@ async def test_for_each_target_aggregates_partial_failure(hass):  # type: ignore
 
     with (
         patch.object(hu, "_async_get_target_entries", AsyncMock(return_value=[e1, e2])),
-        patch.object(
-            hu, "_get_adapter_and_defaults", return_value=(MagicMock(), {}, MagicMock())
-        ),
+        patch.object(hu, "_get_adapter_and_defaults", return_value=(MagicMock(), {}, MagicMock())),
     ):
         with pytest.raises(HomeAssistantError, match="Printer A"):
             await hu._for_each_target(call, "print_text", _body)
@@ -247,9 +380,7 @@ async def test_for_each_target_single_target_propagates_exact_error(hass):  # ty
 
     with (
         patch.object(hu, "_async_get_target_entries", AsyncMock(return_value=[e1])),
-        patch.object(
-            hu, "_get_adapter_and_defaults", return_value=(MagicMock(), {}, MagicMock())
-        ),
+        patch.object(hu, "_get_adapter_and_defaults", return_value=(MagicMock(), {}, MagicMock())),
     ):
         # Single-target: the original ServiceValidationError (with its
         # translation/status context) must propagate untouched.
@@ -278,9 +409,7 @@ async def test_for_each_target_reraises_unauthorized_in_multi(hass):  # type: ig
 
     with (
         patch.object(hu, "_async_get_target_entries", AsyncMock(return_value=[e1, e2])),
-        patch.object(
-            hu, "_get_adapter_and_defaults", return_value=(MagicMock(), {}, MagicMock())
-        ),
+        patch.object(hu, "_get_adapter_and_defaults", return_value=(MagicMock(), {}, MagicMock())),
     ):
         with pytest.raises(Unauthorized):
             await hu._for_each_target(call, "print_image", _body)
@@ -306,9 +435,7 @@ def test_auto_resize_permits_above_base_cap():
     Image.new("L", (5000, 5000), color=255).save(buf, format="PNG")  # 25M px
     # 25M > the 20M base cap, but auto_resize raises the ceiling to 40M and
     # downscales — so it must succeed, not raise.
-    out = process_image_from_bytes(
-        buf.getvalue(), ImageProcessOptions(width=384, auto_resize=True)
-    )
+    out = process_image_from_bytes(buf.getvalue(), ImageProcessOptions(width=384, auto_resize=True))
     assert out.width <= 384
 
 
@@ -326,6 +453,4 @@ def test_auto_resize_still_bounded():
     Image.new("L", (7000, 7000), color=255).save(buf, format="PNG")  # 49M px
     # Even with auto_resize the ceiling (40M) is enforced before load().
     with pytest.raises(ValueError, match="exceeds the maximum"):
-        process_image_from_bytes(
-            buf.getvalue(), ImageProcessOptions(width=384, auto_resize=True)
-        )
+        process_image_from_bytes(buf.getvalue(), ImageProcessOptions(width=384, auto_resize=True))

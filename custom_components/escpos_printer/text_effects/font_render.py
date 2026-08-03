@@ -129,7 +129,7 @@ def _char_split(word: str, font: Any, max_width_px: int) -> list[str]:
                 # widths; cumulative bbox of the joined string can be a
                 # hair wider than the sum of truncated per-char widths.
                 ch_w = max(1, math.ceil(getlength(ch)))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 ch_w, _ = _measure(font, ch)
         else:
             ch_w, _ = _measure(font, ch)
@@ -152,7 +152,7 @@ def _word_width(word: str, font: Any) -> int:
     if getlength is not None:
         try:
             measured: int = max(0, math.ceil(getlength(word)))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             measured = -1
         if measured >= 0:
             return measured
@@ -266,9 +266,7 @@ def render_text_image(
             try:
                 mtime_ns = os.stat(resolved.path).st_mtime_ns
             except OSError as exc:
-                raise ValueError(
-                    f"Could not load font {resolved.name!r}: {exc}"
-                ) from exc
+                raise ValueError(f"Could not load font {resolved.name!r}: {exc}") from exc
             font = _cached_custom_font(resolved.path, mtime_ns, font_size)
         else:
             font = ImageFont.truetype(resolved.path, font_size)
@@ -317,8 +315,7 @@ def render_text_image(
         )
     if canvas_w * total_h > MAX_RENDER_PIXELS:
         raise ValueError(
-            f"rendered text canvas {canvas_w}x{total_h} "
-            f"exceeds maximum {MAX_RENDER_PIXELS} pixels"
+            f"rendered text canvas {canvas_w}x{total_h} exceeds maximum {MAX_RENDER_PIXELS} pixels"
         )
 
     img = Image.new("L", (canvas_w, total_h), color=255)

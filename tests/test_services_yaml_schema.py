@@ -13,7 +13,9 @@ Covers:
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
+import re
 
 from homeassistant.helpers.service import _SERVICES_SCHEMA
 from homeassistant.util.yaml import load_yaml_dict
@@ -247,6 +249,53 @@ def test_print_image_path_schema_auto_resize_default_is_true():
     assert out["auto_resize"] is True
 
 
+def test_print_image_path_schema_strips_and_rejects_whitespace_prefixed_entity():
+    """A leading-space value must be checked/rejected using the same shape ``_classify`` will see.
+
+    ``_classify()`` strips the source before classifying it, so
+    ``" camera.front_door"`` (leading space) is really a camera entity —
+    the path-only schema must reject it, not silently accept it as an
+    unmatched (non-URL, non-entity-looking) local path because it only
+    checked the un-stripped string.
+    """
+    from custom_components.escpos_printer.services.schemas import (
+        PRINT_IMAGE_PATH_SCHEMA,
+    )
+
+    with pytest.raises(vol.Invalid):
+        PRINT_IMAGE_PATH_SCHEMA({"path": " camera.front_door"})
+
+
+def test_print_image_path_schema_strips_leading_whitespace_from_local_path():
+    """A leading-space local path is still a local path once stripped; the schema accepts it."""
+    from custom_components.escpos_printer.services.schemas import (
+        PRINT_IMAGE_PATH_SCHEMA,
+    )
+
+    out = PRINT_IMAGE_PATH_SCHEMA({"path": " /config/www/x.png"})
+    assert out["path"] == "/config/www/x.png"
+
+
+def test_print_image_url_schema_strips_and_rejects_whitespace_prefixed_path():
+    """A leading-space local-path value must be rejected by the URL-only schema."""
+    from custom_components.escpos_printer.services.schemas import (
+        PRINT_IMAGE_URL_SCHEMA,
+    )
+
+    with pytest.raises(vol.Invalid):
+        PRINT_IMAGE_URL_SCHEMA({"url": " /config/www/x.png"})
+
+
+def test_print_image_url_schema_strips_leading_whitespace_from_url():
+    """A leading-space URL is still a URL once stripped; the schema accepts it."""
+    from custom_components.escpos_printer.services.schemas import (
+        PRINT_IMAGE_URL_SCHEMA,
+    )
+
+    out = PRINT_IMAGE_URL_SCHEMA({"url": " http://example.com/x.png"})
+    assert out["url"] == "http://example.com/x.png"
+
+
 def test_print_camera_snapshot_schema_defaults_match_ui():
     """services.yaml prefills autocontrast=true and auto_resize=true; the schema must agree."""
     from custom_components.escpos_printer.services.schemas import (
@@ -353,12 +402,13 @@ _FOCUSED_IMAGE_SERVICES = (
     "print_image_path",
     "print_camera_snapshot",
     "print_image_entity",
+    "preview_image",
 )
 
 # Fields that every image service must expose with identical UI metadata.
-# `image_width` / `cut` / `feed` are excluded because their YAML defaults
-# legitimately vary per service. `rotation`, `dither`, etc. carry their
-# own defaults but should be uniform.
+# `cut` is excluded because it's absent from the focused services' common
+# fragment entirely. `rotation`, `dither`, etc. carry their own per-service
+# defaults but should be uniform in name/description/selector.
 _PARITY_FIELDS = (
     "rotation",
     "dither",
@@ -367,18 +417,31 @@ _PARITY_FIELDS = (
     "invert",
     "autocontrast",
     "align",
-    "center",
     "high_density",
     "impl",
     "fragment_height",
     "chunk_delay_ms",
     "fallback_image",
+    "broadcast",
+    "auto_resize",
+    "feed",
+    "image_width",
 )
 
 # Fields whose default *may* differ between services (documented per-service
 # UX choice). Listed explicitly so the parity test stays loud about any
 # *unintended* drift on other fields.
 _DEFAULT_MAY_VARY = frozenset({"auto_resize", "autocontrast", "feed"})
+
+# preview_image deliberately omits the printer-communication knobs
+# (CLAUDE.md "Image services: field-set parity invariant") because they
+# have no effect on the PNG written to disk — exempt from the "every
+# _PARITY_FIELDS entry must exist" check rather than failing as missing.
+_PARITY_EXEMPT_FIELDS: dict[str, frozenset[str]] = {
+    "preview_image": frozenset(
+        {"high_density", "impl", "fragment_height", "chunk_delay_ms", "broadcast", "feed"}
+    ),
+}
 
 
 def _load_services_yaml() -> dict:
@@ -391,20 +454,50 @@ def _load_services_yaml() -> dict:
     return load_yaml_dict(str(services_yaml))
 
 
+def _flatten_fields(svc_def: dict) -> dict[str, tuple[str | None, dict]]:
+    """Flatten a service's ``fields`` map, resolving collapsed sections.
+
+    A section is a fields-map entry that is itself a mapping containing a
+    nested ``fields`` key (HA's collapsed-section syntax). Returns
+    ``{field_name: (section_id_or_None, field_def)}`` so callers can check
+    both a field's own metadata and which section (if any) it lives under.
+    """
+    flat: dict[str, tuple[str | None, dict]] = {}
+    for name, fdef in (svc_def.get("fields") or {}).items():
+        if isinstance(fdef, dict) and isinstance(fdef.get("fields"), dict):
+            for child_name, child_def in fdef["fields"].items():
+                flat[child_name] = (name, child_def)
+        else:
+            flat[name] = (None, fdef)
+    return flat
+
+
 def test_image_services_share_common_field_metadata() -> None:
     """All focused image services must expose the same field metadata as print_image."""
     services = _load_services_yaml()
-    canonical = services["print_image"]["fields"]
+    canonical_fields = services["print_image"]["fields"]
+    canonical = _flatten_fields(services["print_image"])
     mismatches: list[str] = []
     for svc in _FOCUSED_IMAGE_SERVICES:
-        svc_fields = services[svc]["fields"]
+        svc_def = services[svc]
+        svc_fields = _flatten_fields(svc_def)
+        exempt = _PARITY_EXEMPT_FIELDS.get(svc, frozenset())
         for f in _PARITY_FIELDS:
+            if f in exempt:
+                continue
             if f not in svc_fields:
                 mismatches.append(f"{svc}.{f} missing entirely")
                 continue
+            expected_section, expected_def = canonical[f]
+            actual_section, actual_def = svc_fields[f]
+            if expected_section != actual_section:
+                mismatches.append(
+                    f"{svc}.{f} section mismatch: expected {expected_section!r}, "
+                    f"got {actual_section!r}"
+                )
             for attr in ("name", "description", "selector"):
-                expected = canonical[f].get(attr)
-                actual = svc_fields[f].get(attr)
+                expected = expected_def.get(attr)
+                actual = actual_def.get(attr)
                 if expected != actual:
                     mismatches.append(
                         f"{svc}.{f}.{attr} mismatch:\n"
@@ -413,13 +506,31 @@ def test_image_services_share_common_field_metadata() -> None:
                     )
             # Defaults: must match canonical *unless* listed in _DEFAULT_MAY_VARY.
             if f not in _DEFAULT_MAY_VARY:
-                expected_default = canonical[f].get("default")
-                actual_default = svc_fields[f].get("default")
+                expected_default = expected_def.get("default")
+                actual_default = actual_def.get("default")
                 if expected_default != actual_default:
                     mismatches.append(
                         f"{svc}.{f}.default mismatch (not in _DEFAULT_MAY_VARY):\n"
                         f"  expected: {expected_default!r}\n"
                         f"  actual:   {actual_default!r}"
+                    )
+        # Every section print_image declares must exist on this service with
+        # identical name/description/collapsed.
+        for section_id, section_def in canonical_fields.items():
+            if not (isinstance(section_def, dict) and isinstance(section_def.get("fields"), dict)):
+                continue
+            actual_section_def = svc_def["fields"].get(section_id)
+            if not isinstance(actual_section_def, dict):
+                mismatches.append(f"{svc} missing section {section_id!r}")
+                continue
+            for attr in ("name", "description", "collapsed"):
+                expected = section_def.get(attr)
+                actual = actual_section_def.get(attr)
+                if expected != actual:
+                    mismatches.append(
+                        f"{svc}.{section_id}.{attr} mismatch:\n"
+                        f"  expected: {expected!r}\n"
+                        f"  actual:   {actual!r}"
                     )
     assert not mismatches, "services.yaml image-service field parity drift:\n  " + "\n  ".join(
         mismatches
@@ -430,16 +541,139 @@ def test_image_services_no_truncated_descriptions() -> None:
     """Regression guard for unquoted YAML descriptions containing `#`."""
     services = _load_services_yaml()
     for svc in ("print_image", *_FOCUSED_IMAGE_SERVICES):
-        for fname, fdef in services[svc]["fields"].items():
+        svc_def = services[svc]
+        for fname, (_section, fdef) in _flatten_fields(svc_def).items():
             desc = fdef.get("description")
-            if desc is None:
-                continue
-            # Description should end with sentence-terminating punctuation
-            # or be a single short phrase. The bug we're guarding against
-            # left tooltips ending mid-word (e.g. ending in "(issue").
-            assert isinstance(desc, str), f"{svc}.{fname} description not a string"
-            assert desc.strip(), f"{svc}.{fname} description is empty"
-            stripped = desc.rstrip().rstrip("\n")
-            assert stripped[-1] in ".)>!?\"'", (
-                f"{svc}.{fname} description appears truncated; ends with: {stripped[-30:]!r}"
+            if desc is not None:
+                _assert_description_not_truncated(svc, fname, desc)
+    # Sections carry their own tooltip description too — check them on every
+    # service, not just the image family (print_barcode, print_message and
+    # print_text_image have sections as well).
+    for svc, svc_def in services.items():
+        for field_name, field_def in svc_def.get("fields", {}).items():
+            if isinstance(field_def, dict) and isinstance(field_def.get("fields"), dict):
+                desc = field_def.get("description")
+                if desc is not None:
+                    _assert_description_not_truncated(svc, field_name, desc)
+
+
+def test_no_icu_tag_like_angle_brackets_in_user_visible_strings() -> None:
+    """Regression guard for 'Translation error: UNCLOSED_TAG' in the HA UI.
+
+    The frontend parses translation strings as ICU messages, where ``<word``
+    opens a rich-text tag; an unclosed one (e.g. ``camera.<id>`` or
+    ``<config>/fonts/``) makes the whole description render as
+    'Translation error: UNCLOSED_TAG'. Use ``[placeholder]`` instead.
+    """
+    root = Path(__file__).resolve().parents[1] / "custom_components" / "escpos_printer"
+    tag_open = re.compile(r"<[A-Za-z/]")
+    offenders = [
+        f"{rel}:{lineno}: {line.strip()[:100]}"
+        for rel in ("services.yaml", "strings.json", "translations/en.json")
+        for lineno, line in enumerate(
+            (root / rel).read_text(encoding="utf-8").splitlines(), start=1
+        )
+        if tag_open.search(line)
+    ]
+    assert not offenders, (
+        "ICU-tag-like '<' in user-visible strings (frontend raises UNCLOSED_TAG):\n  "
+        + "\n  ".join(offenders)
+    )
+
+
+def test_no_icu_invalid_braces_in_user_visible_strings() -> None:
+    """Regression guard for 'Translation error: INVALID_ARGUMENT_TYPE'.
+
+    The frontend parses translation strings as ICU messages, where ``{...}``
+    is a placeholder. Literal brace text like ``{path, width, line_count}``
+    parses as a placeholder with a bogus argument type and the whole string
+    renders as 'Translation error: INVALID_ARGUMENT_TYPE'. Only simple
+    ``{identifier}`` placeholders are allowed; spell out literal lists
+    without braces.
+
+    Also rejects an apostrophe directly before ``{`` or ``<``: ICU quoting
+    rules turn ``'{value}'`` into the literal text ``{value}``, silently
+    skipping placeholder substitution. Quote values with ``"`` instead.
+    """
+    root = Path(__file__).resolve().parents[1] / "custom_components" / "escpos_printer"
+    simple_placeholder = re.compile(r"^\{[A-Za-z0-9_]+\}$")
+    offenders: list[str] = []
+
+    def check(value: object, where: str) -> None:
+        if isinstance(value, str):
+            offenders.extend(
+                f"{where}: {match}"
+                for match in re.findall(r"\{[^{}]*\}", value)
+                if not simple_placeholder.match(match)
             )
+            if value.count("{") != value.count("}"):
+                offenders.append(f"{where}: unbalanced braces")
+            if re.search(r"'[{<]", value):
+                offenders.append(f"{where}: ICU apostrophe-escape before {{ or <")
+        elif isinstance(value, dict):
+            for key, sub in value.items():
+                check(sub, f"{where}.{key}")
+        elif isinstance(value, list):
+            for index, sub in enumerate(value):
+                check(sub, f"{where}[{index}]")
+
+    check(_load_services_yaml(), "services.yaml")
+    for rel in ("strings.json", "translations/en.json"):
+        check(json.loads((root / rel).read_text(encoding="utf-8")), rel)
+
+    assert not offenders, (
+        "Non-{identifier} braces in user-visible strings "
+        "(frontend raises INVALID_ARGUMENT_TYPE):\n  " + "\n  ".join(offenders)
+    )
+
+
+def test_no_unquoted_hash_in_plain_scalar_descriptions() -> None:
+    """Regression guard for the YAML `#`-comment-truncation bug class,
+    scanned across every service in services.yaml (not just the image
+    family). An unquoted `#` in a plain-scalar ``description:`` value
+    starts a YAML comment, silently dropping everything after it before
+    PyYAML ever hands the value back — so this scans the raw text, not
+    the parsed result.
+    """
+    root = Path(__file__).resolve().parents[1] / "custom_components" / "escpos_printer"
+    lines = (root / "services.yaml").read_text(encoding="utf-8").splitlines()
+
+    # A plain-scalar `description:` value: not quoted (`"`/`'`) and not a
+    # block-scalar indicator (`>`/`|`).
+    plain_scalar_desc = re.compile(r'^(\s*)description:\s+(?!["\'>|])(.*)$')
+    offenders = [
+        f"services.yaml:{lineno}: {line.strip()[:100]}"
+        for lineno, line in enumerate(lines, start=1)
+        if (match := plain_scalar_desc.match(line))
+        # `#` preceded by whitespace (or leading the value) opens a
+        # comment in a plain scalar.
+        and re.search(r"(^|\s)#", match.group(2))
+    ]
+    assert not offenders, (
+        "Unquoted '#' in a plain-scalar description silently truncates the "
+        "value at YAML-parse time — quote the description or use a '>' "
+        "folded scalar:\n  " + "\n  ".join(offenders)
+    )
+
+
+def test_icons_json_services_match_services_yaml() -> None:
+    """icons.json's service icon keys must exactly match services.yaml's
+    registered services — no stale entries for removed/renamed services,
+    no service missing an automation-picker icon.
+    """
+    services = _load_services_yaml()
+    root = Path(__file__).resolve().parents[1] / "custom_components" / "escpos_printer"
+    icons = json.loads((root / "icons.json").read_text(encoding="utf-8"))
+    assert set(icons["services"].keys()) == set(services.keys())
+
+
+def _assert_description_not_truncated(svc: str, fname: str, desc: object) -> None:
+    # Description should end with sentence-terminating punctuation or be a
+    # single short phrase. The bug we're guarding against left tooltips
+    # ending mid-word (e.g. ending in "(issue").
+    assert isinstance(desc, str), f"{svc}.{fname} description not a string"
+    assert desc.strip(), f"{svc}.{fname} description is empty"
+    stripped = desc.rstrip().rstrip("\n")
+    assert stripped[-1] in ".)>!?\"'", (
+        f"{svc}.{fname} description appears truncated; ends with: {stripped[-30:]!r}"
+    )

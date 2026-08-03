@@ -58,7 +58,7 @@ Try a different cable / port. Verify the printer is powered on.
 
 ### "Input/Output Error" (errno 5)
 
-libusb's generic I/O error — usually USB autosuspend or another driver holds the device.
+libusb's generic I/O error: usually USB autosuspend or another driver holds the device.
 
 Fixes:
 
@@ -97,7 +97,7 @@ Vendor ID isn't in the known list. Use **Browse all USB devices** or **Manual en
 | `bt_permission_denied` | HA process can't open BT socket | Add HA user to `bluetooth` group on bare Linux |
 | `bt_device_not_found` | Printer never paired, or pairing was removed | Pair on host first (see [bluetooth.md](bluetooth.md#one-time-pairing)) |
 | `bt_host_down` | Powered off, out of range, already connected to another host | Power on, bring closer, disconnect other host |
-| `bt_timeout` | Printer asleep — first probe missed | Print once to wake, or increase timeout |
+| `bt_timeout` | Printer asleep: first probe missed | Print once to wake, or increase timeout |
 | `bt_channel_refused` | Wrong RFCOMM channel | Use 1; confirm via `bluetoothctl info <MAC>` |
 | `cannot_connect_bt` | Catchall (errno not recognized) | Check HA debug logs |
 | `invalid_bt_mac` | MAC format invalid | Use `AA:BB:CC:DD:EE:FF` (uppercase, colons) |
@@ -107,9 +107,9 @@ Vendor ID isn't in the known list. Use **Browse all USB devices** or **Manual en
 
 Kernel `AF_BLUETOOTH` socket family isn't reachable from the HA process.
 
-- HA Container without `--net=host` — add to compose.
-- Rootless Docker / Podman — bluez D-Bus EXTERNAL auth fails across UID namespaces. Use the `socat` host-bridge fallback.
-- Non-Linux host — `AF_BLUETOOTH` is Linux-only. Use a network printer or the `socat` bridge.
+- HA Container without `--net=host`: add to compose.
+- Rootless Docker / Podman: bluez D-Bus EXTERNAL auth fails across UID namespaces. Use the `socat` host-bridge fallback.
+- Non-Linux host: `AF_BLUETOOTH` is Linux-only. Use a network printer or the `socat` bridge.
 
 ### Status flaps online/offline
 
@@ -187,29 +187,30 @@ See [serial.md](serial.md) for the full setup guide, ESPHome YAML, and detailed 
 
 ## Print-quality problems
 
-- **Garbled characters** — codepage mismatch. Try CP437, CP850, or use `print_text_utf8`.
-- **Special characters missing** — printer codepage doesn't support them. Use `print_text_utf8` for best-effort transliteration.
-- **Text wraps wrong** — line width setting wrong. 32 for 58mm paper, 42–48 for 80mm.
-- **Print too light/dark** — printer hardware setting. Not controllable from the integration.
+- **Garbled characters**: codepage mismatch. Try CP437, CP850, or use `print_text_utf8`.
+- **Special characters missing**: printer codepage doesn't support them. Use `print_text_utf8` for best-effort transliteration.
+- **Text wraps wrong**: line width setting wrong. 32 for 58mm paper, 42–48 for 80mm.
+- **Print too light/dark**: printer hardware setting. Not controllable from the integration.
 
 ## Service errors
 
-- **"Service not found"** — restart HA; verify the integration loaded.
-- **"No valid ESC/POS printer targets found"** — wrong device ID, or entry not loaded. Omit `target:` to broadcast.
-- **"Printer configuration not found"** — entry was removed. Restart HA or re-add.
-- **Timeout errors during printing** — increase timeout, reduce image size, check network.
+- **"Service not found"**: restart HA; verify the integration loaded.
+- **"No valid ESC/POS printer targets found"**: wrong device ID, or entry not loaded. Use `broadcast: true` to send to all printers.
+- **"no device_id specified: printing to all N configured printers" warning**: a service call with multiple printers configured named no target. Add a `device_id` to target one printer, or set `broadcast: true` if printing everywhere is intended.
+- **"Printer configuration not found"**: entry was removed. Restart HA or re-add.
+- **Timeout errors during printing**: increase timeout, reduce image size, check network.
 
 ## Image issues
 
-- **"Image too large"** — the source file exceeds the 10 MB cap (40 MB with `auto_resize: true`), or the decoded image exceeds 20 M pixels. Re-export at lower resolution/quality, or set `auto_resize: true`. Width is fitted to the printer automatically and is not the cause of this error.
-- **Image doesn't print** — use PNG or JPEG; for URLs verify reachable from HA host; for local files use absolute paths starting with `/config/`.
-- **Image prints solid black** — image is too dark or has alpha issues. Use white background, increase contrast, convert to 1-bit B&W.
+- **"Image too large"**: the source file exceeds the 10 MB cap (40 MB with `auto_resize: true`), or the decoded image exceeds 20 M pixels. Re-export at lower resolution/quality, or set `auto_resize: true`. Width is fitted to the printer automatically and is not the cause of this error.
+- **Image doesn't print**: use PNG or JPEG; for URLs verify reachable from HA host; for local files use absolute paths starting with `/config/`.
+- **Image prints solid black**: image is too dark or has alpha issues. Use white background, increase contrast, convert to 1-bit B&W.
 
 ## Paper and cutting
 
-- **Paper doesn't cut** — verify the printer has an auto-cutter. Try `partial` instead of `full`.
-- **Partial cut leaves too much attached** — normal; use `full` if you need a cleaner cut.
-- **Paper jams during cutting** — wrong paper width, debris in cutter, or low-grade paper.
+- **Paper doesn't cut**: verify the printer has an auto-cutter. Try `partial` instead of `full`.
+- **Partial cut leaves too much attached**: normal; use `full` if you need a cleaner cut.
+- **Paper jams during cutting**: wrong paper width, debris in cutter, or low-grade paper.
 
 ## Debug logging
 
@@ -232,9 +233,9 @@ docker logs homeassistant 2>&1 | grep escpos  # Docker
 
 ## Printer-specific notes
 
-- **Epson TM series** — verify ESC/POS mode (not Epson proprietary). Check DIP switches.
-- **Star Micronics** — verify ESC/POS emulation (not Star native mode). Check the printer's web interface.
-- **Generic / unbranded** — use **Auto-detect** profile. Try CP437 first. Some cheap printers don't support all ESC/POS commands (QR codes, beep, cut).
+- **Epson TM series**: verify ESC/POS mode (not Epson proprietary). Check DIP switches.
+- **Star Micronics**: verify ESC/POS emulation (not Star native mode). Check the printer's web interface.
+- **Generic / unbranded**: use **Auto-detect** profile. Try CP437 first. Some cheap printers don't support all ESC/POS commands (QR codes, beep, cut).
 
 ## Getting more help
 

@@ -93,7 +93,7 @@ async def _for_each_target(
             adapter, defaults, config = _get_adapter_and_defaults(call.hass, entry.entry_id)
             _LOGGER.debug("Service call: %s for entry %s", service_name, entry.entry_id)
             await body(entry, adapter, defaults, config)
-        except (Unauthorized, ServiceValidationError):
+        except Unauthorized, ServiceValidationError:
             # Auth/validation failures are not per-printer transport
             # hiccups — propagate immediately with context intact instead
             # of aggregating and continuing to other printers.

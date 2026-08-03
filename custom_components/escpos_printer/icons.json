@@ -1,19 +1,30 @@
 {
   "entity": {
-    "binary_sensor": {
-      "status": {"default": "mdi:printer"}
-    },
     "sensor": {
-      "battery": {"default": "mdi:battery"}
+      "last_image_print": {"default": "mdi:image-outline"},
+      "paper_status": {"default": "mdi:paper-roll-outline"}
     }
   },
   "services": {
     "print_text_utf8": "mdi:format-text",
     "print_text": "mdi:format-text",
+    "print_text_image": "mdi:format-letter-case",
     "print_qr": "mdi:qrcode",
     "print_image": "mdi:image",
+    "print_image_url": "mdi:web",
+    "print_image_path": "mdi:file-image",
+    "print_image_entity": "mdi:image-frame",
+    "print_camera_snapshot": "mdi:camera",
+    "preview_image": "mdi:eye-outline",
     "print_barcode": "mdi:barcode",
     "print_message": "mdi:message-text",
+    "print_box": "mdi:card-text-outline",
+    "preview_box": "mdi:eye-outline",
+    "print_table": "mdi:table",
+    "preview_table": "mdi:eye-outline",
+    "print_kvtable": "mdi:format-list-text",
+    "print_separator": "mdi:minus",
+    "calibration_print": "mdi:ruler",
     "feed": "mdi:arrow-down-thick",
     "cut": "mdi:content-cut",
     "beep": "mdi:bell-ring"

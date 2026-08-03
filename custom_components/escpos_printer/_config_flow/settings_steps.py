@@ -215,7 +215,9 @@ class SettingsFlowMixin:
         data_schema = vol.Schema(
             {
                 vol.Optional(CONF_CODEPAGE, default=""): vol.In(codepage_choices),
-                vol.Optional(CONF_LINE_WIDTH, default=str(DEFAULT_LINE_WIDTH)): vol.In(width_choices),
+                vol.Optional(CONF_LINE_WIDTH, default=str(DEFAULT_LINE_WIDTH)): vol.In(
+                    width_choices
+                ),
                 vol.Optional(CONF_DEFAULT_ALIGN, default=DEFAULT_ALIGN): vol.In(
                     ["left", "center", "right"]
                 ),

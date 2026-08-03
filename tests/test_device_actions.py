@@ -212,3 +212,37 @@ async def test_call_action_print_image_local(hass, tmp_path):  # type: ignore[no
         )
     spy.assert_called_once()
     assert spy.call_args.kwargs["image"] == str(img_path)
+
+
+async def test_call_action_print_image_forwards_context(hass, tmp_path):  # type: ignore[no-untyped-def]
+    """print_image action must forward the caller's context to the adapter.
+
+    Regression guard: without this, a device action running under a
+    non-admin user bypassed the camera/image entity ACL that the
+    equivalent service call enforces (image_sources._check_user_can_read_entity
+    treats a missing context as "allowed").
+    """
+    from homeassistant.core import Context
+    from PIL import Image as PILImage
+
+    entry, device_id = await _setup_and_get_device_id(hass)
+    adapter = entry.runtime_data.adapter
+
+    img_path = tmp_path / "test.png"
+    PILImage.new("RGB", (32, 32), "white").save(img_path)
+
+    call_context = Context(user_id="some-user-id")
+
+    with patch.object(adapter, "print_image", wraps=adapter.print_image) as spy:
+        await async_call_action_from_config(
+            hass,
+            {
+                CONF_DEVICE_ID: device_id,
+                CONF_TYPE: "print_image",
+                "image": str(img_path),
+            },
+            {},
+            call_context,
+        )
+    spy.assert_called_once()
+    assert spy.call_args.kwargs["context"] is call_context

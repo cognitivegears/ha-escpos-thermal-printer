@@ -51,6 +51,17 @@ def _get_usb_printer() -> type[Any]:
     return Usb  # type: ignore[no-any-return]
 
 
+def profile_width_issue_id(entry_id: str | None) -> str:
+    """Build the per-entry repair-issue id for the profile-width fallback.
+
+    Scoped by ``entry_id`` (rather than profile name) so two entries
+    configured with the same profile don't share — and clobber — the same
+    issue. Also used by ``async_remove_entry`` to clean up on entry
+    removal.
+    """
+    return f"profile_width_fallback_{entry_id or 'unknown'}"
+
+
 class EscposPrinterAdapterBase(
     PrintOperationsMixin,
     ImageOperationsMixin,
@@ -76,6 +87,10 @@ class EscposPrinterAdapterBase(
         self._config: BasePrinterConfig = config
         # Validate timeout eagerly
         self._config.timeout = validate_timeout(self._config.timeout)
+        # Set by async_setup_entry after construction; used to scope repair
+        # issues (e.g. profile_width_fallback) to this entry so two entries
+        # sharing a profile name don't clobber each other's issue.
+        self.entry_id: str | None = None
         self._keepalive: bool = False
         self._status_interval: int = 0
         self._printer: Any = None
@@ -147,9 +162,18 @@ class EscposPrinterAdapterBase(
             self._cancel_status = async_track_time_interval(
                 hass, _tick, timedelta(seconds=self._status_interval)
             )
-        # Perform an initial status probe only when status checks are enabled
-        if self._status_interval > 0:
+        # Always run a one-shot initial probe, regardless of whether the
+        # recurring timer above is enabled. Without this, entities that
+        # read get_status() at construction (e.g. the connectivity
+        # binary_sensor) see None ("unknown") until the first print
+        # succeeds or fails -- status_interval defaults to 0, so most
+        # installs never get a periodic probe at all. Errors are swallowed
+        # here (not just inside _status_check's own transport-specific
+        # try/except) so a probe failure never fails entry setup.
+        try:
             await self._status_check(hass)
+        except Exception as err:  # pragma: no cover - defensive
+            _LOGGER.debug("Initial status probe failed: %s", sanitize_log_message(str(err)))
 
     async def stop(self, hass: HomeAssistant | None = None) -> None:
         """Stop the adapter and clean up resources.
@@ -237,16 +261,33 @@ class EscposPrinterAdapterBase(
             owned = False
             failed = True
             try:
-                printer, owned = await self._acquire_printer(hass)
+                printer, owned = await self._acquire_printer_or_offline(hass)
+                # Reaching the printer at all is the reachability signal --
+                # notify here, not after the DLE EOT query below, so a
+                # printer that ignores/times out on paper-status (a real,
+                # known category -- see the docstring) stays stably Online
+                # instead of flapping every 5-minute poll (SCAN_INTERVAL
+                # in sensor.py) on that query alone.
+                await self._mark_success()
                 status = await hass.async_add_executor_job(printer.paper_status)
                 failed = False
             except Exception as e:
+                # Connect failures already went through
+                # `_acquire_printer_or_offline`, which set `_last_check` /
+                # `_last_error` / `_last_error_reason` and notified offline
+                # (a no-op here if already offline, via `_notify_status_change`'s
+                # dedup) -- no bespoke bookkeeping needed for that case.
                 _LOGGER.debug("Paper status query failed: %s", sanitize_log_message(str(e)))
                 self._last_paper_status = None
                 return None
             finally:
                 if printer is not None:
-                    await self._release_printer(hass, printer, owned=owned, failed=failed)
+                    # notify_status=False: a query-level failure here does
+                    # NOT flip back to offline -- we already proved
+                    # reachability above by connecting successfully.
+                    await self._release_printer(
+                        hass, printer, owned=owned, failed=failed, notify_status=False
+                    )
             self._last_paper_status = int(status)
             return self._last_paper_status
 
@@ -287,8 +328,34 @@ class EscposPrinterAdapterBase(
         printer = await hass.async_add_executor_job(self._connect)
         return printer, True
 
+    async def _acquire_printer_or_offline(self, hass: HomeAssistant) -> tuple[Any, bool]:
+        """``_acquire_printer``, marking the adapter offline on connect failure.
+
+        Every operation acquires its printer *before* entering the
+        try/finally that calls ``_release_printer`` on failure -- so a
+        ``_connect()`` exception used to skip the offline notification
+        entirely and the connectivity sensor stayed latched "Online".
+        Wrapping the acquire here gives every call site the same offline
+        signal a failed operation already gets via ``_release_printer``.
+        """
+        try:
+            return await self._acquire_printer(hass)
+        except Exception:
+            now = dt_util.utcnow()
+            self._last_check = now
+            self._last_error = now
+            self._last_error_reason = "connect failed"
+            self._notify_status_change(False)
+            raise
+
     async def _release_printer(
-        self, hass: HomeAssistant, printer: Any, *, owned: bool, failed: bool = False
+        self,
+        hass: HomeAssistant,
+        printer: Any,
+        *,
+        owned: bool,
+        failed: bool = False,
+        notify_status: bool = True,
     ) -> None:
         """Release a printer instance after an operation.
 
@@ -300,6 +367,17 @@ class EscposPrinterAdapterBase(
         Dropping it here forces the next ``_acquire_printer`` to
         reconnect. Runs under the operation lock, so nulling
         ``self._printer`` is race-free.
+
+        A failed operation is also an offline signal in its own right —
+        with status polling disabled by default (``status_interval=0``),
+        operation outcomes are the only thing that ever updates the
+        connectivity sensor. Without this, a run of failed prints leaves
+        the "Online" sensor latched on indefinitely.
+
+        ``notify_status=False`` opts a caller out of that offline signal
+        for failures that don't indicate the transport is down — pass
+        ``failed=True`` for the keepalive-invalidation behaviour above
+        without flapping the connectivity sensor.
         """
         if owned:
 
@@ -308,9 +386,7 @@ class EscposPrinterAdapterBase(
                     printer.close()
 
             await hass.async_add_executor_job(_close)
-            return
-
-        if failed and self._printer is not None:
+        elif failed and self._printer is not None:
             stale = self._printer
             self._printer = None
 
@@ -319,6 +395,13 @@ class EscposPrinterAdapterBase(
                     stale.close()
 
             await hass.async_add_executor_job(_close_stale)
+
+        if failed and notify_status:
+            now = dt_util.utcnow()
+            self._last_check = now
+            self._last_error = now
+            self._last_error_reason = "print operation failed"
+            self._notify_status_change(False)
 
     def _notify_status_change(self, ok: bool) -> None:
         """Notify all status listeners of a status change."""
@@ -435,17 +518,24 @@ class EscposPrinterAdapterBase(
         # Only surface the fallback when the user actually picked a
         # profile that turned out to lack width data; auto/default
         # (``profile_obj is None``) is an expected, silent fallback.
-        if width is None and profile_obj is not None and not self._profile_width_warning_logged:
-            _LOGGER.warning(
-                "Printer profile '%s' does not expose media.width.pixels; "
-                "falling back to %dpx for image width. Set image_width "
-                "explicitly or pick a profile that declares a pixel width.",
-                self._config.profile,
-                FALLBACK_PROFILE_WIDTH,
-            )
-            self._profile_width_warning_logged = True
+        fallback_applies = width is None and profile_obj is not None
+        if fallback_applies:
+            if not self._profile_width_warning_logged:
+                _LOGGER.warning(
+                    "Printer profile '%s' does not expose media.width.pixels; "
+                    "falling back to %dpx for image width. Set image_width "
+                    "explicitly or pick a profile that declares a pixel width.",
+                    self._config.profile,
+                    FALLBACK_PROFILE_WIDTH,
+                )
+                self._profile_width_warning_logged = True
             if hass is not None:
                 self._raise_profile_width_repair_issue(hass)
+        elif hass is not None:
+            # The profile now resolves fine (or auto/default no longer
+            # needs one) -- clear any fallback issue filed for this entry
+            # by a previous, now-fixed profile choice.
+            self._clear_profile_width_repair_issue(hass)
         return width
 
     def _raise_profile_width_repair_issue(self, hass: HomeAssistant) -> None:
@@ -461,7 +551,7 @@ class EscposPrinterAdapterBase(
             ir.async_create_issue(
                 hass,
                 DOMAIN,
-                f"profile_width_fallback_{profile_name}",
+                profile_width_issue_id(self.entry_id),
                 is_fixable=False,
                 severity=ir.IssueSeverity.WARNING,
                 translation_key="profile_width_fallback",
@@ -472,6 +562,24 @@ class EscposPrinterAdapterBase(
             )
         except Exception as exc:
             _LOGGER.debug("Could not create profile_width repair issue: %s", exc)
+
+    def _clear_profile_width_repair_issue(self, hass: HomeAssistant) -> None:
+        """Delete this entry's fallback issue once the profile resolves."""
+        try:
+            from homeassistant.helpers import issue_registry as ir  # noqa: PLC0415
+
+            from ..const import DOMAIN  # noqa: PLC0415
+        except ImportError:
+            return
+        try:
+            ir.async_delete_issue(hass, DOMAIN, profile_width_issue_id(self.entry_id))
+            # Pre-1.0 issue ids were scoped by profile name; delete the
+            # legacy id too so issues created before the entry_id scoping
+            # don't orphan forever.
+            if self.config.profile:
+                ir.async_delete_issue(hass, DOMAIN, f"profile_width_fallback_{self.config.profile}")
+        except Exception as exc:
+            _LOGGER.debug("Could not delete profile_width repair issue: %s", exc)
 
     async def _apply_cut_and_feed(
         self, hass: HomeAssistant, printer: Any, cut: str | None, feed: int | None
@@ -511,15 +619,18 @@ class EscposPrinterAdapterBase(
             await hass.async_add_executor_job(_cut)
 
     async def _mark_success(self) -> None:
-        """Mark a successful operation (updates status tracking)."""
+        """Mark a successful operation (updates status tracking).
+
+        Routed through ``_notify_status_change`` (rather than firing
+        listeners directly) so a success that doesn't change the status
+        -- e.g. the 5-minute paper-status poll on an already-online
+        printer -- doesn't re-fire every listener with a no-op update.
+        """
         now = dt_util.utcnow()
-        self._status = True
         self._last_ok = now
         self._last_check = now
         self._last_error_errno = None
-        for cb in list(self._status_listeners):
-            with contextlib.suppress(Exception):
-                cb(True)
+        self._notify_status_change(True)
 
     async def print_text_with_image(
         self,
@@ -547,7 +658,7 @@ class EscposPrinterAdapterBase(
         )
 
         async with self._lock:
-            printer, owned = await self._acquire_printer(hass)
+            printer, owned = await self._acquire_printer_or_offline(hass)
             failed = True
             try:
                 try:
@@ -557,9 +668,19 @@ class EscposPrinterAdapterBase(
                     failed = False
                 except asyncio.CancelledError, Exception:  # pragma: no cover (T-L4)
                     # S-M3: shield the cleanup so a second cancellation
-                    # mid-flush doesn't leave paper half-printed. The
-                    # suppress() catches Exception only — CancelledError
-                    # propagates from the shielded task if it fires again.
+                    # mid-flush doesn't leave paper half-printed. Only
+                    # ``Exception`` is suppressed here — deliberately not
+                    # ``CancelledError``: suppressing it would make this
+                    # task swallow its own cancellation (``task.cancelled()``
+                    # stays False), breaking ``asyncio.timeout()`` callers
+                    # and HA's shutdown accounting. Known limitation: a
+                    # *third* cancellation arriving while we wait on the
+                    # shield raises CancelledError at this await point and
+                    # runs the ``finally`` below, which releases/closes the
+                    # transport while the shielded cut/feed task may still
+                    # be writing to it. Fixing that requires re-awaiting the
+                    # shielded future on the way out, not suppressing the
+                    # cancellation.
                     #
                     # T-L4: not unit-tested. Triple-cancel races are
                     # notoriously hard to write deterministic tests for;

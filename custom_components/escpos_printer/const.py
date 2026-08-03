@@ -53,6 +53,16 @@ DEFAULT_PORT = 9100
 DEFAULT_TIMEOUT = 4.0
 DEFAULT_ALIGN = "left"
 DEFAULT_CUT = "none"
+# Serial printers get no implicit health check from the paper-status poll
+# (network/USB only -- see sensor.py), so an unplugged printer would
+# otherwise stay "Online" forever. The serial probe is a silent os.stat, so
+# it's safe to default on. Network/USB keep the 0 (disabled) default.
+#
+# Bluetooth deliberately does NOT get this default: a status check opens a
+# real RFCOMM connection, and many cheap BT printers audibly beep on every
+# connect -- default-on polling would beep every 5 minutes (see
+# _config_flow/options_flow.py). Bluetooth stays opt-in at 0.
+DEFAULT_STATUS_INTERVAL_SERIAL = 300
 DEFAULT_LINE_WIDTH = 48
 DEFAULT_CODEPAGE = "CP437"
 DEFAULT_ALLOW_LOCAL_IMAGE_URLS = False
@@ -68,7 +78,7 @@ DEFAULT_RFCOMM_CHANNEL = 1
 DEFAULT_BAUDRATE = 9600
 CONF_SERIAL_WRITE_CHUNK_SIZE = "serial_write_chunk_size"
 CONF_SERIAL_WRITE_CHUNK_DELAY_MS = "serial_write_chunk_delay_ms"
-DEFAULT_SERIAL_WRITE_CHUNK_SIZE = 0   # 0 = no chunking (send all at once)
+DEFAULT_SERIAL_WRITE_CHUNK_SIZE = 0  # 0 = no chunking (send all at once)
 DEFAULT_SERIAL_WRITE_CHUNK_DELAY_MS = 0
 
 # Known thermal printer vendor IDs for auto-discovery.
@@ -104,25 +114,6 @@ THERMAL_PRINTER_VIDS: frozenset[int] = frozenset(
 PROFILE_AUTO = ""  # Auto-detect (default) profile
 PROFILE_CUSTOM = "__custom__"  # Custom profile option
 OPTION_CUSTOM = "__custom__"  # Custom option for codepage/line_width dropdowns
-
-# Common supported codepages (backward compatibility fallback)
-# NOTE: Dynamic codepage loading is now available via capabilities.py
-CODEPAGE_CHOICES: list[str] = [
-    "CP437",
-    "CP932",
-    "CP851",
-    "CP850",
-    "CP852",
-    "CP858",
-    "CP1252",
-    "ISO_8859-1",
-    "ISO_8859-7",
-    "ISO_8859-15",
-]
-
-# Common line widths (backward compatibility fallback)
-# NOTE: Dynamic line width loading is now available via capabilities.py
-LINE_WIDTH_CHOICES: list[int] = [32, 42, 48, 64]
 
 SERVICE_PRINT_TEXT = "print_text"
 SERVICE_PRINT_TEXT_UTF8 = "print_text_utf8"
@@ -162,6 +153,7 @@ ATTR_IMAGE = "image"
 ATTR_HIGH_DENSITY = "high_density"
 ATTR_LINES = "lines"
 ATTR_MODE = "mode"
+ATTR_FEED_BEFORE_CUT = "feed_before_cut"
 
 # Barcode-related
 ATTR_CODE = "code"
@@ -271,9 +263,11 @@ DEFAULT_LINE_SPACING = 1.1
 #   truth. ``services.yaml`` selectors must mirror those bounds.
 DEFAULT_FRAGMENT_HEIGHT = 256
 # ``DEFAULT_CHUNK_DELAY_MS = None`` is the schema-level "no explicit value"
-# sentinel; the adapter substitutes its per-transport default (Network/USB:
-# ``0``; Bluetooth: ``50``). Pre-existing code that imports the int default
-# can still rely on ``DEFAULT_CHUNK_DELAY_MS_BLUETOOTH`` below.
+# sentinel; the adapter substitutes its per-transport default by setting its
+# ``default_chunk_delay_ms`` class attribute to one of these: Network/USB/
+# Serial import ``DEFAULT_CHUNK_DELAY_MS_NETWORK``, Bluetooth imports
+# ``DEFAULT_CHUNK_DELAY_MS_BLUETOOTH`` (see ``printer/bluetooth_adapter.py``,
+# ``printer/serial_adapter.py``, ``printer/base_adapter.py``).
 DEFAULT_CHUNK_DELAY_MS_NETWORK = 0
 DEFAULT_CHUNK_DELAY_MS_BLUETOOTH = 50
 DEFAULT_DITHER = "floyd-steinberg"

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -16,7 +17,21 @@ from custom_components.escpos_printer.const import (
 )
 from custom_components.escpos_printer.printer.config import NetworkPrinterConfig
 from custom_components.escpos_printer.printer.network_adapter import NetworkPrinterAdapter
-from custom_components.escpos_printer.sensor import PaperStatusSensor, async_setup_entry
+from custom_components.escpos_printer.sensor import (
+    SCAN_INTERVAL,
+    PaperStatusSensor,
+    async_setup_entry,
+)
+
+
+def test_scan_interval_is_five_minutes():
+    """Both should_poll sensors were documented as 5-minute polls but had no SCAN_INTERVAL.
+
+    HA's entity-component default is 30s, so battery (D-Bus round-trip)
+    and paper-status (fresh printer connection) polls were 10x more
+    frequent than intended.
+    """
+    assert timedelta(minutes=5) == SCAN_INTERVAL
 
 
 class _FakeEntry:
@@ -101,6 +116,28 @@ async def test_adapter_get_paper_status_returns_none_on_error():
     adapter._connect = _boom  # type: ignore[method-assign]
     assert await adapter.get_paper_status(_FakeHass()) is None
     assert adapter.get_diagnostics()["paper_status"] is None
+
+
+async def test_adapter_get_paper_status_connect_failure_updates_diagnostics():
+    """A connect failure during paper-status must not leave stale diagnostics.
+
+    Regression: `get_paper_status` used to acquire via the bare
+    `_acquire_printer`, whose connect-failure branch notified the
+    connectivity sensor offline but never touched `_last_check` /
+    `_last_error` / `_last_error_reason` -- those stayed at whatever an
+    earlier successful operation last set them to.
+    """
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+
+    def _boom():
+        raise OSError("unreachable")
+
+    adapter._connect = _boom  # type: ignore[method-assign]
+    assert await adapter.get_paper_status(_FakeHass()) is None
+    diagnostics = adapter.get_diagnostics()
+    assert diagnostics["last_check"] is not None
+    assert diagnostics["last_error"] is not None
+    assert diagnostics["last_error_reason"] == "connect failed"
 
 
 async def test_adapter_get_paper_status_skips_when_print_in_flight():

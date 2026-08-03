@@ -49,6 +49,7 @@ from .const import (
     DEFAULT_RFCOMM_CHANNEL,
     DEFAULT_SERIAL_WRITE_CHUNK_DELAY_MS,
     DEFAULT_SERIAL_WRITE_CHUNK_SIZE,
+    DEFAULT_STATUS_INTERVAL_SERIAL,
     DOMAIN,
     RELIABILITY_PROFILE_AUTO,
     RELIABILITY_PROFILE_PRESETS,
@@ -60,6 +61,7 @@ from .printer import (
     SerialPrinterConfig,
     UsbPrinterConfig,
     create_printer_adapter,
+    profile_width_issue_id,
 )
 from .security import sanitize_log_message
 from .services import async_setup_services, async_unload_services
@@ -106,8 +108,6 @@ def _shared_print_config(entry: EscposConfigEntry) -> dict[str, Any]:
             opt.get(CONF_ALLOW_LOCAL_IMAGE_URLS, DEFAULT_ALLOW_LOCAL_IMAGE_URLS)
         ),
     }
-
-
 
 
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
@@ -169,7 +169,7 @@ async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) ->
             config_entry,
             data=new_data,
             version=2,
-            minor_version=0,
+            minor_version=1,
         )
 
         _LOGGER.info("Migration to v2 complete for entry %s", config_entry.entry_id)
@@ -187,11 +187,16 @@ async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) ->
             config_entry,
             data=new_data,
             version=3,
-            minor_version=0,
+            minor_version=1,
         )
 
         _LOGGER.info("Migration to v3 complete for entry %s", config_entry.entry_id)
         return True
+
+    # Normalize entries already at version 3 created before MINOR_VERSION existed
+    # (or otherwise left at minor_version 0) so they match the flow's MINOR_VERSION.
+    if config_entry.version == 3 and config_entry.minor_version < 1:
+        hass.config_entries.async_update_entry(config_entry, minor_version=1)
 
     return True
 
@@ -251,6 +256,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bo
         )
 
     adapter = create_printer_adapter(config)
+    adapter.entry_id = entry.entry_id
 
     reliability_profile = entry.options.get(CONF_RELIABILITY_PROFILE, RELIABILITY_PROFILE_AUTO)
     adapter.reliability_profile_defaults = dict(
@@ -267,11 +273,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bo
 
     # Start adapter background tasks (keepalive/status)
     # Note: USB printers don't support keepalive, but the adapter handles this
+    # Serial defaults to a non-zero status_interval (see
+    # DEFAULT_STATUS_INTERVAL_SERIAL); network/USB/Bluetooth stay at 0.
+    # Network/USB already get an implicit health check from the paper-status
+    # poll; Bluetooth's status check opens a real RFCOMM connection and many
+    # cheap printers beep on every connect, so it stays opt-in. Only applied
+    # when the user hasn't set the option themselves.
+    default_status_interval = (
+        DEFAULT_STATUS_INTERVAL_SERIAL if connection_type == CONNECTION_TYPE_SERIAL else 0
+    )
     try:
         await adapter.start(
             hass,
             keepalive=bool(entry.options.get(CONF_KEEPALIVE, False)),
-            status_interval=int(entry.options.get(CONF_STATUS_INTERVAL, 0)),
+            status_interval=int(
+                entry.options.get(CONF_STATUS_INTERVAL, default_status_interval)
+            ),
         )
     except Exception as err:
         # The only blocking work in start() is the initial keepalive
@@ -304,8 +321,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> b
         try:
             adapter = entry.runtime_data.adapter
             await adapter.stop(hass)
-        except Exception:  # best effort on unload
-            pass
+        except Exception as err:  # best effort on unload
+            _LOGGER.debug(
+                "Adapter stop failed for entry %s: %s",
+                entry.entry_id,
+                sanitize_log_message(str(err)),
+            )
         _LOGGER.debug("Unloaded entry %s", entry.entry_id)
 
         # If this was the last loaded config entry, tear down global services.
@@ -321,3 +342,30 @@ async def async_unload_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> b
             _LOGGER.debug("Unloaded global services for %s", DOMAIN)
 
     return unload_ok
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> None:
+    """Clean up entry-scoped repair issues when the entry is deleted.
+
+    Without this, a profile_width_fallback issue filed for this entry
+    (see EscposPrinterAdapterBase._raise_profile_width_repair_issue) would
+    linger in the repairs UI forever, even after the printer itself is
+    removed from Home Assistant.
+    """
+    try:
+        from homeassistant.helpers import issue_registry as ir  # noqa: PLC0415
+
+        ir.async_delete_issue(hass, DOMAIN, profile_width_issue_id(entry.entry_id))
+        # Pre-1.0 issue ids were scoped by profile name (see
+        # EscposPrinterAdapterBase._clear_profile_width_repair_issue);
+        # mirror that legacy-id deletion here too so an issue filed under
+        # the old scheme doesn't outlive the entry it was raised for.
+        profile = entry.options.get(CONF_PROFILE, entry.data.get(CONF_PROFILE))
+        if profile:
+            ir.async_delete_issue(hass, DOMAIN, f"profile_width_fallback_{profile}")
+    except Exception as err:  # best effort
+        _LOGGER.debug(
+            "Could not clean up repair issues for entry %s: %s",
+            entry.entry_id,
+            sanitize_log_message(str(err)),
+        )

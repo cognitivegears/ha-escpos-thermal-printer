@@ -1,13 +1,13 @@
-# UniFi Guest Wi-Fi — rotate monthly, print anytime
+# UniFi Guest Wi-Fi: rotate monthly, print anytime
 
 A small recipe that pairs the [Guest Wi-Fi QR](script/escpos_printer/guest_wifi_qr.yaml) blueprint with the **official [Home Assistant UniFi integration](https://www.home-assistant.io/integrations/unifi/)** so you can:
 
 - Tap a button → print a QR with the current guest Wi-Fi password.
 - On the 1st of each month → automatically rotate the password and print the new slip.
 
-It reuses the credentials *you've already given* the official UniFi integration. No new secrets to manage, no `.env` files, no extra `input_text` helpers — if you can already see your UniFi devices in HA, you're 90% set up.
+It reuses the credentials *you've already given* the official UniFi integration. No new secrets to manage, no `.env` files, no extra `input_text` helpers. If you can already see your UniFi devices in HA, you're 90% set up.
 
-> **Don't need automation?** If you just want a QR with your typed-in SSID and password, stop here — see the [Guest Wi-Fi QR Quick start](GUEST_WIFI_QR.md#quick-start-works-on-any-router--about-2-minutes) and you're done in 2 minutes.
+> **Don't need automation?** If you just want a QR with your typed-in SSID and password, stop here, see the [Guest Wi-Fi QR Quick start](GUEST_WIFI_QR.md#quick-start-works-on-any-router--about-2-minutes) and you're done in 2 minutes.
 
 ---
 
@@ -27,19 +27,19 @@ That's it. ~50 lines of script, ~30 lines of YAML.
 
 - **Official HA UniFi integration installed.** **Settings → Devices & Services → + Add Integration → UniFi Network**. Enter your controller IP, username, password. If you see UniFi devices in **Devices & Services**, you're done.
   - **For rotation to work**, the UniFi account you used here must have Site Admin / write permission. Read-only accounts can still do the *read* / print-current half of this recipe; rotation will fail with a 403.
-  - **MFA must be off** on the UniFi account. UniFi's JSON login flow returns 401 if MFA is enabled — this is a UniFi limitation, not a bug. Use a dedicated local account.
+  - **MFA must be off** on the UniFi account. UniFi's JSON login flow returns 401 if MFA is enabled. This is a UniFi limitation, not a bug. Use a dedicated local account.
 - **`jq` available** on the HA host. HA OS doesn't bundle it; the easiest fix is the [SSH & Web Terminal add-on](https://github.com/hassio-addons/addon-ssh) → `apk add jq`. HA Container / Core users have their own package managers.
-- **You know the exact name** of your guest WLAN as shown in the UniFi UI (it's case-sensitive — `MyHouse-Guest` ≠ `myhouse-guest`).
+- **You know the exact name** of your guest WLAN as shown in the UniFi UI (it's case-sensitive, `MyHouse-Guest` ≠ `myhouse-guest`).
 
 ---
 
-## Step 1 — Drop the script
+## Step 1: Drop the script
 
 Save this as `/config/shell_scripts/unifi_wifi.sh` and `chmod 755` it.
 
 ```bash
 #!/usr/bin/env bash
-# /config/shell_scripts/unifi_wifi.sh — read or rotate a UniFi guest WLAN.
+# /config/shell_scripts/unifi_wifi.sh: read or rotate a UniFi guest WLAN.
 #
 # Credentials come from the official HA UniFi integration's config entry,
 # so there's nothing extra to configure.
@@ -57,7 +57,7 @@ target="${2:?usage: unifi_wifi.sh <read|rotate> <wlan-name>}"
 # Pull creds from the official HA UniFi integration's config entry.
 storage=/config/.storage/core.config_entries
 [ -r "$storage" ] || {
-    echo "cannot read $storage — is the UniFi integration installed?" >&2
+    echo "cannot read $storage: is the UniFi integration installed?" >&2
     exit 2
 }
 creds="$(jq -r '.data.entries[] | select(.domain == "unifi") | .data' "$storage")"
@@ -128,7 +128,7 @@ esac
 
 ---
 
-## Step 2 — Add the HA wiring
+## Step 2: Add the HA wiring
 
 In `configuration.yaml`, replace `YourGuestWLAN` with the exact name of your guest WLAN in both places:
 
@@ -153,7 +153,7 @@ Reload **YAML configuration** from **Developer Tools → YAML** (or restart HA).
 
 ---
 
-## Step 3 — Wire the blueprint
+## Step 3: Wire the blueprint
 
 Open your Guest Wi-Fi QR script (the one you created from the [blueprint](script/escpos_printer/guest_wifi_qr.yaml)) in **Settings → Automations & Scenes → Scripts → edit**. Set:
 
@@ -163,11 +163,11 @@ Open your Guest Wi-Fi QR script (the one you created from the [blueprint](script
 | Password | `{{ state_attr('sensor.guest_wifi', 'passphrase') }}` |
 | Security | `WPA` |
 
-Save. Note the script's `entity_id` — call it `script.print_guest_wifi` here.
+Save. Note the script's `entity_id`: call it `script.print_guest_wifi` here.
 
 ---
 
-## Step 4 — Create the rotate-and-print script
+## Step 4: Create the rotate-and-print script
 
 **Settings → Automations & Scenes → Scripts → + Add Script → Create new script**. Click ⋮ → **Edit in YAML**:
 
@@ -193,7 +193,7 @@ sequence:
   # step can race the sensor's poll (median ~700ms, p95 ~1.8s, occasionally
   # longer) and produce a slip with the OLD password while the network has
   # the NEW one. ``continue_on_timeout: false`` halts the script if the
-  # sensor never catches up — far better than printing stale credentials.
+  # sensor never catches up: far better than printing stale credentials.
   - service: homeassistant.update_entity
     target:
       entity_id: sensor.guest_wifi
@@ -203,11 +203,11 @@ sequence:
   - service: script.print_guest_wifi   # ← your blueprint script from Step 3
 ```
 
-Save. Note its entity_id — `script.rotate_guest_wifi_and_print` here.
+Save. Note its entity_id: `script.rotate_guest_wifi_and_print` here.
 
 ---
 
-## Step 5 — Schedule monthly rotation
+## Step 5: Schedule monthly rotation
 
 **Settings → Automations & Scenes → Automations → + Create automation → Start with an empty automation**. Click ⋮ → **Edit in YAML**:
 
@@ -266,7 +266,7 @@ Run these in order from a shell (SSH add-on, terminal):
    If you get `no UniFi config entry found` → install the official UniFi integration first. `401` → the UniFi account has MFA, or wrong creds. `404` / empty → WLAN name doesn't match the UniFi UI exactly.
 2. **Sensor populated.** **Developer Tools → States** → search `sensor.guest_wifi`. State = SSID, `passphrase` attribute = the password. If unknown, check the HA log for the `command_line` error.
 3. **Print current works.** Tap the **Print current** button. A QR slip prints; scanning it joins you to the network.
-4. **Rotation works.** Tap **Rotate now**. A new slip prints with a *different* password. Confirm in the UniFi UI that the WLAN password changed. The `Print current` button continues to print the new password — that's the sensor working correctly.
+4. **Rotation works.** Tap **Rotate now**. A new slip prints with a *different* password. Confirm in the UniFi UI that the WLAN password changed. The `Print current` button continues to print the new password. That's the sensor working correctly.
 
 ---
 
@@ -274,7 +274,7 @@ Run these in order from a shell (SSH add-on, terminal):
 
 1. **MFA on the UniFi account = 401**, full stop. Use a dedicated local UniFi account with MFA disabled.
 2. **`jq` missing on HA OS.** `apk add jq` via the SSH add-on.
-3. **WLAN name mismatch.** Must match the UniFi UI exactly — case-sensitive, no leading/trailing spaces.
+3. **WLAN name mismatch.** Must match the UniFi UI exactly: case-sensitive, no leading/trailing spaces.
 4. **Read-only UniFi account.** Reads work; rotation returns 403. Either give the account Site Admin or use only the read half (skip Steps 4–5).
 5. **Multi-site controller.** The script defaults to `default`. If your site has a slug like `4anv2bxq`, edit the script's `UNIFI_SITE=` fallback or set the site in the UniFi integration's config entry.
 
@@ -283,11 +283,11 @@ Run these in order from a shell (SSH add-on, terminal):
 ## Security model
 
 **Where credentials live.** In HA's existing UniFi config entry
-(`.storage/core.config_entries`) — the same plaintext-JSON storage that holds
+(`.storage/core.config_entries`), the same plaintext-JSON storage that holds
 every other HA integration's secrets. No `.env` dotfile, no `secrets.yaml`
 edit, no extra `input_text` helper. The shell script reads them via `jq`
 and uses them in `curl` calls. They land in the script's process memory
-and, briefly, in curl's `--data` argv during the login and PUT requests —
+and, briefly, in curl's `--data` argv during the login and PUT requests,
 visible to `ps` for anything else running as the HA user during that
 window (on a single-user HA OS install this is just HA itself; on a
 multi-user host other users could observe them). This is the same exposure
@@ -304,7 +304,7 @@ file. Treat with the same care as any session cookie on the host.
 alphabet (`A-HJ-NP-Za-km-z2-9`) yields ~93 bits of entropy. The alphabet
 strips `0/1/I/L/O` (the most visually confusable across common fonts) so
 the printed plaintext fallback is easy to type by hand. Note that
-lowercase `i` and `o` are *not* stripped — they could still be confused
+lowercase `i` and `o` are *not* stripped. They could still be confused
 with their digit counterparts in some fonts. If this matters for your
 users, fork the script and replace the `tr` class with
 `A-HJ-NP-Za-hj-km-np-z2-9` (54 chars, ~92 bits).
@@ -314,7 +314,7 @@ the printer can read the slip. Tear it off, hand it over, and don't leave
 it on the fridge. The QR carries the same plaintext password.
 
 **Recorder retention.** The `command_line:` sensor's `passphrase`
-attribute is recorded by HA's default recorder — every rotated password
+attribute is recorded by HA's default recorder: every rotated password
 ends up in `home-assistant_v2.db` and any HA backups taken since. If you
 rotate often, add `sensor.guest_wifi` to your `recorder:` `exclude` list.
 

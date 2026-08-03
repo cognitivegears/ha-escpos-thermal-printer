@@ -1,4 +1,10 @@
 {
+  "extensions": {
+    "front-matter": {
+      "enabled": true,
+      "_comment": "Parse YAML frontmatter (--- blocks) instead of misreading it as a setext heading; skill files (.claude/skills/*/SKILL.md) carry frontmatter."
+    }
+  },
   "plugins": {
     "md013": {
       "enabled": false,

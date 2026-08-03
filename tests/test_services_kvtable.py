@@ -5,9 +5,11 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 from homeassistant.const import CONF_HOST, CONF_PORT
+from homeassistant.exceptions import ServiceValidationError
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.escpos_printer.const import DOMAIN
+from custom_components.escpos_printer.const import DEFAULT_LINE_WIDTH, DOMAIN
 
 
 async def _setup_entry(hass):  # type: ignore[no-untyped-def]
@@ -149,6 +151,52 @@ async def test_print_kvtable_rejects_empty_items(hass) -> None:  # type: ignore[
         except vol.Invalid:
             return
         raise AssertionError("expected voluptuous error for empty items")
+
+
+async def test_print_kvtable_total_width_too_small_raises_service_error(hass) -> None:  # type: ignore[no-untyped-def]
+    """Bordered style needs total_width >= 5 for a 2-column table (3 for borders + 2 cells).
+
+    Before this fix, ``_kvtable_widths``'s ``max(2, total_width - overhead)``
+    floor let widths sail past ``total_width``, and ``render_table`` raised
+    a raw ``ValueError`` instead of a caller-facing ``ServiceValidationError``.
+    """
+    await _setup_entry(hass)
+    with patch("escpos.printer.Network"), pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN,
+            "print_kvtable",
+            {
+                "items": [["A", "1"]],
+                "style": "ascii",
+                "total_width": 4,
+            },
+            blocking=True,
+        )
+
+
+async def test_print_kvtable_total_width_clamped_to_line_width(hass) -> None:  # type: ignore[no-untyped-def]
+    """total_width wider than the printer's line_width is clamped, not shredded.
+
+    Without the clamp, the adapter's ``_wrap_text`` re-wraps the rendered
+    layout at ``line_width`` afterward, corrupting borders/columns rendered
+    wider than that.
+    """
+    await _setup_entry(hass)
+    fake = MagicMock()
+    with patch("escpos.printer.Network", return_value=fake):
+        await hass.services.async_call(
+            DOMAIN,
+            "print_kvtable",
+            {
+                "items": [["Subtotal", "$10.00"]],
+                "total_width": DEFAULT_LINE_WIDTH + 50,
+            },
+            blocking=True,
+        )
+    printed = fake.text.call_args.args[0]
+    lines = printed.splitlines()
+    for line in lines:
+        assert len(line) <= DEFAULT_LINE_WIDTH
 
 
 def test_validate_kv_items_shape_does_not_strip() -> None:

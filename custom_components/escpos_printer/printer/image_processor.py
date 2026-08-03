@@ -31,10 +31,11 @@ from ..security import (
 
 _LOGGER = logging.getLogger(__name__)
 
-# Fallback when the printer profile reports no usable pixel width. 512 px
-# is a worst-case-safe default for 58 mm thermals; 80 mm printers should
-# override with their actual width (576) via the adapter base.
-FALLBACK_PROFILE_WIDTH = 512
+# Fallback when the printer profile reports no usable pixel width. 384 px
+# is the worst-case-safe default (58 mm @ 203 dpi); 512 would clip a 58 mm
+# head. 80 mm printers should override with their actual width (576) via
+# the adapter base / profile.
+FALLBACK_PROFILE_WIDTH = 384
 
 # NOTE: we deliberately do NOT set ``PIL.Image.MAX_IMAGE_PIXELS`` — that
 # is a process-global shared with every other Pillow consumer in the HA
@@ -90,7 +91,7 @@ class ImageProcessOptions:
     """Options controlling the image processing pipeline."""
 
     width: int | None = None
-    """Target width in pixels; if None, use ``profile_width`` (falls back to 512)."""
+    """Target width in pixels; if None, use ``profile_width`` (falls back to 384)."""
 
     profile_width: int | None = None
     """Printer profile's max pixel width, used when ``width`` is None."""
@@ -123,7 +124,7 @@ def process_image(img: Image.Image, opts: ImageProcessOptions) -> Image.Image:
         oriented = ImageOps.exif_transpose(img)
         if oriented is not None:
             img = oriented
-    except (KeyError, AttributeError, TypeError, OSError):
+    except KeyError, AttributeError, TypeError, OSError:
         _LOGGER.debug("EXIF transpose failed; continuing with original")
 
     # auto_resize: knock huge phone snapshots down *before* the alpha
@@ -223,8 +224,7 @@ def process_image_from_bytes(raw: bytes, opts: ImageProcessOptions) -> Image.Ima
                 else "reduce the source resolution or enable auto_resize"
             )
             raise ValueError(
-                f"Image {width}x{height} ({pixels} px) exceeds the maximum of "
-                f"{cap} px; {hint}"
+                f"Image {width}x{height} ({pixels} px) exceeds the maximum of {cap} px; {hint}"
             )
         src.load()
         return process_image(src, opts)

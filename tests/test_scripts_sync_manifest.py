@@ -189,9 +189,7 @@ class TestCompatibleVersionMembership:
     """``compatible()`` must use real version membership, not a probe list."""
 
     @pytest.fixture(autouse=True)
-    def _import_check_module(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
-    ) -> None:
+    def _import_check_module(self, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
         # The module evaluates ``ROOT = Path.cwd()`` at import; point it
         # at a benign empty project so the import doesn't read main's
         # files (or fail if run elsewhere).
@@ -236,3 +234,23 @@ class TestCompatibleVersionMembership:
         # represents the "we bumped pyproject but forgot to widen
         # manifest" class of drift.
         assert not mod.compatible(SpecifierSet("==13.0.0"), SpecifierSet(">=12.1.1,<13.0.0"))
+
+
+class TestHaProvidedExcludesParity:
+    """``check_requirements_sync.HA_PROVIDED`` and
+    ``sync_manifest_requirements.MANIFEST_EXCLUDES`` both describe the same
+    "provided by HA core, omit from manifest.json" package set, maintained
+    as separate module-level constants in two scripts with nothing else
+    asserting they agree.
+    """
+
+    def test_sets_are_equal(self, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.syspath_prepend(str(SCRIPTS))
+        sys.modules.pop("check_requirements_sync", None)
+        sys.modules.pop("sync_manifest_requirements", None)
+
+        import check_requirements_sync
+        import sync_manifest_requirements
+
+        assert check_requirements_sync.HA_PROVIDED == sync_manifest_requirements.MANIFEST_EXCLUDES

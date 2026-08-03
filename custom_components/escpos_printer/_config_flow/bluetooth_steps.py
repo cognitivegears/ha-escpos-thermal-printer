@@ -299,6 +299,73 @@ class BluetoothFlowMixin:
             step_id="bluetooth_manual", data_schema=data_schema, errors=errors
         )
 
+    async def async_step_reconfigure_bluetooth(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle reconfiguration of an existing Bluetooth printer entry.
+
+        Unlike a network host or serial port path, a MAC address is the
+        printer's actual hardware identity rather than a lookup address
+        that can legitimately drift on its own. Re-pointing this entry at
+        a *different* MAC is treated as configuring a different physical
+        printer and aborts via the standard reconfigure unique-ID
+        mismatch guard.
+        """
+        reconfigure_entry = self._get_reconfigure_entry()  # type: ignore[attr-defined]
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            raw_mac = str(user_input.get(CONF_BT_MAC, "")).strip()
+            mac = _normalize_bt_mac(raw_mac)
+            if mac is None:
+                errors["base"] = "invalid_bt_mac"
+
+            try:
+                channel = validate_rfcomm_channel(
+                    user_input.get(CONF_RFCOMM_CHANNEL, DEFAULT_RFCOMM_CHANNEL)
+                )
+            except HomeAssistantError:
+                errors["base"] = "invalid_rfcomm_channel"
+                channel = DEFAULT_RFCOMM_CHANNEL
+
+            if not errors:
+                assert mac is not None  # narrowed by errors check above
+                timeout = float(user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
+
+                unique_id = _generate_bt_unique_id(mac)
+                await self.async_set_unique_id(unique_id)  # type: ignore[attr-defined]
+                self._abort_if_unique_id_mismatch()  # type: ignore[attr-defined]
+
+                ok, error_code, _err_no = await self.hass.async_add_executor_job(
+                    _can_connect_bluetooth, mac, channel, timeout
+                )
+                if ok:
+                    return self.async_update_reload_and_abort(  # type: ignore[attr-defined,no-any-return]
+                        reconfigure_entry,
+                        unique_id=unique_id,
+                        data_updates={
+                            CONF_BT_MAC: mac,
+                            CONF_RFCOMM_CHANNEL: channel,
+                            CONF_TIMEOUT: timeout,
+                        },
+                    )
+                errors["base"] = _bt_error_to_key(error_code)
+
+        data_schema = vol.Schema(
+            {
+                vol.Required(CONF_BT_MAC): str,
+                vol.Optional(CONF_RFCOMM_CHANNEL, default=DEFAULT_RFCOMM_CHANNEL): int,
+                vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
+            }
+        )
+        return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
+            step_id="reconfigure_bluetooth",
+            data_schema=self.add_suggested_values_to_schema(  # type: ignore[attr-defined]
+                data_schema, user_input or reconfigure_entry.data
+            ),
+            errors=errors,
+        )
+
     async def _finalize_bt_step(
         self,
         *,

@@ -50,9 +50,7 @@ def _joined_text_bytes(command_log: list) -> str:
     'latin-1' decode is enough to expose the printable payload for
     substring assertions.
     """
-    blob = b"".join(
-        cmd.raw_data or b"" for cmd in command_log if cmd.command_type == "text"
-    )
+    blob = b"".join(cmd.raw_data or b"" for cmd in command_log if cmd.command_type == "text")
     return blob.decode("latin-1", errors="ignore")
 
 
@@ -220,6 +218,4 @@ async def test_beep_service_triggers_buzzer(printer_with_ha) -> None:  # type: i
     final = sum(len(cmd.raw_data or b"") for cmd in await printer.get_command_log())
     # ESC ( A buzzer command is short (~7 bytes) — any non-trivial
     # increase proves the buzzer reached the wire.
-    assert final - initial > 0, (
-        "Expected the beep service to emit ESC/POS bytes on the wire."
-    )
+    assert final - initial > 0, "Expected the beep service to emit ESC/POS bytes on the wire."

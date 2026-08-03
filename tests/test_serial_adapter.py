@@ -161,8 +161,38 @@ class TestSerialPrinterAdapter:
             write_chunk_size=0,
             write_chunk_delay_ms=0,
         )
-        mock_make.assert_called_once_with(mock_transport, serial_adapter._get_profile_obj())
+        # Must be the profile *name*, not the resolved object -- python-escpos's
+        # get_profile() only accepts a name (see _profile_for_constructor's
+        # docstring in base_adapter.py).
+        mock_make.assert_called_once_with(mock_transport, serial_adapter._profile_for_constructor())
         assert result is mock_escpos
+
+    def test_connect_passes_profile_name_not_object(self):
+        """Regression test: a named profile must construct successfully.
+
+        Passing the resolved profile *object* into ``make_serial_escpos``
+        (which round-trips it through ``escpos.capabilities.get_profile``)
+        raises ``KeyError`` for any profile other than the library default --
+        this exercises the real (non-mocked) ``make_serial_escpos`` with a
+        fake transport and a real named profile to prove the fix.
+        """
+        config = SerialPrinterConfig(
+            serial_port="/dev/ttyUSB0",
+            baudrate=9600,
+            timeout=4.0,
+            profile="TM-T20II",
+        )
+        adapter = SerialPrinterAdapter(config)
+        mock_transport = MagicMock()
+        with patch(
+            "custom_components.escpos_printer.printer.serial_adapter.serial_transport"
+            ".open_serial_transport",
+            return_value=mock_transport,
+        ):
+            result = adapter._connect()
+
+        assert result is not None
+        assert result.profile.name == "TM-T20II"
 
     def test_connect_retries_on_ebusy(self, serial_adapter):
         import errno as _errno
@@ -389,7 +419,9 @@ class TestSerialTransportImpl:
     def test_flush_with_chunk_delay(self):
         transport, port = self._make_transport(write_chunk_size=4, write_chunk_delay_s=0.001)
         transport.write(b"01234567")  # 8 bytes → 2 chunks of 4
-        with patch("custom_components.escpos_printer.printer.serial_transport.time.sleep") as mock_sleep:
+        with patch(
+            "custom_components.escpos_printer.printer.serial_transport.time.sleep"
+        ) as mock_sleep:
             transport.close()
         assert port.write.call_count == 2
         mock_sleep.assert_called_once_with(0.001)
@@ -459,3 +491,52 @@ class TestSerialReleasePrinterFlush:
         await serial_adapter._release_printer(hass, printer, owned=True, failed=True)
         printer.flush.assert_not_called()
         printer.close.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_release_passes_through_notify_status_false(self, hass, serial_adapter):
+        """``notify_status`` must reach the base implementation unchanged.
+
+        ``SerialPrinterAdapter._release_printer`` overrides the base to add
+        the flush step, but must still forward ``notify_status`` -- a
+        caller opting out of the offline signal (e.g. ``get_paper_status``)
+        must not have that suppressed by the serial-specific override.
+        """
+        printer = MagicMock()
+        received: list[bool] = []
+        serial_adapter.add_status_listener(received.append)
+        serial_adapter._status = True
+
+        await serial_adapter._release_printer(
+            hass, printer, owned=True, failed=True, notify_status=False
+        )
+
+        assert serial_adapter.get_status() is True  # unchanged
+        assert received == []
+
+
+class TestOpenSerialTransportOpenFailure:
+    """A failed ``port.open()`` must close the port, not leak its fd/handle."""
+
+    def test_port_closed_when_open_raises(self):
+        from custom_components.escpos_printer.printer.serial_transport import (
+            open_serial_transport,
+        )
+
+        port = MagicMock()
+        port.open.side_effect = OSError("device busy")
+        with patch("serialx.serial_for_url", return_value=port):
+            with pytest.raises(OSError, match="device busy"):
+                open_serial_transport("/dev/ttyUSB0", 9600, 1.0)
+        port.close.assert_called_once()
+
+    def test_port_close_error_does_not_mask_open_error(self):
+        from custom_components.escpos_printer.printer.serial_transport import (
+            open_serial_transport,
+        )
+
+        port = MagicMock()
+        port.open.side_effect = OSError("device busy")
+        port.close.side_effect = OSError("close also failed")
+        with patch("serialx.serial_for_url", return_value=port):
+            with pytest.raises(OSError, match="device busy"):
+                open_serial_transport("/dev/ttyUSB0", 9600, 1.0)

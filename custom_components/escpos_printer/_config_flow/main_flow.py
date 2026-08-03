@@ -41,6 +41,7 @@ class EscposConfigFlow(
     """Config flow for ESC/POS Thermal Printer."""
 
     VERSION = 3
+    MINOR_VERSION = 1
 
     def __init__(self) -> None:
         """Initialize config flow."""
@@ -86,6 +87,27 @@ class EscposConfigFlow(
         )
 
         return self.async_show_form(step_id="user", data_schema=data_schema)
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Route a reconfigure flow to the entry's transport-specific step.
+
+        HA calls this when the user picks "Reconfigure" on an existing
+        entry. The per-transport steps (``async_step_reconfigure_network``
+        etc., one per mixin) do the actual work; this just dispatches on
+        the entry's stored connection type, mirroring how ``async_step_user``
+        routes new entries.
+        """
+        entry = self._get_reconfigure_entry()
+        connection_type = entry.data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
+        if connection_type == CONNECTION_TYPE_USB:
+            return await self.async_step_reconfigure_usb()
+        if connection_type == CONNECTION_TYPE_BLUETOOTH:
+            return await self.async_step_reconfigure_bluetooth()
+        if connection_type == CONNECTION_TYPE_SERIAL:
+            return await self.async_step_reconfigure_serial()
+        return await self.async_step_reconfigure_network()
 
     @staticmethod
     @callback

@@ -30,6 +30,7 @@ def fake_escpos_module(request: Any, monkeypatch: pytest.MonkeyPatch) -> Generat
     # all-fake escpos hid it by making ``_get_profile_obj`` silently
     # return None in unit tests).
     import escpos.capabilities as real_capabilities
+    import escpos.exceptions as real_exceptions
 
     escpos = types.ModuleType("escpos")
     printer = types.ModuleType("escpos.printer")
@@ -117,6 +118,9 @@ def fake_escpos_module(request: Any, monkeypatch: pytest.MonkeyPatch) -> Generat
     # Keep the real capabilities reachable through the fake package so
     # ``from escpos.capabilities import get_profile`` works in unit tests.
     escpos.capabilities = real_capabilities  # type: ignore[attr-defined]
+    # Same for exceptions (pure dataclasses, no hardware deps) so
+    # ``from escpos.exceptions import BarcodeTypeError`` works too.
+    escpos.exceptions = real_exceptions  # type: ignore[attr-defined]
 
     # Use monkeypatch.setitem so each test's stub is automatically reverted at
     # teardown. Previously this used sys.modules.setdefault which never cleaned
@@ -126,6 +130,7 @@ def fake_escpos_module(request: Any, monkeypatch: pytest.MonkeyPatch) -> Generat
     monkeypatch.setitem(sys.modules, "escpos.printer", printer)
     monkeypatch.setitem(sys.modules, "escpos.escpos", escpos_pkg)
     monkeypatch.setitem(sys.modules, "escpos.capabilities", real_capabilities)
+    monkeypatch.setitem(sys.modules, "escpos.exceptions", real_exceptions)
 
     # The Bluetooth subclass is cached at module scope; invalidate it so the
     # next make_bluetooth_escpos call resolves the (just-installed) fake base.
@@ -218,6 +223,33 @@ def fake_bluetooth_module(request: Any) -> Generator[None]:
         yield
     finally:
         bt_mod.open_rfcomm_transport = original  # type: ignore[assignment]
+
+
+@pytest.fixture(autouse=True)
+def fake_network_status_probe(request: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stub the network adapter's raw socket probe for unit tests.
+
+    ``EscposPrinterAdapterBase.start()`` now always runs a one-shot status
+    probe (see base_adapter.py), and NetworkPrinterAdapter._status_check
+    calls ``socket.create_connection`` directly -- unlike the escpos/usb/
+    bluetooth transports, that's not covered by any of the fakes above.
+    pytest-homeassistant-custom-component blocks all real sockets, and
+    raises ``pytest_socket.SocketBlockedError`` (a ``RuntimeError``, not
+    ``OSError``), which the adapter's ``except OSError`` doesn't catch --
+    every network-entry test would otherwise fail at teardown with "the
+    test opens sockets". Raising OSError here instead keeps the probe on
+    its normal "unreachable" path. Tests that want to exercise a specific
+    probe outcome already monkeypatch this same target themselves (see
+    test_adapter_lifecycle.py), which takes precedence within its scope.
+    """
+    if request.node.get_closest_marker("integration"):
+        return
+    from custom_components.escpos_printer.printer import network_adapter
+
+    def _blocked_create_connection(*_args: Any, **_kwargs: Any) -> Any:
+        raise OSError("unit test: no real network access")
+
+    monkeypatch.setattr(network_adapter.socket, "create_connection", _blocked_create_connection)
 
 
 @pytest.fixture(autouse=True)

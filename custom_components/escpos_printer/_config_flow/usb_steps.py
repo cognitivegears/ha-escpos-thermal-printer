@@ -29,9 +29,11 @@ from ..const import (
 from .usb_helpers import (
     _build_usb_device_choices,
     _can_connect_usb,
+    _default_usb_choice_key,
     _discover_all_usb_devices,
     _discover_usb_printers,
     _generate_usb_unique_id,
+    _parse_vid_pid,
     _usb_error_to_key,
 )
 
@@ -64,7 +66,7 @@ class UsbFlowMixin:
     _discovered_printers: list[dict[str, Any]]
     _all_usb_devices: list[dict[str, Any]]
 
-    async def async_step_usb_select(  # noqa: PLR0912
+    async def async_step_usb_select(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Handle USB printer selection/configuration.
@@ -108,11 +110,12 @@ class UsbFlowMixin:
             if not errors:
                 timeout = float(user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
 
-                # Only set unique ID if we have a serial number to distinguish devices
-                if serial_number:
-                    unique_id = _generate_usb_unique_id(vendor_id, product_id, serial_number)
-                    await self.async_set_unique_id(unique_id)  # type: ignore[attr-defined]
-                    self._abort_if_unique_id_configured()  # type: ignore[attr-defined]
+                # Always set a unique ID (falls back to vid:pid when the
+                # device reports no serial) so serial-less printers -- most
+                # cheap POS-58/80 hardware -- can't be added twice.
+                unique_id = _generate_usb_unique_id(vendor_id, product_id, serial_number)
+                await self.async_set_unique_id(unique_id)  # type: ignore[attr-defined]
+                self._abort_if_unique_id_configured()  # type: ignore[attr-defined]
 
                 _LOGGER.debug("Attempting USB connection test to %04X:%04X", vendor_id, product_id)
                 ok, error_code, errno = await self.hass.async_add_executor_job(
@@ -163,21 +166,18 @@ class UsbFlowMixin:
         # Build profile choices dynamically
         profile_choices = await self.hass.async_add_executor_job(get_profile_choices_dict)
 
-        # Build schema based on whether printers were found
-        if device_choices:
-            default_device = (
-                next(iter(device_choices.keys())) if self._discovered_printers else "__browse_all__"
-            )
-            data_schema = vol.Schema(
-                {
-                    vol.Required("usb_device", default=default_device): vol.In(device_choices),
-                    vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
-                    vol.Optional(CONF_PROFILE, default=PROFILE_AUTO): vol.In(profile_choices),
-                }
-            )
-        else:
-            # Redirect to manual entry if no devices found
-            return await self.async_step_usb_manual()
+        # _build_usb_device_choices always appends "__manual__", so
+        # device_choices is never empty here.
+        default_device = (
+            next(iter(device_choices.keys())) if self._discovered_printers else "__browse_all__"
+        )
+        data_schema = vol.Schema(
+            {
+                vol.Required("usb_device", default=default_device): vol.In(device_choices),
+                vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
+                vol.Optional(CONF_PROFILE, default=PROFILE_AUTO): vol.In(profile_choices),
+            }
+        )
 
         return self.async_show_form(step_id="usb_select", data_schema=data_schema, errors=errors)  # type: ignore[attr-defined,no-any-return]
 
@@ -231,17 +231,16 @@ class UsbFlowMixin:
                 serial_number = selected_usb_device.get("serial_number")
 
             # Validate endpoint addresses (0x00-0xFF)
-            if not errors and (
-                not (0x00 <= in_ep <= 0xFF) or not (0x00 <= out_ep <= 0xFF)
-            ):
+            if not errors and (not (0x00 <= in_ep <= 0xFF) or not (0x00 <= out_ep <= 0xFF)):
                 errors["base"] = "invalid_endpoint"
 
             if not errors:
-                # Only set unique ID if we have a serial number to distinguish devices
-                if serial_number:
-                    unique_id = _generate_usb_unique_id(vendor_id, product_id, serial_number)
-                    await self.async_set_unique_id(unique_id)  # type: ignore[attr-defined]
-                    self._abort_if_unique_id_configured()  # type: ignore[attr-defined]
+                # Always set a unique ID (falls back to vid:pid when the
+                # device reports no serial) so serial-less printers -- most
+                # cheap POS-58/80 hardware -- can't be added twice.
+                unique_id = _generate_usb_unique_id(vendor_id, product_id, serial_number)
+                await self.async_set_unique_id(unique_id)  # type: ignore[attr-defined]
+                self._abort_if_unique_id_configured()  # type: ignore[attr-defined]
 
                 _LOGGER.debug(
                     "Attempting USB connection test to %04X:%04X (in_ep=%02X, out_ep=%02X)",
@@ -340,23 +339,32 @@ class UsbFlowMixin:
             out_ep = int(user_input.get(CONF_OUT_EP, DEFAULT_OUT_EP))
 
             try:
-                vendor_id = int(user_input.get(CONF_VENDOR_ID, 0))
-                product_id = int(user_input.get(CONF_PRODUCT_ID, 0))
+                vendor_id = _parse_vid_pid(user_input.get(CONF_VENDOR_ID, 0))
+                product_id = _parse_vid_pid(user_input.get(CONF_PRODUCT_ID, 0))
                 # VID/PID must be in range 0x0001-0xFFFF (1-65535)
                 if not (0x0001 <= vendor_id <= 0xFFFF) or not (0x0001 <= product_id <= 0xFFFF):
                     errors["base"] = "invalid_usb_device"
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 errors["base"] = "invalid_usb_device"
                 vendor_id, product_id = 0, 0
 
             # Validate endpoint addresses (0x00-0xFF)
-            if not errors and (
-                not (0x00 <= in_ep <= 0xFF) or not (0x00 <= out_ep <= 0xFF)
-            ):
+            if not errors and (not (0x00 <= in_ep <= 0xFF) or not (0x00 <= out_ep <= 0xFF)):
                 errors["base"] = "invalid_endpoint"
 
             if not errors:
-                # Note: No unique_id set for manual entry - allows multiple identical printers
+                # A manual entry has no serial number, so the base id is
+                # just vendor:product -- but manual entry legitimately
+                # supports custom in_ep/out_ep for multi-interface
+                # composite devices, so two same-VID:PID entries can be
+                # real. Only fold the endpoints into the id when they
+                # differ from the defaults, so the common case still
+                # dedupes against the default-endpoint entry.
+                unique_id = _generate_usb_unique_id(vendor_id, product_id, None)
+                if in_ep != DEFAULT_IN_EP or out_ep != DEFAULT_OUT_EP:
+                    unique_id = f"{unique_id}:{in_ep:02x}:{out_ep:02x}"
+                await self.async_set_unique_id(unique_id)  # type: ignore[attr-defined]
+                self._abort_if_unique_id_configured()  # type: ignore[attr-defined]
 
                 _LOGGER.debug(
                     "Attempting USB connection test to %04X:%04X (in_ep=%02X, out_ep=%02X)",
@@ -405,8 +413,13 @@ class UsbFlowMixin:
 
         data_schema = vol.Schema(
             {
-                vol.Required(CONF_VENDOR_ID): int,
-                vol.Required(CONF_PRODUCT_ID): int,
+                # str, not int -- voluptuous_serialize can't render a
+                # custom coercion callable into a form field, and an
+                # `int`-typed field rejects the "0x04B8" hex form the
+                # help text recommends. Parsing happens in the handler
+                # via _parse_vid_pid above.
+                vol.Required(CONF_VENDOR_ID): str,
+                vol.Required(CONF_PRODUCT_ID): str,
                 vol.Optional(CONF_IN_EP, default=DEFAULT_IN_EP): int,
                 vol.Optional(CONF_OUT_EP, default=DEFAULT_OUT_EP): int,
                 vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
@@ -434,7 +447,7 @@ class UsbFlowMixin:
         try:
             vendor_id = int(discovery_info.vid, 16) if discovery_info.vid else 0
             product_id = int(discovery_info.pid, 16) if discovery_info.pid else 0
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             vendor_id, product_id = 0, 0
 
         if not vendor_id or not product_id:
@@ -498,3 +511,188 @@ class UsbFlowMixin:
             data_schema=data_schema,
             description_placeholders={"printer_name": printer_name},
         )
+
+    async def async_step_reconfigure_usb(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle reconfiguration of an existing USB printer entry.
+
+        vendor_id:product_id[:serial] is the printer's hardware identity
+        (see :func:`_generate_usb_unique_id`), so re-picking a *different*
+        device is treated as pointing this entry at a different physical
+        printer and aborts via the standard reconfigure unique-ID
+        mismatch guard.
+        """
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            selected_device = user_input.get("usb_device")
+            if selected_device == "__manual__":
+                return await self.async_step_reconfigure_usb_manual()
+
+            selected_printer = next(
+                (p for p in self._discovered_printers if p.get("_choice_key") == selected_device),
+                None,
+            )
+            if selected_printer is None:
+                errors["base"] = "invalid_usb_device"
+            else:
+                result = await self._finalize_usb_reconfigure(
+                    vendor_id=selected_printer["vendor_id"],
+                    product_id=selected_printer["product_id"],
+                    serial_number=selected_printer.get("serial_number"),
+                    timeout=float(user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)),
+                    errors=errors,
+                )
+                if result is not None:
+                    return result
+
+        self._discovered_printers = await self.hass.async_add_executor_job(_discover_usb_printers)
+        device_choices = _build_usb_device_choices(
+            self._discovered_printers, include_browse_all=False
+        )
+        reconfigure_entry = self._get_reconfigure_entry()  # type: ignore[attr-defined]
+        # reconfigure_entry.data has no "usb_device" key (that's a UI-only
+        # choice-dict key, never stored) -- match on the entry's stored
+        # vendor/product ID so the dropdown preselects the configured
+        # device. Falls back to the first discovered device when the
+        # configured one isn't present (e.g. unplugged).
+        default_device = _default_usb_choice_key(
+            self._discovered_printers, reconfigure_entry.data
+        ) or next(iter(device_choices.keys()))
+        data_schema = vol.Schema(
+            {
+                vol.Required("usb_device", default=default_device): vol.In(device_choices),
+                vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
+            }
+        )
+        suggested_values: dict[str, Any] = dict(user_input or reconfigure_entry.data)
+        suggested_values.setdefault("usb_device", default_device)
+        return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
+            step_id="reconfigure_usb",
+            data_schema=self.add_suggested_values_to_schema(  # type: ignore[attr-defined]
+                data_schema, suggested_values
+            ),
+            errors=errors,
+        )
+
+    async def async_step_reconfigure_usb_manual(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Manual VID:PID fallback for USB reconfigure when discovery finds nothing."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            try:
+                vendor_id = _parse_vid_pid(user_input.get(CONF_VENDOR_ID, 0))
+                product_id = _parse_vid_pid(user_input.get(CONF_PRODUCT_ID, 0))
+                if not (0x0001 <= vendor_id <= 0xFFFF) or not (0x0001 <= product_id <= 0xFFFF):
+                    errors["base"] = "invalid_usb_device"
+            except ValueError, TypeError:
+                errors["base"] = "invalid_usb_device"
+                vendor_id, product_id = 0, 0
+
+            if not errors:
+                result = await self._finalize_usb_reconfigure(
+                    vendor_id=vendor_id,
+                    product_id=product_id,
+                    serial_number=None,
+                    timeout=float(user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)),
+                    errors=errors,
+                )
+                if result is not None:
+                    return result
+
+        data_schema = vol.Schema(
+            {
+                # str, not int -- see async_step_usb_manual for why.
+                vol.Required(CONF_VENDOR_ID): str,
+                vol.Required(CONF_PRODUCT_ID): str,
+                vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
+            }
+        )
+        reconfigure_entry = self._get_reconfigure_entry()  # type: ignore[attr-defined]
+        return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
+            step_id="reconfigure_usb_manual",
+            data_schema=self.add_suggested_values_to_schema(  # type: ignore[attr-defined]
+                data_schema, user_input or reconfigure_entry.data
+            ),
+            errors=errors,
+        )
+
+    async def _finalize_usb_reconfigure(
+        self,
+        *,
+        vendor_id: int,
+        product_id: int,
+        serial_number: str | None,
+        timeout: float,
+        errors: dict[str, str],
+    ) -> ConfigFlowResult | None:
+        """Set unique ID, guard identity, probe, and finish the reconfigure flow.
+
+        Returns a ``ConfigFlowResult`` on success (caller returns it
+        directly). On failure, mutates ``errors["base"]`` and returns
+        ``None`` so the caller re-renders its own form with the error.
+        """
+        reconfigure_entry = self._get_reconfigure_entry()  # type: ignore[attr-defined]
+        unique_id = _generate_usb_unique_id(vendor_id, product_id, serial_number)
+        existing_unique_id = reconfigure_entry.unique_id
+        # The reconfigure forms only collect vendor_id/product_id --
+        # reconfigure_usb_manual never asks for a serial, and
+        # reconfigure_usb can't reproduce a manual entry's custom-endpoint
+        # suffix -- so a freshly computed id legitimately drops a suffix
+        # the original entry had. Compare on the "usb:vid:pid" base only:
+        # a match there means it's still the same physical device, so
+        # keep the existing unique_id instead of mismatching on a suffix
+        # the form can't know. A genuinely different vid:pid still falls
+        # through to the mismatch guard below.
+        if (
+            existing_unique_id is not None
+            and unique_id.split(":")[:3] == existing_unique_id.split(":")[:3]
+        ):
+            unique_id = existing_unique_id
+        await self.async_set_unique_id(unique_id)  # type: ignore[attr-defined]
+        # Pre-existing serial-less entries created before unique IDs were
+        # backfilled (or via the manual-entry step, which historically set
+        # none) have unique_id=None -- that never matches a freshly
+        # computed id, so the mismatch guard would permanently block
+        # reconfigure. Skip it once and let this reconfigure adopt/set the
+        # unique ID instead -- but still guard against the id landing on a
+        # *different* already-configured entry (the mismatch guard can't
+        # catch this case since it only fires when there's an original id
+        # to compare against).
+        if existing_unique_id is not None:
+            self._abort_if_unique_id_mismatch()  # type: ignore[attr-defined]
+        else:
+            colliding = self.hass.config_entries.async_entry_for_domain_unique_id(
+                self.handler,  # type: ignore[attr-defined]
+                unique_id,
+            )
+            if colliding is not None and colliding.entry_id != reconfigure_entry.entry_id:
+                return self.async_abort(reason="already_configured")  # type: ignore[attr-defined,no-any-return]
+
+        in_ep = reconfigure_entry.data.get(CONF_IN_EP, DEFAULT_IN_EP)
+        out_ep = reconfigure_entry.data.get(CONF_OUT_EP, DEFAULT_OUT_EP)
+        ok, error_code, errno = await self.hass.async_add_executor_job(
+            _can_connect_usb, vendor_id, product_id, timeout, in_ep, out_ep
+        )
+        if ok:
+            return self.async_update_reload_and_abort(  # type: ignore[attr-defined,no-any-return]
+                reconfigure_entry,
+                unique_id=unique_id,
+                data_updates={
+                    CONF_VENDOR_ID: vendor_id,
+                    CONF_PRODUCT_ID: product_id,
+                    CONF_TIMEOUT: timeout,
+                },
+            )
+        _LOGGER.warning(
+            "USB reconfigure connection test failed for %04X:%04X (errno=%s): %s",
+            vendor_id,
+            product_id,
+            errno,
+            error_code,
+        )
+        errors["base"] = _usb_error_to_key(error_code)
+        return None

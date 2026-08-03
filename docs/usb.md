@@ -21,16 +21,16 @@ If your printer isn't auto-discovered:
 1. Choose **USB** as connection type
 2. Select **Browse all USB devices** or **Manual entry**
 3. For manual entry, provide:
-   - **Vendor ID** — from `lsusb` (Linux) or Device Manager (Windows)
-   - **Product ID** — listed alongside Vendor ID
-   - **Endpoints** — usually `0x82` (in) and `0x01` (out)
+   - **Vendor ID**: from `lsusb` (Linux) or Device Manager (Windows)
+   - **Product ID**: listed alongside Vendor ID
+   - **Endpoints**: usually `0x82` (in) and `0x01` (out)
 
 ## Connection settings
 
 | Setting | Description | Default |
 |---------|-------------|---------|
-| Vendor ID | USB Vendor ID — use the `0x`-prefixed hex form, e.g. `0x04B8` (a plain decimal number is also accepted) | From discovery |
-| Product ID | USB Product ID — use the `0x`-prefixed hex form, e.g. `0x0E03` (a plain decimal number is also accepted) | From discovery |
+| Vendor ID | USB Vendor ID: use the `0x`-prefixed hex form, e.g. `0x04B8` (a plain decimal number is also accepted) | From discovery |
+| Product ID | USB Product ID: use the `0x`-prefixed hex form, e.g. `0x0E03` (a plain decimal number is also accepted) | From discovery |
 | Input Endpoint | USB IN endpoint | 0x82 |
 | Output Endpoint | USB OUT endpoint | 0x01 |
 | Timeout | Connect timeout (seconds) | 4.0 |
@@ -71,9 +71,9 @@ Or pass-through a specific device (e.g. `/dev/usb/lp0`).
 
 ## Common issues
 
-- **"Permission denied"** — add a udev rule (above) or run on HA OS.
-- **"Device not found"** — verify with `lsusb`; check cable; try another USB port.
-- **"Input/Output Error" / errno 5** — usually USB autosuspend or another driver holding the device. Disable autosuspend or replug.
-- **Wrong endpoints** — defaults are 0x82/0x01; if those fail, find correct ones with `lsusb -v -d VENDOR:PRODUCT | grep Endpoint`.
+- **"Permission denied"**: add a udev rule (above) or run on HA OS.
+- **"Device not found"**: verify with `lsusb`; check cable; try another USB port.
+- **"Input/Output Error" / errno 5**: usually USB autosuspend or another driver holding the device. Disable autosuspend or replug.
+- **Wrong endpoints**: defaults are 0x82/0x01; if those fail, find correct ones with `lsusb -v -d VENDOR:PRODUCT | grep Endpoint`.
 
 See [troubleshooting.md](troubleshooting.md#usb-issues) for more.

@@ -27,7 +27,7 @@ from urllib.parse import urlparse
 
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
-from .const import DITHER_MODES, IMPL_MODES, ROTATION_VALUES
+from .const import DITHER_MODES, DOMAIN, IMPL_MODES, ROTATION_VALUES
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -44,12 +44,12 @@ MAX_QR_DATA_LENGTH = 2000  # Maximum QR code data length
 MAX_BARCODE_LENGTH = 100  # Maximum barcode data length
 MAX_IMAGE_SIZE_MB = 10  # Maximum image download / decoded size, MB
 MAX_FEED_LINES = 50  # Maximum feed lines to prevent paper waste
-MAX_BEEP_TIMES = 10  # Maximum beep repetitions
+MAX_BEEP_TIMES = 9  # Maximum beep repetitions (python-escpos Escpos.buzzer() hard limit)
 # B-L2: separate semantic bound for beep *duration*. Numerically the same
 # upper bound today, but the schema + validators should not pretend the
 # two fields share a meaning. Units are python-escpos "buzzer ticks"
 # (~100ms per tick on most supported printers).
-MAX_BEEP_DURATION = 10
+MAX_BEEP_DURATION = 9  # python-escpos Escpos.buzzer() hard limit
 
 # Image processing bounds (mirror in `services.yaml` + voluptuous schemas).
 IMAGE_WIDTH_MIN = 16
@@ -163,10 +163,20 @@ MAX_ENTITY_ID_OBJECT_LEN = 64
 def validate_text_input(text: str, max_length: int = MAX_TEXT_LENGTH) -> str:
     """Validate and sanitize printable-text input."""
     if not isinstance(text, str):
-        raise HomeAssistantError("Text input must be a string")
+        raise ServiceValidationError(
+            "Text input must be a string",
+            translation_domain=DOMAIN,
+            translation_key="must_be_string",
+            translation_placeholders={"field": "Text input"},
+        )
 
     if len(text) > max_length:
-        raise HomeAssistantError(f"Text length exceeds maximum of {max_length} characters")
+        raise ServiceValidationError(
+            f"Text length exceeds maximum of {max_length} characters",
+            translation_domain=DOMAIN,
+            translation_key="text_too_long",
+            translation_placeholders={"field": "Text input", "max": str(max_length)},
+        )
 
     # Strip C0 control characters except CR/LF/HT (which ESC/POS handles).
     sanitized = _CONTROL_CHAR_RE.sub("", text)
@@ -180,15 +190,28 @@ def validate_text_input(text: str, max_length: int = MAX_TEXT_LENGTH) -> str:
 def validate_qr_data(data: str) -> str:
     """Validate QR code data."""
     if not isinstance(data, str):
-        raise HomeAssistantError("QR data must be a string")
+        raise ServiceValidationError(
+            "QR data must be a string",
+            translation_domain=DOMAIN,
+            translation_key="must_be_string",
+            translation_placeholders={"field": "QR data"},
+        )
 
     if len(data) > MAX_QR_DATA_LENGTH:
-        raise HomeAssistantError(
-            f"QR data length exceeds maximum of {MAX_QR_DATA_LENGTH} characters"
+        raise ServiceValidationError(
+            f"QR data length exceeds maximum of {MAX_QR_DATA_LENGTH} characters",
+            translation_domain=DOMAIN,
+            translation_key="text_too_long",
+            translation_placeholders={"field": "QR data", "max": str(MAX_QR_DATA_LENGTH)},
         )
 
     if not data.strip():
-        raise HomeAssistantError("QR data cannot be empty")
+        raise ServiceValidationError(
+            "QR data cannot be empty",
+            translation_domain=DOMAIN,
+            translation_key="value_empty",
+            translation_placeholders={"field": "QR data"},
+        )
 
     return data
 
@@ -196,15 +219,28 @@ def validate_qr_data(data: str) -> str:
 def validate_barcode_data(code: str, bc_type: str) -> tuple[str, str]:
     """Validate barcode data + type and normalize aliases."""
     if not isinstance(code, str) or not isinstance(bc_type, str):
-        raise HomeAssistantError("Barcode code and type must be strings")
+        raise ServiceValidationError(
+            "Barcode code and type must be strings",
+            translation_domain=DOMAIN,
+            translation_key="must_be_string",
+            translation_placeholders={"field": "Barcode code and type"},
+        )
 
     if len(code) > MAX_BARCODE_LENGTH:
-        raise HomeAssistantError(
-            f"Barcode data length exceeds maximum of {MAX_BARCODE_LENGTH} characters"
+        raise ServiceValidationError(
+            f"Barcode data length exceeds maximum of {MAX_BARCODE_LENGTH} characters",
+            translation_domain=DOMAIN,
+            translation_key="text_too_long",
+            translation_placeholders={"field": "Barcode data", "max": str(MAX_BARCODE_LENGTH)},
         )
 
     if not code.strip():
-        raise HomeAssistantError("Barcode data cannot be empty")
+        raise ServiceValidationError(
+            "Barcode data cannot be empty",
+            translation_domain=DOMAIN,
+            translation_key="value_empty",
+            translation_placeholders={"field": "Barcode data"},
+        )
 
     # Reject ESC/GS/C0 control bytes. python-escpos frames barcode data
     # in a ``GS k`` command (NUL-terminated for the type-A form), so an
@@ -213,7 +249,11 @@ def validate_barcode_data(code: str, bc_type: str) -> tuple[str, str]:
     # codepage/config change). Text input is stripped of these bytes;
     # barcode data must be *exact*, so we reject rather than strip.
     if _CONTROL_CHAR_RE.search(code):
-        raise HomeAssistantError("Barcode data contains disallowed control characters")
+        raise ServiceValidationError(
+            "Barcode data contains disallowed control characters",
+            translation_domain=DOMAIN,
+            translation_key="barcode_control_chars",
+        )
 
     aliases = {
         "UPC-A": "UPCA",
@@ -222,6 +262,9 @@ def validate_barcode_data(code: str, bc_type: str) -> tuple[str, str]:
         "JAN": "EAN13",
         "JAN13": "EAN13",
         "JAN8": "EAN8",
+        # ITF-14 is a 14-digit ITF; python-escpos has no ITF14 entry in its
+        # hw/sw name maps, so the unaliased name raises BarcodeTypeError.
+        "ITF14": "ITF",
     }
     valid_types = {
         "EAN13",
@@ -239,6 +282,11 @@ def validate_barcode_data(code: str, bc_type: str) -> tuple[str, str]:
         "JAN",
         "JAN13",
         "JAN8",
+        "GS1-128",
+        "GS1 DATABAR OMNIDIRECTIONAL",
+        "GS1 DATABAR TRUNCATED",
+        "GS1 DATABAR LIMITED",
+        "GS1 DATABAR EXPANDED",
     }
     bc_upper = bc_type.upper()
     if bc_upper not in valid_types:
@@ -268,26 +316,56 @@ def validate_image_url(url: str, *, allow_local: bool = False) -> str:
     by the resolved-address check in :func:`validate_image_url_and_resolve`.
     """
     if not isinstance(url, str):
-        raise HomeAssistantError("Image URL must be a string")
+        raise ServiceValidationError(
+            "Image URL must be a string",
+            translation_domain=DOMAIN,
+            translation_key="must_be_string",
+            translation_placeholders={"field": "Image URL"},
+        )
 
     if len(url) > MAX_URL_LENGTH:
-        raise HomeAssistantError("URL is too long")
+        raise ServiceValidationError(
+            "URL is too long",
+            translation_domain=DOMAIN,
+            translation_key="text_too_long",
+            translation_placeholders={"field": "URL", "max": str(MAX_URL_LENGTH)},
+        )
 
     try:
         parsed = urlparse(url)
     except ValueError as exc:
-        raise HomeAssistantError(f"Invalid URL format: {exc}") from exc
+        raise ServiceValidationError(
+            f"Invalid URL format: {exc}",
+            translation_domain=DOMAIN,
+            translation_key="url_invalid",
+            translation_placeholders={"reason": f"invalid URL format ({exc})"},
+        ) from exc
 
     if parsed.scheme not in VALID_URL_SCHEMES:
-        raise HomeAssistantError(
-            f"Invalid URL scheme. Only {sorted(VALID_URL_SCHEMES)} are allowed"
+        raise ServiceValidationError(
+            f"Invalid URL scheme. Only {sorted(VALID_URL_SCHEMES)} are allowed",
+            translation_domain=DOMAIN,
+            translation_key="url_invalid",
+            translation_placeholders={
+                "reason": f"scheme must be one of {sorted(VALID_URL_SCHEMES)}"
+            },
         )
 
     if not parsed.hostname:
-        raise HomeAssistantError("URL must include a valid hostname")
+        raise ServiceValidationError(
+            "URL must include a valid hostname",
+            translation_domain=DOMAIN,
+            translation_key="url_invalid",
+            translation_placeholders={"reason": "URL must include a valid hostname"},
+        )
 
     if parsed.username or parsed.password:
-        raise HomeAssistantError("URLs with embedded credentials are not allowed")
+        raise ServiceValidationError(
+            "URLs with embedded credentials are not allowed",
+            translation_domain=DOMAIN,
+            translation_key="url_invalid",
+            translation_placeholders={"reason": "URLs with embedded credentials are not allowed"},
+        )
 
     # IDN/punycode: a homograph URL renders visually identical to a
     # legitimate one in logs/toasts. Reject IDN hostnames whether the
@@ -301,11 +379,22 @@ def validate_image_url(url: str, *, allow_local: bool = False) -> str:
         try:
             hostname_to_check = hostname_to_check.encode("idna").decode("ascii")
         except UnicodeError as exc:
-            raise HomeAssistantError(f"Invalid IDN hostname: {exc}") from exc
+            raise ServiceValidationError(
+                f"Invalid IDN hostname: {exc}",
+                translation_domain=DOMAIN,
+                translation_key="url_invalid",
+                translation_placeholders={"reason": f"invalid IDN hostname ({exc})"},
+            ) from exc
     if "xn--" in hostname_to_check.lower():
-        raise HomeAssistantError(
+        raise ServiceValidationError(
             "Internationalized (IDN/punycode) hostnames are not allowed; "
-            "use the ASCII hostname or a numeric IP to avoid homograph confusion."
+            "use the ASCII hostname or a numeric IP to avoid homograph confusion.",
+            translation_domain=DOMAIN,
+            translation_key="url_invalid",
+            translation_placeholders={
+                "reason": "internationalized (IDN/punycode) hostnames are not allowed; "
+                "use the ASCII hostname or a numeric IP"
+            },
         )
 
     # Accessing ``.port`` parses+range-checks it lazily (raises ValueError
@@ -313,7 +402,12 @@ def validate_image_url(url: str, *, allow_local: bool = False) -> str:
     try:
         port = parsed.port
     except ValueError as exc:
-        raise HomeAssistantError(f"Invalid URL port: {exc}") from exc
+        raise ServiceValidationError(
+            f"Invalid URL port: {exc}",
+            translation_domain=DOMAIN,
+            translation_key="url_invalid",
+            translation_placeholders={"reason": f"invalid URL port ({exc})"},
+        ) from exc
 
     # Restrict to default ports for the scheme unless the local opt-in is
     # set. In the strict (public-only) default this catches 22 (SSH) and
@@ -322,10 +416,17 @@ def validate_image_url(url: str, *, allow_local: bool = False) -> str:
     # non-standard ports are exactly what they need, so the allowlist is
     # lifted — the resolved-address SSRF check still applies.
     if not allow_local and port not in VALID_URL_PORTS:
-        raise HomeAssistantError(
+        raise ServiceValidationError(
             f"URL port {port} not allowed; only {sorted(p for p in VALID_URL_PORTS if p)} "
             "are permitted (enable 'Allow local image URLs' in the printer options to "
-            "use non-standard ports)"
+            "use non-standard ports)",
+            translation_domain=DOMAIN,
+            translation_key="url_invalid",
+            translation_placeholders={
+                "reason": f"port {port} not allowed; only "
+                f"{sorted(p for p in VALID_URL_PORTS if p)} are permitted (enable "
+                "'Allow local image URLs' in the printer options to use non-standard ports)"
+            },
         )
 
     return url
@@ -347,18 +448,32 @@ def _is_public_address(addr: str) -> bool:
     )
 
 
-# Cloud-metadata endpoints that must never be fetched, even in permissive
-# (``allow_local``) mode. The IPv4 service (and its IPv6 *link-local* form)
-# is already caught by the link-local check, but the AWS IMDSv6 endpoint
-# ``fd00:ec2::254`` is an IPv6 *Unique-Local* address (``fc00::/7``) — Python
-# flags it ``is_private`` but not ``is_link_local``, so without this explicit
-# denylist it would slip through the permissive ULA grant on a dual-stack EC2
-# host. Home IPv6 LANs legitimately use ULA, so we block the specific
-# endpoints rather than the whole ULA range.
+# Cloud-metadata endpoints that must never be fetched, in *any* mode
+# (including the default strict/``allow_local=False`` mode — these are
+# checked before the public/private classification below, not just in the
+# permissive branch). The IPv4 AWS/GCP/Azure metadata service (and its IPv6
+# link-local form) is already caught by the link-local check, but a few
+# endpoints live in ranges Python's ``ipaddress`` doesn't flag as
+# link-local or private, so without this explicit denylist they would slip
+# through:
+#
+# - AWS IMDSv6 ``fd00:ec2::254`` is an IPv6 *Unique-Local* address
+#   (``fc00::/7``) — Python flags it ``is_private`` but not
+#   ``is_link_local``, so it would otherwise only be caught by the
+#   permissive-mode ULA grant (i.e. still reachable with ``allow_local``).
+# - Alibaba Cloud IMDS ``100.100.100.200`` lives in CGNAT space
+#   (``100.64.0.0/10``), which Python deliberately reports as *neither*
+#   ``is_private`` *nor* ``is_global`` (see the stdlib ``ipaddress``
+#   docs). That makes ``_is_public_address`` treat it as public, so
+#   without this denylist it would be reachable even in strict mode.
+#
+# Home IPv6 LANs legitimately use ULA, so we block the specific endpoints
+# rather than the whole ULA range.
 _ALWAYS_BLOCKED_HOSTS: frozenset[ipaddress.IPv4Address | ipaddress.IPv6Address] = frozenset(
     {
         ipaddress.ip_address("169.254.169.254"),  # IMDSv4 (also caught by link-local)
         ipaddress.ip_address("fd00:ec2::254"),  # AWS IMDSv6 (ULA — not otherwise caught)
+        ipaddress.ip_address("100.100.100.200"),  # Alibaba Cloud IMDS (CGNAT — not otherwise caught)
     }
 )
 
@@ -371,41 +486,41 @@ def _is_allowed_address(addr: str, *, allow_local: bool) -> bool:
     loopback addresses are *also* allowed so URLs pointing at LAN cameras,
     NVRs, NAS shares, or the Home Assistant instance itself work.
 
-    The genuinely dangerous ranges stay blocked **even with ``allow_local``**:
+    The genuinely dangerous ranges stay blocked **even with ``allow_local``,
+    and even in the default strict mode**:
 
+    - the cloud-metadata endpoints in :data:`_ALWAYS_BLOCKED_HOSTS`,
+      checked first so a quirk in the public/private classification below
+      (e.g. the Alibaba Cloud IMDS address sitting in CGNAT space, which
+      Python's ``ipaddress`` reports as neither private nor global) can't
+      accidentally classify one of them as "public" and let it through.
     - link-local (``169.254.0.0/16`` / ``fe80::/10``) — this is the cloud
       metadata endpoint (``169.254.169.254``); SSRF here leaks IAM creds.
-    - the IPv6 cloud-metadata endpoints in :data:`_ALWAYS_BLOCKED_HOSTS`
-      (AWS IMDSv6 ``fd00:ec2::254`` is a ULA that the private grant would
-      otherwise permit).
     - multicast / unspecified (``0.0.0.0`` / ``::``).
     - reserved/future-use ranges (e.g. ``240.0.0.0/4``) that aren't a real
       LAN. Note ``::1`` is flagged *both* loopback and reserved by Python,
       so loopback is granted before the reserved exclusion is applied.
 
-    With ``allow_local=False`` this is exactly :func:`_is_public_address`, so
-    the historical strict behavior is preserved by construction.
+    With ``allow_local=False`` this is :func:`_is_public_address` minus the
+    always-blocked hosts, so the historical strict behavior is otherwise
+    preserved by construction.
     """
-    if _is_public_address(addr):
-        return True
-    if not allow_local:
-        return False
     try:
         ip = ipaddress.ip_address(addr)
     except ValueError:
         return False
-    # Permissive (LAN) mode — still refuse the always-dangerous ranges
-    # (specific cloud-metadata hosts + link-local/multicast/unspecified).
-    if (
-        ip in _ALWAYS_BLOCKED_HOSTS
-        or ip.is_link_local
-        or ip.is_multicast
-        or ip.is_unspecified
-    ):
+    if ip in _ALWAYS_BLOCKED_HOSTS:
         return False
-    if ip.is_loopback:
+    if _is_public_address(addr):
         return True
-    return ip.is_private and not ip.is_reserved
+    if not allow_local:
+        return False
+    # Permissive (LAN) mode — still refuse the always-dangerous ranges
+    # (link-local/multicast/unspecified; the cloud-metadata denylist was
+    # already applied above, before the public/private split).
+    if ip.is_link_local or ip.is_multicast or ip.is_unspecified:
+        return False
+    return ip.is_loopback or (ip.is_private and not ip.is_reserved)
 
 
 def _resolve_hostname_sync(hostname: str, port: int | None) -> list[str]:
@@ -413,10 +528,20 @@ def _resolve_hostname_sync(hostname: str, port: int | None) -> list[str]:
     try:
         infos = socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
     except OSError as exc:
-        raise HomeAssistantError(f"Could not resolve image URL hostname: {exc}") from exc
+        raise ServiceValidationError(
+            f"Could not resolve image URL hostname: {exc}",
+            translation_domain=DOMAIN,
+            translation_key="url_invalid",
+            translation_placeholders={"reason": f"could not resolve hostname ({exc})"},
+        ) from exc
     addrs = sorted({str(info[4][0]) for info in infos})
     if not addrs:
-        raise HomeAssistantError("Could not resolve image URL hostname")
+        raise ServiceValidationError(
+            "Could not resolve image URL hostname",
+            translation_domain=DOMAIN,
+            translation_key="url_invalid",
+            translation_placeholders={"reason": "could not resolve hostname"},
+        )
     return addrs
 
 
@@ -438,7 +563,12 @@ async def validate_image_url_and_resolve(
     parsed = urlparse(validated)
     hostname = parsed.hostname
     if hostname is None:  # pragma: no cover — validate_image_url enforces it
-        raise HomeAssistantError("URL must include a valid hostname")
+        raise ServiceValidationError(
+            "URL must include a valid hostname",
+            translation_domain=DOMAIN,
+            translation_key="url_invalid",
+            translation_placeholders={"reason": "URL must include a valid hostname"},
+        )
     addrs = await hass.async_add_executor_job(_resolve_hostname_sync, hostname, parsed.port)
     # The ``allow_local`` opt-in lifts the port allowlist (see
     # ``validate_image_url``) so LAN cameras/NVRs on non-standard ports
@@ -449,24 +579,43 @@ async def validate_image_url_and_resolve(
     if allow_local and parsed.port not in VALID_URL_PORTS:
         public = [a for a in addrs if _is_public_address(a)]
         if public:
-            raise HomeAssistantError(
+            raise ServiceValidationError(
                 f"URL port {parsed.port} is only permitted for private/LAN "
-                "targets; this hostname resolves to a public address"
+                "targets; this hostname resolves to a public address",
+                translation_domain=DOMAIN,
+                translation_key="url_invalid",
+                translation_placeholders={
+                    "reason": f"port {parsed.port} is only permitted for private/LAN "
+                    "targets; this hostname resolves to a public address"
+                },
             )
     bad = [a for a in addrs if not _is_allowed_address(a, allow_local=allow_local)]
     if bad:
         if allow_local:
             # Already in the permissive mode and still blocked → it's one of
             # the always-unsafe ranges, so don't dangle a non-existent knob.
-            raise HomeAssistantError(
+            raise ServiceValidationError(
                 "Image URL resolves to a blocked address (link-local/metadata, "
-                "multicast, reserved, or unspecified)"
+                "multicast, reserved, or unspecified)",
+                translation_domain=DOMAIN,
+                translation_key="url_invalid",
+                translation_placeholders={
+                    "reason": "resolves to a blocked address (link-local/metadata, "
+                    "multicast, reserved, or unspecified)"
+                },
             )
-        raise HomeAssistantError(
+        raise ServiceValidationError(
             "Image URL resolves to a non-public address "
             "(private, loopback, link-local, reserved, or multicast). "
             "Enable 'Allow local image URLs' in the printer options to permit "
-            "private/LAN addresses."
+            "private/LAN addresses.",
+            translation_domain=DOMAIN,
+            translation_key="url_invalid",
+            translation_placeholders={
+                "reason": "resolves to a non-public address (private, loopback, "
+                "link-local, reserved, or multicast); enable 'Allow local image "
+                "URLs' in the printer options to permit private/LAN addresses"
+            },
         )
     return validated, addrs
 
@@ -493,7 +642,12 @@ def _validate_local_path_sync(
     cap fires).
     """
     if not isinstance(raw_path, str):
-        raise HomeAssistantError("Image path must be a string")
+        raise ServiceValidationError(
+            "Image path must be a string",
+            translation_domain=DOMAIN,
+            translation_key="must_be_string",
+            translation_placeholders={"field": "Image path"},
+        )
 
     if max_bytes is None:
         max_bytes = MAX_IMAGE_SIZE_MB * 1024 * 1024
@@ -501,26 +655,75 @@ def _validate_local_path_sync(
     try:
         resolved = Path(raw_path).resolve(strict=True)
     except FileNotFoundError as exc:
-        raise HomeAssistantError("Image file does not exist or is not a regular file") from exc
+        raise ServiceValidationError(
+            "Image file does not exist or is not a regular file",
+            translation_domain=DOMAIN,
+            translation_key="path_not_found",
+            translation_placeholders={"kind": "Image"},
+        ) from exc
     except OSError as exc:
-        raise HomeAssistantError(f"Cannot access image file: {exc}") from exc
+        raise ServiceValidationError(
+            f"Cannot access image file: {exc}",
+            translation_domain=DOMAIN,
+            translation_key="path_access_error",
+            translation_placeholders={"kind": "Image", "error": str(exc)},
+        ) from exc
 
     if resolved.suffix.lower() not in allowed:
-        raise HomeAssistantError(
-            f"File extension '{resolved.suffix}' not allowed. Allowed: {sorted(allowed)}"
+        raise ServiceValidationError(
+            f"File extension '{resolved.suffix}' not allowed. Allowed: {sorted(allowed)}",
+            translation_domain=DOMAIN,
+            translation_key="path_extension_not_allowed",
+            translation_placeholders={
+                "kind": "Image",
+                "extension": resolved.suffix,
+                "allowed": ", ".join(sorted(allowed)),
+            },
         )
 
     try:
         st = resolved.stat()
     except OSError as exc:
-        raise HomeAssistantError(f"Cannot access image file: {exc}") from exc
+        raise ServiceValidationError(
+            f"Cannot access image file: {exc}",
+            translation_domain=DOMAIN,
+            translation_key="path_access_error",
+            translation_placeholders={"kind": "Image", "error": str(exc)},
+        ) from exc
     if not stat.S_ISREG(st.st_mode):
-        raise HomeAssistantError("Image path is not a regular file")
+        raise ServiceValidationError(
+            "Image path is not a regular file",
+            translation_domain=DOMAIN,
+            translation_key="path_not_regular_file",
+            translation_placeholders={"kind": "Image"},
+        )
     if st.st_size > max_bytes:
         mb = max_bytes // (1024 * 1024)
-        raise HomeAssistantError(f"Image file too large (max {mb}MB)")
+        raise ServiceValidationError(
+            f"Image file too large (max {mb}MB)",
+            translation_domain=DOMAIN,
+            translation_key="path_too_large",
+            translation_placeholders={"kind": "Image", "max_mb": str(mb)},
+        )
 
     return resolved
+
+
+def _best_effort_resolve(raw_path: str) -> str:
+    """Resolve ``raw_path`` for an allowlist pre-check without requiring it to exist.
+
+    Used to decide *where a path points* before running any check that
+    would reveal existence/type/size details about it — mirrors what
+    ``Config.is_allowed_path`` does internally (resolve if it exists,
+    else resolve the parent), but callers here need the string up front
+    to gate a subsequent trust decision. Falls back to the raw string on
+    ``OSError``/``ValueError`` (e.g. a symlink loop) so the caller fails
+    closed (an unresolvable path won't match an allowlist prefix).
+    """
+    try:
+        return str(Path(raw_path).resolve())
+    except (OSError, ValueError):
+        return raw_path
 
 
 def validate_font_path(
@@ -536,50 +739,131 @@ def validate_font_path(
     not be a symlink (``Path.is_symlink``) — this defeats the "drop a
     symlink in ``<config>/fonts/`` pointing at ``/etc/...``" trick
     that would otherwise let an attacker make Pillow parse arbitrary
-    on-disk binaries. The resolved path is then rejected if it falls
-    outside ``hass``'s ``allowlist_external_dirs`` (when ``hass`` is
-    supplied — the standalone form is used by unit tests).
+    on-disk binaries. The path is rejected up front if it falls outside
+    ``hass``'s ``allowlist_external_dirs`` (when ``hass`` is supplied —
+    the standalone form is used by unit tests); this allowlist check
+    runs *before* the symlink/existence/extension/size checks below so
+    a caller can't use those distinct errors as an oracle for a path
+    outside the allowlist (existence, type, extension, size bucket).
 
     Blocking — call from an executor thread when ``hass`` is set,
     because ``hass.config.is_allowed_path`` may stat the filesystem.
     """
     if not isinstance(raw_path, str):
-        raise HomeAssistantError("Font path must be a string")
+        raise ServiceValidationError(
+            "Font path must be a string",
+            translation_domain=DOMAIN,
+            translation_key="must_be_string",
+            translation_placeholders={"field": "Font path"},
+        )
     if len(raw_path) > MAX_FONT_PATH_LENGTH:
-        raise HomeAssistantError(f"Font path exceeds maximum length {MAX_FONT_PATH_LENGTH}")
+        raise ServiceValidationError(
+            f"Font path exceeds maximum length {MAX_FONT_PATH_LENGTH}",
+            translation_domain=DOMAIN,
+            translation_key="text_too_long",
+            translation_placeholders={"field": "Font path", "max": str(MAX_FONT_PATH_LENGTH)},
+        )
+    if hass is not None and not hass.config.is_allowed_path(_best_effort_resolve(raw_path)):
+        raise ServiceValidationError(
+            f"Font path '{raw_path}' is outside allowlist_external_dirs",
+            translation_domain=DOMAIN,
+            translation_key="font_path_outside_allowlist",
+            translation_placeholders={"path": raw_path},
+        )
     try:
         raw_is_symlink = Path(raw_path).is_symlink()
     except OSError as exc:
-        raise HomeAssistantError(f"Cannot access font file: {exc}") from exc
+        raise ServiceValidationError(
+            f"Cannot access font file: {exc}",
+            translation_domain=DOMAIN,
+            translation_key="path_access_error",
+            translation_placeholders={"kind": "Font", "error": str(exc)},
+        ) from exc
     if raw_is_symlink:
-        raise HomeAssistantError("Font path must not be a symlink")
+        raise ServiceValidationError(
+            "Font path must not be a symlink",
+            translation_domain=DOMAIN,
+            translation_key="font_path_symlink_rejected",
+        )
     try:
         resolved = Path(raw_path).resolve(strict=True)
     except FileNotFoundError as exc:
-        raise HomeAssistantError("Font file does not exist or is not a regular file") from exc
+        raise ServiceValidationError(
+            "Font file does not exist or is not a regular file",
+            translation_domain=DOMAIN,
+            translation_key="path_not_found",
+            translation_placeholders={"kind": "Font"},
+        ) from exc
     except OSError as exc:
-        raise HomeAssistantError(f"Cannot access font file: {exc}") from exc
+        raise ServiceValidationError(
+            f"Cannot access font file: {exc}",
+            translation_domain=DOMAIN,
+            translation_key="path_access_error",
+            translation_placeholders={"kind": "Font", "error": str(exc)},
+        ) from exc
 
     if resolved.suffix.lower() not in ALLOWED_FONT_EXTENSIONS:
-        raise HomeAssistantError(
+        raise ServiceValidationError(
             f"Font extension '{resolved.suffix}' not allowed. "
-            f"Allowed: {sorted(ALLOWED_FONT_EXTENSIONS)}"
+            f"Allowed: {sorted(ALLOWED_FONT_EXTENSIONS)}",
+            translation_domain=DOMAIN,
+            translation_key="path_extension_not_allowed",
+            translation_placeholders={
+                "kind": "Font",
+                "extension": resolved.suffix,
+                "allowed": ", ".join(sorted(ALLOWED_FONT_EXTENSIONS)),
+            },
         )
 
     try:
         st = resolved.stat()
     except OSError as exc:
-        raise HomeAssistantError(f"Cannot access font file: {exc}") from exc
+        raise ServiceValidationError(
+            f"Cannot access font file: {exc}",
+            translation_domain=DOMAIN,
+            translation_key="path_access_error",
+            translation_placeholders={"kind": "Font", "error": str(exc)},
+        ) from exc
     if not stat.S_ISREG(st.st_mode):
-        raise HomeAssistantError("Font path is not a regular file")
+        raise ServiceValidationError(
+            "Font path is not a regular file",
+            translation_domain=DOMAIN,
+            translation_key="path_not_regular_file",
+            translation_placeholders={"kind": "Font"},
+        )
     if st.st_size > MAX_FONT_SIZE_BYTES:
         mb = MAX_FONT_SIZE_BYTES // (1024 * 1024)
-        raise HomeAssistantError(f"Font file too large (max {mb}MB)")
-
-    if hass is not None and not hass.config.is_allowed_path(str(resolved)):
-        raise HomeAssistantError(f"Font path '{resolved}' is outside allowlist_external_dirs")
+        raise ServiceValidationError(
+            f"Font file too large (max {mb}MB)",
+            translation_domain=DOMAIN,
+            translation_key="path_too_large",
+            translation_placeholders={"kind": "Font", "max_mb": str(mb)},
+        )
 
     return resolved
+
+
+def _is_trusted_font_location(raw_path: str, hass: HomeAssistant) -> bool:
+    """Return True if ``raw_path`` resolves inside the allowlist or ``<config>/fonts/``.
+
+    Tolerant of a non-existent leaf (via :func:`_best_effort_resolve`, same
+    trick ``Config.is_allowed_path`` uses internally) so this trust decision
+    doesn't require the file to exist. Callers run this *before* any
+    existence/extension/size/symlink check so those checks — each with a
+    distinct, descriptive error — can't be used as an oracle for a path
+    outside both trusted locations.
+    """
+    resolved_str = _best_effort_resolve(raw_path)
+    if hass.config.is_allowed_path(resolved_str):
+        return True
+    try:
+        fonts_dir = Path(hass.config.path("fonts")).resolve()
+    except (OSError, ValueError):
+        return False
+    try:
+        return Path(resolved_str).is_relative_to(fonts_dir)
+    except (OSError, ValueError):
+        return False
 
 
 def validate_font_path_with_fonts_dir(raw_path: str, hass: HomeAssistant) -> Path:
@@ -591,33 +875,46 @@ def validate_font_path_with_fonts_dir(raw_path: str, hass: HomeAssistant) -> Pat
 
     The narrowing — only one well-known subdirectory of the HA config
     dir, only for font loading — keeps HA's broader allowlist model
-    intact for other path-based services. Blocking; call from an
-    executor thread.
+    intact for other path-based services.
+
+    The "is this location trusted at all" decision (allowlist *or*
+    ``<config>/fonts/``) runs before ``validate_font_path``'s
+    symlink/existence/extension/size checks — see
+    :func:`_is_trusted_font_location`. Blocking; call from an executor
+    thread.
+
+    ``_is_trusted_font_location`` and ``validate_font_path`` each
+    resolve ``raw_path`` independently (separate ``Path.resolve()``
+    calls), so a symlink swapped in between could point the second
+    resolve somewhere the trust check never saw. The trust decision is
+    therefore re-checked against the actually-resolved path before it's
+    returned to the caller.
     """
-    # Run extension / size / symlink / regular-file checks first (these
-    # don't depend on the allowlist decision).
+    if not isinstance(raw_path, str):
+        raise ServiceValidationError(
+            "Font path must be a string",
+            translation_domain=DOMAIN,
+            translation_key="must_be_string",
+            translation_placeholders={"field": "Font path"},
+        )
+    if not _is_trusted_font_location(raw_path, hass):
+        raise ServiceValidationError(
+            f"Font path '{raw_path}' is outside allowlist_external_dirs "
+            f"(and not under <config>/fonts/)",
+            translation_domain=DOMAIN,
+            translation_key="font_path_outside_allowlist",
+            translation_placeholders={"path": raw_path},
+        )
     resolved = validate_font_path(raw_path)
-    resolved_str = str(resolved)
-    if hass.config.is_allowed_path(resolved_str):
-        return resolved
-    try:
-        fonts_dir = Path(hass.config.path("fonts")).resolve()
-    except (OSError, ValueError) as exc:
-        raise HomeAssistantError(
-            f"Font path '{resolved}' is outside allowlist_external_dirs "
-            f"(and <config>/fonts/ is not accessible)"
-        ) from exc
-    try:
-        if Path(resolved_str).resolve().is_relative_to(fonts_dir):
-            return resolved
-    except (OSError, ValueError) as exc:
-        raise HomeAssistantError(
-            f"Font path '{resolved}' is outside allowlist_external_dirs "
-            f"(and not under <config>/fonts/)"
-        ) from exc
-    raise HomeAssistantError(
-        f"Font path '{resolved}' is outside allowlist_external_dirs (and not under <config>/fonts/)"
-    )
+    if not _is_trusted_font_location(str(resolved), hass):
+        raise ServiceValidationError(
+            f"Font path '{raw_path}' is outside allowlist_external_dirs "
+            f"(and not under <config>/fonts/)",
+            translation_domain=DOMAIN,
+            translation_key="font_path_outside_allowlist",
+            translation_placeholders={"path": raw_path},
+        )
+    return resolved
 
 
 # Combined control-character strip regex. Used by both `validate_text_input`
@@ -648,17 +945,50 @@ def validate_rows(rows: Any) -> list[list[str]]:
     coercion).
     """
     if not isinstance(rows, (list, tuple)):
-        raise HomeAssistantError("rows must be a list of rows")
+        raise ServiceValidationError(
+            "rows must be a list of rows",
+            translation_domain=DOMAIN,
+            translation_key="must_be_list",
+            translation_placeholders={"field": "rows"},
+        )
     if len(rows) > MAX_TABLE_ROWS:
-        raise HomeAssistantError(f"rows length {len(rows)} exceeds maximum {MAX_TABLE_ROWS}")
+        raise ServiceValidationError(
+            f"rows length {len(rows)} exceeds maximum {MAX_TABLE_ROWS}",
+            translation_domain=DOMAIN,
+            translation_key="list_length_exceeds_max",
+            translation_placeholders={
+                "field": "rows",
+                "count": str(len(rows)),
+                "max": str(MAX_TABLE_ROWS),
+            },
+        )
     if not rows:
-        raise HomeAssistantError("rows must contain at least one row")
+        raise ServiceValidationError(
+            "rows must contain at least one row",
+            translation_domain=DOMAIN,
+            translation_key="list_empty",
+            translation_placeholders={"field": "rows"},
+        )
     out: list[list[str]] = []
     for row in rows:
         if not isinstance(row, (list, tuple)):
-            raise HomeAssistantError("each row must be a list of cells")
+            raise ServiceValidationError(
+                "each row must be a list of cells",
+                translation_domain=DOMAIN,
+                translation_key="must_be_list",
+                translation_placeholders={"field": "each row"},
+            )
         if len(row) > MAX_TABLE_COLS:
-            raise HomeAssistantError(f"row width {len(row)} exceeds maximum {MAX_TABLE_COLS}")
+            raise ServiceValidationError(
+                f"row width {len(row)} exceeds maximum {MAX_TABLE_COLS}",
+                translation_domain=DOMAIN,
+                translation_key="list_length_exceeds_max",
+                translation_placeholders={
+                    "field": "row width",
+                    "count": str(len(row)),
+                    "max": str(MAX_TABLE_COLS),
+                },
+            )
         cells: list[str] = []
         for cell in row:
             if cell is None:
@@ -666,7 +996,12 @@ def validate_rows(rows: Any) -> list[list[str]]:
                 continue
             text = str(cell)
             if len(text) > MAX_TABLE_CELL_LENGTH:
-                raise HomeAssistantError(f"cell length exceeds maximum {MAX_TABLE_CELL_LENGTH}")
+                raise ServiceValidationError(
+                    f"cell length exceeds maximum {MAX_TABLE_CELL_LENGTH}",
+                    translation_domain=DOMAIN,
+                    translation_key="table_cell_too_long",
+                    translation_placeholders={"max": str(MAX_TABLE_CELL_LENGTH)},
+                )
             cells.append(_strip_controls(text))
         out.append(cells)
     return out
@@ -688,8 +1023,11 @@ def sanitise_kv_items(items: Any) -> list[list[str]]:
         for cell in entry:
             s = "" if cell is None else str(cell)
             if len(s) > MAX_TABLE_CELL_LENGTH:
-                raise HomeAssistantError(
-                    f"cell length {len(s)} exceeds maximum {MAX_TABLE_CELL_LENGTH}"
+                raise ServiceValidationError(
+                    f"cell length {len(s)} exceeds maximum {MAX_TABLE_CELL_LENGTH}",
+                    translation_domain=DOMAIN,
+                    translation_key="table_cell_too_long",
+                    translation_placeholders={"max": str(MAX_TABLE_CELL_LENGTH)},
                 )
             pair.append(_strip_controls(s))
         out.append(pair)
@@ -702,6 +1040,15 @@ def open_local_image_no_follow(path: Path, *, max_bytes: int | None = None) -> b
     Used together with :func:`_validate_local_path_sync` to defeat
     TOCTOU symlink swaps between stat and open. Caller is expected to
     have already validated the path (size, extension, allowlist).
+
+    Scope: ``O_NOFOLLOW`` only guards the *leaf* path component — the
+    open fails if ``path`` itself is (or has become) a symlink, but any
+    intermediate directory in ``path`` is still traversed normally. An
+    attacker with local code execution (already a stronger position than
+    this integration defends against) could swap an intermediate
+    directory for a symlink between validation and open and redirect the
+    read to a different file tree; that residual TOCTOU window is not
+    closed by this primitive.
     """
     if max_bytes is None:
         max_bytes = MAX_IMAGE_SIZE_MB * 1024 * 1024
@@ -716,6 +1063,9 @@ def open_local_font_no_follow(path: Path, *, max_bytes: int | None = None) -> by
     these bytes through :class:`io.BytesIO` to ``ImageFont.truetype`` so
     Pillow does not re-open the resolved path (which would otherwise be
     swappable for an attacker-controlled file between validate and load).
+
+    Scope: same leaf-only ``O_NOFOLLOW`` guarantee (and residual
+    intermediate-directory-symlink risk) as :func:`open_local_image_no_follow`.
     """
     if max_bytes is None:
         max_bytes = MAX_FONT_SIZE_BYTES
@@ -723,15 +1073,30 @@ def open_local_font_no_follow(path: Path, *, max_bytes: int | None = None) -> by
 
 
 def _read_no_follow(path: Path, *, max_bytes: int, kind: str) -> bytes:
-    """Common O_NOFOLLOW open + size check for image / font readers."""
+    """Common O_NOFOLLOW open + size check for image / font readers.
+
+    ``O_NOFOLLOW`` rejects a symlink at the final path component only;
+    it does not protect against a symlink substituted into one of
+    ``path``'s parent directories (see the callers' docstrings).
+    """
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
     try:
         st = os.fstat(fd)
         if not stat.S_ISREG(st.st_mode):
-            raise HomeAssistantError(f"{kind} path is not a regular file")
+            raise ServiceValidationError(
+                f"{kind} path is not a regular file",
+                translation_domain=DOMAIN,
+                translation_key="path_not_regular_file",
+                translation_placeholders={"kind": kind},
+            )
         if st.st_size > max_bytes:
             mb = max_bytes // (1024 * 1024)
-            raise HomeAssistantError(f"{kind} file too large (max {mb}MB)")
+            raise ServiceValidationError(
+                f"{kind} file too large (max {mb}MB)",
+                translation_domain=DOMAIN,
+                translation_key="path_too_large",
+                translation_placeholders={"kind": kind, "max_mb": str(mb)},
+            )
         with os.fdopen(fd, "rb", closefd=True) as handle:
             fd = -1  # ownership transferred to the file object
             return handle.read(max_bytes + 1)
@@ -750,6 +1115,12 @@ def write_file_no_follow(path: str, data: bytes) -> None:
     symlink. ``O_EXCL`` + ``O_CREAT`` would refuse to clobber an
     existing file, but preview writes intentionally overwrite — so we
     pair ``O_NOFOLLOW`` with ``O_TRUNC`` and explicit owner-only mode.
+
+    Scope: this only guards the *leaf* path component, same as
+    :func:`open_local_image_no_follow` / :func:`open_local_font_no_follow`.
+    A symlink swapped into one of ``path``'s parent directories between
+    validation and this call (which requires local code execution) is
+    not caught here.
 
     Blocking; call from an executor thread.
     """
@@ -779,17 +1150,27 @@ def validate_base64_image(value: str) -> bytes:
     cannot OOM us via a 200 MB base64 string.
     """
     if not isinstance(value, str):
-        raise HomeAssistantError("Base64 image must be a string")
+        raise ServiceValidationError(
+            "Base64 image must be a string",
+            translation_domain=DOMAIN,
+            translation_key="must_be_string",
+            translation_placeholders={"field": "Base64 image"},
+        )
     if len(value) > MAX_BASE64_INPUT_BYTES:
-        raise HomeAssistantError(
-            f"Base64 image string too large (max ~{MAX_IMAGE_SIZE_MB}MB decoded)"
+        raise ServiceValidationError(
+            f"Base64 image string too large (max ~{MAX_IMAGE_SIZE_MB}MB decoded)",
+            translation_domain=DOMAIN,
+            translation_key="base64_too_large",
+            translation_placeholders={"max_mb": str(MAX_IMAGE_SIZE_MB)},
         )
 
     match = _DATA_URI_RE.match(value.strip())
     if not match:
-        raise HomeAssistantError(
+        raise ServiceValidationError(
             "Base64 image must be a data:image/<subtype>;base64,... URI "
-            "with subtype png/jpeg/jpg/gif/bmp/tiff/webp"
+            "with subtype png/jpeg/jpg/gif/bmp/tiff/webp",
+            translation_domain=DOMAIN,
+            translation_key="base64_invalid_format",
         )
 
     # Strip whitespace via bytes.translate instead of re.sub to avoid an
@@ -799,10 +1180,20 @@ def validate_base64_image(value: str) -> bytes:
     try:
         raw = base64.b64decode(encoded_bytes, validate=True)
     except (binascii.Error, ValueError) as exc:
-        raise HomeAssistantError(f"Invalid base64 data: {exc}") from exc
+        raise ServiceValidationError(
+            f"Invalid base64 data: {exc}",
+            translation_domain=DOMAIN,
+            translation_key="base64_decode_error",
+            translation_placeholders={"error": str(exc)},
+        ) from exc
 
     if len(raw) > MAX_IMAGE_SIZE_MB * 1024 * 1024:
-        raise HomeAssistantError(f"Image too large (max {MAX_IMAGE_SIZE_MB}MB)")
+        raise ServiceValidationError(
+            f"Image too large (max {MAX_IMAGE_SIZE_MB}MB)",
+            translation_domain=DOMAIN,
+            translation_key="base64_too_large",
+            translation_placeholders={"max_mb": str(MAX_IMAGE_SIZE_MB)},
+        )
     return raw
 
 
@@ -817,12 +1208,27 @@ _ENTITY_OBJECT_RE = re.compile(rf"^[a-z0-9_]{{1,{MAX_ENTITY_ID_OBJECT_LEN}}}$")
 def validate_entity_id_for_domain(value: str, domain: str) -> str:
     """Validate ``value`` is an entity_id in the given domain."""
     if not isinstance(value, str):
-        raise HomeAssistantError("Entity id must be a string")
+        raise ServiceValidationError(
+            "Entity id must be a string",
+            translation_domain=DOMAIN,
+            translation_key="must_be_string",
+            translation_placeholders={"field": "Entity id"},
+        )
     parts = value.split(".")
     if len(parts) != 2 or parts[0] != domain or not parts[1]:
-        raise HomeAssistantError(f"Expected entity_id in domain '{domain}', got: {value}")
+        raise ServiceValidationError(
+            f"Expected entity_id in domain '{domain}', got: {value}",
+            translation_domain=DOMAIN,
+            translation_key="invalid_entity_id",
+            translation_placeholders={"value": value, "domain": domain},
+        )
     if not _ENTITY_OBJECT_RE.match(parts[1]):
-        raise HomeAssistantError(f"Invalid entity_id: {value}")
+        raise ServiceValidationError(
+            f"Invalid entity_id: {value}",
+            translation_domain=DOMAIN,
+            translation_key="invalid_entity_id",
+            translation_placeholders={"value": value, "domain": domain},
+        )
     return value
 
 
@@ -835,7 +1241,14 @@ def _validate_choice(value: Any, choices: frozenset[Any], field_name: str) -> An
     """
     if value not in choices:
         raise ServiceValidationError(
-            f"{field_name} must be one of {sorted(choices)}; got {value!r}"
+            f"{field_name} must be one of {sorted(choices)}; got {value!r}",
+            translation_domain=DOMAIN,
+            translation_key="choice_invalid",
+            translation_placeholders={
+                "field": field_name,
+                "choices": ", ".join(str(c) for c in sorted(choices)),
+                "value": str(value),
+            },
         )
     return value
 
@@ -843,14 +1256,24 @@ def _validate_choice(value: Any, choices: frozenset[Any], field_name: str) -> An
 def validate_dither_mode(value: str) -> str:
     """Whitelist dither mode against ``DITHER_MODES``."""
     if not isinstance(value, str):
-        raise ServiceValidationError("dither must be a string")
+        raise ServiceValidationError(
+            "dither must be a string",
+            translation_domain=DOMAIN,
+            translation_key="must_be_string",
+            translation_placeholders={"field": "dither"},
+        )
     return str(_validate_choice(value, DITHER_MODES, "dither"))
 
 
 def validate_impl_mode(value: str) -> str:
     """Whitelist python-escpos image impl against ``IMPL_MODES``."""
     if not isinstance(value, str):
-        raise ServiceValidationError("impl must be a string")
+        raise ServiceValidationError(
+            "impl must be a string",
+            translation_domain=DOMAIN,
+            translation_key="must_be_string",
+            translation_placeholders={"field": "impl"},
+        )
     return str(_validate_choice(value, IMPL_MODES, "impl"))
 
 
@@ -859,7 +1282,12 @@ def validate_rotation(value: Any) -> int:
     try:
         rotation = int(value)
     except (TypeError, ValueError) as exc:
-        raise ServiceValidationError("rotation must be an integer") from exc
+        raise ServiceValidationError(
+            "rotation must be an integer",
+            translation_domain=DOMAIN,
+            translation_key="must_be_integer",
+            translation_placeholders={"field": "rotation"},
+        ) from exc
     return int(_validate_choice(rotation, ROTATION_VALUES, "rotation"))
 
 
@@ -868,10 +1296,24 @@ def validate_numeric_input(value: Any, min_val: int, max_val: int, field_name: s
     try:
         num_value = int(value)
     except (TypeError, ValueError) as exc:
-        raise HomeAssistantError(f"{field_name} must be a valid integer") from exc
+        raise ServiceValidationError(
+            f"{field_name} must be a valid integer",
+            translation_domain=DOMAIN,
+            translation_key="must_be_integer",
+            translation_placeholders={"field": field_name},
+        ) from exc
 
     if not (min_val <= num_value <= max_val):
-        raise HomeAssistantError(f"{field_name} must be between {min_val} and {max_val}")
+        raise ServiceValidationError(
+            f"{field_name} must be between {min_val} and {max_val}",
+            translation_domain=DOMAIN,
+            translation_key="numeric_out_of_range",
+            translation_placeholders={
+                "field": field_name,
+                "min": str(min_val),
+                "max": str(max_val),
+            },
+        )
 
     return num_value
 

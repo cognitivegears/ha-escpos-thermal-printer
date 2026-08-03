@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import logging
 import time
 from typing import Any
@@ -152,18 +151,13 @@ class UsbPrinterAdapter(EscposPrinterAdapterBase):
         else:
             self._last_error = now
             self._last_error_reason = sanitize_log_message(err or "USB device unavailable")
-        if self._status != ok:
-            self._status = ok
-            if not ok:
-                _LOGGER.warning(
-                    "USB Printer %04X:%04X not available",
-                    self._usb_config.vendor_id,
-                    self._usb_config.product_id,
-                )
-            # Notify listeners
-            for cb in list(self._status_listeners):
-                with contextlib.suppress(Exception):
-                    cb(ok)
+        if not ok and self._status != ok:
+            _LOGGER.warning(
+                "USB Printer %04X:%04X not available",
+                self._usb_config.vendor_id,
+                self._usb_config.product_id,
+            )
+        self._notify_status_change(ok)
 
     def get_connection_info(self) -> str:
         """Return a human-readable connection info string."""

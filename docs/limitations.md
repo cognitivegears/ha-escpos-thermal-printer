@@ -3,11 +3,11 @@
 ## All connection types
 
 - **One queued operation per printer.** Each adapter holds an `asyncio.Lock`; service calls to the same printer serialize. Concurrent prints to the same device wait their turn.
-- **Images auto-fit to the printer's profile width.** By default, images wider than the printer profile's maximum pixel width are resized down (with aspect ratio preserved). When you've selected a profile that doesn't expose `media.width.pixels`, the integration falls back to **512 px**, logs a `WARNING` once per adapter (check `home-assistant.log` for `does not expose media.width.pixels`), and raises a Repairs issue. The auto/default profile (no profile chosen) also uses the 512 px fallback, but silently — it has no declared width by design. Set `image_width` on `print_image` to override, or pick a profile that declares a pixel width. Images are never upscaled. See the [Images guide](images.md).
+- **Images auto-fit to the printer's profile width.** By default, images wider than the printer profile's maximum pixel width are resized down (with aspect ratio preserved). When you've selected a profile that doesn't expose `media.width.pixels`, the integration falls back to **384 px** (58 mm-safe; the pre-1.0 fallback of 512 px overflowed 58 mm heads), logs a `WARNING` once per adapter (check `home-assistant.log` for `does not expose media.width.pixels`), and raises a Repairs issue. The auto/default profile (no profile chosen) also uses the 384 px fallback, but silently: it has no declared width by design; on an 80 mm printer this means images print at ~2/3 paper width until you pick a profile or set `image_width: 576`. Images are never upscaled. See [How the target width is chosen](images.md#how-the-target-width-is-chosen).
 - **Image files are capped at 10 MB** (both for HTTP download and for decoded base64 data URIs).
-- **Image processing caps.** Decoded images cannot exceed 20 M pixels (40 M with `auto_resize`, since the source is downscaled after decode) — enforced per-decode against the image header, scoped to this integration — 8192 rows of processed height, or 64 slices per print. These guard against decompression bombs and paper-DoS via tall ribbons.
+- **Image processing caps.** Decoded images cannot exceed 20 M pixels (40 M with `auto_resize`, since the source is downscaled after decode; enforced per-decode against the image header, scoped to this integration), 8192 rows of processed height, or 64 slices per print. These guard against decompression bombs and paper-DoS via tall ribbons.
 - **Buffer overruns on tall images.** Chunked transmission (`fragment_height`, `chunk_delay_ms`) mitigates this; tune both per printer if you still see freezes or character dumps. Default `chunk_delay_ms` is 0 on Network / USB and 50 on Bluetooth.
-- **Output is unbuffered ESC/POS** — once a print service runs, the bytes go straight to the printer. To iterate on layout without wasting paper, use the `preview_image`, `preview_box`, and `preview_table` services, which render to a PNG/TXT file instead of printing.
+- **Output is unbuffered ESC/POS**: once a print service runs, the bytes go straight to the printer. To iterate on layout without wasting paper, use the `preview_image`, `preview_box`, and `preview_table` services, which render to a PNG/TXT file instead of printing.
 - **Print quality** depends on the printer's hardware density setting and paper. Not adjustable from the integration.
 
 ## Security posture (image pipeline)
@@ -38,14 +38,14 @@ should understand what is and isn't enforced. Cross-linked from
 - **Camera / image entity reads check the caller's permissions.**
   Non-admin users without `POLICY_READ` on the named entity get
   `Unauthorized`. Admins bypass entity permissions by design.
-- **Error messages from failed image loads are sanitized** —
+- **Error messages from failed image loads are sanitized**:
   URL credentials, filesystem paths under HA mount points, and
   Bluetooth MACs are redacted from logs.
 - **Trust boundary.** Any HA user who can call `escpos_printer.print_image`
   or `notify.<printer>` can print to your physical paper roll.
   Restrict service exposure for shared installations. If a printer has
   **"Allow local image URLs"** enabled, those same callers can also make
-  it fetch arbitrary LAN hosts/ports — a port-scan / SSRF oracle — so
+  it fetch arbitrary LAN hosts/ports (a port-scan / SSRF oracle), so
   enable it only on printers whose callers you trust.
 
 ## Network printers
@@ -64,11 +64,11 @@ should understand what is and isn't enforced. Cross-linked from
 - **Pair on the host first.** The integration does not initiate pairing. It only opens RFCOMM sockets to already-paired devices.
 - **One client at a time.** RFCOMM is single-session. The integration auto-skips status probes during prints; aggressive `status_interval` settings hurt rather than help.
 - **Plaintext over the air.** Bluetooth Classic SPP with no PIN or PIN `0000` is unencrypted. Don't route OTPs, 2FA codes, or other sensitive content to a BT printer.
-- **`status_interval` floor of 60s.** Cheap BT printers beep on every connect; aggressive polling competes with in-flight prints. Set to 60s+ or 0.
+- **`status_interval` floor of 60s (enforced).** Cheap BT printers beep on every connect; aggressive polling competes with in-flight prints. `0` disables polling, `1`–`59` is rejected with a form error, `60`+ is accepted.
 - **Linux-only.** `AF_BLUETOOTH` is Linux-only. macOS / Windows HA installs cannot use this connection type natively.
 - **Container caveats.** HA Container needs `--net=host` + `NET_ADMIN` + `NET_RAW` + `/run/dbus` mount. Or use the `socat` host-bridge fallback (see README).
 - **Battery sensor only when bluez exposes it.** Most cheap thermal printers don't expose `org.bluez.Battery1`; the sensor stays unavailable for those.
-- **No paper status sensor.** The Bluetooth and serial transports are write-only in this integration, and an empty status read would misreport as "plenty of paper" — so those connection types don't create the sensor (network/USB only).
+- **No paper status sensor.** The Bluetooth and serial transports are write-only in this integration, and an empty status read would misreport as "plenty of paper", so those connection types don't create the sensor (network/USB only).
 
 ## Codepage / character set
 

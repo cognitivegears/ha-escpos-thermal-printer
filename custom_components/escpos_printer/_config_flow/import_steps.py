@@ -90,13 +90,13 @@ class ImportFlowMixin:
                 _LOGGER.error("USB YAML import VID/PID out of range: %s/%s", vendor_id, product_id)
                 return self.async_abort(reason="invalid_usb_device")  # type: ignore[attr-defined,no-any-return]
 
-            # Set unique ID only if serial_number provided (allows multiple identical printers)
+            # Always set a unique ID (falls back to vid:pid when
+            # serial_number is absent) so serial-less printers -- most
+            # cheap POS-58/80 hardware -- can't be imported twice.
             serial_number = user_input.get("serial_number")
-            if serial_number:
-                unique_id = _generate_usb_unique_id(vendor_id, product_id, serial_number)
-                await self.async_set_unique_id(unique_id)  # type: ignore[attr-defined]
-                self._abort_if_unique_id_configured()  # type: ignore[attr-defined]
-            # Note: Without serial_number, no unique_id is set - duplicates allowed
+            unique_id = _generate_usb_unique_id(vendor_id, product_id, serial_number)
+            await self.async_set_unique_id(unique_id)  # type: ignore[attr-defined]
+            self._abort_if_unique_id_configured()  # type: ignore[attr-defined]
 
             # Build complete entry data with defaults
             data = {

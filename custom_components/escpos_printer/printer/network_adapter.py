@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import logging
 import socket
 import time
@@ -78,18 +77,13 @@ class NetworkPrinterAdapter(EscposPrinterAdapterBase):
         else:
             self._last_error = now
             self._last_error_reason = sanitize_log_message(err or "unreachable")
-        if self._status != ok:
-            self._status = ok
-            if not ok:
-                _LOGGER.warning(
-                    "Printer %s:%s not reachable",
-                    self._network_config.host,
-                    self._network_config.port,
-                )
-            # Notify listeners
-            for cb in list(self._status_listeners):
-                with contextlib.suppress(Exception):
-                    cb(ok)
+        if not ok and self._status != ok:
+            _LOGGER.warning(
+                "Printer %s:%s not reachable",
+                self._network_config.host,
+                self._network_config.port,
+            )
+        self._notify_status_change(ok)
 
     def get_connection_info(self) -> str:
         """Return a human-readable connection info string."""

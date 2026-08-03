@@ -17,8 +17,48 @@ from ..const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 
+def _all_loaded_entries_for_broadcast(
+    call: ServiceCall, *, broadcast: bool, warn_implicit_broadcast: bool = True
+) -> list[ConfigEntry]:
+    """Resolve the "no device_id" target list: every loaded printer.
+
+    ``broadcast: true`` is the explicit, silent form of this. Omitting both
+    ``device_id`` and ``broadcast`` is kept for backward compatibility, but
+    warns once per call (unless there's only one printer, which is
+    unambiguous) so a caller who meant to target one printer notices
+    instead of silently printing to every printer.
+
+    ``warn_implicit_broadcast=False`` skips that warning for callers that
+    require exactly one target and will raise their own, more specific
+    error right after this returns (the preview services) -- otherwise the
+    log would warn about a broadcast print that never actually happens.
+
+    Split out of :func:`_async_get_target_entries` to keep that function's
+    branch count under the ruff/pylint threshold (PLR0912).
+    """
+    hass = call.hass
+    all_entries = list(hass.config_entries.async_loaded_entries(DOMAIN))
+    if not all_entries:
+        raise ServiceValidationError(
+            "No valid ESC/POS printer targets found. Please select a printer device.",
+            translation_domain=DOMAIN,
+            translation_key="no_target_found",
+        )
+    if not broadcast and warn_implicit_broadcast and len(all_entries) > 1:
+        _LOGGER.warning(
+            "escpos_printer.%s: no device_id specified — printing to all %d configured "
+            "printers. Set broadcast: true to make this explicit, or device_id to target "
+            "one printer.",
+            call.service,
+            len(all_entries),
+        )
+    return all_entries
+
+
 async def _async_get_target_entries(
     call: ServiceCall,
+    *,
+    warn_implicit_broadcast: bool = True,
 ) -> list[ConfigEntry]:
     """Extract target config entries from a service call.
 
@@ -27,6 +67,10 @@ async def _async_get_target_entries(
 
     Args:
         call: Service call with device_id in data
+        warn_implicit_broadcast: Whether an implicit (no device_id, no
+            broadcast) multi-printer target logs a warning. Pass False for
+            callers that require exactly one target and raise their own
+            error immediately after -- see :func:`_all_loaded_entries_for_broadcast`.
 
     Returns:
         List of ConfigEntry objects to target
@@ -38,6 +82,10 @@ async def _async_get_target_entries(
 
     # Get device_id from service call data
     device_ids = call.data.get("device_id")
+    # `broadcast` and `device_id` are mutually exclusive at the schema layer
+    # (see schemas._reject_broadcast_with_device_id), so if device_id_list
+    # ends up non-empty below, broadcast is guaranteed False.
+    broadcast = call.data.get("broadcast", False)
 
     # Normalize to a list
     if device_ids is None:
@@ -49,14 +97,9 @@ async def _async_get_target_entries(
 
     # If no device_id specified, fall back to all configured printers
     if not device_id_list:
-        all_entries = list(hass.config_entries.async_loaded_entries(DOMAIN))
-        if not all_entries:
-            raise ServiceValidationError(
-                "No valid ESC/POS printer targets found. Please select a printer device.",
-                translation_domain=DOMAIN,
-                translation_key="no_target_found",
-            )
-        return all_entries
+        return _all_loaded_entries_for_broadcast(
+            call, broadcast=broadcast, warn_implicit_broadcast=warn_implicit_broadcast
+        )
 
     # Resolve device IDs to config entries
     device_registry = dr.async_get(hass)
@@ -68,18 +111,21 @@ async def _async_get_target_entries(
             _LOGGER.warning("Targeted device %s not found in registry; skipping", device_id)
             continue
 
-        # Get config entry IDs from the device
+        # Get config entry IDs from the device.
+        # DeviceEntry.config_entries is deprecated in HA 2026.8 (removal 2027.8)
+        # in favour of config_entry_id; our floor (2026.5) predates that
+        # attribute, so prefer it only when present.
+        entry_id = getattr(device, "config_entry_id", None)
+        entry_ids = [entry_id] if entry_id else device.config_entries
         matched = False
-        for config_entry_id in device.config_entries:
+        for config_entry_id in entry_ids:
             # Check if this config entry is for our domain
             entry = hass.config_entries.async_get_entry(config_entry_id)
             if entry and entry.domain == DOMAIN:
                 target_entry_ids.add(config_entry_id)
                 matched = True
         if not matched:
-            _LOGGER.warning(
-                "Targeted device %s is not an ESC/POS printer; skipping", device_id
-            )
+            _LOGGER.warning("Targeted device %s is not an ESC/POS printer; skipping", device_id)
 
     # Get the actual config entry objects
     loaded_entry_ids = {e.entry_id for e in hass.config_entries.async_loaded_entries(DOMAIN)}

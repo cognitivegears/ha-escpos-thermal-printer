@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
 from typing import TYPE_CHECKING, Any
 
 from ..const import DEFAULT_CUT
 from ..security import (
-    sanitize_log_message,
     validate_barcode_data,
     validate_numeric_input,
 )
@@ -17,6 +17,39 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
+
+# Cache of ``printer.barcode`` supported kwarg names, keyed by printer
+# class. ``None`` means "accepts arbitrary kwargs" (a ``**kwargs``
+# parameter, or a signature we couldn't introspect), so the full kwarg set
+# is passed through unfiltered. Mirrors ``image_operations._IMAGE_KWARGS_CACHE``.
+_BARCODE_KWARGS_CACHE: dict[type, frozenset[str] | None] = {}
+
+
+def _supported_barcode_kwargs(printer: Any) -> frozenset[str] | None:
+    """Return the keyword-argument names ``printer.barcode`` accepts (cached).
+
+    Older python-escpos releases may not accept ``force_software``.
+    Probing the signature up front — instead of calling with the full kwarg
+    set and retrying on ``TypeError`` — avoids a second ``printer.barcode()``
+    call (and a risk of duplicate output) if the ``TypeError`` actually
+    originated deeper in python-escpos after bytes were already written.
+    """
+    cls = type(printer)
+    if cls in _BARCODE_KWARGS_CACHE:
+        return _BARCODE_KWARGS_CACHE[cls]
+    try:
+        params = inspect.signature(printer.barcode).parameters.values()
+    except TypeError, ValueError:
+        supported: frozenset[str] | None = None
+    else:
+        if any(p.kind is p.VAR_KEYWORD for p in params):
+            supported = None
+        else:
+            supported = frozenset(
+                p.name for p in params if p.kind in (p.POSITIONAL_OR_KEYWORD, p.KEYWORD_ONLY)
+            )
+    _BARCODE_KWARGS_CACHE[cls] = supported
+    return supported
 
 
 class BarcodeOperationsMixin:
@@ -35,6 +68,10 @@ class BarcodeOperationsMixin:
         """Return a printer instance and whether it should be closed by the caller."""
         raise NotImplementedError
 
+    async def _acquire_printer_or_offline(self, hass: Any) -> tuple[Any, bool]:
+        """``_acquire_printer``, marking the adapter offline on connect failure."""
+        raise NotImplementedError
+
     async def _release_printer(
         self, hass: Any, printer: Any, *, owned: bool, failed: bool = False
     ) -> None:
@@ -45,6 +82,10 @@ class BarcodeOperationsMixin:
         self, hass: Any, printer: Any, cut: str | None, feed: int | None
     ) -> None:
         """Apply feed and cut operations (implemented in base)."""
+        raise NotImplementedError
+
+    async def _mark_success(self) -> None:
+        """Mark a successful operation (implemented in base)."""
         raise NotImplementedError
 
     async def print_barcode(
@@ -79,8 +120,7 @@ class BarcodeOperationsMixin:
         def _do_print(printer: Any) -> None:
             if hasattr(printer, "set"):
                 printer.set(align=align_m, normal_textsize=True)
-            # Attempt to pass 'force_software' when provided; fall back if unsupported
-            kwargs = {
+            kwargs: dict[str, Any] = {
                 "height": height_v,
                 "width": width_v,
                 "pos": pos_v,
@@ -90,35 +130,40 @@ class BarcodeOperationsMixin:
             }
             if force_software is not None:
                 kwargs["force_software"] = force_software
-
-            try:
-                printer.barcode(
-                    v_code,
-                    v_bc,
-                    **kwargs,
-                )
-            except TypeError as e:
-                # Older python-escpos may not accept force_software; retry without it
-                if "force_software" in kwargs:
+                supported = _supported_barcode_kwargs(printer)
+                if supported is not None and "force_software" not in supported:
                     _LOGGER.debug(
-                        "force_software unsupported; retrying without it: %s",
-                        sanitize_log_message(str(e)),
+                        "force_software unsupported by this printer's barcode() signature; omitting"
                     )
-                    kwargs.pop("force_software", None)
-                    printer.barcode(
-                        v_code,
-                        v_bc,
-                        **kwargs,
-                    )
-                else:
-                    raise
+                    kwargs.pop("force_software")
+
+            printer.barcode(
+                v_code,
+                v_bc,
+                **kwargs,
+            )
+
+        from escpos.exceptions import (  # noqa: PLC0415
+            BarcodeCodeError,
+            BarcodeSizeError,
+            BarcodeTypeError,
+        )
 
         async with self._lock:
-            printer, owned = await self._acquire_printer(hass)
+            printer, owned = await self._acquire_printer_or_offline(hass)
             failed = True
             try:
                 await hass.async_add_executor_job(_do_print, printer)
                 await self._apply_cut_and_feed(hass, printer, cut, feed)
                 failed = False
+            except BarcodeTypeError, BarcodeCodeError, BarcodeSizeError:
+                # python-escpos validates the barcode type/payload/size
+                # before writing anything to the transport -- the
+                # connection is fine, only this payload is bad. Don't
+                # invalidate a keepalive connection or flap the
+                # connectivity sensor over a caller error.
+                failed = False
+                raise
             finally:
                 await self._release_printer(hass, printer, owned=owned, failed=failed)
+        await self._mark_success()

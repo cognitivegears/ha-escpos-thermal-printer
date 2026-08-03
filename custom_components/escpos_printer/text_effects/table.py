@@ -175,14 +175,12 @@ def render_table(
     between every body row.
     """
     cells, n_cols = _normalize_rows(rows)
-    if not _WARNED_WIDE_CHARS_TABLE[0] and any(
-        _has_wide_chars(c) for row in cells for c in row
-    ):
+    if not _WARNED_WIDE_CHARS_TABLE[0] and any(_has_wide_chars(c) for row in cells for c in row):
         _LOGGER.warning(
             "Table contains wide-width characters (CJK / fullwidth / emoji); "
             "column alignment may be off because text-mode padding assumes one "
             "column per character. Use print_text_image for accurate layout — "
-            "see docs/text-effects.md#cjk. "
+            "see docs/text-effects.md#cjk--wide-character-content. "
             "(This warning fires once per process.)"
         )
         _WARNED_WIDE_CHARS_TABLE[0] = True

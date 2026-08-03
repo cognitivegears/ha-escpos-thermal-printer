@@ -57,20 +57,29 @@ async def test_print_image_service_base64_data_uri(hass):  # type: ignore[no-unt
     assert fake.image.called
 
 
-async def test_print_image_service_template_renders(hass, tmp_path):  # type: ignore[no-untyped-def]
+async def test_print_image_service_jinja_looking_string_not_rendered(hass, tmp_path):  # type: ignore[no-untyped-def]
+    """Security fix: the handler no longer renders Jinja server-side.
+
+    A raw `{{ ... }}` string is treated as a literal local-file path (it
+    doesn't match any other source form), which doesn't exist on disk, so
+    the call fails instead of silently executing the template.
+    """
     img_path = tmp_path / "tpl.png"
     Image.new("RGB", (10, 10)).save(img_path)
     await _setup(hass)
 
     fake = MagicMock()
-    with patch("escpos.printer.Network", return_value=fake):
+    with (
+        patch("escpos.printer.Network", return_value=fake),
+        pytest.raises(HomeAssistantError),
+    ):
         await hass.services.async_call(
             DOMAIN,
             "print_image",
             {"image": "{{ '" + str(img_path) + "' }}"},
             blocking=True,
         )
-    assert fake.image.called
+    assert not fake.image.called
 
 
 async def test_print_image_service_rotation_passes_through(hass, tmp_path):  # type: ignore[no-untyped-def]
@@ -197,10 +206,8 @@ async def test_print_image_legacy_literal_path_with_inline_options(hass, tmp_pat
 
     Beyond the bare-string case already covered by ``test_print_image_service_local``,
     real-world legacy automations also passed options alongside the literal path
-    (``image: /config/x.png`` + ``rotation: 90``). The selector swap from
-    ``text:`` to ``template:`` must preserve that calling shape — the template
-    editor accepts plain strings AND surrounding option keys validate the same
-    way they did before.
+    (``image: /config/x.png`` + ``rotation: 90``). Confirms the plain-string
+    ``image`` field and its surrounding option keys still validate together.
     """
     img_path = tmp_path / "legacy.png"
     Image.new("L", (10, 20), color=0).save(img_path)
@@ -257,6 +264,77 @@ async def test_preview_image_writes_png_and_returns_path(hass, tmp_path):  # typ
     assert out_path.exists()
     saved = Image.open(out_path)
     assert saved.mode == "1"
+
+
+async def test_preview_image_accepts_cut_and_feed(hass, tmp_path):  # type: ignore[no-untyped-def]
+    """cut/feed are printer-only knobs but must be accepted, not rejected.
+
+    CLAUDE.md documents that preview_image accepts the printer-communication
+    knobs (they have no effect on the PNG) so programmatic callers sharing
+    kwargs with print_image don't break. Before this fix, cut/feed were
+    missing from PREVIEW_IMAGE_SCHEMA and voluptuous rejected them as
+    "extra keys not allowed".
+    """
+    img_path = tmp_path / "src.png"
+    Image.new("L", (40, 40), color=128).save(img_path)
+    hass.config.allowlist_external_dirs = {str(tmp_path)}
+    await _setup(hass)
+
+    fake = MagicMock()
+    with patch("escpos.printer.Network", return_value=fake):
+        result = await hass.services.async_call(
+            DOMAIN,
+            "preview_image",
+            {"image": str(img_path), "cut": "full", "feed": 2},
+            blocking=True,
+            return_response=True,
+        )
+    assert isinstance(result, dict)
+
+
+async def test_preview_image_debug_log_only_when_printer_only_keys_passed(hass, tmp_path, caplog):  # type: ignore[no-untyped-def]
+    """The "ignoring printer-only keys" debug line only fires when a caller
+    actually supplied one of those keys — not on every call, even though
+    voluptuous fills in schema defaults like high_density=True/center=False
+    before the handler runs.
+    """
+    import logging
+
+    img_path = tmp_path / "src.png"
+    Image.new("L", (40, 40), color=128).save(img_path)
+    hass.config.allowlist_external_dirs = {str(tmp_path)}
+    await _setup(hass)
+
+    fake = MagicMock()
+    log_name = "custom_components.escpos_printer.services.print_handlers"
+    with (
+        patch("escpos.printer.Network", return_value=fake),
+        caplog.at_level(logging.DEBUG, logger=log_name),
+    ):
+        caplog.clear()
+        await hass.services.async_call(
+            DOMAIN,
+            "preview_image",
+            {"image": str(img_path)},
+            blocking=True,
+            return_response=True,
+        )
+    assert "ignoring printer-only keys" not in caplog.text
+
+    with (
+        patch("escpos.printer.Network", return_value=fake),
+        caplog.at_level(logging.DEBUG, logger=log_name),
+    ):
+        caplog.clear()
+        await hass.services.async_call(
+            DOMAIN,
+            "preview_image",
+            {"image": str(img_path), "fragment_height": 128},
+            blocking=True,
+            return_response=True,
+        )
+    assert "ignoring printer-only keys" in caplog.text
+    assert "fragment_height" in caplog.text
 
 
 async def test_preview_image_rejects_output_path_outside_tempdir(hass, tmp_path):  # type: ignore[no-untyped-def]

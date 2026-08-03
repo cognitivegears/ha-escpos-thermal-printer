@@ -157,8 +157,8 @@ jobs:
         run: |
           PIP_AUDIT_ARGS=(
             --skip-editable
-            # Pillow 12.2.0 — pinned by homeassistant==2026.6.3.
-            # Fixed in 12.3.0; no HA release ships it yet.
+            # Pillow 12.2.0 — pinned by homeassistant (2026.7.4 still pins
+            # 12.2.0). Fixed in 12.3.0; no HA release ships it yet.
             --ignore-vuln PYSEC-2026-2253
             --ignore-vuln PYSEC-2026-2254
             --ignore-vuln PYSEC-2026-2255
@@ -167,6 +167,11 @@ jobs:
             --ignore-vuln PYSEC-2026-3451
             --ignore-vuln PYSEC-2026-3452
             --ignore-vuln PYSEC-2026-3453
+            --ignore-vuln PYSEC-2026-3454
+            --ignore-vuln PYSEC-2026-3493
+            --ignore-vuln PYSEC-2026-3494
+            --ignore-vuln PYSEC-2026-3495
+            --ignore-vuln PYSEC-2026-3496
             # aiohttp 3.13.5 — pinned by homeassistant==2026.6.3.
             # All fixed in 3.14.0 / 3.14.1; clears when HA bumps the pin.
             --ignore-vuln PYSEC-2026-237

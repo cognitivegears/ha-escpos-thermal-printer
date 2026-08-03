@@ -21,22 +21,36 @@ except Exception as exc:  # pragma: no cover
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "custom_components" / "escpos_printer" / "manifest.json"
 PYPROJECT = ROOT / "pyproject.toml"
+CHANGELOG = ROOT / "CHANGELOG.md"
 
 
 def main() -> int:
     manifest_version = json.loads(MANIFEST.read_text())["version"]
     pyproject_version = tomllib.loads(PYPROJECT.read_text())["project"]["version"]
-    if manifest_version == pyproject_version:
-        print(f"OK manifest.json and pyproject.toml both at {manifest_version}")
-        return 0
-    print(
-        "ERROR Version drift detected:\n"
-        f"  manifest.json   = {manifest_version}\n"
-        f"  pyproject.toml  = {pyproject_version}\n"
-        "Update both to the same value before merging.",
-        file=sys.stderr,
-    )
-    return 1
+    if manifest_version != pyproject_version:
+        print(
+            "ERROR Version drift detected:\n"
+            f"  manifest.json   = {manifest_version}\n"
+            f"  pyproject.toml  = {pyproject_version}\n"
+            "Update both to the same value before merging.",
+            file=sys.stderr,
+        )
+        return 1
+
+    # CHANGELOG.md must document the released version under its own
+    # `## [<version>]` heading (Keep a Changelog style) before the version
+    # bump merges, or HACS/GitHub users land on a version with no entry.
+    changelog_heading = f"## [{manifest_version}]"
+    if changelog_heading not in CHANGELOG.read_text():
+        print(
+            f"ERROR CHANGELOG.md has no '{changelog_heading}' section.\n"
+            "Promote the Unreleased entries to a versioned section before merging.",
+            file=sys.stderr,
+        )
+        return 1
+
+    print(f"OK manifest.json and pyproject.toml both at {manifest_version}, CHANGELOG.md documents it")
+    return 0
 
 
 if __name__ == "__main__":

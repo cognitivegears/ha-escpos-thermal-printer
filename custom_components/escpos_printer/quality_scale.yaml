@@ -9,7 +9,7 @@ rules:
       target_resolution); moving registration to async_setup to fully
       satisfy this rule is pending.
   appropriate-polling: done
-  brands: todo  # PR to home-assistant/brands required before submission
+  brands: done  # local brand images shipped under custom_components/escpos_printer/brand/ (HA 2026.3+ local-brands mechanism)
   common-modules: done
   config-flow-test-coverage: done
   config-flow: done
@@ -43,7 +43,7 @@ rules:
   # Gold
   devices: done
   diagnostics: done
-  discovery-update-info: todo  # blocks on reconfiguration-flow
+  discovery-update-info: todo  # USB/BT discovery doesn't push updates into reconfigure yet
   discovery: done  # USB vendor IDs in manifest; Bluetooth uses manual MAC entry
   docs-data-update: todo
   docs-examples: done
@@ -57,11 +57,11 @@ rules:
     comment: One device per config entry; no dynamic device set to manage.
   entity-category: done
   entity-device-class: done
-  entity-disabled-by-default: todo
-  entity-translations: todo
-  exception-translations: done  # `no_target_found` wired up in strings.json + translations/en.json
+  entity-disabled-by-default: done  # LastImagePrintSensor and BluetoothPrinterBatterySensor default disabled (diagnostic entities most users never enable)
+  entity-translations: done  # entity section in strings.json + translations/en.json
+  exception-translations: done  # 34 translation_key exceptions wired up in strings.json + translations/en.json
   icon-translations: done
-  reconfiguration-flow: todo  # only options-flow exists; no async_step_reconfigure. Blocks discovery-update-info.
+  reconfiguration-flow: done  # async_step_reconfigure per transport (network/serial/usb/bluetooth) in main_flow.py + mixins
   repair-issues: done  # profile_width_fallback issue raised in printer/base_adapter.py
   stale-devices:
     status: exempt

@@ -1,6 +1,6 @@
 # ESCPOS Printer Integration Test Framework
 
-A comprehensive framework for testing the Home Assistant ESCPOS thermal printer integration with realistic scenarios, virtual printer emulation, and Home Assistant automation testing.
+A framework for testing the Home Assistant ESCPOS thermal printer integration with realistic scenarios, virtual printer emulation, and Home Assistant automation testing.
 
 ## Overview
 
@@ -9,7 +9,7 @@ This framework enables thorough testing of the ESCPOS printer integration by pro
 - **Virtual Printer Emulator**: TCP server that simulates ESCPOS protocol behavior
 - **Home Assistant Test Environment**: Realistic HA simulation with state changes and automations
 - **Error Simulation**: Programmable error conditions and recovery testing
-- **Comprehensive Test Scenarios**: Basic functionality, error handling, automations, and performance
+- **Test Scenarios**: Basic functionality, error handling, automations, and performance
 - **Test Utilities**: Verification tools, mock data generators, and reusable fixtures
 
 ## Quick Start
@@ -180,7 +180,7 @@ async def test_with_fixtures(printer_with_ha, temp_image_file):
 
 #### 4. Verification Utilities (`fixtures/verification_utils.py`)
 
-Comprehensive verification tools:
+Verification tools:
 
 ```python
 from tests.integration_tests.fixtures import VerificationUtilities
@@ -255,7 +255,7 @@ Located in `scenarios/test_automation_integration.py`:
 
 ## Error Simulation
 
-The framework provides comprehensive error simulation capabilities:
+The framework provides error simulation capabilities:
 
 ### Predefined Error Conditions
 

@@ -41,6 +41,10 @@ ROOT = pathlib.Path.cwd()
 # `scripts/sync_manifest_requirements.py` MANIFEST_OVERRIDES.
 ALLOWED_NON_PINNED: set[str] = set()
 
+# Provided by HA core at runtime; must appear in pyproject (dev/CI) but NOT
+# in manifest.json. Mirror `sync_manifest_requirements.py` MANIFEST_EXCLUDES.
+HA_PROVIDED: set[str] = {"pillow", "dbus-fast"}
+
 
 def parse_pyproject() -> dict[str, SpecifierSet]:
     data = tomllib.loads((ROOT / "pyproject.toml").read_text())
@@ -130,7 +134,15 @@ def main() -> int:
     py = parse_pyproject()
     mf = parse_manifest()
 
-    missing = set(py.keys()) ^ set(mf.keys())
+    leaked = HA_PROVIDED & set(mf.keys())
+    if leaked:
+        print(
+            f"❌ HA-core-provided packages must not be in manifest.json: {sorted(leaked)}",
+            file=sys.stderr,
+        )
+        return 1
+
+    missing = (set(py.keys()) - HA_PROVIDED) ^ set(mf.keys())
     if missing:
         print(
             f"❌ Package sets differ between pyproject and manifest: {sorted(missing)}",
@@ -147,7 +159,7 @@ def main() -> int:
 
     problems = [
         (name, str(py[name]), str(mf[name]))
-        for name in sorted(py.keys())
+        for name in sorted(set(py.keys()) - HA_PROVIDED)
         if not compatible(py[name], mf[name])
     ]
 

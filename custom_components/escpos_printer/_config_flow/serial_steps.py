@@ -7,6 +7,7 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.helpers.selector import SerialPortSelector
+from homeassistant.helpers.typing import UNDEFINED, UndefinedType
 import voluptuous as vol
 
 from ..capabilities import (
@@ -58,9 +59,7 @@ class SerialFlowMixin:
     hass: Any
     _user_data: dict[str, Any]
 
-    async def async_step_serial(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_serial(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Configure serial port, baud rate, timeout, and profile in one step."""
         errors: dict[str, str] = {}
 
@@ -69,11 +68,15 @@ class SerialFlowMixin:
             # Convert to str first so the vol.In string-key check works for
             # both UI submissions (always strings) and unit tests (may be int).
             baudrate_str = str(user_input.get(CONF_BAUDRATE, str(DEFAULT_BAUDRATE)))
-            baudrate = int(baudrate_str)
             timeout = float(user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
             profile = user_input.get(CONF_PROFILE, PROFILE_AUTO)
 
-            if baudrate_str not in _BAUDRATE_CHOICES:
+            # Check membership before parsing -- a non-numeric baudrate_str
+            # must hit the invalid_baudrate branch, not raise out of int().
+            if baudrate_str in _BAUDRATE_CHOICES:
+                baudrate = int(baudrate_str)
+            else:
+                baudrate = DEFAULT_BAUDRATE
                 errors["base"] = "invalid_baudrate"
 
             if not errors:
@@ -126,5 +129,93 @@ class SerialFlowMixin:
         return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
             step_id="serial",
             data_schema=data_schema,
+            errors=errors,
+        )
+
+    async def async_step_reconfigure_serial(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle reconfiguration of an existing serial printer entry.
+
+        The port path *is* the unique_id for serial printers (device
+        nodes can be reassigned across reboots), so changing it
+        legitimately changes the unique_id -- same address-based pattern
+        as :meth:`NetworkFlowMixin.async_step_reconfigure_network`.
+        """
+        reconfigure_entry = self._get_reconfigure_entry()  # type: ignore[attr-defined]
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            port = str(user_input.get(CONF_SERIAL_PORT, "")).strip()
+            baudrate_str = str(user_input.get(CONF_BAUDRATE, str(DEFAULT_BAUDRATE)))
+            timeout = float(user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
+
+            # Check membership before parsing -- a non-numeric baudrate_str
+            # must hit the invalid_baudrate branch, not raise out of int().
+            if baudrate_str in _BAUDRATE_CHOICES:
+                baudrate = int(baudrate_str)
+            else:
+                baudrate = DEFAULT_BAUDRATE
+                errors["base"] = "invalid_baudrate"
+
+            if not errors:
+                # Raw ``_async_abort_entries_match`` is case-sensitive but
+                # the unique_id is lower-cased -- look up by the would-be
+                # normalised unique_id instead, mirroring the network
+                # reconfigure guard, so e.g. "/dev/TTYUSB0" vs
+                # "/dev/ttyUSB0" can't collide on unique_id undetected.
+                new_unique_id = f"serial:{port.lower()}"
+                colliding = self.hass.config_entries.async_entry_for_domain_unique_id(
+                    self.handler,  # type: ignore[attr-defined]
+                    new_unique_id,
+                )
+                if colliding is not None and colliding.entry_id != reconfigure_entry.entry_id:
+                    return self.async_abort(reason="already_configured")  # type: ignore[attr-defined,no-any-return]
+
+                ok, error_code, _err_no = await self.hass.async_add_executor_job(
+                    _can_connect_serial, port, baudrate, timeout
+                )
+                if ok:
+                    # Only follow the port to a new auto-generated title
+                    # when the entry still carries the original
+                    # auto-generated one -- a user's manual rename must
+                    # never be clobbered.
+                    title: str | UndefinedType = UNDEFINED
+                    old_port = reconfigure_entry.data.get(CONF_SERIAL_PORT, "")
+                    if reconfigure_entry.title == f"Serial {sanitize_log_message(old_port)}":
+                        title = f"Serial {sanitize_log_message(port)}"
+                    return self.async_update_reload_and_abort(  # type: ignore[attr-defined,no-any-return]
+                        reconfigure_entry,
+                        unique_id=new_unique_id,
+                        title=title,
+                        data_updates={
+                            CONF_SERIAL_PORT: port,
+                            CONF_BAUDRATE: baudrate,
+                            CONF_TIMEOUT: timeout,
+                        },
+                    )
+                errors["base"] = _serial_error_to_key(error_code)
+
+        data_schema = vol.Schema(
+            {
+                vol.Required(CONF_SERIAL_PORT): SerialPortSelector(),
+                vol.Optional(CONF_BAUDRATE, default=str(DEFAULT_BAUDRATE)): vol.In(
+                    _BAUDRATE_CHOICES
+                ),
+                vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
+            }
+        )
+        suggested_values: dict[str, Any] = dict(user_input or reconfigure_entry.data)
+        # CONF_BAUDRATE is stored as int, but the dropdown's options are the
+        # string keys in _BAUDRATE_CHOICES -- an unconverted int suggestion
+        # fails to preselect and a untouched submit silently falls back to
+        # the schema default (9600) instead of the entry's real baudrate.
+        if CONF_BAUDRATE in suggested_values:
+            suggested_values[CONF_BAUDRATE] = str(suggested_values[CONF_BAUDRATE])
+        return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
+            step_id="reconfigure_serial",
+            data_schema=self.add_suggested_values_to_schema(  # type: ignore[attr-defined]
+                data_schema, suggested_values
+            ),
             errors=errors,
         )

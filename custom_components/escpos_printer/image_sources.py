@@ -29,9 +29,8 @@ from urllib.parse import urljoin, urlparse
 import aiohttp
 from homeassistant.auth.permissions.const import POLICY_READ
 from homeassistant.core import Context
-from homeassistant.exceptions import HomeAssistantError, Unauthorized
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError, Unauthorized
 from homeassistant.helpers.aiohttp_client import SERVER_SOFTWARE
-from homeassistant.helpers.template import Template
 
 from .const import (
     ATTR_ALIGN,
@@ -50,9 +49,11 @@ from .const import (
     ATTR_MIRROR,
     ATTR_ROTATION,
     ATTR_THRESHOLD,
+    DOMAIN,
 )
 from .security import (
     MAX_IMAGE_SIZE_MB,
+    _best_effort_resolve,
     _validate_local_path_sync,
     open_local_image_no_follow,
     sanitize_log_message,
@@ -119,7 +120,11 @@ def _classify(source: str) -> tuple[SourceKind, str]:
     lower = stripped.lower()
     if lower.startswith("data:"):
         if not lower.startswith("data:image/"):
-            raise HomeAssistantError("Only data:image/<subtype>;base64,... data URIs are supported")
+            raise ServiceValidationError(
+                "Only data:image/<subtype>;base64,... data URIs are supported",
+                translation_domain=DOMAIN,
+                translation_key="image_source_bad_data_uri",
+            )
         return "data", stripped
     if lower.startswith("camera."):
         return "camera", stripped
@@ -128,31 +133,6 @@ def _classify(source: str) -> tuple[SourceKind, str]:
     if lower.startswith(("http://", "https://")):
         return "http", stripped
     return "local", stripped
-
-
-def render_template(hass: HomeAssistant, value: Any) -> str:
-    """Render ``value`` as a Jinja template if it looks like one.
-
-    Accepts either a ``Template`` object (as produced by ``cv.template``
-    in a service schema) or a raw string. The string fast-path avoids
-    constructing a ``Template`` for the common case where no template
-    syntax is present.
-    """
-    if isinstance(value, Template):
-        if value.hass is None:
-            # HA core 2025.10 made Template.hass non-Optional; mypy
-            # against HA master flags this branch as unreachable, but
-            # it is still reachable on older pinned HA versions.
-            value.hass = hass  # type: ignore[unreachable, unused-ignore]
-        rendered: Any = value.async_render(parse_result=False)
-        return str(rendered)
-    if not isinstance(value, str):
-        raise HomeAssistantError("Image source must be a string or template")
-    if "{{" in value or "{%" in value:
-        tpl = Template(value, hass)
-        rendered = tpl.async_render(parse_result=False)
-        return str(rendered)
-    return value
 
 
 async def resolve_image_bytes(
@@ -181,7 +161,11 @@ async def resolve_image_bytes(
     ranges (link-local metadata, multicast, reserved) stay blocked.
     """
     if not isinstance(source, str) or not source.strip():
-        raise HomeAssistantError("Image source must be a non-empty string")
+        raise ServiceValidationError(
+            "Image source must be a non-empty string",
+            translation_domain=DOMAIN,
+            translation_key="image_source_empty",
+        )
 
     kind, value = _classify(source)
     match kind:
@@ -285,9 +269,12 @@ async def _stream_to_buffer(aiter: Any, max_bytes: int) -> bytearray:
     async for chunk in aiter:
         buf.extend(chunk)
         if len(buf) > max_bytes:
-            raise HomeAssistantError(
+            raise ServiceValidationError(
                 f"Image too large (max {max_bytes // (1024 * 1024)}MB) — "
-                f"enable auto_resize to allow up to 4x this cap"
+                f"enable auto_resize to allow up to 4x this cap",
+                translation_domain=DOMAIN,
+                translation_key="image_too_large",
+                translation_placeholders={"max_mb": str(max_bytes // (1024 * 1024))},
             )
     return buf
 
@@ -301,10 +288,13 @@ def _check_content_length(headers: Mapping[str, str], max_bytes: int) -> None:
     except TypeError, ValueError:
         return
     if size > max_bytes:
-        raise HomeAssistantError(
+        raise ServiceValidationError(
             f"Image declared too-large Content-Length ({size}); "
             f"max {max_bytes // (1024 * 1024)}MB — enable auto_resize for "
-            f"larger payloads"
+            f"larger payloads",
+            translation_domain=DOMAIN,
+            translation_key="image_too_large",
+            translation_placeholders={"max_mb": str(max_bytes // (1024 * 1024))},
         )
 
 
@@ -414,7 +404,12 @@ async def _resolve_http_aiohttp(
         parsed = urlparse(validated)
         hostname = parsed.hostname
         if hostname is None:  # pragma: no cover — validator enforces it
-            raise HomeAssistantError("URL must include a valid hostname")
+            raise ServiceValidationError(
+                "URL must include a valid hostname",
+                translation_domain=DOMAIN,
+                translation_key="url_invalid",
+                translation_placeholders={"reason": "URL must include a valid hostname"},
+            )
         try:
             async with (
                 _build_pinned_session(hostname, addrs) as session,
@@ -484,15 +479,37 @@ async def _resolve_local(
     final target is outside ``allowlist_external_dirs`` or fails any
     other check. The file is then opened with ``O_NOFOLLOW`` to defeat
     a TOCTOU symlink swap between validation and open.
+
+    The allowlist check runs *before* the existence/extension/size
+    checks in :func:`_validate_local_path_sync` (which each raise a
+    distinct, descriptive error): otherwise a caller could use those
+    distinct errors as an oracle to learn whether an arbitrary host
+    path outside the allowlist exists, its type, extension, or rough
+    size bucket. The precheck resolves symlinks itself (best-effort,
+    non-strict — the path need not exist yet) so the allowlist check
+    sees the same target `_validate_local_path_sync` would validate.
+
+    The precheck's resolve and `_validate_local_path_sync`'s own
+    ``Path.resolve(strict=True)`` are two separate syscalls, so a
+    symlink swapped in between could point resolve #2 somewhere the
+    precheck never saw. The allowlist is therefore re-checked against
+    the actually-resolved path before it's opened.
     """
     max_bytes = _MAX_BYTES_AUTO_RESIZE if auto_resize else _MAX_BYTES
 
     def _validate_and_read() -> bytes:
+        if not hass.config.is_allowed_path(_best_effort_resolve(path)):
+            raise ServiceValidationError(
+                "Image path is outside Home Assistant's allowlist_external_dirs",
+                translation_domain=DOMAIN,
+                translation_key="image_path_outside_allowlist",
+            )
         resolved = _validate_local_path_sync(path, max_bytes=max_bytes)
-        is_allowed = hass.config.is_allowed_path
-        if not is_allowed(str(resolved)):
-            raise HomeAssistantError(
-                "Image path is outside Home Assistant's allowlist_external_dirs"
+        if not hass.config.is_allowed_path(str(resolved)):
+            raise ServiceValidationError(
+                "Image path is outside Home Assistant's allowlist_external_dirs",
+                translation_domain=DOMAIN,
+                translation_key="image_path_outside_allowlist",
             )
         return open_local_image_no_follow(resolved, max_bytes=max_bytes)
 
@@ -507,7 +524,12 @@ def _check_size(num_bytes: int, *, auto_resize: bool = False) -> None:
     if num_bytes > max_bytes:
         mb = max_bytes // (1024 * 1024)
         hint = "" if auto_resize else " — enable auto_resize to allow up to 4x this cap"
-        raise HomeAssistantError(f"Image too large ({num_bytes} bytes; max {mb}MB){hint}")
+        raise ServiceValidationError(
+            f"Image too large ({num_bytes} bytes; max {mb}MB){hint}",
+            translation_domain=DOMAIN,
+            translation_key="image_too_large",
+            translation_placeholders={"max_mb": str(mb)},
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -564,7 +586,6 @@ def extract_image_kwargs(
     printer_defaults: Mapping[str, Any],
     *,
     prefix: str = "",
-    hass: HomeAssistant | None = None,
 ) -> dict[str, Any]:
     """Pull the print_image kwargs from a service-call/notify-call dict.
 
@@ -574,12 +595,8 @@ def extract_image_kwargs(
     in ``data`` are included — missing keys fall through to the
     adapter's signature defaults.
 
-    ``fallback_image`` is run through :func:`render_template` (when
-    ``hass`` is supplied) because the schema validates it with
-    ``cv.template``, producing a ``Template`` *object*; the downstream
-    resolver requires a string, so without this the fallback could never
-    fire — it silently failed the ``isinstance(str)`` guard and the
-    primary error was re-raised.
+    Image source strings (including ``fallback_image``) are used as-is;
+    no template rendering happens here.
 
     Selection precedence for each image option:
     1. The prefixed key (``image_dither`` on notify; ``dither`` on
@@ -609,9 +626,6 @@ def extract_image_kwargs(
             # fallback when ``image_dither`` was not supplied.
             out[target] = data[key]
 
-    fallback = out.get(ATTR_FALLBACK_IMAGE)
-    if fallback is not None and hass is not None:
-        out[ATTR_FALLBACK_IMAGE] = render_template(hass, fallback)
     return out
 
 
@@ -621,6 +635,5 @@ __all__ = [
     "SourceKind",
     "classify_source",
     "extract_image_kwargs",
-    "render_template",
     "resolve_image_bytes",
 ]
