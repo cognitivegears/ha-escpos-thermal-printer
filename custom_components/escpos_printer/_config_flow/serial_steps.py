@@ -73,10 +73,11 @@ class SerialFlowMixin:
 
             # Check membership before parsing -- a non-numeric baudrate_str
             # must hit the invalid_baudrate branch, not raise out of int().
-            if baudrate_str not in _BAUDRATE_CHOICES:
-                errors["base"] = "invalid_baudrate"
-            else:
+            if baudrate_str in _BAUDRATE_CHOICES:
                 baudrate = int(baudrate_str)
+            else:
+                baudrate = DEFAULT_BAUDRATE
+                errors["base"] = "invalid_baudrate"
 
             if not errors:
                 await self.async_set_unique_id(  # type: ignore[attr-defined]
@@ -151,10 +152,11 @@ class SerialFlowMixin:
 
             # Check membership before parsing -- a non-numeric baudrate_str
             # must hit the invalid_baudrate branch, not raise out of int().
-            if baudrate_str not in _BAUDRATE_CHOICES:
-                errors["base"] = "invalid_baudrate"
-            else:
+            if baudrate_str in _BAUDRATE_CHOICES:
                 baudrate = int(baudrate_str)
+            else:
+                baudrate = DEFAULT_BAUDRATE
+                errors["base"] = "invalid_baudrate"
 
             if not errors:
                 # Raw ``_async_abort_entries_match`` is case-sensitive but

@@ -540,7 +540,7 @@
       "description": "Trigger the printer buzzer (if supported). Select one or more printer devices as the target.",
       "fields": {
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.\n",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
           "name": "Broadcast"
         },
         "device_id": {
@@ -559,10 +559,10 @@
       "name": "Beep"
     },
     "calibration_print": {
-      "description": "Print a calibration sheet — a pixel ruler plus a threshold sweep strip — so you can visually pick the best dither/threshold for your printer. Burns ~10 cm of paper.\n",
+      "description": "Print a calibration sheet — a pixel ruler plus a threshold sweep strip — so you can visually pick the best dither/threshold for your printer. Burns ~10 cm of paper.",
       "fields": {
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.\n",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
           "name": "Broadcast"
         },
         "cut": {
@@ -584,7 +584,7 @@
       "description": "Cut the paper. Select one or more printer devices as the target.",
       "fields": {
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.\n",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
           "name": "Broadcast"
         },
         "device_id": {
@@ -606,7 +606,7 @@
       "description": "Feed the paper a number of lines. Select one or more printer devices as the target.",
       "fields": {
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.\n",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
           "name": "Broadcast"
         },
         "device_id": {
@@ -621,18 +621,18 @@
       "name": "Feed Paper"
     },
     "preview_box": {
-      "description": "Run the print_box layout pipeline and write the rendered text to a .txt file WITHOUT printing it. Lets you iterate on borders, padding, and width without burning paper. The cut/feed fields are deliberately omitted — a text file has no paper. Returns path, width, line_count, and codepage as service response data — enable \"Return response data\" in Developer Tools to see the values.\n",
+      "description": "Run the print_box layout pipeline and write the rendered text to a .txt file WITHOUT printing it. Lets you iterate on borders, padding, and width without burning paper. The cut/feed fields are deliberately omitted — a text file has no paper. Returns path, width, line_count, and codepage as service response data — enable \"Return response data\" in Developer Tools to see the values.",
       "fields": {
         "align": {
           "description": "Text alignment inside the box.",
           "name": "Alignment"
         },
         "device_id": {
-          "description": "Select the printer whose codepage and line width should drive the preview. If multiple devices are selected, only the first is used.\n",
+          "description": "Select the printer whose codepage and line width should drive the preview. If multiple devices are selected, only the first is used.",
           "name": "Device"
         },
         "output_path": {
-          "description": "Where to save the rendered text. Must be inside the system temp directory (typically /tmp). Defaults to /tmp/escpos_preview_box_[entry].txt. To persist the preview elsewhere, copy the returned `path` in a follow-up step.\n",
+          "description": "Where to save the rendered text. Must be inside the system temp directory (typically /tmp). Defaults to /tmp/escpos_preview_box_[entry].txt. To persist the preview elsewhere, copy the returned `path` in a follow-up step.",
           "name": "Output Path"
         },
         "padding": {
@@ -655,14 +655,14 @@
       "name": "Preview Box (no paper)"
     },
     "preview_image": {
-      "description": "Run the full image pipeline (dither, resize, etc) and write the 1-bit PNG to disk WITHOUT printing it. Returns the output path so automations can chain a notification. Printer-communication options (high density, impl, fragment height, chunk delay, center, cut, feed) are not exposed here because they have no effect on the file written to disk — they only matter when streaming to a real printer.\n",
+      "description": "Run the full image pipeline (dither, resize, etc) and write the 1-bit PNG to disk WITHOUT printing it. Returns the output path so automations can chain a notification. Printer-communication options (high density, impl, fragment height, chunk delay, center, cut, feed) are not exposed here because they have no effect on the file written to disk — they only matter when streaming to a real printer.",
       "fields": {
         "align": {
           "description": "Image alignment on the paper.",
           "name": "Alignment"
         },
         "auto_resize": {
-          "description": "Allow source images up to 40 MB and downscale before processing. Enable when printing phone snapshots, high-resolution cameras, or any source that would otherwise hit the 10 MB cap.\n",
+          "description": "Allow source images up to 40 MB and downscale before processing. Enable when printing phone snapshots, high-resolution cameras, or any source that would otherwise hit the 10 MB cap.",
           "name": "Auto-Resize Large Sources"
         },
         "autocontrast": {
@@ -674,31 +674,31 @@
           "name": "Device"
         },
         "dither": {
-          "description": "How to convert to 1-bit B&W. floyd-steinberg works well for photos; threshold gives crisp logos/text; none disables dithering.\n",
+          "description": "How to convert to 1-bit B&W. floyd-steinberg works well for photos; threshold gives crisp logos/text; none disables dithering.",
           "name": "Dither Mode"
         },
         "fallback_image": {
-          "description": "Optional URL / path / camera entity to print if the primary source fails to resolve. The same processing options apply to both.\n",
+          "description": "Optional URL / path / camera entity to print if the primary source fails to resolve. The same processing options apply to both.",
           "name": "Fallback Image"
         },
         "image": {
-          "description": "Same source forms as print_image — URL, file path, camera.[id], image.[id], or base64 data URI.\n",
+          "description": "Same source forms as print_image — URL, file path, camera.[id], image.[id], or base64 data URI.",
           "name": "Image"
         },
         "image_width": {
-          "description": "Target width in pixels. Defaults to the printer profile's max pixel width (or 512 if unknown — check the log for a WARNING). The image is scaled proportionally and is never upscaled.\n",
+          "description": "Target width in pixels. Defaults to the printer profile's max pixel width (or 512 if unknown — check the log for a WARNING). The image is scaled proportionally and is never upscaled.",
           "name": "Width (pixels)"
         },
         "invert": {
-          "description": "Swap black and white before B&W conversion. Useful for dark-mode source images, white-on-black logos, or printing reflected QR codes.\n",
+          "description": "Swap black and white before B&W conversion. Useful for dark-mode source images, white-on-black logos, or printing reflected QR codes.",
           "name": "Invert Colors"
         },
         "mirror": {
-          "description": "Flip the image left-to-right before printing. Useful for receipt-window displays where the print is read through the back of the paper.\n",
+          "description": "Flip the image left-to-right before printing. Useful for receipt-window displays where the print is read through the back of the paper.",
           "name": "Mirror Horizontally"
         },
         "output_path": {
-          "description": "Where to save the PNG. Must be inside the system temp directory (typically /tmp). Defaults to /tmp/escpos_preview_[entry].png. To stage the preview into /config/www/ for a Lovelace card, add a follow-up automation step that copies the returned `path`.\n",
+          "description": "Where to save the PNG. Must be inside the system temp directory (typically /tmp). Defaults to /tmp/escpos_preview_[entry].png. To stage the preview into /config/www/ for a Lovelace card, add a follow-up automation step that copies the returned `path`.",
           "name": "Output Path"
         },
         "rotation": {
@@ -723,7 +723,7 @@
       }
     },
     "preview_table": {
-      "description": "Run the print_table layout pipeline and write the rendered text to a .txt file WITHOUT printing it. Lets you iterate on column widths, alignment, and borders without burning paper. The cut/feed fields are deliberately omitted — a text file has no paper. Returns path, width, line_count, and codepage as service response data — enable \"Return response data\" in Developer Tools to see the values.\n",
+      "description": "Run the print_table layout pipeline and write the rendered text to a .txt file WITHOUT printing it. Lets you iterate on column widths, alignment, and borders without burning paper. The cut/feed fields are deliberately omitted — a text file has no paper. Returns path, width, line_count, and codepage as service response data — enable \"Return response data\" in Developer Tools to see the values.",
       "fields": {
         "column_aligns": {
           "description": "Optional list of per-column alignments (left/center/right).",
@@ -734,7 +734,7 @@
           "name": "Column Widths"
         },
         "device_id": {
-          "description": "Select the printer whose codepage and line width should drive the preview. If multiple devices are selected, only the first is used.\n",
+          "description": "Select the printer whose codepage and line width should drive the preview. If multiple devices are selected, only the first is used.",
           "name": "Device"
         },
         "header": {
@@ -742,7 +742,7 @@
           "name": "Header Row"
         },
         "output_path": {
-          "description": "Where to save the rendered text. Must be inside the system temp directory (typically /tmp). Defaults to /tmp/escpos_preview_table_[entry].txt. To persist the preview elsewhere, copy the returned `path` in a follow-up step.\n",
+          "description": "Where to save the rendered text. Must be inside the system temp directory (typically /tmp). Defaults to /tmp/escpos_preview_table_[entry].txt. To persist the preview elsewhere, copy the returned `path` in a follow-up step.",
           "name": "Output Path"
         },
         "row_separators": {
@@ -750,7 +750,7 @@
           "name": "Row Separators"
         },
         "rows": {
-          "description": "A YAML list where each entry is a list of cell strings (one per column). Example: [[\"Item\", \"Qty\", \"Price\"], [\"Apple\", \"2\", \"$1.00\"], [\"Bread\", \"1\", \"$3.50\"]]. Every row should have the same number of cells. When \"Header Row\" is enabled, the first row is rendered as the header.\n",
+          "description": "A YAML list where each entry is a list of cell strings (one per column). Example: [[\"Item\", \"Qty\", \"Price\"], [\"Apple\", \"2\", \"$1.00\"], [\"Bread\", \"1\", \"$3.50\"]]. Every row should have the same number of cells. When \"Header Row\" is enabled, the first row is rendered as the header.",
           "name": "Rows"
         },
         "style": {
@@ -776,7 +776,7 @@
           "name": "Barcode Type"
         },
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.\n",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
           "name": "Broadcast"
         },
         "check": {
@@ -804,7 +804,7 @@
           "name": "Font"
         },
         "force_software": {
-          "description": "Force a software-rendered barcode (image) instead of the printer's native barcode command. Use a specific image command if the default rendering looks wrong.\n",
+          "description": "Force a software-rendered barcode (image) instead of the printer's native barcode command. Use a specific image command if the default rendering looks wrong.",
           "name": "Rendering Mode"
         },
         "height": {
@@ -840,7 +840,7 @@
           "name": "Alignment"
         },
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.\n",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
           "name": "Broadcast"
         },
         "cut": {
@@ -860,29 +860,29 @@
           "name": "Padding"
         },
         "style": {
-          "description": "Border-glyph family. \"auto\" picks the cp437 single-line glyphs on codepages that support them (CP437, CP850, CP852, CP858, CP860, CP863, CP865, CP866) and falls back to ASCII otherwise.\n",
+          "description": "Border-glyph family. \"auto\" picks the cp437 single-line glyphs on codepages that support them (CP437, CP850, CP852, CP858, CP860, CP863, CP865, CP866) and falls back to ASCII otherwise.",
           "name": "Border Style"
         },
         "text": {
-          "description": "The text to wrap in a border. Supports newlines. ASCII / Latin-1 is what fits per-column on a thermal printer; CJK / emoji / combining marks may misalign (each column is one character cell).\n",
+          "description": "The text to wrap in a border. Supports newlines. ASCII / Latin-1 is what fits per-column on a thermal printer; CJK / emoji / combining marks may misalign (each column is one character cell).",
           "name": "Text"
         },
         "total_width": {
-          "description": "Total printed width in characters including borders. Defaults to the printer's configured line width.\n",
+          "description": "Total printed width in characters including borders. Defaults to the printer's configured line width.",
           "name": "Total Width"
         }
       },
       "name": "Print Box"
     },
     "print_camera_snapshot": {
-      "description": "Print a live snapshot from a camera entity. Convenience wrapper around print_image with a camera-entity selector for a friendlier UI.\n",
+      "description": "Print a live snapshot from a camera entity. Convenience wrapper around print_image with a camera-entity selector for a friendlier UI.",
       "fields": {
         "align": {
           "description": "Image alignment on the paper.",
           "name": "Alignment"
         },
         "auto_resize": {
-          "description": "Allow source images up to 40 MB and downscale before processing. Enable when printing phone snapshots, high-resolution cameras, or any source that would otherwise hit the 10 MB cap.\n",
+          "description": "Allow source images up to 40 MB and downscale before processing. Enable when printing phone snapshots, high-resolution cameras, or any source that would otherwise hit the 10 MB cap.",
           "name": "Auto-Resize Large Sources"
         },
         "autocontrast": {
@@ -890,7 +890,7 @@
           "name": "Autocontrast"
         },
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.\n",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
           "name": "Broadcast"
         },
         "camera_entity": {
@@ -898,7 +898,7 @@
           "name": "Camera"
         },
         "chunk_delay_ms": {
-          "description": "Milliseconds to sleep between image chunks. Leave unset to honor the printer's Reliability profile (0 on Network/USB, 50 on Bluetooth). Set higher (e.g. 100-200) if your printer freezes or dumps characters on tall images.\n",
+          "description": "Milliseconds to sleep between image chunks. Leave unset to honor the printer's Reliability profile (0 on Network/USB, 50 on Bluetooth). Set higher (e.g. 100-200) if your printer freezes or dumps characters on tall images.",
           "name": "Chunk Delay (ms)"
         },
         "cut": {
@@ -910,11 +910,11 @@
           "name": "Device"
         },
         "dither": {
-          "description": "How to convert to 1-bit B&W. floyd-steinberg works well for photos; threshold gives crisp logos/text; none disables dithering.\n",
+          "description": "How to convert to 1-bit B&W. floyd-steinberg works well for photos; threshold gives crisp logos/text; none disables dithering.",
           "name": "Dither Mode"
         },
         "fallback_image": {
-          "description": "Optional URL / path / camera entity to print if the primary source fails to resolve. The same processing options apply to both.\n",
+          "description": "Optional URL / path / camera entity to print if the primary source fails to resolve. The same processing options apply to both.",
           "name": "Fallback Image"
         },
         "feed": {
@@ -922,7 +922,7 @@
           "name": "Feed Lines"
         },
         "fragment_height": {
-          "description": "Rows per chunk when sending the image. Smaller values reduce buffer-overrun risk on cheap printers; larger values are faster. Leave unset to honor the printer's Reliability profile.\n",
+          "description": "Rows per chunk when sending the image. Smaller values reduce buffer-overrun risk on cheap printers; larger values are faster. Leave unset to honor the printer's Reliability profile.",
           "name": "Fragment Height"
         },
         "high_density": {
@@ -930,19 +930,19 @@
           "name": "High Density"
         },
         "image_width": {
-          "description": "Target width in pixels. Defaults to the printer profile's max pixel width (or 512 if unknown — check the log for a WARNING). The image is scaled proportionally and is never upscaled.\n",
+          "description": "Target width in pixels. Defaults to the printer profile's max pixel width (or 512 if unknown — check the log for a WARNING). The image is scaled proportionally and is never upscaled.",
           "name": "Width (pixels)"
         },
         "impl": {
-          "description": "ESC/POS image command to use. Leave unset to honor the printer's Reliability profile (default raster). If the chosen impl isn't supported by the installed python-escpos, the integration silently falls back to a kwarg-less printer.image() call.\n",
+          "description": "ESC/POS image command to use. Leave unset to honor the printer's Reliability profile (default raster). If the chosen impl isn't supported by the installed python-escpos, the integration silently falls back to a kwarg-less printer.image() call.",
           "name": "Print Implementation"
         },
         "invert": {
-          "description": "Swap black and white before B&W conversion. Useful for dark-mode source images, white-on-black logos, or printing reflected QR codes.\n",
+          "description": "Swap black and white before B&W conversion. Useful for dark-mode source images, white-on-black logos, or printing reflected QR codes.",
           "name": "Invert Colors"
         },
         "mirror": {
-          "description": "Flip the image left-to-right before printing. Useful for receipt-window displays where the print is read through the back of the paper.\n",
+          "description": "Flip the image left-to-right before printing. Useful for receipt-window displays where the print is read through the back of the paper.",
           "name": "Mirror Horizontally"
         },
         "rotation": {
@@ -967,14 +967,14 @@
       }
     },
     "print_image": {
-      "description": "Print an image from a URL, file path, camera.[id], image.[id], or base64 data URI. Automations can still use a Jinja template for this field — HA renders it before the service call is dispatched — but the field itself is a plain string, not evaluated server-side. For a friendlier UI, prefer the focused services (Print Image from URL, from Path, Camera Snapshot, Image Entity) — see docs/images.md.\n",
+      "description": "Print an image from a URL, file path, camera.[id], image.[id], or base64 data URI. Automations can still use a Jinja template for this field — HA renders it before the service call is dispatched — but the field itself is a plain string, not evaluated server-side. For a friendlier UI, prefer the focused services (Print Image from URL, from Path, Camera Snapshot, Image Entity) — see docs/images.md.",
       "fields": {
         "align": {
           "description": "Image alignment on the paper.",
           "name": "Alignment"
         },
         "auto_resize": {
-          "description": "Allow source images up to 40 MB and downscale before processing. Enable when printing phone snapshots, high-resolution cameras, or any source that would otherwise hit the 10 MB cap.\n",
+          "description": "Allow source images up to 40 MB and downscale before processing. Enable when printing phone snapshots, high-resolution cameras, or any source that would otherwise hit the 10 MB cap.",
           "name": "Auto-Resize Large Sources"
         },
         "autocontrast": {
@@ -982,11 +982,11 @@
           "name": "Autocontrast"
         },
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.\n",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
           "name": "Broadcast"
         },
         "chunk_delay_ms": {
-          "description": "Milliseconds to sleep between image chunks. Leave unset to honor the printer's Reliability profile (0 on Network/USB, 50 on Bluetooth). Set higher (e.g. 100-200) if your printer freezes or dumps characters on tall images.\n",
+          "description": "Milliseconds to sleep between image chunks. Leave unset to honor the printer's Reliability profile (0 on Network/USB, 50 on Bluetooth). Set higher (e.g. 100-200) if your printer freezes or dumps characters on tall images.",
           "name": "Chunk Delay (ms)"
         },
         "cut": {
@@ -998,11 +998,11 @@
           "name": "Device"
         },
         "dither": {
-          "description": "How to convert to 1-bit B&W. floyd-steinberg works well for photos; threshold gives crisp logos/text; none disables dithering.\n",
+          "description": "How to convert to 1-bit B&W. floyd-steinberg works well for photos; threshold gives crisp logos/text; none disables dithering.",
           "name": "Dither Mode"
         },
         "fallback_image": {
-          "description": "Optional URL / path / camera entity to print if the primary source fails to resolve. The same processing options apply to both.\n",
+          "description": "Optional URL / path / camera entity to print if the primary source fails to resolve. The same processing options apply to both.",
           "name": "Fallback Image"
         },
         "feed": {
@@ -1010,7 +1010,7 @@
           "name": "Feed Lines"
         },
         "fragment_height": {
-          "description": "Rows per chunk when sending the image. Smaller values reduce buffer-overrun risk on cheap printers; larger values are faster. Leave unset to honor the printer's Reliability profile.\n",
+          "description": "Rows per chunk when sending the image. Smaller values reduce buffer-overrun risk on cheap printers; larger values are faster. Leave unset to honor the printer's Reliability profile.",
           "name": "Fragment Height"
         },
         "high_density": {
@@ -1018,23 +1018,23 @@
           "name": "High Density"
         },
         "image": {
-          "description": "URL (http/https), local file path, camera.[entity], image.[entity], or data:image/...;base64,.... A literal string (e.g. \"/config/www/logo.png\") works the same as it did before.\n",
+          "description": "URL (http/https), local file path, camera.[entity], image.[entity], or data:image/...;base64,.... A literal string (e.g. \"/config/www/logo.png\") works the same as it did before.",
           "name": "Image"
         },
         "image_width": {
-          "description": "Target width in pixels. Defaults to the printer profile's max pixel width (or 512 if unknown — check the log for a WARNING). The image is scaled proportionally and is never upscaled.\n",
+          "description": "Target width in pixels. Defaults to the printer profile's max pixel width (or 512 if unknown — check the log for a WARNING). The image is scaled proportionally and is never upscaled.",
           "name": "Width (pixels)"
         },
         "impl": {
-          "description": "ESC/POS image command to use. Leave unset to honor the printer's Reliability profile (default raster). If the chosen impl isn't supported by the installed python-escpos, the integration silently falls back to a kwarg-less printer.image() call.\n",
+          "description": "ESC/POS image command to use. Leave unset to honor the printer's Reliability profile (default raster). If the chosen impl isn't supported by the installed python-escpos, the integration silently falls back to a kwarg-less printer.image() call.",
           "name": "Print Implementation"
         },
         "invert": {
-          "description": "Swap black and white before B&W conversion. Useful for dark-mode source images, white-on-black logos, or printing reflected QR codes.\n",
+          "description": "Swap black and white before B&W conversion. Useful for dark-mode source images, white-on-black logos, or printing reflected QR codes.",
           "name": "Invert Colors"
         },
         "mirror": {
-          "description": "Flip the image left-to-right before printing. Useful for receipt-window displays where the print is read through the back of the paper.\n",
+          "description": "Flip the image left-to-right before printing. Useful for receipt-window displays where the print is read through the back of the paper.",
           "name": "Mirror Horizontally"
         },
         "rotation": {
@@ -1059,14 +1059,14 @@
       }
     },
     "print_image_entity": {
-      "description": "Print the current frame from an HA image entity (weather radar, ML overlay, generated chart, etc).\n",
+      "description": "Print the current frame from an HA image entity (weather radar, ML overlay, generated chart, etc).",
       "fields": {
         "align": {
           "description": "Image alignment on the paper.",
           "name": "Alignment"
         },
         "auto_resize": {
-          "description": "Allow source images up to 40 MB and downscale before processing. Enable when printing phone snapshots, high-resolution cameras, or any source that would otherwise hit the 10 MB cap.\n",
+          "description": "Allow source images up to 40 MB and downscale before processing. Enable when printing phone snapshots, high-resolution cameras, or any source that would otherwise hit the 10 MB cap.",
           "name": "Auto-Resize Large Sources"
         },
         "autocontrast": {
@@ -1074,11 +1074,11 @@
           "name": "Autocontrast"
         },
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.\n",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
           "name": "Broadcast"
         },
         "chunk_delay_ms": {
-          "description": "Milliseconds to sleep between image chunks. Leave unset to honor the printer's Reliability profile (0 on Network/USB, 50 on Bluetooth). Set higher (e.g. 100-200) if your printer freezes or dumps characters on tall images.\n",
+          "description": "Milliseconds to sleep between image chunks. Leave unset to honor the printer's Reliability profile (0 on Network/USB, 50 on Bluetooth). Set higher (e.g. 100-200) if your printer freezes or dumps characters on tall images.",
           "name": "Chunk Delay (ms)"
         },
         "cut": {
@@ -1090,11 +1090,11 @@
           "name": "Device"
         },
         "dither": {
-          "description": "How to convert to 1-bit B&W. floyd-steinberg works well for photos; threshold gives crisp logos/text; none disables dithering.\n",
+          "description": "How to convert to 1-bit B&W. floyd-steinberg works well for photos; threshold gives crisp logos/text; none disables dithering.",
           "name": "Dither Mode"
         },
         "fallback_image": {
-          "description": "Optional URL / path / camera entity to print if the primary source fails to resolve. The same processing options apply to both.\n",
+          "description": "Optional URL / path / camera entity to print if the primary source fails to resolve. The same processing options apply to both.",
           "name": "Fallback Image"
         },
         "feed": {
@@ -1102,7 +1102,7 @@
           "name": "Feed Lines"
         },
         "fragment_height": {
-          "description": "Rows per chunk when sending the image. Smaller values reduce buffer-overrun risk on cheap printers; larger values are faster. Leave unset to honor the printer's Reliability profile.\n",
+          "description": "Rows per chunk when sending the image. Smaller values reduce buffer-overrun risk on cheap printers; larger values are faster. Leave unset to honor the printer's Reliability profile.",
           "name": "Fragment Height"
         },
         "high_density": {
@@ -1114,19 +1114,19 @@
           "name": "Image Entity"
         },
         "image_width": {
-          "description": "Target width in pixels. Defaults to the printer profile's max pixel width (or 512 if unknown — check the log for a WARNING). The image is scaled proportionally and is never upscaled.\n",
+          "description": "Target width in pixels. Defaults to the printer profile's max pixel width (or 512 if unknown — check the log for a WARNING). The image is scaled proportionally and is never upscaled.",
           "name": "Width (pixels)"
         },
         "impl": {
-          "description": "ESC/POS image command to use. Leave unset to honor the printer's Reliability profile (default raster). If the chosen impl isn't supported by the installed python-escpos, the integration silently falls back to a kwarg-less printer.image() call.\n",
+          "description": "ESC/POS image command to use. Leave unset to honor the printer's Reliability profile (default raster). If the chosen impl isn't supported by the installed python-escpos, the integration silently falls back to a kwarg-less printer.image() call.",
           "name": "Print Implementation"
         },
         "invert": {
-          "description": "Swap black and white before B&W conversion. Useful for dark-mode source images, white-on-black logos, or printing reflected QR codes.\n",
+          "description": "Swap black and white before B&W conversion. Useful for dark-mode source images, white-on-black logos, or printing reflected QR codes.",
           "name": "Invert Colors"
         },
         "mirror": {
-          "description": "Flip the image left-to-right before printing. Useful for receipt-window displays where the print is read through the back of the paper.\n",
+          "description": "Flip the image left-to-right before printing. Useful for receipt-window displays where the print is read through the back of the paper.",
           "name": "Mirror Horizontally"
         },
         "rotation": {
@@ -1151,14 +1151,14 @@
       }
     },
     "print_image_path": {
-      "description": "Print an image from a local file path. The path must lie inside one of Home Assistant's allowlist_external_dirs (typically /config or /media — add directories under homeassistant -> allowlist_external_dirs in configuration.yaml if needed).\n",
+      "description": "Print an image from a local file path. The path must lie inside one of Home Assistant's allowlist_external_dirs (typically /config or /media — add directories under homeassistant -> allowlist_external_dirs in configuration.yaml if needed).",
       "fields": {
         "align": {
           "description": "Image alignment on the paper.",
           "name": "Alignment"
         },
         "auto_resize": {
-          "description": "Allow source images up to 40 MB and downscale before processing. Enable when printing phone snapshots, high-resolution cameras, or any source that would otherwise hit the 10 MB cap.\n",
+          "description": "Allow source images up to 40 MB and downscale before processing. Enable when printing phone snapshots, high-resolution cameras, or any source that would otherwise hit the 10 MB cap.",
           "name": "Auto-Resize Large Sources"
         },
         "autocontrast": {
@@ -1166,11 +1166,11 @@
           "name": "Autocontrast"
         },
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.\n",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
           "name": "Broadcast"
         },
         "chunk_delay_ms": {
-          "description": "Milliseconds to sleep between image chunks. Leave unset to honor the printer's Reliability profile (0 on Network/USB, 50 on Bluetooth). Set higher (e.g. 100-200) if your printer freezes or dumps characters on tall images.\n",
+          "description": "Milliseconds to sleep between image chunks. Leave unset to honor the printer's Reliability profile (0 on Network/USB, 50 on Bluetooth). Set higher (e.g. 100-200) if your printer freezes or dumps characters on tall images.",
           "name": "Chunk Delay (ms)"
         },
         "cut": {
@@ -1182,11 +1182,11 @@
           "name": "Device"
         },
         "dither": {
-          "description": "How to convert to 1-bit B&W. floyd-steinberg works well for photos; threshold gives crisp logos/text; none disables dithering.\n",
+          "description": "How to convert to 1-bit B&W. floyd-steinberg works well for photos; threshold gives crisp logos/text; none disables dithering.",
           "name": "Dither Mode"
         },
         "fallback_image": {
-          "description": "Optional URL / path / camera entity to print if the primary source fails to resolve. The same processing options apply to both.\n",
+          "description": "Optional URL / path / camera entity to print if the primary source fails to resolve. The same processing options apply to both.",
           "name": "Fallback Image"
         },
         "feed": {
@@ -1194,7 +1194,7 @@
           "name": "Feed Lines"
         },
         "fragment_height": {
-          "description": "Rows per chunk when sending the image. Smaller values reduce buffer-overrun risk on cheap printers; larger values are faster. Leave unset to honor the printer's Reliability profile.\n",
+          "description": "Rows per chunk when sending the image. Smaller values reduce buffer-overrun risk on cheap printers; larger values are faster. Leave unset to honor the printer's Reliability profile.",
           "name": "Fragment Height"
         },
         "high_density": {
@@ -1202,19 +1202,19 @@
           "name": "High Density"
         },
         "image_width": {
-          "description": "Target width in pixels. Defaults to the printer profile's max pixel width (or 512 if unknown — check the log for a WARNING). The image is scaled proportionally and is never upscaled.\n",
+          "description": "Target width in pixels. Defaults to the printer profile's max pixel width (or 512 if unknown — check the log for a WARNING). The image is scaled proportionally and is never upscaled.",
           "name": "Width (pixels)"
         },
         "impl": {
-          "description": "ESC/POS image command to use. Leave unset to honor the printer's Reliability profile (default raster). If the chosen impl isn't supported by the installed python-escpos, the integration silently falls back to a kwarg-less printer.image() call.\n",
+          "description": "ESC/POS image command to use. Leave unset to honor the printer's Reliability profile (default raster). If the chosen impl isn't supported by the installed python-escpos, the integration silently falls back to a kwarg-less printer.image() call.",
           "name": "Print Implementation"
         },
         "invert": {
-          "description": "Swap black and white before B&W conversion. Useful for dark-mode source images, white-on-black logos, or printing reflected QR codes.\n",
+          "description": "Swap black and white before B&W conversion. Useful for dark-mode source images, white-on-black logos, or printing reflected QR codes.",
           "name": "Invert Colors"
         },
         "mirror": {
-          "description": "Flip the image left-to-right before printing. Useful for receipt-window displays where the print is read through the back of the paper.\n",
+          "description": "Flip the image left-to-right before printing. Useful for receipt-window displays where the print is read through the back of the paper.",
           "name": "Mirror Horizontally"
         },
         "path": {
@@ -1243,14 +1243,14 @@
       }
     },
     "print_image_url": {
-      "description": "Print an image fetched from an HTTP(S) URL. SSRF-aware — private, loopback, and link-local addresses are refused.\n",
+      "description": "Print an image fetched from an HTTP(S) URL. SSRF-aware — private, loopback, and link-local addresses are refused.",
       "fields": {
         "align": {
           "description": "Image alignment on the paper.",
           "name": "Alignment"
         },
         "auto_resize": {
-          "description": "Allow source images up to 40 MB and downscale before processing. Enable when printing phone snapshots, high-resolution cameras, or any source that would otherwise hit the 10 MB cap.\n",
+          "description": "Allow source images up to 40 MB and downscale before processing. Enable when printing phone snapshots, high-resolution cameras, or any source that would otherwise hit the 10 MB cap.",
           "name": "Auto-Resize Large Sources"
         },
         "autocontrast": {
@@ -1258,11 +1258,11 @@
           "name": "Autocontrast"
         },
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.\n",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
           "name": "Broadcast"
         },
         "chunk_delay_ms": {
-          "description": "Milliseconds to sleep between image chunks. Leave unset to honor the printer's Reliability profile (0 on Network/USB, 50 on Bluetooth). Set higher (e.g. 100-200) if your printer freezes or dumps characters on tall images.\n",
+          "description": "Milliseconds to sleep between image chunks. Leave unset to honor the printer's Reliability profile (0 on Network/USB, 50 on Bluetooth). Set higher (e.g. 100-200) if your printer freezes or dumps characters on tall images.",
           "name": "Chunk Delay (ms)"
         },
         "cut": {
@@ -1274,11 +1274,11 @@
           "name": "Device"
         },
         "dither": {
-          "description": "How to convert to 1-bit B&W. floyd-steinberg works well for photos; threshold gives crisp logos/text; none disables dithering.\n",
+          "description": "How to convert to 1-bit B&W. floyd-steinberg works well for photos; threshold gives crisp logos/text; none disables dithering.",
           "name": "Dither Mode"
         },
         "fallback_image": {
-          "description": "Optional URL / path / camera entity to print if the primary source fails to resolve. The same processing options apply to both.\n",
+          "description": "Optional URL / path / camera entity to print if the primary source fails to resolve. The same processing options apply to both.",
           "name": "Fallback Image"
         },
         "feed": {
@@ -1286,7 +1286,7 @@
           "name": "Feed Lines"
         },
         "fragment_height": {
-          "description": "Rows per chunk when sending the image. Smaller values reduce buffer-overrun risk on cheap printers; larger values are faster. Leave unset to honor the printer's Reliability profile.\n",
+          "description": "Rows per chunk when sending the image. Smaller values reduce buffer-overrun risk on cheap printers; larger values are faster. Leave unset to honor the printer's Reliability profile.",
           "name": "Fragment Height"
         },
         "high_density": {
@@ -1294,19 +1294,19 @@
           "name": "High Density"
         },
         "image_width": {
-          "description": "Target width in pixels. Defaults to the printer profile's max pixel width (or 512 if unknown — check the log for a WARNING). The image is scaled proportionally and is never upscaled.\n",
+          "description": "Target width in pixels. Defaults to the printer profile's max pixel width (or 512 if unknown — check the log for a WARNING). The image is scaled proportionally and is never upscaled.",
           "name": "Width (pixels)"
         },
         "impl": {
-          "description": "ESC/POS image command to use. Leave unset to honor the printer's Reliability profile (default raster). If the chosen impl isn't supported by the installed python-escpos, the integration silently falls back to a kwarg-less printer.image() call.\n",
+          "description": "ESC/POS image command to use. Leave unset to honor the printer's Reliability profile (default raster). If the chosen impl isn't supported by the installed python-escpos, the integration silently falls back to a kwarg-less printer.image() call.",
           "name": "Print Implementation"
         },
         "invert": {
-          "description": "Swap black and white before B&W conversion. Useful for dark-mode source images, white-on-black logos, or printing reflected QR codes.\n",
+          "description": "Swap black and white before B&W conversion. Useful for dark-mode source images, white-on-black logos, or printing reflected QR codes.",
           "name": "Invert Colors"
         },
         "mirror": {
-          "description": "Flip the image left-to-right before printing. Useful for receipt-window displays where the print is read through the back of the paper.\n",
+          "description": "Flip the image left-to-right before printing. Useful for receipt-window displays where the print is read through the back of the paper.",
           "name": "Mirror Horizontally"
         },
         "rotation": {
@@ -1335,10 +1335,10 @@
       }
     },
     "print_kvtable": {
-      "description": "Print a two-column label/value table — receipt totals, sensor readings, ingredient lists. Labels left-aligned, values per \"value_align\" (default right).\n",
+      "description": "Print a two-column label/value table — receipt totals, sensor readings, ingredient lists. Labels left-aligned, values per \"value_align\" (default right).",
       "fields": {
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.\n",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
           "name": "Broadcast"
         },
         "cut": {
@@ -1354,15 +1354,15 @@
           "name": "Feed Lines"
         },
         "items": {
-          "description": "List of [label, value] pairs. Example [[\"Subtotal\",\"$10.00\"], [\"Tax\",\"$0.80\"], [\"Total\",\"$10.80\"]].\n",
+          "description": "List of [label, value] pairs. Example [[\"Subtotal\",\"$10.00\"], [\"Tax\",\"$0.80\"], [\"Total\",\"$10.80\"]].",
           "name": "Items"
         },
         "label_width": {
-          "description": "Characters reserved for the label column. If omitted, sized from the longest label up to ~60% of total width.\n",
+          "description": "Characters reserved for the label column. If omitted, sized from the longest label up to ~60% of total width.",
           "name": "Label Width"
         },
         "style": {
-          "description": "Border-glyph family. Defaults to \"none\" (borderless) which is the common receipt-totals look.\n",
+          "description": "Border-glyph family. Defaults to \"none\" (borderless) which is the common receipt-totals look.",
           "name": "Border Style"
         },
         "total_width": {
@@ -1377,7 +1377,7 @@
       "name": "Print Key/Value Table"
     },
     "print_message": {
-      "description": "Print a message with full text formatting (bold, underline, size, alignment) plus an optional image attachment that prints as a single uninterrupted receipt. Targets an ESC/POS notify entity. See docs/images.md.\n",
+      "description": "Print a message with full text formatting (bold, underline, size, alignment) plus an optional image attachment that prints as a single uninterrupted receipt. Targets an ESC/POS notify entity. See docs/images.md.",
       "fields": {
         "align": {
           "description": "Text alignment",
@@ -1404,7 +1404,7 @@
           "name": "Height"
         },
         "image": {
-          "description": "Optional image printed after the message. Accepts the same source forms as print_image (URL, file path, camera.[id], image.[id], or base64 data URI). See docs/images.md.\n",
+          "description": "Optional image printed after the message. Accepts the same source forms as print_image (URL, file path, camera.[id], image.[id], or base64 data URI). See docs/images.md.",
           "name": "Image"
         },
         "image_align": {
@@ -1412,7 +1412,7 @@
           "name": "Image Alignment"
         },
         "image_auto_resize": {
-          "description": "Allow source images up to 40 MB and downscale before processing.\n",
+          "description": "Allow source images up to 40 MB and downscale before processing.",
           "name": "Image Auto-Resize"
         },
         "image_autocontrast": {
@@ -1420,7 +1420,7 @@
           "name": "Image Autocontrast"
         },
         "image_chunk_delay_ms": {
-          "description": "Milliseconds to sleep between image chunks. Leave unset to honor the printer's Reliability profile. See print_image notes.\n",
+          "description": "Milliseconds to sleep between image chunks. Leave unset to honor the printer's Reliability profile. See print_image notes.",
           "name": "Image Chunk Delay (ms)"
         },
         "image_dither": {
@@ -1432,7 +1432,7 @@
           "name": "Image Fallback"
         },
         "image_fragment_height": {
-          "description": "Rows per chunk when sending the image. Leave unset to honor the printer's Reliability profile. See print_image notes.\n",
+          "description": "Rows per chunk when sending the image. Leave unset to honor the printer's Reliability profile. See print_image notes.",
           "name": "Image Fragment Height"
         },
         "image_high_density": {
@@ -1440,7 +1440,7 @@
           "name": "Image High Density"
         },
         "image_impl": {
-          "description": "ESC/POS image command (see print_image). Leave unset to honor the printer's Reliability profile.\n",
+          "description": "ESC/POS image command (see print_image). Leave unset to honor the printer's Reliability profile.",
           "name": "Image Implementation"
         },
         "image_invert": {
@@ -1504,7 +1504,7 @@
           "name": "Alignment"
         },
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.\n",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
           "name": "Broadcast"
         },
         "cut": {
@@ -1535,10 +1535,10 @@
       "name": "Print QR Code"
     },
     "print_separator": {
-      "description": "Print a single decorative rule built by repeating one character to fill the printer's line width. Examples — \"-\" for a single rule, \"=\" for a heavy rule, \"*\" or \"_\" for decorative bars.\n",
+      "description": "Print a single decorative rule built by repeating one character to fill the printer's line width. Examples — \"-\" for a single rule, \"=\" for a heavy rule, \"*\" or \"_\" for decorative bars.",
       "fields": {
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.\n",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
           "name": "Broadcast"
         },
         "char": {
@@ -1572,15 +1572,15 @@
       "description": "Print a multi-column table (receipt-style) with optional borders and header.",
       "fields": {
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.\n",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
           "name": "Broadcast"
         },
         "column_aligns": {
-          "description": "Optional per-column alignment list (e.g. [\"left\",\"right\",\"right\"]). Defaults to \"left\" for every column.\n",
+          "description": "Optional per-column alignment list (e.g. [\"left\",\"right\",\"right\"]). Defaults to \"left\" for every column.",
           "name": "Column Alignments"
         },
         "column_widths": {
-          "description": "Optional explicit column widths in characters. When omitted, total_width is divided evenly across columns. Sum plus separators must fit within total_width.\n",
+          "description": "Optional explicit column widths in characters. When omitted, total_width is divided evenly across columns. Sum plus separators must fit within total_width.",
           "name": "Column Widths"
         },
         "cut": {
@@ -1604,11 +1604,11 @@
           "name": "Row Separators"
         },
         "rows": {
-          "description": "A YAML list where each entry is a list of cell strings (one per column). Example: [[\"Item\", \"Qty\", \"Price\"], [\"Coffee\", \"2\", \"$6.00\"], [\"Bagel\", \"1\", \"$3.50\"]]. Every row should have the same number of cells. When \"Header Row\" is enabled, the first row is rendered as the header.\n",
+          "description": "A YAML list where each entry is a list of cell strings (one per column). Example: [[\"Item\", \"Qty\", \"Price\"], [\"Coffee\", \"2\", \"$6.00\"], [\"Bagel\", \"1\", \"$3.50\"]]. Every row should have the same number of cells. When \"Header Row\" is enabled, the first row is rendered as the header.",
           "name": "Rows"
         },
         "style": {
-          "description": "Border glyphs. Same options as print_box. Use \"none\" for a borderless grid that still aligns columns.\n",
+          "description": "Border glyphs. Same options as print_box. Use \"none\" for a borderless grid that still aligns columns.",
           "name": "Border Style"
         },
         "total_width": {
@@ -1630,7 +1630,7 @@
           "name": "Bold"
         },
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.\n",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
           "name": "Broadcast"
         },
         "cut": {
@@ -1669,14 +1669,14 @@
       "name": "Print Text (Raw Encoding)"
     },
     "print_text_image": {
-      "description": "Render text to a bitmap with a custom TTF/OTF font, optional rotation, and arbitrary point size. The rendered image is printed through the same dither/threshold pipeline as print_image. Use this when you need bigger or styled text than the printer's built-in 32-column font can produce.\n",
+      "description": "Render text to a bitmap with a custom TTF/OTF font, optional rotation, and arbitrary point size. The rendered image is printed through the same dither/threshold pipeline as print_image. Use this when you need bigger or styled text than the printer's built-in 32-column font can produce.",
       "fields": {
         "align": {
           "description": "Horizontal alignment of each rendered line within the canvas.",
           "name": "Alignment"
         },
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.\n",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
           "name": "Broadcast"
         },
         "cut": {
@@ -1696,7 +1696,7 @@
           "name": "Font"
         },
         "font_path": {
-          "description": "Drop a .ttf or .otf file in /config/fonts/ and reference it here. Paths under allowlist_external_dirs also work. Overrides the bundled \"font\" field when provided.\n",
+          "description": "Drop a .ttf or .otf file in /config/fonts/ and reference it here. Paths under allowlist_external_dirs also work. Overrides the bundled \"font\" field when provided.",
           "name": "Custom Font Path"
         },
         "font_size": {
@@ -1784,7 +1784,7 @@
           "name": "Bold"
         },
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.\n",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
           "name": "Broadcast"
         },
         "cut": {

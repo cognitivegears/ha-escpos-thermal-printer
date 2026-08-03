@@ -42,9 +42,9 @@ def _field_entry(field: dict[str, Any]) -> dict[str, str]:
     """
     entry: dict[str, str] = {}
     if "description" in field:
-        entry["description"] = str(field["description"])
+        entry["description"] = str(field["description"]).strip()
     if "name" in field:
-        entry["name"] = str(field["name"])
+        entry["name"] = str(field["name"]).strip()
     return entry
 
 
@@ -87,11 +87,11 @@ def build_services_section(services_yaml: dict[str, Any]) -> dict[str, Any]:
 
         entry: dict[str, Any] = {}
         if "description" in body:
-            entry["description"] = str(body["description"])
+            entry["description"] = str(body["description"]).strip()
         if fields:
             entry["fields"] = dict(sorted(fields.items()))
         if "name" in body:
-            entry["name"] = str(body["name"])
+            entry["name"] = str(body["name"]).strip()
         if sections:
             entry["sections"] = dict(sorted(sections.items()))
 

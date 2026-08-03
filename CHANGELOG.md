@@ -62,6 +62,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Service descriptions synced from `services.yaml` no longer carry a
+  trailing newline in `strings.json`/`translations/en.json` (hassfest
+  rejects leading/trailing whitespace in translation strings).
+- The serial config/reconfigure flows now initialize the baudrate on
+  every code path; previously a rejected baudrate left the variable
+  unassigned (flagged by CodeQL, unreachable in practice).
 - **`preview_box` / `preview_table` showed "Translation error:
   INVALID_ARGUMENT_TYPE" in the service UI.** Their descriptions contained
   literal `{path, width, line_count, codepage}` text, which the frontend's
