@@ -1,6 +1,6 @@
 # Services
 
-The integration registers these services. All printer services accept a `device_id` for targeting, plus a `broadcast: true` flag to explicitly print to every configured printer (`broadcast` and `device_id` are mutually exclusive). Omitting both also prints to all printers — kept for backward compatibility — but logs a warning when more than one printer is configured. See [multi-printer.md](multi-printer.md).
+The integration registers these services. All printer services accept a `device_id` for targeting, plus a `broadcast: true` flag to explicitly print to every configured printer (`broadcast` and `device_id` are mutually exclusive). Omitting both also prints to all printers (kept for backward compatibility), but logs a warning when more than one printer is configured. See [multi-printer.md](multi-printer.md).
 
 ## escpos_printer.print_text
 
@@ -14,7 +14,7 @@ Print raw text using the configured codepage. No transcoding.
 | underline | string | `none`, `single`, `double` |
 | width | string\|int | `normal`, `double`, `triple`, or 1–8 |
 | height | string\|int | `normal`, `double`, `triple`, or 1–8 |
-| encoding | string | Codepage override — a python-escpos codepage name such as `CP437`/`CP858` (not a Python codec name) |
+| encoding | string | Codepage override: a python-escpos codepage name such as `CP437`/`CP858` (not a Python codec name) |
 | cut | string | `none`, `partial`, `full` |
 | feed | int | Lines to feed (0–50) |
 
@@ -31,13 +31,13 @@ Entity service for the notify platform. Targets a notify entity and supports all
 | message | string | Text (required) |
 | title | string | Printed before the message |
 | utf8 | boolean | Enable UTF-8 transcoding |
-| image | string | Optional image source — same forms as `print_image`. See [Images guide](images.md). |
+| image | string | Optional image source: same forms as `print_image`. See [Images guide](images.md). |
 | image_width | int | Target image width (pixels) |
 | image_align | string | `left`, `center`, `right` |
 | image_dither | string | `floyd-steinberg`, `none`, `threshold` |
 | image_rotation | int | `0`, `90`, `180`, `270` |
 | image_impl | string | `bitImageRaster`, `graphics`, `bitImageColumn` |
-| image_center | boolean | Horizontally center the image by padding the bitmap. No longer shown in the UI form — prefer `image_align: center`; still accepted in YAML |
+| image_center | boolean | Horizontally center the image by padding the bitmap. No longer shown in the UI form: prefer `image_align: center`; still accepted in YAML |
 | image_autocontrast | boolean | Stretch contrast before B&W conversion |
 | image_threshold | int | 1–254 (used with `image_dither: threshold`) |
 | image_fragment_height | int | Pixels per chunk |
@@ -56,7 +56,7 @@ Entity service for the notify platform. Targets a notify entity and supports all
 
 ## escpos_printer.print_barcode
 
-Supported types: `EAN13`, `EAN8`, `UPC-A`, `UPC-E`, `CODE39`, `CODE93`, `CODE128`, `ITF`, `ITF14` (printed as `ITF`), `CODABAR`, `NW7` (alias of `CODABAR`), `JAN`, `JAN13`, `JAN8` (printed as `EAN13`/`EAN8` — identical symbologies), `GS1-128`, `GS1 DATABAR OMNIDIRECTIONAL`, `GS1 DATABAR TRUNCATED`, `GS1 DATABAR LIMITED`, `GS1 DATABAR EXPANDED`.
+Supported types: `EAN13`, `EAN8`, `UPC-A`, `UPC-E`, `CODE39`, `CODE93`, `CODE128`, `ITF`, `ITF14` (printed as `ITF`), `CODABAR`, `NW7` (alias of `CODABAR`), `JAN`, `JAN13`, `JAN8` (printed as `EAN13`/`EAN8`, identical symbologies), `GS1-128`, `GS1 DATABAR OMNIDIRECTIONAL`, `GS1 DATABAR TRUNCATED`, `GS1 DATABAR LIMITED`, `GS1 DATABAR EXPANDED`.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -72,16 +72,16 @@ Supported types: `EAN13`, `EAN8`, `UPC-A`, `UPC-E`, `CODE39`, `CODE93`, `CODE128
 | cut | string | `none`, `partial`, `full` |
 | feed | int | Lines to feed (0–50) |
 
-`align_ct` (boolean, "center the barcode") is still accepted in service calls for backward compatibility, but is no longer shown in the UI form — use `align: center` instead.
+`align_ct` (boolean, "center the barcode") is still accepted in service calls for backward compatibility, but is no longer shown in the UI form: use `align: center` instead.
 
 ## Image services
 
-The integration ships six image-printing services. They all share the same image-processing options (rotation, mirror, threshold, dither, etc.) and route through the same backend pipeline — the only difference is the source field and which UI selector is used.
+The integration ships six image-printing services. They all share the same image-processing options (rotation, mirror, threshold, dither, etc.) and route through the same backend pipeline; the only difference is the source field and which UI selector is used.
 
 | Service | Source field | When to use |
 |---------|--------------|-------------|
-| `escpos_printer.print_image` | `image` (text) | Generic / power-user. Accepts any source form — URL, file path, `camera.<id>`, `image.<id>`, or base64 data URI. **Existing automations using a literal URL or path keep working unchanged**, and automations can still compute the value with a Jinja template — Home Assistant renders it before the service is called. |
-| `escpos_printer.print_image_url` | `url` (text) | Print from an HTTP(S) URL. SSRF-aware — private, loopback, and link-local addresses are refused. |
+| `escpos_printer.print_image` | `image` (text) | Generic / power-user. Accepts any source form: URL, file path, `camera.<id>`, `image.<id>`, or base64 data URI. **Existing automations using a literal URL or path keep working unchanged**, and automations can still compute the value with a Jinja template; Home Assistant renders it before the service is called. |
+| `escpos_printer.print_image_url` | `url` (text) | Print from an HTTP(S) URL. SSRF-aware: private, loopback, and link-local addresses are refused. |
 | `escpos_printer.print_image_path` | `path` (text) | Print a local file. The path must lie inside `allowlist_external_dirs` (typically `/config` or `/media`). |
 | `escpos_printer.print_camera_snapshot` | `camera_entity` (camera entity picker) | Print a live snapshot from a camera entity. |
 | `escpos_printer.print_image_entity` | `image_entity` (image entity picker) | Print the current frame from an HA `image` entity (weather radar, ML overlay, generated chart). |
@@ -104,7 +104,7 @@ Every image service accepts the same option set. In the UI form, image-processin
 | autocontrast | boolean | Stretch contrast before B&W conversion (helps photos). Default `false` (`true` for `print_camera_snapshot`). |
 | auto_resize | boolean | Allow source images up to 40 MB and downscale before processing. Default `false` (`true` for `print_image_url`, `print_image_path`, `print_camera_snapshot`). |
 | align | string | `left`, `center`, `right`. |
-| center | boolean | Horizontally center the image by padding the bitmap to full paper width. Default `false`. No longer shown in the UI form — prefer `align: center`; still useful in YAML for printers that ignore alignment commands on raster images. |
+| center | boolean | Horizontally center the image by padding the bitmap to full paper width. Default `false`. No longer shown in the UI form: prefer `align: center`; still useful in YAML for printers that ignore alignment commands on raster images. |
 | high_density | boolean | High-density printing mode. Default `true`. |
 | cut | string | `none`, `partial`, `full`. Defaults to the printer's configured cut mode. |
 | feed | int | Lines to feed after printing (0–50). Default depends on the service: `print_image` = `0`; `print_image_url` / `print_image_path` / `print_image_entity` = `1`; `print_camera_snapshot` = `2`; `calibration_print` = `2`. The focused services pick friendlier defaults than `print_image` because their typical use-case prints once and you want a paper buffer for tearing off cleanly. |
@@ -169,7 +169,7 @@ Render text to a bitmap with a TTF/OTF font, optionally rotated, then print thro
 | rotation | int | `0`, `90`, `180`, `270` (clockwise; applied to canvas before binarisation) |
 | cut | string | `none`, `partial`, `full` |
 | feed | int | Lines to feed (0–50) |
-| `image_*` knobs | — | `image_width`, `image_dither`, `image_threshold`, `image_impl`, `image_center` (YAML-only, prefer `align: center`), `image_autocontrast`, `image_invert`, `image_mirror`, `image_high_density`, `image_fragment_height`, `image_chunk_delay_ms` — same names and defaults as `print_message`'s image-pipeline knobs |
+| `image_*` knobs | N/A | `image_width`, `image_dither`, `image_threshold`, `image_impl`, `image_center` (YAML-only, prefer `align: center`), `image_autocontrast`, `image_invert`, `image_mirror`, `image_high_density`, `image_fragment_height`, `image_chunk_delay_ms`; same names and defaults as `print_message`'s image-pipeline knobs |
 
 ### escpos_printer.print_separator
 
@@ -199,12 +199,12 @@ Two-column label/value table for receipt totals, sensor readings, ingredient lis
 
 ### escpos_printer.preview_box
 
-Render a `print_box` layout to a `.txt` file *without* printing. Returns the output path and rendered size so automations can chain a notification or inspect the layout. Has `supports_response: only` — call with `return_response: true`.
+Render a `print_box` layout to a `.txt` file *without* printing. Returns the output path and rendered size so automations can chain a notification or inspect the layout. Has `supports_response: only`: call with `return_response: true`.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| text, style, padding, align, total_width | — | Same fields as `print_box`. `cut` and `feed` are deliberately omitted — a text file has no paper. |
-| output_path | string | Where to save the rendered text. **Must be inside the system temp directory (typically `/tmp`)** — non-admin HA users could otherwise overwrite arbitrary files in `allowlist_external_dirs`. Defaults to `/tmp/escpos_preview_box_<entry>.txt`. To persist the preview elsewhere, copy the returned `path` in a follow-up automation step. |
+| text, style, padding, align, total_width | N/A | Same fields as `print_box`. `cut` and `feed` are deliberately omitted: a text file has no paper. |
+| output_path | string | Where to save the rendered text. **Must be inside the system temp directory (typically `/tmp`)**: non-admin HA users could otherwise overwrite arbitrary files in `allowlist_external_dirs`. Defaults to `/tmp/escpos_preview_box_<entry>.txt`. To persist the preview elsewhere, copy the returned `path` in a follow-up automation step. |
 
 Response shape: `{path, width, line_count, codepage}`.
 
@@ -214,8 +214,8 @@ Render a `print_table` layout to a `.txt` file *without* printing. Same contract
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| rows, style, column_widths, column_aligns, header, row_separators, total_width | — | Same fields as `print_table`. `cut` and `feed` are deliberately omitted — a text file has no paper. |
-| output_path | string | Where to save the rendered text. **Must be inside the system temp directory (typically `/tmp`)** — non-admin HA users could otherwise overwrite arbitrary files in `allowlist_external_dirs`. Defaults to `/tmp/escpos_preview_table_<entry>.txt`. To persist the preview elsewhere, copy the returned `path` in a follow-up automation step. |
+| rows, style, column_widths, column_aligns, header, row_separators, total_width | N/A | Same fields as `print_table`. `cut` and `feed` are deliberately omitted: a text file has no paper. |
+| output_path | string | Where to save the rendered text. **Must be inside the system temp directory (typically `/tmp`)**: non-admin HA users could otherwise overwrite arbitrary files in `allowlist_external_dirs`. Defaults to `/tmp/escpos_preview_table_<entry>.txt`. To persist the preview elsewhere, copy the returned `path` in a follow-up automation step. |
 
 Response shape: `{path, width, line_count, codepage}`.
 
@@ -230,7 +230,7 @@ Response shape: `{path, width, line_count, codepage}`.
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | mode | string | `full` or `partial` (required) |
-| feed_before_cut | boolean | Force-feed a few lines before cutting (default `true`, the printer's own behavior). Set `false` if you've already fed enough paper and want the cut right where it currently sits — `mode` is still honored (a full cut stays a full cut) when the feed is skipped. |
+| feed_before_cut | boolean | Force-feed a few lines before cutting (default `true`, the printer's own behavior). Set `false` if you've already fed enough paper and want the cut right where it currently sits; `mode` is still honored (a full cut stays a full cut) when the feed is skipped. |
 
 ## escpos_printer.beep
 

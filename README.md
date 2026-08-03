@@ -27,11 +27,11 @@ start printing in minutes.
 ## Features
 
 - Print text with formatting (bold, underline, alignment, font sizes)
-- Print QR codes, barcodes, and images — from URLs, files, camera/image entities, or base64 ([guide](docs/images.md))
-- Text effects — boxes, multi-column tables, and custom-font / rotated text ([guide](docs/text-effects.md))
+- Print QR codes, barcodes, and images from URLs, files, camera/image entities, or base64 ([guide](docs/images.md))
+- Text effects: boxes, multi-column tables, and custom-font / rotated text ([guide](docs/text-effects.md))
 - Paper feed and cut control
-- Paper status sensor (network/USB) — automate on paper low / paper out
-- Image-print diagnostics sensor — success/failure counts and last-print details for tuning image options ([guide](docs/images.md#diagnostics-sensor))
+- Paper status sensor (network/USB): automate on paper low / paper out
+- Image-print diagnostics sensor: success/failure counts and last-print details for tuning image options ([guide](docs/images.md#diagnostics-sensor))
 - Buzzer/beeper support
 - UTF-8 text with automatic character conversion
 - 35+ printer profiles with automatic feature detection
@@ -55,7 +55,7 @@ start printing in minutes.
 
 ### Install via HACS
 
-This integration is in the HACS default store — no custom repository needed.
+This integration is in the HACS default store. No custom repository needed.
 
 [![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=cognitivegears&repository=ha-escpos-thermal-printer&category=integration)
 
@@ -112,7 +112,7 @@ data:
   cut: partial
 ```
 
-To print to every configured printer at once, set `broadcast: true` in `data`. (Omitting the target entirely also broadcasts — kept for backward compatibility — but logs a warning when more than one printer is configured.)
+To print to every configured printer at once, set `broadcast: true` in `data`. (Omitting the target entirely also broadcasts, kept for backward compatibility, but logs a warning when more than one printer is configured.)
 
 ### Print a Bordered Header
 
@@ -166,17 +166,17 @@ For ready-to-import scripts and automations see the
 | `escpos_printer.print_message` | Print formatted message via notify entity (supports all text formatting + UTF-8) |
 | `escpos_printer.print_qr` | Print QR codes |
 | `escpos_printer.print_barcode` | Print barcodes (EAN13, CODE128, etc.) |
-| `escpos_printer.print_image` | Print images from URL, file, camera/image entity, or base64 — see [Images guide](docs/images.md) |
-| `escpos_printer.print_image_url` | Focused convenience service for HTTP(S) URLs (UI gets a URL field) — see [Images guide](docs/images.md) |
-| `escpos_printer.print_image_path` | Focused convenience service for local file paths — see [Images guide](docs/images.md) |
+| `escpos_printer.print_image` | Print images from URL, file, camera/image entity, or base64. See [Images guide](docs/images.md) |
+| `escpos_printer.print_image_url` | Focused convenience service for HTTP(S) URLs (UI gets a URL field). See [Images guide](docs/images.md) |
+| `escpos_printer.print_image_path` | Focused convenience service for local file paths. See [Images guide](docs/images.md) |
 | `escpos_printer.print_camera_snapshot` | Print a live snapshot from a `camera.<id>` entity (UI gets an entity picker) |
 | `escpos_printer.print_image_entity` | Print the current frame from an `image.<id>` entity |
-| `escpos_printer.print_box` | Wrap text in a printable border (cp437 / ASCII / asterisk / hash) — see [Text effects guide](docs/text-effects.md) |
-| `escpos_printer.print_table` | Print multi-column rows (receipts, logs) — see [Text effects guide](docs/text-effects.md) |
-| `escpos_printer.print_kvtable` | Print two-column label/value pairs (receipt totals, sensor readings) — see [Text effects guide](docs/text-effects.md) |
+| `escpos_printer.print_box` | Wrap text in a printable border (cp437 / ASCII / asterisk / hash). See [Text effects guide](docs/text-effects.md) |
+| `escpos_printer.print_table` | Print multi-column rows (receipts, logs). See [Text effects guide](docs/text-effects.md) |
+| `escpos_printer.print_kvtable` | Print two-column label/value pairs (receipt totals, sensor readings). See [Text effects guide](docs/text-effects.md) |
 | `escpos_printer.print_separator` | Print a single decorative rule (line of repeated characters) |
-| `escpos_printer.print_text_image` | Render text with a TTF/OTF font and optional 90/180/270° rotation — see [Text effects guide](docs/text-effects.md) |
-| `escpos_printer.preview_image` | Run the image pipeline and write the resulting 1-bit PNG to disk (no paper) — see [Images guide](docs/images.md) |
+| `escpos_printer.print_text_image` | Render text with a TTF/OTF font and optional 90/180/270° rotation. See [Text effects guide](docs/text-effects.md) |
+| `escpos_printer.preview_image` | Run the image pipeline and write the resulting 1-bit PNG to disk (no paper). See [Images guide](docs/images.md) |
 | `escpos_printer.preview_box` | Render a `print_box` layout to a `.txt` file (no paper) |
 | `escpos_printer.preview_table` | Render a `print_table` layout to a `.txt` file (no paper) |
 | `escpos_printer.calibration_print` | Print a ruler + threshold sweep strip so you can pick dither/threshold without burning a roll |
@@ -196,7 +196,7 @@ This integration works with any printer supported by
 
 ## Bluetooth (RFCOMM) printers
 
-Cheap thermal printers (Netum, MUNBYN, POS-58 generics, Phomemo Classic line, etc.) connect over **Bluetooth Classic / RFCOMM**. Pair the printer on the host first, then add it in HA — the integration opens a raw RFCOMM socket to an already-paired device but does not handle pairing itself. Bluetooth Classic is plaintext by default, so don't route sensitive content (OTPs, 2FA codes, door logs) to a BT printer.
+Cheap thermal printers (Netum, MUNBYN, POS-58 generics, Phomemo Classic line, etc.) connect over **Bluetooth Classic / RFCOMM**. Pair the printer on the host first, then add it in HA; the integration opens a raw RFCOMM socket to an already-paired device but does not handle pairing itself. Bluetooth Classic is plaintext by default, so don't route sensitive content (OTPs, 2FA codes, door logs) to a BT printer.
 
 See [docs/bluetooth.md](docs/bluetooth.md) for the full pairing walkthrough, container deployment notes, the `socat` host-bridge fallback, and security considerations.
 
@@ -213,11 +213,11 @@ The [`blueprints/`](blueprints/) directory ships 13 ready-to-import Home Assista
 | Blueprint | Type | Use case |
 |-----------|------|----------|
 | [Shopping List](blueprints/script/escpos_printer/shopping_list.yaml) | Script | Print a `todo` entity as a bordered grocery list. |
-| [TODO List](blueprints/script/escpos_printer/todo_list.yaml) | Script | Generic todo printer — any list, optional completed items, optional numbering. |
+| [TODO List](blueprints/script/escpos_printer/todo_list.yaml) | Script | Generic todo printer: any list, optional completed items, optional numbering. |
 | [Daily Agenda](blueprints/automation/escpos_printer/daily_agenda.yaml) | Automation | Print today's calendar events at a fixed time each day. |
 | [Weather Forecast](blueprints/script/escpos_printer/weather_forecast.yaml) | Script | Print an N-day forecast table. |
 | [Receipt](blueprints/script/escpos_printer/receipt.yaml) | Script | Itemised receipt with subtotal / tax / total. |
-| [Recipe Card](blueprints/script/escpos_printer/recipe_card.yaml) | Script | Kitchen card — name, servings, ingredients, numbered steps. |
+| [Recipe Card](blueprints/script/escpos_printer/recipe_card.yaml) | Script | Kitchen card: name, servings, ingredients, numbered steps. |
 | [Guest Wi-Fi QR](blueprints/script/escpos_printer/guest_wifi_qr.yaml) | Script | Print a scannable Wi-Fi join QR code for guests. |
 | [Sensor Alert](blueprints/automation/escpos_printer/sensor_alert.yaml) | Automation | Print a bordered alert when a sensor reaches a target state. |
 | [TODO Item](blueprints/automation/escpos_printer/todo_item.yaml) | Automation | Print a card per item added to a `todo` entity (fridge-printer style). |
@@ -239,7 +239,7 @@ See [`blueprints/README.md`](blueprints/README.md) for import instructions, per-
 | [Bluetooth printers](docs/bluetooth.md) | Pairing, RFCOMM, container caveats |
 | [Serial printers](docs/serial.md) | Serial/UART setup, ESPHome proxy, write chunking |
 | [Services](docs/services.md) | Service parameter reference |
-| [Images](docs/images.md) | Image printing — sources, processing, reliability, recipes |
+| [Images](docs/images.md) | Image printing: sources, processing, reliability, recipes |
 | [Text effects](docs/text-effects.md) | Boxes, multi-column tables, and custom-font / rotated text |
 | [Automations](docs/automations.md) | Automation examples |
 | [Notifications](docs/notifications.md) | Notify entity and `print_message` service |

@@ -8,8 +8,8 @@ After initial setup, click **Configure** on the integration entry to change thes
 
 Selects your printer model from the bundled [escpos-printer-db](https://github.com/receipt-print-hq/escpos-printer-db) (~35 profiles). The profile determines available codepages, line width options, supported cut modes, and other capabilities.
 
-- **Auto-detect** — works with most printers; use if your model isn't listed.
-- **Custom** — type a profile name from escpos-printer-db manually.
+- **Auto-detect**: works with most printers; use if your model isn't listed.
+- **Custom**: type a profile name from escpos-printer-db manually.
 
 ## Timeout
 
@@ -59,24 +59,24 @@ Maintains a persistent TCP connection. Reduces print latency at the cost of misb
 How often to probe the printer (seconds). Default is `0` (disabled) for network, USB, and Bluetooth; **serial defaults to `300`**. A one-shot status probe still runs at startup regardless of this setting, so the binary sensor doesn't stay unknown even with periodic polling off.
 
 - **Network**: any value works; `0` is fine for most setups since print success/failure already updates the sensor.
-- **USB**: same as network — `0` is fine, since the status sensor is backed by USB device enumeration rather than a live connection.
+- **USB**: same as network; `0` is fine, since the status sensor is backed by USB device enumeration rather than a live connection.
 - **Serial**: defaults to `300` seconds. Serial has no implicit health check from a paper-status poll the way network/USB do, so without periodic polling an unplugged printer would stay "Online" forever. The probe is a silent `os.stat` on the device path, so polling by default costs nothing.
-- **Bluetooth**: defaults to `0` (disabled) — deliberately *not* the serial default, even though Bluetooth also lacks an implicit health check. A status check opens a real RFCOMM connection, and many cheap BT printers audibly beep on every connect; default-on polling would beep every 5 minutes. `60` or higher is accepted, and `1`–`59` is rejected with a form error. The integration auto-skips probes during prints, so aggressive polling has no benefit.
+- **Bluetooth**: defaults to `0` (disabled), deliberately *not* the serial default, even though Bluetooth also lacks an implicit health check. A status check opens a real RFCOMM connection, and many cheap BT printers audibly beep on every connect; default-on polling would beep every 5 minutes. `60` or higher is accepted, and `1`–`59` is rejected with a form error. The integration auto-skips probes during prints, so aggressive polling has no benefit.
 
 ## Allow Local Image URLs
 
-Off by default. When enabled, `print_image_url` (and the other image services) may fetch URLs that resolve to private/LAN/loopback addresses **and** use non-standard ports — e.g. a LAN camera, a Frigate proxy on `:5000`, or your Home Assistant instance on `:8123`. By default only public addresses and ports 80/443 are allowed.
+Off by default. When enabled, `print_image_url` (and the other image services) may fetch URLs that resolve to private/LAN/loopback addresses **and** use non-standard ports, e.g. a LAN camera, a Frigate proxy on `:5000`, or your Home Assistant instance on `:8123`. By default only public addresses and ports 80/443 are allowed.
 
 Cloud-metadata (`169.254.169.254` and AWS IMDSv6 `fd00:ec2::254`), link-local, multicast, reserved, and unspecified addresses stay blocked even when this is on. The fetch carries no auth token, so only unauthenticated endpoints work.
 
-The option is **per-printer** and is evaluated against the printer you print to. Because `print_image_url` has no per-user authorization, enabling it lets any HA user/automation reach LAN hosts/ports through that printer (an SSRF / port-scan oracle) — only enable it where callers are trusted, and prefer camera/image entity sources where possible. See the [Images guide](images.md#allowing-local--lan-urls).
+The option is **per-printer** and is evaluated against the printer you print to. Because `print_image_url` has no per-user authorization, enabling it lets any HA user/automation reach LAN hosts/ports through that printer (an SSRF / port-scan oracle); only enable it where callers are trusted, and prefer camera/image entity sources where possible. See the [Images guide](images.md#allowing-local--lan-urls).
 
 ## Reconfiguring a printer's connection
 
-If a printer's connection details change — a new IP address or port, a moved serial device path, a different USB port, or a re-paired Bluetooth adapter — update the existing entry instead of deleting and re-adding it:
+If a printer's connection details change (a new IP address or port, a moved serial device path, a different USB port, or a re-paired Bluetooth adapter), update the existing entry instead of deleting and re-adding it:
 
 1. **Settings → Devices & services → ESC/POS Thermal Printer**
 2. Click your printer, then **Reconfigure** (in the three-dot menu of the integration entry)
 3. Enter the new connection details
 
-The entry keeps its identity, so entities, automations, blueprints, and device actions keep working. Reconfigure is for *connection* settings; print settings (profile, codepage, line width, timeouts, etc.) live under **Configure** (the options flow) as documented above. Note: USB and Bluetooth reconfiguration must point at the *same physical printer* — re-pointing at a different device is rejected; add a new entry for a new printer.
+The entry keeps its identity, so entities, automations, blueprints, and device actions keep working. Reconfigure is for *connection* settings; print settings (profile, codepage, line width, timeouts, etc.) live under **Configure** (the options flow) as documented above. Note: USB and Bluetooth reconfiguration must point at the *same physical printer*. Re-pointing at a different device is rejected; add a new entry for a new printer.

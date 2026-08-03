@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Documentation punctuation pass: replaced em-dashes across the README,
+  docs/, blueprints/, and repo-root markdown with conventional punctuation.
+
+### Fixed
+
+- **`preview_box` / `preview_table` showed "Translation error:
+  INVALID_ARGUMENT_TYPE" in the service UI.** Their descriptions contained
+  literal `{path, width, line_count, codepage}` text, which the frontend's
+  ICU message parser read as a malformed placeholder. Reworded without
+  braces; a regression test now rejects any non-`{identifier}` braces in
+  user-visible strings.
+- **Seven exception messages showed literal `{placeholder}` text instead
+  of the actual value.** ICU quoting rules treat an apostrophe before `{`
+  as an escape, so `'{value}'` rendered as the literal text `{value}` in
+  the frontend. Those messages now quote values with `"` instead, and the
+  same regression test rejects `'{`/`'<` sequences.
+
 ## [1.0.0] - 2026-08-02
 
 ### Added
@@ -15,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   feed ~6 lines of paper before cutting; set `feed_before_cut: false` to
   skip that feed and save paper when you've already positioned the cut
   point. Defaults to `true` (previous behavior). The selected cut mode
-  (full/partial) is honored either way — the integration emits the
+  (full/partial) is honored either way; the integration emits the
   `GS V` function-B opcode directly when skipping the feed, since
   python-escpos's own `feed=False` path always cuts partial.
 - **Six more hardware barcode types on `print_barcode`**: NW7, GS1-128,
@@ -34,7 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Reconfigure flow** for all four connection types (**Settings** →
   **Devices & services** → printer → **Reconfigure**). A printer whose IP
   address, serial port, USB device, or Bluetooth MAC changes can now be
-  updated in place — previously the only option was delete and re-add,
+  updated in place; previously the only option was delete and re-add,
   which broke every automation targeting the device. Network/serial
   reconfiguration updates the entry identity (the address *is* the
   identity); USB/Bluetooth abort if re-pointed at a different physical
@@ -45,16 +64,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   printer is configured; set `broadcast: true` to fan out intentionally
   (mutually exclusive with `device_id`).
 - **`serial_number` on the device entry for USB printers**, when the
-  device reported one during setup — visible in **Settings** → **Devices
+  device reported one during setup, visible in **Settings** → **Devices
   & services** → device page. Network/Bluetooth/serial transports are
   unaffected.
 - **Service and field names/descriptions are now translatable.** Every
   service (`print_text_utf8`, `print_image`, `print_barcode`, etc.) and
-  their fields — including the collapsed "Image Options"/"Advanced
-  Options" section groups — now have entries under strings.json's new
+  their fields (including the collapsed "Image Options"/"Advanced
+  Options" section groups) now have entries under strings.json's new
   `services` key, generated from `services.yaml` by
   `scripts/sync_service_translations.py` so the two can never drift.
-- **Every service now has an icon** in the automation action picker — 13
+- **Every service now has an icon** in the automation action picker: 13
   of the 22 were missing one.
 - **`print_message`'s High Density and `print_text_image`'s Auto-Resize
   options are now visible in the UI forms** (previously accepted in
@@ -66,7 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   print.** The serial adapter passed the resolved profile *object* into
   python-escpos, whose profile lookup only accepts the profile *name*, so
   any real profile (e.g. TM-T20II) raised `KeyError` on connect. Setup
-  appeared to succeed — the failure only surfaced when printing. The
+  appeared to succeed. The failure only surfaced when printing. The
   default `profile: auto` was unaffected.
 - **Reconfiguring a serial printer silently reset its baudrate to 9600.**
   The stored baudrate (an integer) never matched the reconfigure form's
@@ -80,7 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   selector resolves to a printable python-escpos type.
 - **Reconfiguring a USB printer now preselects the currently configured
   device** in the device dropdown instead of the first discovered one.
-  (Submitting the wrong preselection was already rejected — this fixes
+  (Submitting the wrong preselection was already rejected; this fixes
   the confusing form state, not a data-loss path.)
 - **`print_separator` now clamps its width to the printer's line width**,
   matching `print_box`/`print_table`/`print_kvtable`. Previously a width
@@ -99,14 +118,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   dead `binary_sensor.status` key left over from a since-renamed entity.
 - **Diagnostic-only attributes (connection probe timestamps/latency, last
   image-print stats) no longer get written to the recorder database** on
-  every state change — they're excluded via `_unrecorded_attributes`,
+  every state change; they're excluded via `_unrecorded_attributes`,
   cutting needless history-table churn. The stable `connection_type`
   attribute is still recorded.
 - **The "Online" connectivity sensor could latch on and never report
   offline.** Failed print operations now mark the printer offline
   immediately, and `print_barcode`, `feed`, `cut`, and `beep` now mark it
   online on success (previously only text/QR/image prints did). Invalid
-  barcode payloads deliberately do *not* affect connectivity state — only
+  barcode payloads deliberately do *not* affect connectivity state: only
   real transport failures do.
 - **The "Online" connectivity sensor stayed "unknown" until the first
   print** on a default install, because status polling is off by default
@@ -124,11 +143,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   removed), instead of only ever being created and never deleted.
 - **Diagnostics downloads omitted several options** (serial write
   chunk size/delay, `allow_local_image_urls`, default align/cut,
-  reliability profile) needed for triage — only a hand-picked subset was
+  reliability profile) needed for triage: only a hand-picked subset was
   reported. The full options dict is now included (still redacted).
 - Both `should_poll` sensors (Bluetooth battery, paper status) were
   documented as polling every 5 minutes but had no `SCAN_INTERVAL` set,
-  so they used Home Assistant's 30-second default — 10x more D-Bus
+  so they used Home Assistant's 30-second default: 10x more D-Bus
   round-trips / printer connections than intended.
 - **USB printers that don't report a serial number now get a stable
   unique ID** (`usb:VID:PID`), preventing the same printer from being
@@ -143,10 +162,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   aborts. The form also no longer silently resets a tuned timeout back
   to the default on submit.
 - **USB manual setup rejected the 0x-prefixed hex VID/PID format its own
-  help text recommends** — the fields only accepted bare integers. Hex
+  help text recommends**: the fields only accepted bare integers. Hex
   (`0x04B8`), decimal strings, and plain integers all work now.
 - **Options-flow validation errors displayed as raw keys** (e.g.
-  `invalid_profile`) instead of readable messages — the translations
+  `invalid_profile`) instead of readable messages; the translations
   existed only under the config-flow namespace. The `already_in_progress`
   abort message was also missing.
 - **Opening Options on a Bluetooth printer and pressing Submit silently
@@ -158,7 +177,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   512 px while `calibration_print`/`print_text_image` used 384. Unified
   on 384 (58 mm-safe at 203 dpi; 512 clipped 58 mm heads). Note for 80 mm
   printers without a profile selected: images now print at ~2/3 paper
-  width instead of ~89% — select your printer's profile or set
+  width instead of ~89%: select your printer's profile or set
   `image_width: 576` for full width (see the Images guide, "How the
   target width is chosen").
 - **`print_kvtable` with a tiny `total_width` (3–4) raised a raw internal
@@ -182,18 +201,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Device actions offered cut modes the printer's profile doesn't
   support** (e.g. full cut on partial-only cutters); the choices are now
   profile-gated, matching the config flow.
-- **`print_barcode`** — an explicit `align` was silently overridden by
+- **`print_barcode`**: an explicit `align` was silently overridden by
   the default center-align (`align_ct`); explicit `align` now wins
   unless `align_ct` is also explicitly set (calls setting neither behave
   exactly as before).
-- **`print_text_image`** — the `image_threshold` description wrongly
+- **`print_text_image`**: the `image_threshold` description wrongly
   claimed it applies when `dither` is `"none"`.
 - (internal) Config entries now declare `MINOR_VERSION = 1`; existing v3
   entries left at minor version 0 are normalized on load so future
   minor-version migrations aren't skipped.
 - (internal) Device-to-config-entry resolution now prefers
   `DeviceEntry.config_entry_id` when present, falling back to the
-  deprecated `config_entries` set — forward-compat with HA 2026.8+ ahead
+  deprecated `config_entries` set, forward-compat with HA 2026.8+ ahead
   of that attribute's 2027.8 removal.
 - **A printer connect failure during any print, feed, cut, beep, or
   barcode operation now correctly marks the printer offline and
@@ -228,7 +247,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Image source fields (`image`, `fallback_image`) are no longer
   rendered as Jinja templates inside the integration.** Server-side
   rendering ran without Home Assistant's per-user state-read permission
-  checks. Templates in automations and scripts are unaffected — Home
+  checks. Templates in automations and scripts are unaffected; Home
   Assistant renders those before the service is called. Only raw
   `{{ ... }}` strings typed directly into Developer Tools → Actions are
   now treated as literal text instead of being evaluated.
@@ -260,7 +279,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `Battery1`); enable them from the entity registry if wanted. Existing
   registry entries keep their current enabled state.
 - **`print_text_image` no longer accepts `image_rotation` /
-  `image_align`** — both were silently discarded (the service's own
+  `image_align`**: both were silently discarded (the service's own
   alignment and orientation apply), so passing them is now a validation
   error instead of a no-op.
 - Service-call validation failures (bad URLs/paths, invalid barcode or QR
@@ -274,10 +293,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `print_message`, `print_text_image`, `print_barcode`); UI-only, call
   data is unchanged and existing automations are unaffected. Removed the
   redundant `center` / `image_center` / `align_ct` toggles from the UI
-  forms — they're still accepted in service calls (use `align: center`
+  forms; they're still accepted in service calls (use `align: center`
   instead). Advanced transport knobs no longer require HA "advanced
   mode" (now in the collapsed Advanced Options section).
-- Now available in the HACS default store — installation docs updated to
+- Now available in the HACS default store; installation docs updated to
   drop the custom-repository steps.
 - Dropped `Pillow` and `dbus-fast` from `manifest.json` requirements: both
   are provided by Home Assistant core, and pinning them from a custom
@@ -314,7 +333,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   notify when paper runs low or out. Bluetooth and serial printers
   don't get the sensor: those transports are write-only in this
   integration, and python-escpos reports an empty read as "plenty of
-  paper" — a false OK. The last polled value also appears in the
+  paper", a false OK. The last polled value also appears in the
   diagnostics download as `paper_status`.
 
 - **Serial (UART/RS-232) printer support.** Printers connected via a
@@ -326,19 +345,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   (introduces `SerialPortSelector`) and serialx ≥ 1.7.0 (pinned by HA
   core's `package_constraints.txt`).
 - **Write chunking for ESP32/serial buffer overruns.** Two new options
-  under **Configure** — *Write chunk size* (bytes per write call,
-  0 = disabled) and *Inter-chunk delay* (ms between chunks) — allow
+  under **Configure**: *Write chunk size* (bytes per write call,
+  0 = disabled) and *Inter-chunk delay* (ms between chunks), allow
   the integration to pace output to devices with small UART FIFOs (e.g.
   ESP32 via ESPHome `serial_proxy`). Recommended values: chunk size 128,
   delay 10 ms. Both are validated in the options flow (0–4096 bytes,
   0–1000 ms) to prevent runaway `time.sleep()` calls under the print
   lock. Because serial writes are coalesced and only sent to the wire at
   flush time, the payload is now flushed with error propagation before the
-  connection closes — a failed write (unplugged adapter, dropped proxy)
+  connection closes: a failed write (unplugged adapter, dropped proxy)
   surfaces as a failed print instead of silently reporting success.
 - **Serial printer status sensor.** The binary sensor checks device-path
   ports via `os.stat` + `S_ISCHR` (non-invasive, no open required) and
-  URL-based ports via a brief open/close probe — consistent with the
+  URL-based ports via a brief open/close probe, consistent with the
   Bluetooth reachability model. The probe runs under the operation lock,
   so it never opens a second connection to a URL proxy while a print is in
   flight.
@@ -380,7 +399,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   object at 0x…>`). The 0.7.3 profile fix passed the *resolved profile
   object* into the python-escpos printer constructors, but
   `Escpos.__init__` re-runs that kwarg through `get_profile()`, which
-  only accepts a profile *name* — the object fell through to a dict
+  only accepts a profile *name*; the object fell through to a dict
   lookup keyed by the object itself and every connect raised `KeyError`.
   The adapters now hand over the validated profile name; an unknown
   profile still degrades to the library default with a debug log. The
@@ -390,13 +409,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   SSRF-hardened per-request fetch session sent aiohttp's default
   `Python/3.x aiohttp/…` User-Agent, which CDN/WAF bot rules
   (WordPress/Photon, Cloudflare) often answer with an HTML block page
-  served as 200 — surfacing as `cannot identify image file`. The session
+  served as 200, surfacing as `cannot identify image file`. The session
   now sends HA's own User-Agent (as the pooled clients did pre-0.7) plus
   an Accept header biased toward the decodable image formats.
 - **Undecodable image bytes now produce an actionable error.** Instead
   of Pillow's bare `cannot identify image file <_io.BytesIO …>`, the
   error reports the declared content type, payload size, and the leading
-  bytes — and calls out the likely HTML-error/bot-block page when the
+  bytes, and calls out the likely HTML-error/bot-block page when the
   body looks like HTML.
 
 ## [0.7.3] - 2026-06-12
@@ -410,7 +429,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `ImportError` was swallowed, so the profile was silently dropped at
   connect time. Separately, `get_profile_pixel_width()` read the width
   from the live connection, which is `None` for USB, Bluetooth, and
-  non-keepalive network printers — so the width lookup always missed and
+  non-keepalive network printers, so the width lookup always missed and
   filed a spurious Repairs issue. Width is now read from the configured
   profile object, and the fallback warning/Repairs issue only fires when
   you actually selected a profile that lacks a pixel width (the
@@ -501,7 +520,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   when "Advanced mode" was enabled on your HA user profile; that flag is
   deprecated (removal in HA 2027.6) and newer HA versions hard-wire it
   on, which would have surfaced the field for everyone. The section is
-  always available — expand it to set a non-default channel — and a
+  always available (expand it to set a non-default channel) and a
   refused default channel still routes to the focused channel-retry
   step.
 
@@ -511,8 +530,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **"Allow local image URLs" printer option** (issue #95). Image URL
   fetches (`print_image_url` and the other image services) still reject
-  private/LAN/loopback targets and non-standard ports by default — an
-  SSRF guard — but you can now opt in per-printer (**Configure → "Allow
+  private/LAN/loopback targets and non-standard ports by default (an
+  SSRF guard), but you can now opt in per-printer (**Configure → "Allow
   local image URLs"**) to print from a LAN camera, an NVR/Frigate proxy
   (e.g. `:5000`), a NAS, or your own Home Assistant instance (`:8123`).
   Enabling it lifts both the private-address block and the default-port
@@ -521,7 +540,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   the AWS IMDSv6 endpoint `fd00:ec2::254`), multicast, reserved
   (`240.0.0.0/4`), and unspecified. The fetch sends no auth token, so
   only unauthenticated endpoints work, and `print_image_url` has no
-  per-user authorization — enabling the option lets any HA user or
+  per-user authorization: enabling the option lets any HA user or
   automation reach LAN hosts/ports through that printer. The strict-mode
   rejection messages now point at the new toggle. See
   [docs/images.md](docs/images.md#allowing-local--lan-urls).
@@ -532,7 +551,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `Cannot connect to host <host>:443 ssl:default [None]` (issue #95).
   The DNS-pinning `_StaticResolver` only answered lookups for an
   explicit `AF_INET` / `AF_INET6` family, but `aiohttp.TCPConnector`
-  resolves with `AF_UNSPEC` (0) by default — so every fetch matched no
+  resolves with `AF_UNSPEC` (0) by default, so every fetch matched no
   address bucket and raised a `strerror`-less `OSError` that surfaced as
   the misleading `[None]` connect error. `AF_UNSPEC` now returns all
   pre-validated addresses, each tagged with its real family. The
@@ -551,34 +570,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   pre-existing). Existing scripts created from this blueprint will need
   to be re-saved (HA will show the input as unset on the next edit and
   default it to `auto`). The single-input change is otherwise
-  semantically identical — same border-style options, same default.
+  semantically identical: same border-style options, same default.
 
 ### Added
 
-- **`blueprints/automation/escpos_printer/doorbell_snapshot.yaml`** —
+- **`blueprints/automation/escpos_printer/doorbell_snapshot.yaml`**:
   on doorbell button / motion / state-trigger entity firing, prints a
   titled camera snapshot (via `print_camera_snapshot`) with a "From /
   Time" footer. Configurable rotation, dither mode, and border style.
   The snapshot service call carries `continue_on_error: true` so a
   camera that's offline or mid-reboot still produces the title +
   timestamp slip rather than silently skipping the whole automation.
-- **`blueprints/automation/escpos_printer/morning_briefing.yaml`** —
+- **`blueprints/automation/escpos_printer/morning_briefing.yaml`**:
   single morning slip combining a date header, optional weather
   forecast table, optional today's calendar agenda, and a templated
-  one-line footer. Each section is independently optional — leave the
+  one-line footer. Each section is independently optional: leave the
   matching entity blank to skip. Defensive against null `temperature` /
   `condition` from providers (accuweather, met.no fallback) and against
   all-day calendar events (which return `start` as `{date: "..."}`
-  rather than a string — caught both crashes during pre-merge review).
-- **`blueprints/automation/escpos_printer/trash_reminder.yaml`** —
+  rather than a string, caught both crashes during pre-merge review).
+- **`blueprints/automation/escpos_printer/trash_reminder.yaml`**:
   fires daily at a configured time and looks at the target weekday
   (`offset_days` default 1 = tomorrow's bins; set to 0 with an earlier
   `print_time` for a morning-of reminder). Seven per-weekday text
   inputs hold bin descriptions; empty days silently skip so the
   reminder only prints on the actual pickup days.
-- **`blueprints/automation/escpos_printer/todo_ticket.yaml`** —
+- **`blueprints/automation/escpos_printer/todo_ticket.yaml`**:
   upgraded counterpart to `todo_item`. Per new task, prints a
-  job-ticket slip with a bold double-width title (pure text mode —
+  job-ticket slip with a bold double-width title (pure text mode:
   works on image-less printers), a Due / List / Added KV table,
   optional description, and a QR code linking back to the source task.
   `url_template` is a Jinja template with `uid` / `summary` / `due` /
@@ -588,17 +607,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   configurable via the `header_text` input. New-item detection diffs
   on `uid` first (with summary fallback) so two tasks with the same
   title don't dedup and renames don't look like add+drop.
-- **`blueprints/script/escpos_printer/guest_wifi_qr.yaml`** — prints
+- **`blueprints/script/escpos_printer/guest_wifi_qr.yaml`**: prints
   a scannable Wi-Fi QR encoding the standard
   `WIFI:T:<auth>;S:<ssid>;P:<pass>;H:<hidden>;;` URI (supported by iOS
   / Android / most laptop camera apps), with proper backslash-escaping
   of reserved characters in SSID and password, plus optional plaintext
   fallback for devices without a QR scanner.
-- **`blueprints/UNIFI_GUEST_WIFI.md`** — opinionated, ~10-minute
+- **`blueprints/UNIFI_GUEST_WIFI.md`**: opinionated, ~10-minute
   recipe pairing the Guest Wi-Fi QR blueprint with the **official HA
   UniFi integration**. One shell script (`unifi_wifi.sh` with `read` /
   `rotate` actions) that pulls credentials directly from HA's existing
-  UniFi config entry (`.storage/core.config_entries`) via `jq` — no
+  UniFi config entry (`.storage/core.config_entries`) via `jq`: no
   `.env` dotfiles, no separate `input_text` helpers, no `secrets.yaml`
   edit, no duplicate secret storage. The script handles UniFi OS
   cookie auth + CSRF token extraction; rotation generates a 16-char
@@ -615,7 +634,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   credentials live, argv visibility window, tempfile cleanup, password
   strength + alphabet inconsistency, printed-paper exposure, recorder
   DB retention, and the on-LAN MITM threat model for `--insecure`.
-- **`blueprints/README.md`** — table rows, import badges, and
+- **`blueprints/README.md`**: table rows, import badges, and
   per-blueprint notes for the five new entries (including
   back-end-specific URL patterns for the TODO Ticket blueprint, an
   emoji-rendering caveat for text-mode summaries, and a TODO Item /
@@ -623,7 +642,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   splitting two long sections into their own files (see below); now
   acts as the catalogue index with brief per-blueprint notes and
   pointers to the deeper guides.
-- **`blueprints/AUTHORING.md`** (new) — the full blueprint-authoring
+- **`blueprints/AUTHORING.md`** (new): the full blueprint-authoring
   guide split out of the README. Covers the drop-in workflow for
   private blueprints, key HA concepts (`!input` substitution,
   `mode:` placement, selectors, Jinja rendering at call time),
@@ -637,14 +656,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   pipeline), modifying existing blueprints, and resources. Closes
   the discoverability gap where the only authoring guidance lived
   in `CLAUDE.md`.
-- **`blueprints/GUEST_WIFI_QR.md`** (new) — Guest Wi-Fi QR setup
+- **`blueprints/GUEST_WIFI_QR.md`** (new): Guest Wi-Fi QR setup
   guide split out of the README's per-blueprint notes (which had
   grown to ~65 lines of effectively-a-tutorial under what should be
   a 3-line note). Covers the 2-minute Quick start, helper-backed
   credentials, automated rotation pointer, and ZXing WIFI URI
   format details. `UNIFI_GUEST_WIFI.md`'s "Don't need automation?"
   callout now points here rather than at the README. The Guest Wi-Fi QR section now leads
-  with a "Quick start (works on any router — about 2 minutes)" 6-step
+  with a "Quick start (works on any router, about 2 minutes)" 6-step
   walk-through that gets a non-technical user from blueprint import
   to a printed scan-ready slip without touching YAML or shell
   scripts. Beneath it: a "store credentials in helpers" step for
@@ -654,13 +673,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   reminder fallback for ISP modems / consumer APs with no API.
   Format / ZXing details moved to the bottom so they don't
   intimidate first-time users. Includes a security note about the
-  TODO Ticket `url_template` input — it's rendered with HA's full
+  TODO Ticket `url_template` input: it's rendered with HA's full
   template scope, so a malicious fork could exfiltrate secrets via
   the QR payload (humans don't read QRs; their phones do).
 
 ### Fixed
 
-- **`blueprints/automation/escpos_printer/trash_reminder.yaml`** —
+- **`blueprints/automation/escpos_printer/trash_reminder.yaml`**:
   inlined `now() + timedelta(...)` into the `target_day_name` /
   `target_label` templates. HA's `render_complex` evaluates each
   `variables:` entry with `parse_result=True`, which stringifies any
@@ -674,7 +693,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - **`blueprints/script/escpos_printer/recipe_card.yaml` and
-  `receipt.yaml`** — both bundled scripts swapped their large serif
+  `receipt.yaml`**: both bundled scripts swapped their large serif
   header from `print_text_image` (raster) to `print_text_utf8`
   (double-width / double-height / bold, text-mode). The
   image-rendered headers looked nicer but failed silently on the
@@ -683,10 +702,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   budget USB models). Text-mode headers print on every supported
   printer and still transcode UTF-8 (accents, smart quotes) via the
   codepage. Users who specifically want the typographic header can
-  re-add `print_text_image` in a fork — it's a one-line change in
+  re-add `print_text_image` in a fork: it's a one-line change in
   each blueprint.
 - **`blueprints/script/escpos_printer/recipe_card.yaml` and
-  `blueprints/automation/escpos_printer/todo_ticket.yaml`** — text
+  `blueprints/automation/escpos_printer/todo_ticket.yaml`**: text
   sanitiser chain now strips `\r` (left over from Windows `\r\n` line
   endings after splitting on `\n`) in ingredient/step rows and in
   task descriptions. Previously, pasted-from-Windows content rendered
@@ -696,7 +715,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added (CI / tooling)
 
-- **`scripts/extract_markdown_bash.py`** — extracts fenced ```bash```
+- **`scripts/extract_markdown_bash.py`**: extracts fenced ```bash```
   blocks from `blueprints/*.md`, writes them to tempfiles, runs
   `shellcheck`, and (for blocks that include the password-generator
   pipeline) executes the pipeline 10 times under `set -euo pipefail`
@@ -718,7 +737,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   SIGPIPE pattern must trip the warning; a fixture with the scoped
   pipefail + length assertion must pass.
 - **`pymarkdown`** wired in via pre-commit (config at
-  `.pymarkdown.json`) — disables MD013 (line length, incompatible with
+  `.pymarkdown.json`): disables MD013 (line length, incompatible with
   prose-style markdown), MD036 (bold-as-pseudo-heading is intentional
   for `**Inputs:**` / `**Notes:**` in-paragraph labels), narrows MD024
   to siblings-only (so the CHANGELOG's repeated `### Added` headings
@@ -727,7 +746,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   callout-prefixed docs). Hook scope: **every `.md` file** the repo
   tracks (excluding `dist/`, `.full-review/`, build / cache dirs).
   All 31 existing markdown files now lint clean.
-- **`scripts/md_fix.py`** — safe targeted fixer for MD022 / MD031 /
+- **`scripts/md_fix.py`**: safe targeted fixer for MD022 / MD031 /
   MD032 / MD040 (the four "missing blank lines" / "missing language
   tag" rules that account for >95% of findings on existing docs).
   Required because `pymarkdown fix` has two demonstrated bugs against
@@ -740,7 +759,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   (never touches code-block interior), never alters list-marker
   characters, never adjusts indentation. Reduces a 74-finding
   scan-result over the full doc set to 3 findings in one pass.
-- **`.pre-commit-config.yaml`** — the `validate-blueprints` hook's
+- **`.pre-commit-config.yaml`**: the `validate-blueprints` hook's
   file scope widened to `.yaml|.yml`; new `extract-markdown-bash` hook
   fires on `blueprints/*.md` changes; new `pymarkdown` hook fires on
   any tracked markdown file.
@@ -754,79 +773,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   previously accepted any path inside `allowlist_external_dirs`. After
   security hardening (a non-admin HA user could otherwise call
   `preview_image` with `output_path: /config/configuration.yaml` and
-  clobber it with rendered PNG bytes — CWE-862/CWE-552), user-supplied
+  clobber it with rendered PNG bytes, CWE-862/CWE-552), user-supplied
   `output_path` values outside the system temp directory are rejected
   with `HomeAssistantError`. If your automation needs the file in
   `/config/www/`, add a second step that copies the returned `path`.
 
 ### Added
 
-- **Text-effects services** — seven new services for receipt-style
+- **Text-effects services**: seven new services for receipt-style
   layouts that work within the 1-col-per-glyph thermal text mode:
-  - `escpos_printer.print_box` — wraps text in a printable border.
+  - `escpos_printer.print_box`: wraps text in a printable border.
     `style: auto` picks Unicode single-line `┌─┐` on CP437-capable
     profiles and falls back to ASCII (`+-+`) elsewhere; explicit
     `single` / `double` / `ascii` / `asterisk` / `hash` are honored
     when the user wants a specific look.
-  - `escpos_printer.print_table` — multi-column rows with per-column
+  - `escpos_printer.print_table`: multi-column rows with per-column
     `column_aligns` (`left` / `center` / `right`), optional header
     separator, and the same border-style picker as `print_box`.
-  - `escpos_printer.print_kvtable` — two-column label/value pairs
+  - `escpos_printer.print_kvtable`: two-column label/value pairs
     (subtotals, sensor readings, receipt totals) with auto-aligned
     values on the right edge of the printable width.
-  - `escpos_printer.print_separator` — a single decorative rule
+  - `escpos_printer.print_separator`: a single decorative rule
     (line of repeated characters) at the current printable width.
-  - `escpos_printer.print_text_image` — renders text via a TTF/OTF
+  - `escpos_printer.print_text_image`: renders text via a TTF/OTF
     font (DejaVu trio bundled, custom fonts dropped into
     `<config>/fonts/` or anywhere in `allowlist_external_dirs`),
     rasterises to a 1-bit image, and prints. Supports 90/180/270°
-    rotation, font size, alignment, threshold dither — useful for
+    rotation, font size, alignment, threshold dither, useful for
     glyphs the printer's codepage doesn't carry (CJK, emoji,
     decorative scripts).
-  - `escpos_printer.preview_box` / `escpos_printer.preview_table` —
+  - `escpos_printer.preview_box` / `escpos_printer.preview_table`:
     render the same layouts to a `.txt` file in the system tempdir
     (default `/tmp/escpos_preview_<entry>.txt`) without printing, so
     users can tune column widths and border styles without burning
     paper. Returns `{path, width, line_count, codepage}` so a
     follow-up step can copy the file or chain a notification.
-- **Bundled DejaVu fonts** — `DejaVuSans.ttf`, `DejaVuSansMono.ttf`,
+- **Bundled DejaVu fonts**: `DejaVuSans.ttf`, `DejaVuSansMono.ttf`,
   `DejaVuSerif.ttf` (release 2.37) ship with the integration for
   `print_text_image` to work out of the box. Bitstream Vera license
   text included at `custom_components/escpos_printer/fonts/LICENSE`
   and `NOTICE` at the repo root.
 - **Auto-created `<config>/fonts/` directory** on integration setup.
   Any TTF/OTF dropped in is trusted by `print_text_image.font_path`
-  without needing an `allowlist_external_dirs` entry — removes the
+  without needing an `allowlist_external_dirs` entry: removes the
   "I dropped a font in /config/fonts/ and got an allowlist error"
   friction. Files anywhere else still go through the standard
   allowlist check.
-- **Bundled HA blueprints** in `blueprints/` — eight ready-to-import
+- **Bundled HA blueprints** in `blueprints/`, eight ready-to-import
   scripts and automations exercising the text-effects services:
   - Scripts: `shopping_list`, `todo_list`, `weather_forecast`,
     `receipt`, `recipe_card`.
   - Automations: `daily_agenda`, `sensor_alert`, `todo_item`.
   - `blueprints/README.md` documents import instructions, per-input
     semantics, and troubleshooting.
-- **`scripts/validate_blueprints.py`** — YAML structural validator
+- **`scripts/validate_blueprints.py`**: YAML structural validator
   that tolerates HA's custom `!input` tag, enforces that each
   blueprint sits under a directory matching its
   `blueprint.domain` (`script` or `automation`), and is wired into
   pre-commit via the new `validate-blueprints` hook plus a CI test
   in `tests/test_blueprints_yaml.py`.
-- **`wcwidth==0.2.13`** runtime dependency — `text_effects.width`
+- **`wcwidth==0.2.13`** runtime dependency: `text_effects.width`
   uses it for visual-column measurement so CJK / fullwidth / emoji
   columns line up correctly under the printer's 1-col-per-glyph text
   mode (a naive `len()` silently misaligns).
-- **`security.validate_font_path()`** — validates `print_text_image`
+- **`security.validate_font_path()`**: validates `print_text_image`
   font paths for extension (`.ttf` / `.otf`), file size, symlink
   resolution, and regular-file status, independent of where the path
   lives.
-- **`security.validate_rows()`** — typed validator for `print_table`
+- **`security.validate_rows()`**: typed validator for `print_table`
   rows that enforces consistent column counts, coerces cells to
   strings, and bounds total cell count to protect against
   paper-waste DoS.
-- **`security.open_local_font_no_follow()` / `open_local_image_no_follow()`**
-  — shared `O_NOFOLLOW`-based reader used by font and image
+- **`security.open_local_font_no_follow()` / `open_local_image_no_follow()`**:
+  shared `O_NOFOLLOW`-based reader used by font and image
   validators (refactored from the existing image-only path).
 
 ### Changed
@@ -877,7 +896,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **DNS-rebinding hardening also applies to redirects.** Each
   redirect hop in `_resolve_http_aiohttp` runs through the validator
   again and gets a fresh DNS pin via a new `_StaticResolver`.
-- **Status-vs-print serialisation hardened** — network / USB /
+- **Status-vs-print serialisation hardened**: network / USB /
   Bluetooth `_status_check` skip when the per-adapter print lock
   is held, eliminating a flap-during-print race on bandwidth-
   constrained transports.
@@ -904,7 +923,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   a notification. Tune `dither`/`threshold`/`image_width` in Developer
   Tools instead of burning paper.
 - **Focused convenience services.** `print_camera_snapshot`,
-  `print_image_entity`, `print_image_url`, and `print_image_path` —
+  `print_image_entity`, `print_image_url`, and `print_image_path`:
   each takes only the relevant field with a proper UI selector (camera/
   image entity picker; URL or path text), funneling into the same handler
   as `print_image`. All focused services now expose the **full image
@@ -924,34 +943,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **`invert` and `mirror` options** for `print_image` / notify image
   attachments (white-on-black logos, dark-mode QRs, receipt-window
   displays).
-- **`auto_resize` option** — accepts source images up to 40 MB and
+- **`auto_resize` option**: accepts source images up to 40 MB and
   downscales them before processing. Removes the friction of "image
   too large" errors on iPhone HEIC / high-res camera snapshots.
-- **`fallback_image` option** — if the primary source fails to
+- **`fallback_image` option**: if the primary source fails to
   resolve (camera unavailable, URL down, file missing), the integration
   retries the fallback once. Camera/HTTP sources also get a single
   automatic retry with a 500 ms back-off.
 - **HEIC / HEIF / AVIF support** when `pillow-heif` is installed (soft
-  dependency — no impact on existing setups). iOS-fed camera proxies
+  dependency, no impact on existing setups). iOS-fed camera proxies
   emit HEIC natively.
-- **Notify entity accepts unprefixed image keys** — `dither`, `threshold`,
+- **Notify entity accepts unprefixed image keys**: `dither`, `threshold`,
   `rotation`, `invert`, etc. work on `notify.<printer>` without the
   `image_` prefix. Prefixed names still work; prefixed wins on collision.
 - **Repair issue** when the printer profile doesn't expose
   `media.width.pixels`. Surfaces the silent 512-px fallback in the HA
   UI with actionable guidance instead of a buried log line.
-- **Last image-print diagnostic sensor** — exposes `total_prints`,
+- **Last image-print diagnostic sensor**: exposes `total_prints`,
   `total_failures`, decoded dimensions, slice count, last error class
   as a polled diagnostic sensor on each printer device.
-- **Plain-English `impl` dropdown labels** in the UI — "Raster
-  (default — Epson)" / "Graphics (newer ESC/POS)" / "Column (legacy
+- **Plain-English `impl` dropdown labels** in the UI: "Raster
+  (default: Epson)" / "Graphics (newer ESC/POS)" / "Column (legacy
   POS-58/80)" instead of the raw python-escpos identifiers.
 - **Image sources for `print_image` and notify entities.** `image:` now
   accepts URLs (`http://`, `https://`), local file paths, Home Assistant
   camera entities (`camera.<id>`), image entities (`image.<id>`), base64
   data URIs, and Jinja templates that render to any of the above. See
   `docs/images.md`.
-- **New `print_image` options** — `image_width`, `rotation`, `dither`
+- **New `print_image` options**: `image_width`, `rotation`, `dither`
   (`floyd-steinberg` / `none` / `threshold`), `threshold`, `impl`
   (`bitImageRaster` / `graphics` / `bitImageColumn`), `center`,
   `autocontrast`, `fragment_height`, `chunk_delay_ms`. Defaults are
@@ -965,7 +984,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   one-time WARNING when the profile doesn't expose it).
 - **Image-pipeline diagnostics** in `runtime.image_pipeline` of the
   config-entry diagnostics dump (source kind, last decoded dimensions,
-  total prints / failures, last error class — never URLs or paths).
+  total prints / failures, last error class; never URLs or paths).
 - **GitHub issue template `bug-image.yml`** for structured image-bug
   reports (HA version, printer profile, source kind, image dimensions).
 - **Semgrep rules** under `.github/semgrep/escpos.yml` enforcing
@@ -980,12 +999,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   so another caller can't interleave between the text and image halves.
   Image bytes are pre-resolved *outside* the lock so a slow camera
   doesn't monopolize the printer.
-- **Default `chunk_delay_ms` is now strictly transport-bound** — the
+- **Default `chunk_delay_ms` is now strictly transport-bound**: the
   schema no longer carries a 50 ms default that penalized Network/USB
   callers. Network/USB defaults to 0 ms, Bluetooth to 50 ms, and the
   per-printer Reliability profile can override either.
-- **`impl` and `fragment_height` no longer have schema-level defaults**
-  — they fall through to the per-printer Reliability profile (Auto
+- **`impl` and `fragment_height` no longer have schema-level defaults**:
+  they fall through to the per-printer Reliability profile (Auto
   picks `bitImageRaster` / 256). Service-call values always win.
 - **`MAX_PROCESSED_HEIGHT` error message** now suggests `image_width` /
   `rotation` as the concrete fix instead of just naming the cap.
@@ -998,7 +1017,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   rotate/resize for a ~3-4× speedup and ~3× peak-memory reduction on
   RGBA inputs.
 - **RGBA / alpha-channel images are flattened onto a white background**
-  before dithering — transparent pixels now render as white on the
+  before dithering: transparent pixels now render as white on the
   paper instead of black.
 - **Pillow pinned to `==12.0.0`** in `pyproject.toml` for dev/CI
   reproducibility. `manifest.json` keeps a range to match Home Assistant
@@ -1038,8 +1057,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `Content-Length` is honored before reading. Connection / per-chunk
   read timeouts replace the single total timeout.
 - **`_resolve_http` aiohttp fallback narrowed** to `ImportError` only
-  (previously triggered on every httpx exception including HTTP 4xx
-  — which silently bypassed HA's middleware) and now uses HA's pooled
+  (previously triggered on every httpx exception including HTTP 4xx,
+  which silently bypassed HA's middleware) and now uses HA's pooled
   `async_get_clientsession(hass)` rather than constructing a per-request
   `ClientSession`.
 - **Log redaction extended.** `sanitize_log_message` now also redacts
@@ -1067,11 +1086,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `print_qr` now calls `_mark_success()` so the binary-sensor status
   refreshes after a successful QR print (parity with `print_text` and
   `print_image`).
-- Eager slice materialisation in `print_image` removed — slices are
+- Eager slice materialisation in `print_image` removed: slices are
   cropped just-in-time inside the send loop, roughly halving peak
   resident memory on tall images.
 - Pipeline now enforces a `MAX_PROCESSED_HEIGHT = 8192` cap and a
-  `MAX_SLICES = 64` cap per print — protects against paper-waste DoS.
+  `MAX_SLICES = 64` cap per print: protects against paper-waste DoS.
 - `print_image` cancellation now applies a best-effort cut+feed in a
   `finally` block, so cancelling mid-loop no longer leaves the paper
   mid-image.
@@ -1080,7 +1099,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Image processing pipeline reordered (convert to grayscale before
   rotate/resize). LANCZOS now runs on 1 byte/pixel instead of 3-4
-  bytes/pixel — ~3-4× speedup, ~3× peak-memory reduction on RGBA inputs.
+  bytes/pixel: ~3-4× speedup, ~3× peak-memory reduction on RGBA inputs.
 - `_get_profile_pixel_width()` cached per adapter (previously walked
   python-escpos profile data on every print).
 - `image_processor` threshold dithering now uses a cached LUT instead
@@ -1119,7 +1138,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   (printer I/O serialization is enforced separately by adapter locks).
 - **`EscposOnlineSensor`** now sets `_attr_entity_category = DIAGNOSTIC`,
   matching the battery sensor and satisfying `entity-category`.
-- **`security.yml` SARIF upload fixed** — emits `bandit -f sarif` instead
+- **`security.yml` SARIF upload fixed**: emits `bandit -f sarif` instead
   of uploading non-SARIF JSON. Previously the Security tab silently
   received nothing.
 - **`dependabot-auto-sync.yml` hardened** with a same-repo guard
@@ -1165,7 +1184,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Removed
 
 - `tox.ini`, `.bandit`, `scripts/security_scan.py`,
-  `scripts/framework_smoke_test.py`, `scripts/test_network_printer.py` —
+  `scripts/framework_smoke_test.py`, `scripts/test_network_printer.py`:
   vestigial relative to the canonical `uv run pytest` / `bandit -lll`
   invocations.
 - Stale `[tool.mypy] exclude` entries for nonexistent
@@ -1187,12 +1206,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `image` field still accepts the same literal strings it always did
   (URL, file path, `camera.<id>`, `image.<id>`, base64). The UI now also
   renders Jinja templates, so a literal path may appear inside a code-
-  style editor when you edit the automation — that's expected; the value
+  style editor when you edit the automation. That's expected; the value
   itself is unchanged.
 - For a friendlier UI, switch to the focused service that matches your
   source type: `print_image_url`, `print_image_path` (new),
   `print_camera_snapshot`, or `print_image_entity`. All accept the same
-  image-processing options. Migration is optional — `print_image` stays
+  image-processing options. Migration is optional: `print_image` stays
   fully supported and remains the right choice when the source is
   computed by a template.
 
@@ -1281,7 +1300,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - CI: `ruff`, `mypy`, and `--cov-fail-under=85` are now enforced in
   `validate.yml`. A separate `integration-tests` job runs the
   `pytest -m integration` suite (TCP-loopback against the in-tree
-  emulator — no real radio required).
+  emulator, no real radio required).
 - Tag-driven release workflow (`release.yml`) with version-sync
   verification.
 - `scripts/check_version_sync.py` enforces that `manifest.json::version`
@@ -1315,7 +1334,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [0.4.4] - prior
 
-Earlier releases — see git history.
+Earlier releases: see git history.
 
 [Unreleased]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.8.0...v1.0.0

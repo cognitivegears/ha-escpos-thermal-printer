@@ -26,9 +26,9 @@ If you don't already have a way to run shell commands on the HA host, install th
 
 > The official **Terminal & SSH** add-on also works. The "Advanced" version is recommended because it runs in the host context where `bluetoothctl` is available.
 
-Power on your printer and put it within ~10 metres of the HA host. Some printers need to be put into pairing mode first — usually by holding the power button until an LED blinks rapidly. Check your printer's manual.
+Power on your printer and put it within ~10 metres of the HA host. Some printers need to be put into pairing mode first, usually by holding the power button until an LED blinks rapidly. Check your printer's manual.
 
-### Step 1 — Check whether the printer is already visible
+### Step 1: Check whether the printer is already visible
 
 HA's Bluetooth integration usually scans in the background, so your printer may already be known to BlueZ. In the terminal, run:
 
@@ -49,7 +49,7 @@ If your printer is in the list, **skip to Step 3**. If the list is long, filter 
 bluetoothctl devices | grep -i mpt
 ```
 
-### Step 2 — Scan manually (only if the printer wasn't listed)
+### Step 2: Scan manually (only if the printer wasn't listed)
 
 ```bash
 bluetoothctl scan on
@@ -64,7 +64,7 @@ bluetoothctl devices
 
 The printer should now appear. Note the MAC address (the `XX:XX:XX:XX:XX:XX` value).
 
-### Step 3 — Pair and trust
+### Step 3: Pair and trust
 
 Replace `XX:XX:XX:XX:XX:XX` with your printer's MAC address:
 
@@ -73,11 +73,11 @@ bluetoothctl pair XX:XX:XX:XX:XX:XX
 bluetoothctl trust XX:XX:XX:XX:XX:XX
 ```
 
-You should see `Pairing successful` and `Trusted: yes`. **`trust` is what tells BlueZ to auto-reconnect after a reboot — don't skip it.**
+You should see `Pairing successful` and `Trusted: yes`. **`trust` is what tells BlueZ to auto-reconnect after a reboot; don't skip it.**
 
-If you're prompted for a PIN, try `0000` or `1234` — these are the most common defaults for cheap thermal printers.
+If you're prompted for a PIN, try `0000` or `1234`; these are the most common defaults for cheap thermal printers.
 
-### Step 4 — Verify
+### Step 4: Verify
 
 ```bash
 bluetoothctl devices Paired
@@ -85,7 +85,7 @@ bluetoothctl devices Paired
 
 The printer should be in this list. You can also check `bluetoothctl devices Trusted` and `bluetoothctl devices Connected`.
 
-### Step 5 — Add the integration in HA
+### Step 5: Add the integration in HA
 
 1. Go to **Settings → Devices & Services**
 2. Click **Add Integration** and search for **ESC/POS Thermal Printer**
@@ -97,7 +97,7 @@ The printer should be in this list. You can also check `bluetoothctl devices Tru
 
 The dropdown filters to imaging-class Bluetooth devices by default so your phone and headset don't clutter the list. If your printer doesn't advertise the Class-of-Device correctly (some cheap models don't), pick **Show all paired Bluetooth devices** from the dropdown. Or use **Manual MAC entry** if you already know the address.
 
-The **RFCOMM channel** is hidden by default — almost every ESC/POS printer uses channel 1. If the connection test fails with `bt_channel_refused` you'll be prompted for a different one. Power users can also enable HA's *Advanced Mode* in their profile to surface the field up-front.
+The **RFCOMM channel** is hidden by default; almost every ESC/POS printer uses channel 1. If the connection test fails with `bt_channel_refused` you'll be prompted for a different one. Power users can also enable HA's *Advanced Mode* in their profile to surface the field up-front.
 
 ### No paired devices found
 
@@ -106,7 +106,7 @@ If the picker shows **No paired Bluetooth printers found**:
 - The host can't see any paired BT devices, *or*
 - bluez D-Bus isn't reachable from the HA process (most likely on HA Container without `/run/dbus` mounted, or rootless Docker).
 
-Pair the printer first using the steps above, or — if you already know the MAC — submit the form to enter it manually. The data plane works without bluez D-Bus as long as `AF_BLUETOOTH` is reachable.
+Pair the printer first using the steps above, or, if you already know the MAC, submit the form to enter it manually. The data plane works without bluez D-Bus as long as `AF_BLUETOOTH` is reachable.
 
 ## Connection settings
 
@@ -114,7 +114,7 @@ Pair the printer first using the steps above, or — if you already know the MAC
 |---------|-------------|---------|
 | Bluetooth device | Picked from paired devices, or **Manual MAC entry** | Required |
 | MAC address | `AA:BB:CC:DD:EE:FF` (manual entry only) | Required |
-| RFCOMM channel | Service channel — 1 for almost every ESC/POS printer | 1 |
+| RFCOMM channel | Service channel: 1 for almost every ESC/POS printer | 1 |
 | Timeout | Connect timeout (seconds) | 4.0 |
 | Printer Profile | Your printer model | Auto-detect |
 
@@ -124,7 +124,7 @@ Almost every ESC/POS printer exposes SPP on **channel 1**. If you get `bt_channe
 
 ```bash
 bluetoothctl info AA:BB:CC:DD:EE:FF
-# Look for the SerialPort service-record entry — its "Channel:" line is
+# Look for the SerialPort service-record entry; its "Channel:" line is
 # the value to use.
 ```
 
@@ -147,13 +147,13 @@ services:
     restart: unless-stopped
 ```
 
-These settings substantially weaken Docker's isolation — see [Security considerations](#security-considerations) before adopting them. **If you care about container isolation, use the [`socat` host bridge](#host-bridge-fallback-socat) instead.**
+These settings substantially weaken Docker's isolation; see [Security considerations](#security-considerations) before adopting them. **If you care about container isolation, use the [`socat` host bridge](#host-bridge-fallback-socat) instead.**
 
 **Rootless Docker / Podman** is not supported because of a known D-Bus EXTERNAL-auth limitation; use the host bridge.
 
 ## Host bridge fallback (`socat`)
 
-If exposing bluez D-Bus to your container isn't workable, run `socat` on the host as a one-line bridge and use the integration's existing **Network (TCP/IP)** flow instead — zero new code path, no privilege grants:
+If exposing bluez D-Bus to your container isn't workable, run `socat` on the host as a one-line bridge and use the integration's existing **Network (TCP/IP)** flow instead: zero new code path, no privilege grants.
 
 ```bash
 # Install socat once: apt install socat
@@ -164,7 +164,7 @@ Add the printer in HA as a network printer at `127.0.0.1:9100`.
 
 ## Battery sensor
 
-For BT printers that expose `org.bluez.Battery1`, a `sensor.<printer>_battery` entity is created reporting % charge. Most cheap thermal printers don't expose this and the sensor stays unavailable; portable models (Phomemo M02, newer Netum firmware, some Cashino models) do. The entity is **disabled by default** (diagnostic-style, since most printers won't populate it) — enable it from the entity's settings in the entity registry if your printer supports it.
+For BT printers that expose `org.bluez.Battery1`, a `sensor.<printer>_battery` entity is created reporting % charge. Most cheap thermal printers don't expose this and the sensor stays unavailable; portable models (Phomemo M02, newer Netum firmware, some Cashino models) do. The entity is **disabled by default** (diagnostic-style, since most printers won't populate it); enable it from the entity's settings in the entity registry if your printer supports it.
 
 ## Security considerations
 
@@ -179,19 +179,19 @@ Bluetooth Classic / RFCOMM has security properties you should understand before 
 
 ### Pairing problems
 
-- **Printer doesn't appear in `bluetoothctl devices` even after scanning** — Power-cycle the printer, make sure it's in pairing mode (often signalled by a fast-blinking LED), and confirm it's within ~10 m of the HA host. Some printers stop advertising after a minute or two.
-- **`bluetoothctl pair` fails or times out** — Try again with the printer freshly powered on. If prompted for a PIN, try `0000` or `1234`. Some printers need to be removed first: `bluetoothctl remove XX:XX:XX:XX:XX:XX`, then re-pair.
-- **Printer disappears after rebooting HA** — You skipped `bluetoothctl trust`. Run it now; trusting is what tells BlueZ to auto-reconnect.
-- **`bluetoothctl` command not found** — You're probably in the standard **Terminal & SSH** add-on which runs in a restricted container. Switch to the **Advanced SSH & Web Terminal** add-on, which runs in the host context.
+- **Printer doesn't appear in `bluetoothctl devices` even after scanning**: Power-cycle the printer, make sure it's in pairing mode (often signalled by a fast-blinking LED), and confirm it's within ~10 m of the HA host. Some printers stop advertising after a minute or two.
+- **`bluetoothctl pair` fails or times out**: Try again with the printer freshly powered on. If prompted for a PIN, try `0000` or `1234`. Some printers need to be removed first: `bluetoothctl remove XX:XX:XX:XX:XX:XX`, then re-pair.
+- **Printer disappears after rebooting HA**: You skipped `bluetoothctl trust`. Run it now; trusting is what tells BlueZ to auto-reconnect.
+- **`bluetoothctl` command not found**: You're probably in the standard **Terminal & SSH** add-on which runs in a restricted container. Switch to the **Advanced SSH & Web Terminal** add-on, which runs in the host context.
 
 ### HA-side problems
 
-- **"No paired Bluetooth printers found" in the config flow** — Restart Home Assistant after pairing (**Settings → System → Restart**). If it still doesn't appear, use **Manual MAC entry** with the address from `bluetoothctl devices`.
-- **`bt_unavailable`** — Kernel doesn't expose `AF_BLUETOOTH`. HA Container without `--net=host` is the typical culprit.
-- **`bt_permission_denied`** — HA process lacks Bluetooth socket permission. Add to the `bluetooth` group on bare Linux.
-- **`bt_device_not_found`** — Printer was never paired on the host, or pairing didn't persist. Re-run Steps 3–4.
-- **`bt_host_down`** — Printer powered off, out of range, or already connected to another host (phones in particular like to grab BT printers).
-- **`bt_channel_refused`** — Wrong RFCOMM channel; almost always means use 1. See "Confirming the RFCOMM channel" above.
-- **Paired-device list empty in the flow** — D-Bus not reachable; the flow falls through to manual MAC entry.
+- **"No paired Bluetooth printers found" in the config flow**: Restart Home Assistant after pairing (**Settings → System → Restart**). If it still doesn't appear, use **Manual MAC entry** with the address from `bluetoothctl devices`.
+- **`bt_unavailable`**: Kernel doesn't expose `AF_BLUETOOTH`. HA Container without `--net=host` is the typical culprit.
+- **`bt_permission_denied`**: HA process lacks Bluetooth socket permission. Add to the `bluetooth` group on bare Linux.
+- **`bt_device_not_found`**: Printer was never paired on the host, or pairing didn't persist. Re-run Steps 3–4.
+- **`bt_host_down`**: Printer powered off, out of range, or already connected to another host (phones in particular like to grab BT printers).
+- **`bt_channel_refused`**: Wrong RFCOMM channel; almost always means use 1. See "Confirming the RFCOMM channel" above.
+- **Paired-device list empty in the flow**: D-Bus not reachable; the flow falls through to manual MAC entry.
 
 See [troubleshooting.md](troubleshooting.md#bluetooth-issues) for the full error-key reference.

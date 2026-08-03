@@ -8,7 +8,7 @@ entity-coverage analysis against HA platform conventions.
 
 ### 1. Button entities: Feed, Cut, Calibration print
 
-The dashboard staples for a receipt printer — tap to advance paper before
+The dashboard staples for a receipt printer: tap to advance paper before
 tearing, tap to cut, tap to print a test sheet when debugging alignment.
 Everything needed already exists: `adapter.feed()` / `adapter.cut()`
 (`printer/control_operations.py`) and the `calibration_print` service. Roughly
@@ -34,7 +34,7 @@ DLE EOT n=2 transmit-status query works on the same transports as the existing
 paper sensor (network + USB). Implementation notes:
 
 - Fold the query into the existing 5-minute paper poll's connection
-  (`base_adapter.get_paper_status()`) — do not open a second connection.
+  (`base_adapter.get_paper_status()`); do not open a second connection.
 - Treat a zero-length response as *unknown*, never "OK": python-escpos
   interprets an empty read as a healthy status, so a silent printer would
   otherwise report a false all-clear.
@@ -42,21 +42,21 @@ paper sensor (network + USB). Implementation notes:
 ### 5. Last-print timestamp sensor
 
 `SensorDeviceClass.TIMESTAMP` enabling "no receipt printed today" automations.
-Needs a new `_last_print` field set only in the print paths — the existing
+Needs a new `_last_print` field set only in the print paths: the existing
 `_last_ok` is also updated by status probes, so it means "last successful
 operation", not "last print".
 
 ### 6. Smaller items
 
-- **`hw("INIT")` reset service** — cheap recovery path for a wedged printer.
-- **Native QR rendering** (`qr(native=True)`) — faster and sharper than the
+- **`hw("INIT")` reset service**: cheap recovery path for a wedged printer.
+- **Native QR rendering** (`qr(native=True)`): faster and sharper than the
   image path, but needs a fallback since not all printers support it.
-- **ESC/POS `line_spacing()`** — compact receipts. Note the name collides with
+- **ESC/POS `line_spacing()`**: compact receipts. Note the name collides with
   the PIL renderer's `line_spacing` field on `print_text_image`; pick a
   distinct service field name.
-- **Push updates for the image-print sensor** — it currently polls on a
+- **Push updates for the image-print sensor**: it currently polls on a
   5-minute interval despite the adapter having a listener mechanism.
-- **`_last_error_errno` in the Online sensor's attributes** — already tracked
+- **`_last_error_errno` in the Online sensor's attributes**: already tracked
   by the adapters and exposed in diagnostics, just not on the entity.
 
 ## Considered and rejected

@@ -30,13 +30,13 @@ The integration supports four connection formats:
         - /dev/ttyUSB0:/dev/ttyUSB0
   ```
 
-- **Network-based connections (ESPHome, RFC2217, socket):** No special permissions needed — the integration connects over TCP.
+- **Network-based connections (ESPHome, RFC2217, socket):** No special permissions needed. The integration connects over TCP.
 
 ## Configuration
 
 | Setting | Description | Default |
 |---------|-------------|---------|
-| Serial port | Device path (e.g. `/dev/ttyUSB0`) or URL (e.g. `esphome://host:6053?port_name=Name`) | — |
+| Serial port | Device path (e.g. `/dev/ttyUSB0`) or URL (e.g. `esphome://host:6053?port_name=Name`) | N/A |
 | Baud rate | Serial speed for the serial connection. | 9600 |
 | Timeout | Connection timeout in seconds | 4.0 |
 | Printer Profile | Your printer model (or Auto-detect) | Auto-detect |
@@ -99,7 +99,7 @@ For printers with a physical RS-232 or TTL serial port connected directly to the
    ls -l /dev/serial/by-id/
    ```
 
-2. Find the right baud rate — check your printer's manual or print a self-test page (hold the feed button while powering on). Common rates: 9600, 19200, 38400, 115200.
+2. Find the right baud rate: check your printer's manual or print a self-test page (hold the feed button while powering on). Common rates: 9600, 19200, 38400, 115200.
 3. In the integration setup, enter the device path (e.g. `/dev/ttyUSB0`) and select the baud rate.
 
 ## Troubleshooting
@@ -139,7 +139,7 @@ SUBSYSTEM=="tty", ATTRS{idVendor}=="<VID>", ATTRS{idProduct}=="<PID>", ENV{ID_MM
 
 ### Garbled or truncated output (ESPHome/ESP32)
 
-The ESP32 is dropping bytes due to UART buffer overruns. Enable write chunking — see [Write chunk size and inter-chunk delay](#write-chunk-size-and-inter-chunk-delay) above.
+The ESP32 is dropping bytes due to UART buffer overruns. Enable write chunking: see [Write chunk size and inter-chunk delay](#write-chunk-size-and-inter-chunk-delay) above.
 
 ### Status shows "Unknown" until first print
 

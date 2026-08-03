@@ -13,12 +13,12 @@ resource exhaustion. Validation is centralized in
 `custom_components/escpos_printer/security.py` and reused by every service
 schema (Bronze quality-scale `action-setup` rule):
 
-- **Service-level schemas** (voluptuous) — every action registered via
+- **Service-level schemas** (voluptuous): every action registered via
   `hass.services.async_register(..., schema=...)`. REST / WebSocket /
   Python-script callers go through the same validation as the UI selectors.
-- **Text input** — length cap (`MAX_TEXT_LENGTH = 10000`), control characters
+- **Text input**: length cap (`MAX_TEXT_LENGTH = 10000`), control characters
   stripped.
-- **Image URLs** — `validate_image_url` rejects non-`http(s)` schemes,
+- **Image URLs**: `validate_image_url` rejects non-`http(s)` schemes,
   embedded credentials (`https://user:pass@host/`), IDN/punycode hostnames,
   and non-default ports. `validate_image_url_and_resolve` additionally
   resolves the hostname and **rejects private, loopback, link-local,
@@ -28,30 +28,30 @@ schema (Bronze quality-scale `action-setup` rule):
   redirect target is re-validated. A per-printer **"Allow local image
   URLs"** opt-in (default off) relaxes the private/loopback block and the
   port allowlist for that printer; the always-dangerous ranges remain
-  blocked even when enabled — cloud-metadata (`169.254.169.254`, AWS
+  blocked even when enabled: cloud-metadata (`169.254.169.254`, AWS
   IMDSv6 `fd00:ec2::254`, and Alibaba Cloud `100.100.100.200`, the
   `_ALWAYS_BLOCKED_HOSTS` denylist),
   link-local, multicast, reserved, and unspecified. Enabling it turns that
   printer's `print_image_url` into an unauthenticated LAN-reach primitive
   (the service has no per-user authorization), so enable it only where the
   callers are trusted.
-- **Local image paths** — `Path.resolve(strict=True)` dereferences
+- **Local image paths**: `Path.resolve(strict=True)` dereferences
   symlinks before the extension / size / allowlist checks; the final
   `open()` uses `O_NOFOLLOW` to defeat TOCTOU swaps. Paths outside
   `allowlist_external_dirs` are **rejected** (no warn-but-read).
-- **Camera / image entity sources** — the calling user's permissions are
+- **Camera / image entity sources**: the calling user's permissions are
   checked via `user.permissions.check_entity(entity_id, POLICY_READ)`;
   denied users receive `Unauthorized` (HTTP 403 from the WebSocket / REST
   API). Internal calls without a `user_id` and admins bypass.
-- **Base64 data URIs** — input length capped *before* regex/decoding
+- **Base64 data URIs**: input length capped *before* regex/decoding
   (no OOM on a 200 MB base64 string); subtype pinned to
   `png|jpe?g|gif|bmp|tiff|webp` (no SVG / XML decoder reach).
-- **Pillow** — a decompression-bomb guard is enforced per-decode against
+- **Pillow**: a decompression-bomb guard is enforced per-decode against
   the image header dimensions (before any full-bitmap allocation),
   scoped to this integration so Pillow's process-global limit is left
   untouched for other Home Assistant consumers; `Image.open` is invoked
   with a pinned `formats=` allow-list.
-- **Numeric input** — every numeric parameter validated within safe
+- **Numeric input**: every numeric parameter validated within safe
   bounds (`MAX_FEED_LINES`, `IMAGE_FRAGMENT_MIN/MAX`, etc.) declared in
   `security.py` and reused by the voluptuous schemas in
   `services/schemas.py`.
@@ -96,7 +96,7 @@ _LOGGER.debug(log_msg)
   `mac`, `alias`, `url`, `path`, `host`, `image`, `source`).
 - URL userinfo (`scheme://user:pass@host/...` → `scheme://[REDACTED]@host/...`).
 - Filesystem paths under HA's standard mount points (`/config/`,
-  `/media/`, `/share/`, `/ssl/`, `/addon_configs/`, `/data/`) — preserves
+  `/media/`, `/share/`, `/ssl/`, `/addon_configs/`, `/data/`): preserves
   the prefix, redacts the rest.
 - Bluetooth MAC addresses (preserves the 3-octet OUI for vendor lookups,
   redacts the device-specific portion as personal data under GDPR).
@@ -123,65 +123,65 @@ have moved to "Mitigated" with the implementation pointer.
 
 ### Mitigated
 
-- **DNS rebinding for HTTP image fetch** — The URL validator resolves
+- **DNS rebinding for HTTP image fetch**: The URL validator resolves
   the hostname and returns the address set; the fetcher then builds a
   per-request `aiohttp` session with `_StaticResolver`
   (`image_sources._StaticResolver`) pinned to those addresses. A 0-TTL
   hostile DNS server cannot swap public → private between validation
   and connect. Each redirect hop runs through the validator again and
   gets a fresh pin. **CWE-918 / CWE-350.**
-- **TOCTOU symlink swap on local-file reads** — `Path.resolve()`
+- **TOCTOU symlink swap on local-file reads**: `Path.resolve()`
   dereferences symlinks during validation; the file is then opened
   with `O_NOFOLLOW` (`security.open_local_image_no_follow`,
   `open_local_font_no_follow`) so a symlink swap between stat and
   open is also defeated. **CWE-59 / CWE-367.**
-- **TOCTOU symlink swap on preview writes** — Preview-service file
+- **TOCTOU symlink swap on preview writes**: Preview-service file
   writes use `O_NOFOLLOW | O_TRUNC | 0o600` via
   `security.write_file_no_follow`; an attacker who plants a symlink
   under tempdir between path-validation and image-save cannot redirect
   the write into an arbitrary file. **CWE-59 / CWE-367.**
-- **Preview `output_path` privilege escalation** — `preview_image`,
+- **Preview `output_path` privilege escalation**: `preview_image`,
   `preview_box`, `preview_table` now restrict user-supplied
   `output_path` to the system tempdir. Previously a non-admin HA user
   could call `preview_image` with
   `output_path: /config/configuration.yaml` and clobber it with
   rendered PNG bytes. **CWE-862 / CWE-552.**
-- **IDN homograph bypass** — `validate_image_url` now IDNA-encodes
+- **IDN homograph bypass**: `validate_image_url` now IDNA-encodes
   raw-Unicode hostnames before the `xn--` substring check, so both
   `例え.テスト` and `xn--r8jz45g.xn--zckzah` are rejected. **CWE-918.**
-- **Exception-message information disclosure** — `services/_handler_utils.py`
+- **Exception-message information disclosure**: `services/_handler_utils.py`
   `_for_each_target` routes every service handler's exception through
   `sanitize_log_message` so USB serials, BT MACs, and filesystem
   paths from pyusb/pyserial/python-escpos do not leak into the HA
   Frontend toast. **CWE-209 / CWE-532.**
-- **Font path narrowed trust** — `security.validate_font_path_with_fonts_dir`
+- **Font path narrowed trust**: `security.validate_font_path_with_fonts_dir`
   accepts paths under HA's `allowlist_external_dirs` OR under
   `<config>/fonts/` (auto-created on integration setup). The
   `<config>/fonts/` widening is the only narrowing; all other
   path-based services use the standard allowlist.
-- **Cancel-during-cleanup paper hang** — `print_text_with_image`
+- **Cancel-during-cleanup paper hang**: `print_text_with_image`
   wraps its cleanup `_apply_cut_and_feed` in `asyncio.shield` so a
   second cancellation mid-flush cannot leave paper attached.
 
 ### Residual / Known limitations
 
-- **Trust boundary** — any HA user who can call
+- **Trust boundary**: any HA user who can call
   `escpos_printer.print_image` or `notify.<printer>` can print to
   your physical paper roll. Restrict service exposure via HA's
   standard scripts / scenes / Lovelace card permissions for shared
   installations.
-- **ESC/POS protocol bytes in printed content** — `validate_text_input`
+- **ESC/POS protocol bytes in printed content**: `validate_text_input`
   strips C0 control characters but not all printable ESC/POS escape
   sequences. If a downstream POS scanner consumes the receipt as
   data (rather than a human reading paper), additional sanitization
   may be warranted.
-- **Camera / image entity authorization** — `_check_user_can_read_entity`
+- **Camera / image entity authorization**: `_check_user_can_read_entity`
   forwards `ServiceCall.context` through every image source resolver
   so a non-admin user invoking `print_camera_snapshot` /
   `print_image_entity` is blocked from cameras / image entities they
   cannot read. HA admins bypass entity permissions by design; admin
   users can print any camera regardless.
-- **Blueprint template safety** — the `variables:` block of every
+- **Blueprint template safety**: the `variables:` block of every
   shipped blueprint is rendered through HA's sandboxed Jinja
   environment. Tests in `tests/test_blueprints_template_safety.py`
   pin this and include a regression canary asserting that an unsafe

@@ -15,7 +15,7 @@ data:
   feed: 1
 ```
 
-That's it — a bordered card on paper. Read on for tables, key/value
+That's it: a bordered card on paper. Read on for tables, key/value
 totals, custom fonts, and the previewing workflow that lets you iterate
 without burning a roll of paper.
 
@@ -31,14 +31,14 @@ plain `print_text` formatting (bold / underline / multiplier sizes):
 | `escpos_printer.print_text_image` | Renders text to a bitmap with a bundled or user-supplied TTF/OTF font; supports 0/90/180/270° rotation and any point size. |
 
 `print_box` and `print_table` build a plain text layout and ride on
-the printer's text mode — they're fast and respect the configured
+the printer's text mode; they're fast and respect the configured
 codepage. `print_text_image` rasterizes the text and prints through
 the same pipeline as `print_image`, so it works with **any** font /
 size / rotation but takes longer than text mode.
 
 > **Heads-up on non-ASCII text.** `print_box` and `print_table` use one
 > character cell per column. CJK characters, emoji, and combining marks
-> may misalign on narrow printers — see [CJK / wide-character content](#cjk--wide-character-content)
+> may misalign on narrow printers; see [CJK / wide-character content](#cjk--wide-character-content)
 > at the bottom of this guide. For mixed-script content, prefer
 > `print_text_image` (which measures actual glyph widths in pixels).
 
@@ -48,7 +48,7 @@ Both `print_box` and `print_table` accept a `style` parameter:
 
 | Style | Looks like | Best for |
 |-------|------------|----------|
-| `auto` *(default)* | Adapts to codepage — single on cp437/cp850/cp852/cp858/cp860/cp863/cp865/cp866, ASCII elsewhere. | Most users; the integration picks the right glyphs for your printer. |
+| `auto` *(default)* | Adapts to codepage: single on cp437/cp850/cp852/cp858/cp860/cp863/cp865/cp866, ASCII elsewhere. | Most users; the integration picks the right glyphs for your printer. |
 | `single` | `┌─┐` `│ │` `└─┘` | Receipts with cp437-family codepage. |
 | `double` | `╔═╗` `║ ║` `╚═╝` | Heavier, more visually striking. |
 | `ascii`  | `+-+` `\| \|` `+-+` | Any codepage; very compatible. |
@@ -227,7 +227,7 @@ data:
 Render text to a PIL bitmap with a TrueType / OpenType font, optional
 rotation, and any point size, then print it through the existing
 image pipeline. Unlike `print_box` and `print_table`, the output is
-an image — so the printer doesn't need to support the glyphs in its
+an image, so the printer doesn't need to support the glyphs in its
 codepage. Anything that renders in the font will print.
 
 This is the path to use for:
@@ -248,7 +248,7 @@ Three fonts ship with the integration in
 | `dejavu_serif` | DejaVuSerif.ttf | Elegant receipts, recipe cards, long-form text. Proportional with classic letterforms. |
 
 All three are released under the permissive DejaVu license (public-domain
-modifications on top of Bitstream Vera) — see the `fonts/LICENSE`
+modifications on top of Bitstream Vera); see the `fonts/LICENSE`
 file and the repo-root `NOTICE`.
 
 ### User-supplied fonts
@@ -256,7 +256,7 @@ file and the repo-root `NOTICE`.
 **The easiest way:** drop your `.ttf` / `.otf` files in
 `/config/fonts/` and reference them directly. The integration
 creates this directory on first setup and treats it as locally
-trusted — no `configuration.yaml` edits needed.
+trusted: no `configuration.yaml` edits needed.
 
 ```yaml
 font_path: "/config/fonts/MyBrand-Bold.otf"
@@ -286,7 +286,7 @@ and size is capped at 16 MB.
 | `device_id` | device / [device] | *(all printers)* | Optional target. Omitting it prints to all printers (warns when several are configured). |
 | `broadcast` | bool | `false` | Explicitly print to all printers, without the warning. Mutually exclusive with `device_id`. |
 | `text` | string | *(required)* | Text to render. Supports newlines (each newline starts a new line on the bitmap). Up to 10 000 chars. |
-| `font` | enum | `dejavu_mono` | Bundled font — `dejavu_mono`, `dejavu_sans`, or `dejavu_serif`. Ignored when `font_path` is set. |
+| `font` | enum | `dejavu_mono` | Bundled font: `dejavu_mono`, `dejavu_sans`, or `dejavu_serif`. Ignored when `font_path` is set. |
 | `font_path` | string | *(unset)* | Optional path to a `.ttf` / `.otf` file inside `allowlist_external_dirs`. |
 | `font_size` | int | `16` | Point size (8-96). |
 | `line_spacing` | number | `1.1` | Multiplier on the font's natural line height (1.0-3.0). |
@@ -302,11 +302,11 @@ image-pipeline knobs: `image_width`, `image_dither`, `image_threshold`,
 [Images guide](images.md) for what each one does. The two most
 useful for text:
 
-- `image_dither: threshold` + `image_threshold: 128` (default) — crisp
+- `image_dither: threshold` + `image_threshold: 128` (default): crisp
   text edges. Lower (e.g. `80`) prints "thicker"; higher (`160`) prints
   "thinner". Floyd-Steinberg dithering blurs single-pixel serifs, so
   threshold mode usually wins for text.
-- `font_size` — use 24-36 for headers, 12-18 for body, 48+ for
+- `font_size`: use 24-36 for headers, 12-18 for body, 48+ for
   page-fillers. Larger sizes look better at high `image_width`
   values; 128 px wide at 48 pt produces visibly blocky glyphs.
 
@@ -368,7 +368,7 @@ data:
 ## `escpos_printer.print_separator`
 
 A single decorative rule built by repeating one character across the
-line width. Tiny but constantly useful — visually separates
+line width. Tiny but constantly useful; visually separates
 sections of a multi-call receipt.
 
 ### Examples
@@ -404,7 +404,7 @@ padding, multi-line) but heavier.
 
 ## `escpos_printer.print_kvtable`
 
-A focused two-column service for **label / value** rows — receipt
+A focused two-column service for **label / value** rows: receipt
 totals, sensor readings, ingredient lists, settings recaps. Labels
 left-align; values right-align by default (typical for totals).
 
@@ -463,7 +463,7 @@ data:
 The `preview_box` and `preview_table` services run the same layout
 pipeline as their `print_*` counterparts but write the rendered text
 to a `.txt` file instead of sending it to the printer. Use them when
-designing a layout — iterate on column widths or padding without
+designing a layout: iterate on column widths or padding without
 burning a roll.
 
 Both services have `supports_response: only`. In Developer Tools →
@@ -496,7 +496,7 @@ The file (`/tmp/preview.txt`) contains exactly what would print:
 ```
 
 The returned `response_variable` looks like
-`{path, width, line_count, codepage}` — useful for chaining a
+`{path, width, line_count, codepage}`; useful for chaining a
 `notify.<service>` with the rendered output.
 
 **Workflow:** tweak `column_widths` until the preview reads right,
@@ -505,7 +505,7 @@ then change `preview_table` → `print_table` (same field set, drop
 
 ## Combining services
 
-Each service is independent — call them back-to-back from an
+Each service is independent: call them back-to-back from an
 automation to compose a complete receipt. The printer's lock
 serialises the calls so they don't interleave.
 
@@ -520,7 +520,7 @@ serialises the calls so they don't interleave.
 
 - action: escpos_printer.print_box
   data:
-    text: "Daily Report — {{ now().strftime('%Y-%m-%d') }}"
+    text: "Daily Report: {{ now().strftime('%Y-%m-%d') }}"
     style: double
     align: center
     padding: 1
@@ -569,12 +569,12 @@ ready-to-import automations and scripts that use these patterns.
   underlying string is correct.
 - **`print_text_image` is slower than text mode.** The bitmap path
   goes through dither + slice + chunked send. For a half-receipt of
-  text this is usually a few hundred milliseconds — fine for
+  text this is usually a few hundred milliseconds; fine for
   automations, noticeable in tight loops.
 - **`rotation` only affects `print_text_image`.** Text-mode services
   (`print_text`, `print_text_utf8`, `print_box`, `print_table`) print
   in the printer's native orientation. To rotate a table or box,
-  render it through `print_text_image` instead — pass the laid-out
+  render it through `print_text_image` instead: pass the laid-out
   table string as `text` to that service.
 - **No native ESC/POS rotation.** Some printers expose `ESC V` for
   90° text rotation, but the `python-escpos` version this integration
@@ -586,7 +586,7 @@ ready-to-import automations and scripts that use these patterns.
 ## CJK / wide-character content
 
 Text-mode services (`print_box`, `print_table`, `print_kvtable`)
-measure cell width in Python characters — they treat every codepoint
+measure cell width in Python characters; they treat every codepoint
 as one column. That assumption holds for Latin/Cyrillic/Greek/cp437
 content, but breaks for **CJK ideographs, fullwidth punctuation, and
 most emoji**, which render two terminal columns wide. The result is
@@ -600,11 +600,11 @@ sees wide-width characters in the input it logs a one-shot warning:
 Box content contains wide-width characters (CJK / fullwidth /
 emoji); the borders may misalign because textwrap wraps by
 code-point count, not display columns. Use print_text_image for
-accurate layout — see docs/text-effects.md#cjk--wide-character-content.
+accurate layout; see docs/text-effects.md#cjk--wide-character-content.
 (This warning fires once per process.)
 ```
 
-The warning is **hint-only** — the renderer still produces output
+The warning is **hint-only**; the renderer still produces output
 even when wide glyphs are present, just without per-glyph column
 awareness. Detection samples the first 256 characters of each
 input; if the only wide glyphs appear later in a long string the

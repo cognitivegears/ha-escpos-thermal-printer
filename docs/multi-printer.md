@@ -4,7 +4,7 @@ Add the integration once per printer. Each gets its own device, binary sensor, n
 
 ## Targeting in service calls
 
-Printers are targeted by **`device_id`** — either in a `target:` block or directly in `data:`. Each `device_id` resolves to a config entry; the service runs against each. Targeting by `area_id`, `label_id`, or `entity_id` is **not supported** and is rejected with a validation error.
+Printers are targeted by **`device_id`**: either in a `target:` block or directly in `data:`. Each `device_id` resolves to a config entry; the service runs against each. Targeting by `area_id`, `label_id`, or `entity_id` is **not supported** and is rejected with a validation error.
 
 ### Specific printer
 
@@ -30,7 +30,7 @@ data:
 
 ### Broadcast to all printers
 
-Omit `target:` (and the `broadcast` field) to send to every loaded entry — kept for backward compatibility:
+Omit `target:` (and the `broadcast` field) to send to every loaded entry, kept for backward compatibility:
 
 ```yaml
 service: escpos_printer.print_text
@@ -39,7 +39,7 @@ data:
 ```
 
 If more than one printer is configured, omitting the target logs a warning
-(`no device_id specified — printing to all N configured printers`) so an
+(`no device_id specified: printing to all N configured printers`) so an
 automation that only meant to target one printer doesn't silently print
 everywhere. To send to all printers on purpose without the warning, set
 `broadcast: true` instead:
@@ -51,7 +51,7 @@ data:
   text: "Broadcast to all printers, explicitly"
 ```
 
-`broadcast: true` and `device_id` are mutually exclusive — combining them
+`broadcast: true` and `device_id` are mutually exclusive; combining them
 is rejected before the service runs.
 
 ## Finding device IDs
@@ -63,4 +63,4 @@ is rejected before the service runs.
 
 ## Assigning printers to areas
 
-You can assign a printer device to an area for organization (**Settings → Devices & services** → your printer → pencil icon → pick an area), but service calls cannot target by `area_id` — use `device_id`.
+You can assign a printer device to an area for organization (**Settings → Devices & services** → your printer → pencil icon → pick an area), but service calls cannot target by `area_id`: use `device_id`.
