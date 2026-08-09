@@ -74,11 +74,18 @@ abandoned by closing the flow — nothing is stored until the final step.
    string** — the paper cannot be its own reference (a wrong codepage prints
    plausible-but-different glyphs), so the form text is the source of truth:
    "Each printed line should read exactly: `café ñ ü é ß ° €`. Which numbered
-   line matches this, character for character?" → numbered choices / "none
-   match" / skip / reprint. Result → pending `codepage` ("none"/skip →
-   unchanged). Characters that a candidate encoding cannot represent at all
-   are printed as `?` by the sample generator (never dropped), so a partial
-   match still looks visibly wrong rather than deceptively clean.
+   line matches this, character for character? **If more than one matches,
+   pick the lowest number.**" → numbered choices / "none match" / skip /
+   reprint. Result → pending `codepage` ("none"/skip → unchanged).
+   Ties are expected, not exceptional (CP850 vs CP858 differ only at €;
+   CP1252 vs ISO-8859-1 overlap heavily) — and any matching line is a
+   *correct* codepage for the tested characters, so the tie-break only has
+   to be favorable, not perfect: **candidates are printed most-capable-first**
+   (CP858 before CP850, CP1252 before ISO-8859-1), making "lowest matching
+   number" resolve to the broadest encoding automatically. Characters that a
+   candidate encoding cannot represent at all are printed as `?` by the
+   sample generator (never dropped), so a partial match still looks visibly
+   wrong rather than deceptively clean.
 
 5. **`calibrate_summary`** — shows the measured values via description
    placeholders, plus:
