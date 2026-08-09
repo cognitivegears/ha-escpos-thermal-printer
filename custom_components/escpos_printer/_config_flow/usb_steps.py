@@ -12,6 +12,7 @@ from ..capabilities import (
     PROFILE_AUTO,
     PROFILE_CUSTOM,
     get_profile_choices_dict,
+    suggest_profile,
 )
 from ..const import (
     CONF_CONNECTION_TYPE,
@@ -41,6 +42,24 @@ if TYPE_CHECKING:
     from homeassistant.helpers.service_info.usb import UsbServiceInfo
 
 _LOGGER = logging.getLogger(__name__)
+
+
+async def _suggest_default_profile(
+    hass: Any, devices: list[dict[str, Any]], profile_choices: dict[str, str]
+) -> str:
+    """Return a suggested profile for the first device's descriptor, or PROFILE_AUTO.
+
+    A suggestion only preselects the dropdown default -- it never auto-commits.
+    """
+    if not devices:
+        return PROFILE_AUTO
+    first = devices[0]
+    suggestion: str | None = await hass.async_add_executor_job(
+        suggest_profile, first.get("product"), first.get("vendor_id"), first.get("product_id")
+    )
+    if suggestion and suggestion in profile_choices:
+        return suggestion
+    return PROFILE_AUTO
 
 
 class UsbFlowMixin:
@@ -166,6 +185,13 @@ class UsbFlowMixin:
         # Build profile choices dynamically
         profile_choices = await self.hass.async_add_executor_job(get_profile_choices_dict)
 
+        # Preselect a suggested profile for the default (first) device.
+        # ponytail: suggestion follows the first discovered printer only;
+        # re-computing per selected device would need a two-step flow.
+        default_profile = await _suggest_default_profile(
+            self.hass, self._discovered_printers, profile_choices
+        )
+
         # _build_usb_device_choices always appends "__manual__", so
         # device_choices is never empty here.
         default_device = (
@@ -175,7 +201,7 @@ class UsbFlowMixin:
             {
                 vol.Required("usb_device", default=default_device): vol.In(device_choices),
                 vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
-                vol.Optional(CONF_PROFILE, default=PROFILE_AUTO): vol.In(profile_choices),
+                vol.Optional(CONF_PROFILE, default=default_profile): vol.In(profile_choices),
             }
         )
 
@@ -298,6 +324,13 @@ class UsbFlowMixin:
         # Build profile choices dynamically
         profile_choices = await self.hass.async_add_executor_job(get_profile_choices_dict)
 
+        # Preselect a suggested profile for the default (first) device.
+        # ponytail: suggestion follows the first discovered device only;
+        # re-computing per selected device would need a two-step flow.
+        default_profile = await _suggest_default_profile(
+            self.hass, self._all_usb_devices, profile_choices
+        )
+
         # Show form with all USB devices - include endpoint configuration
         default_device = next(iter(device_choices.keys()))
         data_schema = vol.Schema(
@@ -306,7 +339,7 @@ class UsbFlowMixin:
                 vol.Optional(CONF_IN_EP, default=DEFAULT_IN_EP): int,
                 vol.Optional(CONF_OUT_EP, default=DEFAULT_OUT_EP): int,
                 vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
-                vol.Optional(CONF_PROFILE, default=PROFILE_AUTO): vol.In(profile_choices),
+                vol.Optional(CONF_PROFILE, default=default_profile): vol.In(profile_choices),
             }
         )
 

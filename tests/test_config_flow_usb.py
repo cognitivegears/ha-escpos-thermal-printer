@@ -11,6 +11,7 @@ from custom_components.escpos_printer.const import (
     CONF_IN_EP,
     CONF_OUT_EP,
     CONF_PRODUCT_ID,
+    CONF_PROFILE,
     CONF_VENDOR_ID,
     CONNECTION_TYPE_NETWORK,
     CONNECTION_TYPE_USB,
@@ -208,6 +209,36 @@ class TestUsbStep:
 
         assert result["type"] == "form"
         assert result["errors"]["base"] == "cannot_connect_usb"
+
+    @pytest.mark.asyncio
+    async def test_usb_select_preselects_suggested_profile(self, hass) -> None:
+        """A discovered device whose descriptor matches a bundled profile
+        preselects that profile as the dropdown default (never auto-commits).
+        """
+        fake_printers = [
+            {
+                "vendor_id": 0x04B8,
+                "product_id": 0x0E15,
+                "manufacturer": "EPSON",
+                "product": "TM-T20II",
+                "serial_number": None,
+                "is_known_printer": True,
+                "label": "EPSON TM-T20II (04B8:0E15)",
+            }
+        ]
+        with patch(
+            "custom_components.escpos_printer._config_flow.usb_steps._discover_usb_printers",
+            return_value=fake_printers,
+        ):
+            result = await hass.config_entries.flow.async_init(
+                DOMAIN, context={"source": "user"}
+            )
+            result = await hass.config_entries.flow.async_configure(
+                result["flow_id"], {CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB}
+            )
+        schema = result["data_schema"].schema
+        profile_key = next(k for k in schema if k.schema == CONF_PROFILE)
+        assert profile_key.default() == "TM-T20II"
 
 
 class TestUsbManualStep:
