@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from homeassistant.const import CONF_HOST, CONF_PORT
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+import voluptuous as vol
 
 from custom_components.escpos_printer.const import (
     CONF_ALLOW_LOCAL_IMAGE_URLS,
@@ -79,7 +80,9 @@ async def test_options_flow_allow_local_image_urls_roundtrips(hass):  # type: ig
     assert result["type"] == "form"
     # Default must be off (secure-by-default).
     schema_defaults = {
-        str(key.schema): key.default() for key in result["data_schema"].schema if key.default
+        str(key.schema): key.default()
+        for key in result["data_schema"].schema
+        if key.default and key.default is not vol.UNDEFINED
     }
     assert schema_defaults.get(CONF_ALLOW_LOCAL_IMAGE_URLS) is False
 

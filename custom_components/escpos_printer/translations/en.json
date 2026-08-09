@@ -153,12 +153,14 @@
         "data": {
           "codepage": "Character encoding",
           "line_width": "Characters per line",
+          "width_pixels": "Paper width in pixels (optional)",
           "default_align": "Default alignment",
           "default_cut": "Default cut mode"
         },
         "data_description": {
           "codepage": "Character encoding/codepage for text. Choose 'Custom' to enter a codepage manually.",
           "line_width": "Number of characters per line (columns). Choose 'Custom' to enter a value manually.",
+          "width_pixels": "Overrides the profile's printable width for images. Leave empty to use the profile. Common values: 384 (58 mm), 576 (80 mm).",
           "default_align": "Default text alignment for printing.",
           "default_cut": "Default paper cut mode after printing."
         }
@@ -334,6 +336,7 @@
           "profile": "Printer profile",
           "codepage": "Character encoding",
           "line_width": "Characters per line",
+          "width_pixels": "Paper width in pixels (optional)",
           "default_align": "Default alignment",
           "default_cut": "Default cut mode",
           "reliability_profile": "Image reliability profile",
@@ -348,6 +351,7 @@
           "profile": "Select your printer model. Changing this will reset encoding options.",
           "codepage": "Character encoding/codepage for text.",
           "line_width": "Number of characters per line (columns).",
+          "width_pixels": "Overrides the profile's printable width for images. Leave empty to use the profile. Common values: 384 (58 mm), 576 (80 mm).",
           "default_align": "Default text alignment for printing.",
           "default_cut": "Default paper cut mode after printing.",
           "reliability_profile": "Picks safe defaults for image chunk size, inter-chunk delay, and ESC/POS image command. Service-call options always override these.",
@@ -428,7 +432,7 @@
   "issues": {
     "profile_width_fallback": {
       "title": "Printer profile is missing the pixel width",
-      "description": "The selected printer profile ({profile}) does not expose `media.width.pixels`, so images are being scaled to a generic {fallback}px width. This is usually correct for 58 mm thermals but may print stretched or truncated on 80 mm printers.\n\n**To fix:** open the integration's options, pick the closest matching printer profile, or set `image_width` explicitly in your service calls. If your printer's profile name is correct, the python-escpos profile database may need updating."
+      "description": "The selected printer profile ({profile}) does not expose `media.width.pixels`, so images are being scaled to a generic {fallback}px width. This is usually correct for 58 mm thermals but may print stretched or truncated on 80 mm printers.\n\n**To fix:** open the integration's options and set “Paper width in pixels” (384 for 58 mm, 576 for 80 mm printers), pick a closer matching printer profile, or set `image_width` explicitly in your service calls."
     }
   },
   "exceptions": {

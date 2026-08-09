@@ -30,6 +30,7 @@ from ..const import (
     CONF_PROFILE,
     CONF_SERIAL_PORT,
     CONF_VENDOR_ID,
+    CONF_WIDTH_PIXELS,
     CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
     CONNECTION_TYPE_SERIAL,
@@ -177,6 +178,9 @@ class SettingsFlowMixin:
                 CONF_DEFAULT_CUT: user_input.get(CONF_DEFAULT_CUT, DEFAULT_CUT),
             }
 
+            if user_input.get(CONF_WIDTH_PIXELS):
+                data[CONF_WIDTH_PIXELS] = int(user_input[CONF_WIDTH_PIXELS])
+
             # Remove internal keys
             data.pop("_printer_name", None)
 
@@ -222,6 +226,7 @@ class SettingsFlowMixin:
                     ["left", "center", "right"]
                 ),
                 vol.Optional(CONF_DEFAULT_CUT, default=DEFAULT_CUT): vol.In(cut_choices),
+                vol.Optional(CONF_WIDTH_PIXELS): vol.All(vol.Coerce(int), vol.Range(min=16, max=2048)),
             }
         )
 

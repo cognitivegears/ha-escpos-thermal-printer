@@ -34,6 +34,7 @@ from ..const import (
     CONF_SERIAL_WRITE_CHUNK_SIZE,
     CONF_STATUS_INTERVAL,
     CONF_TIMEOUT,
+    CONF_WIDTH_PIXELS,
     CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
     CONNECTION_TYPE_SERIAL,
@@ -284,6 +285,12 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
             vol.Optional(CONF_PROFILE, default=current_profile): vol.In(profile_choices),
             vol.Optional(CONF_CODEPAGE, default=current_codepage): vol.In(codepage_choices),
             vol.Optional(CONF_LINE_WIDTH, default=current_line_width_str): vol.In(width_choices),
+            vol.Optional(
+                CONF_WIDTH_PIXELS,
+                description={
+                    "suggested_value": opts.get(CONF_WIDTH_PIXELS, data.get(CONF_WIDTH_PIXELS))
+                },
+            ): vol.All(vol.Coerce(int), vol.Range(min=16, max=2048)),
             vol.Optional(
                 CONF_DEFAULT_ALIGN,
                 default=opts.get(CONF_DEFAULT_ALIGN, data.get(CONF_DEFAULT_ALIGN, DEFAULT_ALIGN)),

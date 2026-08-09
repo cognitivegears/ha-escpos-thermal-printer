@@ -502,6 +502,13 @@ class EscposPrinterAdapterBase(
         auto/default profile (no profile chosen) has no declared pixel
         width by design, so it falls back silently without warning.
         """
+        override = getattr(self._config, "width_pixels", None)
+        if override:
+            # User-set width beats the profile and retires any open
+            # profile_width_fallback repairs issue for this entry.
+            if hass is not None:
+                self._clear_profile_width_repair_issue(hass)
+            return int(override)
         if self._profile_width_lookup_done:
             return self._cached_profile_width
         width: int | None = None

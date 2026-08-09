@@ -55,7 +55,7 @@ class TestGetProfileChoices:
         """Auto-detect should be first option."""
         choices = get_profile_choices()
         assert len(choices) > 0
-        assert choices[0] == (PROFILE_AUTO, "Auto-detect (Default)")
+        assert choices[0] == (PROFILE_AUTO, "Generic (no profile)")
 
     def test_custom_option_last(self):
         """Custom option should be last."""

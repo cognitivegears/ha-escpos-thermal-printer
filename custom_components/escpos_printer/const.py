@@ -15,6 +15,7 @@ CONF_KEEPALIVE = "keepalive"
 CONF_STATUS_INTERVAL = "status_interval"
 CONF_PROFILE = "profile"
 CONF_LINE_WIDTH = "line_width"
+CONF_WIDTH_PIXELS = "width_pixels"  # per-entry image width override (overrides profile)
 # Opt-in: allow image URLs that resolve to private/LAN/loopback addresses.
 # Off by default so an upgrade never silently turns the integration into an
 # SSRF proxy; cloud-metadata / link-local ranges stay blocked even when on.

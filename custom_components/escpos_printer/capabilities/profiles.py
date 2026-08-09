@@ -9,7 +9,7 @@ from .loader import _get_capabilities
 def get_profile_choices() -> list[tuple[str, str]]:
     """Get list of (profile_key, display_name) tuples for dropdown.
 
-    Returns list sorted alphabetically with "Auto-detect (Default)" first
+    Returns list sorted alphabetically with "Generic (no profile)" first
     and "Custom..." last.
 
     Returns:
@@ -19,7 +19,7 @@ def get_profile_choices() -> list[tuple[str, str]]:
     profiles = capabilities.get("profiles", {})
 
     # Start with Auto-detect option
-    choices: list[tuple[str, str]] = [(PROFILE_AUTO, "Auto-detect (Default)")]
+    choices: list[tuple[str, str]] = [(PROFILE_AUTO, "Generic (no profile)")]
 
     # Build profile list with vendor + name
     profile_list: list[tuple[str, str]] = []

@@ -35,6 +35,7 @@ from .const import (
     CONF_STATUS_INTERVAL,
     CONF_TIMEOUT,
     CONF_VENDOR_ID,
+    CONF_WIDTH_PIXELS,
     CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
     CONNECTION_TYPE_SERIAL,
@@ -104,6 +105,9 @@ def _shared_print_config(entry: EscposConfigEntry) -> dict[str, Any]:
         "codepage": opt.get(CONF_CODEPAGE, data.get(CONF_CODEPAGE)),
         "profile": opt.get(CONF_PROFILE, data.get(CONF_PROFILE)),
         "line_width": int(opt.get(CONF_LINE_WIDTH, data.get(CONF_LINE_WIDTH, DEFAULT_LINE_WIDTH))),
+        "width_pixels": (
+            int(raw_width) if (raw_width := opt.get(CONF_WIDTH_PIXELS, data.get(CONF_WIDTH_PIXELS))) else None
+        ),
         "allow_local_image_urls": bool(
             opt.get(CONF_ALLOW_LOCAL_IMAGE_URLS, DEFAULT_ALLOW_LOCAL_IMAGE_URLS)
         ),

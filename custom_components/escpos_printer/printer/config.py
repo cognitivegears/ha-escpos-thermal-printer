@@ -39,6 +39,9 @@ class BasePrinterConfig:
     codepage: str | None = None
     profile: str | None = None
     line_width: int = 48
+    # Per-entry override for the printable width in pixels. Beats the
+    # profile's media.width.pixels; None means "use the profile".
+    width_pixels: int | None = None
     timeout: float = 4.0
     # Opt-in: permit image URLs that resolve to private/LAN/loopback
     # addresses. Off by default; the always-unsafe ranges (link-local
