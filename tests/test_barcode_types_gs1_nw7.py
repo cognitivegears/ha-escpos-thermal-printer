@@ -91,10 +91,7 @@ def test_every_selector_type_resolves_in_python_escpos() -> None:
     """
     services = yaml.safe_load(
         (
-            Path(__file__).parent.parent
-            / "custom_components"
-            / "escpos_printer"
-            / "services.yaml"
+            Path(__file__).parent.parent / "custom_components" / "escpos_printer" / "services.yaml"
         ).read_text()
     )
     options = services["print_barcode"]["fields"]["bc"]["selector"]["select"]["options"]

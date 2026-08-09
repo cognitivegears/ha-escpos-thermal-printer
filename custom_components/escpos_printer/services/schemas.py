@@ -779,7 +779,9 @@ BEEP_SCHEMA = _with_target_validation(
     {
         **_TARGET_FIELDS,
         vol.Optional(ATTR_TIMES): vol.All(vol.Coerce(int), vol.Range(min=1, max=MAX_BEEP_TIMES)),
-        vol.Optional(ATTR_DURATION): vol.All(vol.Coerce(int), vol.Range(min=1, max=MAX_BEEP_DURATION)),
+        vol.Optional(ATTR_DURATION): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=MAX_BEEP_DURATION)
+        ),
     }
 )
 

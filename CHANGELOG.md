@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Per-entry "Paper width in pixels" override — fixes image sizing for
+  printers whose profile lacks a width (previously a Repairs issue with
+  no user-side fix).
+- USB config flow now preselects a suggested profile from the device's
+  USB descriptor or a curated VID:PID list.
+- Clone/equivalent model aliases (e.g. Citizen CT-S601II → CT-S651,
+  ZJ-5890 → POS-5890) accepted in the custom profile field.
+- Per-entry "Image printing implementation" option (Auto/Raster/Column/
+  Graphics) with plain-language guidance.
+
+### Changed
+
+- **Behavioral:** image implementation now defaults from the printer
+  profile (raster, or column for column-only printers) instead of
+  always raster; reliability presets no longer force `bitImageRaster`.
+  Explicit `impl` in service calls is unaffected.
+- Profile dropdown's "Auto-detect (Default)" renamed to "Generic (no
+  profile)" — it never detected anything.
+- Printing an image on a profile that declares no image support now
+  logs a warning (the print is still attempted).
+
 ## [1.0.0] - 2026-08-02
 
 ### Added

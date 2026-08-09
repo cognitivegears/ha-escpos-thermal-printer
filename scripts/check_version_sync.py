@@ -49,7 +49,9 @@ def main() -> int:
         )
         return 1
 
-    print(f"OK manifest.json and pyproject.toml both at {manifest_version}, CHANGELOG.md documents it")
+    print(
+        f"OK manifest.json and pyproject.toml both at {manifest_version}, CHANGELOG.md documents it"
+    )
     return 0
 
 

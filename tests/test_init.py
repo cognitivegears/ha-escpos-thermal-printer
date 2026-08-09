@@ -244,9 +244,7 @@ async def test_setup_bluetooth_status_interval_still_defaults_to_0(hass):  # typ
     fake_adapter.stop = AsyncMock()
 
     with (
-        patch(
-            "custom_components.escpos_printer.create_printer_adapter", return_value=fake_adapter
-        ),
+        patch("custom_components.escpos_printer.create_printer_adapter", return_value=fake_adapter),
         patch(
             "custom_components.escpos_printer.sensor.query_bt_battery_percentage",
             AsyncMock(return_value=None),

@@ -28,6 +28,7 @@
 ### Task 1: Per-entry width override + "Generic (no profile)" rename
 
 **Files:**
+
 - Modify: `custom_components/escpos_printer/const.py` (near line 17, next to `CONF_LINE_WIDTH`)
 - Modify: `custom_components/escpos_printer/printer/config.py:39-46` (`BasePrinterConfig`)
 - Modify: `custom_components/escpos_printer/__init__.py:91-110` (`_shared_print_config`)
@@ -39,6 +40,7 @@
 - Test: `tests/test_width_override.py` (new)
 
 **Interfaces:**
+
 - Consumes: existing `BasePrinterConfig`, `create_printer_adapter` (from `custom_components.escpos_printer.printer`).
 - Produces: `CONF_WIDTH_PIXELS = "width_pixels"` in const.py; `BasePrinterConfig.width_pixels: int | None = None`; `get_profile_pixel_width()` returns the override when set. Later tasks rely on `CONF_WIDTH_PIXELS` existing.
 
@@ -153,12 +155,13 @@ and in the entry-creation branch, after `data = {...}` is built:
 ```
 
 `strings.json`:
+
 - `config.step.codepage.data`: add `"width_pixels": "Paper width in pixels (optional)"`.
 - If the step has a `data_description` block, add: `"width_pixels": "Overrides the profile's printable width for images. Leave empty to use the profile. Common values: 384 (58 mm), 576 (80 mm)."`
 - `options.step.init.data`: add the same `"width_pixels"` label (+ description if the block exists).
 - `issues.profile_width_fallback.description`: replace the `**To fix:**` sentence with:
 
-```
+```text
 **To fix:** open the integration's options and set “Paper width in pixels” (384 for 58 mm, 576 for 80 mm printers), pick a closer matching printer profile, or set `image_width` explicitly in your service calls.
 ```
 
@@ -188,6 +191,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ### Task 2: Clone alias table + alias-aware custom profile entry
 
 **Files:**
+
 - Create: `custom_components/escpos_printer/capabilities/aliases.py`
 - Modify: `custom_components/escpos_printer/capabilities/profiles.py` (add `resolve_profile_name`)
 - Modify: `custom_components/escpos_printer/capabilities/__init__.py` (exports)
@@ -196,6 +200,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - Test: `tests/test_profile_aliases.py` (new)
 
 **Interfaces:**
+
 - Consumes: `_get_capabilities()` from `capabilities/loader.py`.
 - Produces: `normalize_model(name: str) -> str`; `PROFILE_ALIASES: dict[str, str]` (normalized alias → bundled profile key); `resolve_alias(name: str) -> str | None`; `resolve_profile_name(raw: str | None) -> str | None` (exact key, case-insensitive key, or alias → bundled key; else None). Task 3 imports `PROFILE_ALIASES` and `normalize_model`.
 
@@ -358,11 +363,13 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ### Task 3: USB profile suggestion module
 
 **Files:**
+
 - Create: `custom_components/escpos_printer/capabilities/suggestions.py`
 - Modify: `custom_components/escpos_printer/capabilities/__init__.py` (exports)
 - Test: `tests/test_profile_suggestions.py` (new)
 
 **Interfaces:**
+
 - Consumes: `PROFILE_ALIASES`, `normalize_model` (Task 2); `_get_capabilities()`.
 - Produces: `suggest_profile(product: str | None, vid: int | None, pid: int | None) -> str | None`. Task 4 calls it from the USB config flow.
 
@@ -480,10 +487,12 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ### Task 4: Preselect suggested profile in the USB config flow
 
 **Files:**
+
 - Modify: `custom_components/escpos_printer/_config_flow/usb_steps.py` (`async_step_usb_select` ~line 155-183; `async_step_usb_all_devices` — same pattern where its schema builds `CONF_PROFILE`)
 - Test: extend the existing USB config-flow test file (locate with `grep -rl "usb_select" tests/`)
 
 **Interfaces:**
+
 - Consumes: `suggest_profile` (Task 3), `self._discovered_printers` dicts with `product`/`vendor_id`/`product_id` keys (built in `usb_helpers.py:267-277`).
 - Produces: no new symbols — the profile dropdown's `default` becomes the suggestion when one exists.
 
@@ -573,12 +582,14 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ### Task 5: `pick_impl` helpers; reliability presets become pacing-only
 
 **Files:**
+
 - Modify: `custom_components/escpos_printer/capabilities/features.py` (add two functions)
 - Modify: `custom_components/escpos_printer/capabilities/__init__.py` (exports)
 - Modify: `custom_components/escpos_printer/const.py:291-313` (`RELIABILITY_PROFILE_PRESETS`)
 - Test: `tests/test_pick_impl.py` (new); adjust any preset-shape assertions in existing tests
 
 **Interfaces:**
+
 - Consumes: `get_profile_features` (existing, same module).
 - Produces: `pick_impl(profile_key: str | None) -> str | None` (`"bitImageRaster"` | `"bitImageColumn"` | None); `profile_declares_no_images(profile_key: str | None) -> bool`. Task 6 calls both from `__init__.py`.
 
@@ -700,6 +711,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ### Task 6: `CONF_IMPL` option + resolution chain wiring
 
 **Files:**
+
 - Modify: `custom_components/escpos_printer/const.py` (near `IMPL_MODES`, line ~279)
 - Modify: `custom_components/escpos_printer/printer/base_adapter.py` (`__init__`, ~line 86-95)
 - Modify: `custom_components/escpos_printer/__init__.py` (`async_setup_entry`, after the reliability wiring at line ~261-264)
@@ -710,6 +722,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - Test: `tests/test_impl_resolution.py` (new)
 
 **Interfaces:**
+
 - Consumes: `pick_impl`, `profile_declares_no_images` (Task 5).
 - Produces: `CONF_IMPL = "impl"`, `IMPL_AUTO = "auto"`, `IMPL_CHOICE_LABELS` in const.py; adapter attributes `default_impl: str | None`, `profile_no_image_support: bool`, `_no_image_warned: bool`. Resolution chain (first hit wins): per-call `impl` → legacy `reliability_profile_defaults["impl"]` → `adapter.default_impl` → `DEFAULT_IMPL`.
 
@@ -841,6 +854,7 @@ pass it into `_build_options_schema` (add parameter `current_impl: str`) and add
 and persist it in the entry-creation branch: `data[CONF_IMPL] = user_input.get(CONF_IMPL, IMPL_AUTO)`.
 
 `strings.json` (+ mirror in `translations/en.json`):
+
 - `config.step.codepage.data`: `"impl": "Image printing implementation"`
 - `options.step.init.data`: `"impl": "Image printing implementation"`
 
@@ -862,10 +876,12 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ### Task 7: services.yaml impl descriptions + translation sync
 
 **Files:**
+
 - Modify: `custom_components/escpos_printer/services.yaml` (the `impl` field in exactly five services: `print_image`, `print_image_url`, `print_image_path`, `print_camera_snapshot`, `print_image_entity` — NOT `preview_image`, which deliberately omits it)
 - Modify (generated): `custom_components/escpos_printer/strings.json`, `translations/en.json` via script
 
 **Interfaces:**
+
 - Consumes: nothing new.
 - Produces: no code symbols — user-facing copy only.
 
@@ -906,6 +922,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ### Task 8: Changelog, version bump, full validation
 
 **Files:**
+
 - Modify: `CHANGELOG.md` (`## [Unreleased]`)
 - Modify: `custom_components/escpos_printer/manifest.json` (`"version": "1.1.0"`)
 - Modify: `pyproject.toml` (`version = "1.1.0"`)

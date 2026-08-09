@@ -473,7 +473,9 @@ _ALWAYS_BLOCKED_HOSTS: frozenset[ipaddress.IPv4Address | ipaddress.IPv6Address] 
     {
         ipaddress.ip_address("169.254.169.254"),  # IMDSv4 (also caught by link-local)
         ipaddress.ip_address("fd00:ec2::254"),  # AWS IMDSv6 (ULA — not otherwise caught)
-        ipaddress.ip_address("100.100.100.200"),  # Alibaba Cloud IMDS (CGNAT — not otherwise caught)
+        ipaddress.ip_address(
+            "100.100.100.200"
+        ),  # Alibaba Cloud IMDS (CGNAT — not otherwise caught)
     }
 )
 
@@ -722,7 +724,7 @@ def _best_effort_resolve(raw_path: str) -> str:
     """
     try:
         return str(Path(raw_path).resolve())
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return raw_path
 
 
@@ -858,11 +860,11 @@ def _is_trusted_font_location(raw_path: str, hass: HomeAssistant) -> bool:
         return True
     try:
         fonts_dir = Path(hass.config.path("fonts")).resolve()
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return False
     try:
         return Path(resolved_str).is_relative_to(fonts_dir)
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return False
 
 

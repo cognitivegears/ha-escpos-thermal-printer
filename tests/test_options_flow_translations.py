@@ -28,7 +28,9 @@ def test_every_options_flow_error_exists_in_strings_json() -> None:
     strings = json.loads((_COMPONENT_DIR / "strings.json").read_text(encoding="utf-8"))
     defined_keys = set(strings["options"]["error"])
     missing = used_keys - defined_keys
-    assert not missing, f"options-flow error key(s) missing from strings.json options.error: {missing}"
+    assert not missing, (
+        f"options-flow error key(s) missing from strings.json options.error: {missing}"
+    )
 
 
 def test_strings_json_and_en_json_options_match() -> None:

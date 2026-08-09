@@ -230,9 +230,7 @@ class TestUsbStep:
             "custom_components.escpos_printer._config_flow.usb_steps._discover_usb_printers",
             return_value=fake_printers,
         ):
-            result = await hass.config_entries.flow.async_init(
-                DOMAIN, context={"source": "user"}
-            )
+            result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
             result = await hass.config_entries.flow.async_configure(
                 result["flow_id"], {CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB}
             )

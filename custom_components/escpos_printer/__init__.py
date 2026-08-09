@@ -109,7 +109,9 @@ def _shared_print_config(entry: EscposConfigEntry) -> dict[str, Any]:
         "profile": opt.get(CONF_PROFILE, data.get(CONF_PROFILE)),
         "line_width": int(opt.get(CONF_LINE_WIDTH, data.get(CONF_LINE_WIDTH, DEFAULT_LINE_WIDTH))),
         "width_pixels": (
-            int(raw_width) if (raw_width := opt.get(CONF_WIDTH_PIXELS, data.get(CONF_WIDTH_PIXELS))) else None
+            int(raw_width)
+            if (raw_width := opt.get(CONF_WIDTH_PIXELS, data.get(CONF_WIDTH_PIXELS)))
+            else None
         ),
         "allow_local_image_urls": bool(
             opt.get(CONF_ALLOW_LOCAL_IMAGE_URLS, DEFAULT_ALLOW_LOCAL_IMAGE_URLS)
@@ -302,9 +304,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bo
         await adapter.start(
             hass,
             keepalive=bool(entry.options.get(CONF_KEEPALIVE, False)),
-            status_interval=int(
-                entry.options.get(CONF_STATUS_INTERVAL, default_status_interval)
-            ),
+            status_interval=int(entry.options.get(CONF_STATUS_INTERVAL, default_status_interval)),
         )
     except Exception as err:
         # The only blocking work in start() is the initial keepalive
