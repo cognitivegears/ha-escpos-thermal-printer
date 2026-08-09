@@ -17,7 +17,7 @@ WIDTH_CANDIDATES: tuple[int, ...] = (384, 512, 576, 640)
 IMPL_CANDIDATES: tuple[str, ...] = ("bitImageRaster", "bitImageColumn", "graphics")
 # Capability order, broadest encoding first: the wizard stores the first
 # checked candidate in this order, so ties resolve to the most capable.
-CODEPAGE_CANDIDATES: tuple[str, ...] = ("CP858", "CP1252", "CP850", "ISO_8859_1", "CP437")
+CODEPAGE_CANDIDATES: tuple[str, ...] = ("CP858", "CP1252", "CP850", "ISO_8859-1", "CP437")
 CODEPAGE_SAMPLE = "café ñ ü é ß ° €"
 
 _ISSUES_URL = "https://github.com/cognitivegears/ha-escpos-thermal-printer/issues/new"

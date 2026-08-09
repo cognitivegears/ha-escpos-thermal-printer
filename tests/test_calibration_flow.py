@@ -10,11 +10,24 @@ from homeassistant.const import CONF_HOST, CONF_PORT
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.escpos_printer._config_flow.calibration import CODEPAGE_CANDIDATES
+from custom_components.escpos_printer.capabilities.loader import _get_capabilities
 from custom_components.escpos_printer.const import (
     CONF_CONNECTION_TYPE,
     CONNECTION_TYPE_NETWORK,
     DOMAIN,
 )
+
+
+def test_codepage_candidates_are_real_encodings():
+    """Every CODEPAGE_CANDIDATES entry must be a real, correctly-spelled encoding.
+
+    A misspelled name (e.g. underscore vs hyphen) would still "print" --
+    python-escpos swallows the charcode() failure inside print_operations'
+    broad except -- so a bad spelling here is otherwise silently unverifiable.
+    """
+    real_encodings = set(_get_capabilities()["encodings"])
+    missing = [cp for cp in CODEPAGE_CANDIDATES if cp not in real_encodings]
+    assert not missing, f"CODEPAGE_CANDIDATES has unknown encoding name(s): {missing}"
 
 
 def _make_entry(hass, *, loaded: bool = True) -> tuple[MockConfigEntry, MagicMock]:

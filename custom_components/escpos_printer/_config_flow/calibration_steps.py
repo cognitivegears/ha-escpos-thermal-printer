@@ -267,7 +267,13 @@ class CalibrationFlowMixin:
                     sanitize_log_message(str(err)),
                 )
         if printed:
-            await adapter.print_text(self.hass, text="", cut="none", feed=2)
+            try:
+                await adapter.print_text(self.hass, text="", cut="none", feed=2)
+            except Exception as err:
+                _LOGGER.debug(
+                    "Calibration codepage trailing feed failed to print: %s",
+                    sanitize_log_message(str(err)),
+                )
         return printed
 
     async def async_step_calibrate_codepage(
