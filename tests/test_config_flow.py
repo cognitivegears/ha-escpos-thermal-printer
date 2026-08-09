@@ -148,15 +148,9 @@ async def test_config_flow_with_profile_selection(hass):  # type: ignore[no-unty
 
 async def test_config_flow_custom_profile(hass):  # type: ignore[no-untyped-def]
     """Test config flow with custom profile entry."""
-    with (
-        patch(
-            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
-            return_value=True,
-        ),
-        patch(
-            "custom_components.escpos_printer._config_flow.settings_steps.is_valid_profile",
-            return_value=True,
-        ),
+    with patch(
+        "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+        return_value=True,
     ):
         # Step 1: Connection type selection
         result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})

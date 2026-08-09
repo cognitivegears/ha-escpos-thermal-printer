@@ -7,6 +7,7 @@ profiles, supported codepages, line widths, and cut modes.
 
 from __future__ import annotations
 
+from .aliases import PROFILE_ALIASES, normalize_model, resolve_alias
 from .codepages import (
     get_all_codepages,
     get_profile_codepages,
@@ -28,13 +29,19 @@ from .features import (
 )
 from .line_widths import get_all_line_widths, get_profile_line_widths
 from .loader import clear_capabilities_cache
-from .profiles import get_profile_choices, get_profile_choices_dict, is_valid_profile
+from .profiles import (
+    get_profile_choices,
+    get_profile_choices_dict,
+    is_valid_profile,
+    resolve_profile_name,
+)
 
 __all__ = [
     "COMMON_CODEPAGES",
     "COMMON_LINE_WIDTHS",
     "DEFAULT_CUT_MODES",
     "OPTION_CUSTOM",
+    "PROFILE_ALIASES",
     "PROFILE_AUTO",
     "PROFILE_CUSTOM",
     "clear_capabilities_cache",
@@ -49,5 +56,8 @@ __all__ = [
     "get_profile_line_widths",
     "is_valid_codepage_for_profile",
     "is_valid_profile",
+    "normalize_model",
     "profile_supports_feature",
+    "resolve_alias",
+    "resolve_profile_name",
 ]

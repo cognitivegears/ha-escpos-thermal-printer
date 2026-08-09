@@ -15,7 +15,7 @@ from ..capabilities import (
     get_profile_cut_modes,
     get_profile_line_widths,
     is_valid_codepage_for_profile,
-    is_valid_profile,
+    resolve_profile_name,
 )
 from ..const import (
     CONF_BT_MAC,
@@ -102,13 +102,12 @@ class SettingsFlowMixin:
             custom_profile = user_input.get("custom_profile", "").strip()
             _LOGGER.debug("Custom profile entered: %s", custom_profile)
 
-            # Validate the profile exists in escpos-printer-db
-            is_valid = await self.hass.async_add_executor_job(is_valid_profile, custom_profile)
-            if not custom_profile or not is_valid:
+            resolved = await self.hass.async_add_executor_job(resolve_profile_name, custom_profile)
+            if not resolved:
                 _LOGGER.warning("Invalid profile name: %s", custom_profile)
                 errors["base"] = "invalid_profile"
             else:
-                self._user_data[CONF_PROFILE] = custom_profile
+                self._user_data[CONF_PROFILE] = resolved
                 return await self.async_step_codepage()
 
         data_schema = vol.Schema(
@@ -226,7 +225,9 @@ class SettingsFlowMixin:
                     ["left", "center", "right"]
                 ),
                 vol.Optional(CONF_DEFAULT_CUT, default=DEFAULT_CUT): vol.In(cut_choices),
-                vol.Optional(CONF_WIDTH_PIXELS): vol.All(vol.Coerce(int), vol.Range(min=16, max=2048)),
+                vol.Optional(CONF_WIDTH_PIXELS): vol.All(
+                    vol.Coerce(int), vol.Range(min=16, max=2048)
+                ),
             }
         )
 

@@ -18,7 +18,7 @@ from ..capabilities import (
     get_profile_cut_modes,
     get_profile_line_widths,
     is_valid_codepage_for_profile,
-    is_valid_profile,
+    resolve_profile_name,
 )
 from ..const import (
     CONF_ALLOW_LOCAL_IMAGE_URLS,
@@ -365,14 +365,13 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
             custom_profile = user_input.get("custom_profile", "").strip()
             _LOGGER.debug("Options: Custom profile entered: %s", custom_profile)
 
-            # Validate the profile exists in escpos-printer-db
-            is_valid = await self.hass.async_add_executor_job(is_valid_profile, custom_profile)
-            if not custom_profile or not is_valid:
+            resolved = await self.hass.async_add_executor_job(resolve_profile_name, custom_profile)
+            if not resolved:
                 _LOGGER.warning("Invalid profile name: %s", custom_profile)
                 errors["base"] = "invalid_profile"
             else:
                 data = dict(self._pending_data)
-                data[CONF_PROFILE] = custom_profile
+                data[CONF_PROFILE] = resolved
 
                 # Check if codepage or line width also need custom entry
                 if data.get(CONF_CODEPAGE) == OPTION_CUSTOM:

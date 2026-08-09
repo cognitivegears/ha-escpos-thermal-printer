@@ -66,3 +66,27 @@ def is_valid_profile(profile_key: str | None) -> bool:
     capabilities = _get_capabilities()
     profiles = capabilities.get("profiles", {})
     return profile_key in profiles
+
+
+def resolve_profile_name(raw: str | None) -> str | None:
+    """Resolve user input to a bundled profile key.
+
+    Accepts an exact key, a case-insensitive key, or a clone alias
+    (see ``aliases.PROFILE_ALIASES``). Returns None when nothing matches.
+    """
+    if not raw:
+        return None
+    from .aliases import resolve_alias  # noqa: PLC0415
+
+    raw = raw.strip()
+    capabilities = _get_capabilities()
+    profiles: dict[str, object] = capabilities.get("profiles", {})
+    if raw in profiles:
+        return raw
+    lowered = {key.casefold(): key for key in profiles}
+    if raw.casefold() in lowered:
+        return lowered[raw.casefold()]
+    target = resolve_alias(raw)
+    if target and target in profiles:
+        return target
+    return None
