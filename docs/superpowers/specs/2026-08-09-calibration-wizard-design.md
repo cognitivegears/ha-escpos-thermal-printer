@@ -70,9 +70,15 @@ abandoned by closing the flow — nothing is stored until the final step.
    Prints numbered sample lines — `café ñ ü é ß ° €` encoded per candidate —
    candidates being the profile's codepages when a profile is set, else
    `COMMON_CODEPAGES` (CP437, CP850, CP858, CP1252, ISO_8859-1 — CP858/CP1252
-   for the € sign). Question: "Which number shows all characters correctly?" →
-   numbered choices / "none" / skip / reprint. Result → pending `codepage`
-   ("none"/skip → unchanged).
+   for the € sign). The **on-screen step description displays the reference
+   string** — the paper cannot be its own reference (a wrong codepage prints
+   plausible-but-different glyphs), so the form text is the source of truth:
+   "Each printed line should read exactly: `café ñ ü é ß ° €`. Which numbered
+   line matches this, character for character?" → numbered choices / "none
+   match" / skip / reprint. Result → pending `codepage` ("none"/skip →
+   unchanged). Characters that a candidate encoding cannot represent at all
+   are printed as `?` by the sample generator (never dropped), so a partial
+   match still looks visibly wrong rather than deceptively clean.
 
 5. **`calibrate_summary`** — shows the measured values via description
    placeholders, plus:
