@@ -54,6 +54,11 @@ ALIAS_MODELS: dict[str, str] = {
     "Xprinter XP-80C": "NT-80-V-UL",
     "Xprinter XP-N160II": "NT-80-V-UL",
     "Xprinter XP-T80A": "NT-80-V-UL",
+    # Rongta RP850P: hardware-verified on a real unit (self-test: 640-dot
+    # head, GD207_v1.16 firmware; differential raster print clips at 576
+    # dots, i.e. standard 72mm printable width @203dpi). NOT aliased to
+    # RP326 because that bundled profile declares no pixel width.
+    "Rongta RP850P": "NT-80-V-UL",
     # Misc verified 58mm/384dot ESC/POS clones.
     "HOIN HOP-E58": "POS-5890",
     "Goojprt PT-210": "POS-5890",

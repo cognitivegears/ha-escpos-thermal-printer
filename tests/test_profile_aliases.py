@@ -76,7 +76,9 @@ def test_no_alias_collides_with_a_real_profile_key() -> None:
 
 
 def test_expanded_alias_count() -> None:
-    assert len(ALIAS_MODELS) == 22
+    # Lower bound only — the invariant tests above pin the properties that
+    # matter; an exact count would just churn on every addition.
+    assert len(ALIAS_MODELS) >= 22
 
 
 def test_resolve_alias() -> None:

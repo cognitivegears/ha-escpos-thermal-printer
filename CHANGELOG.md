@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - 16 more researched clone/equivalent model aliases: Epson TM-T20III/
   TM-T20X/TM-T82II/TM-T82III/TM-T88VI/TM-T88VII, Xprinter XP-58IIH/
   XP-80C/XP-N160II/XP-T80A, Zjiang ZJ-5802, HOIN HOP-E58, Goojprt
-  PT-210, Netum NT-1809DD, Sunmi V1/T2.
+  PT-210, Netum NT-1809DD, Sunmi V1/T2, Rongta RP850P (hardware-verified).
 - Aliased models now appear directly in the profile dropdown as
   "Model (compatible)" entries, so users can find a rebadged printer
   without knowing the custom-profile field exists.
