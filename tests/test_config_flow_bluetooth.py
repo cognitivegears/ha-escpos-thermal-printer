@@ -13,10 +13,12 @@ from custom_components.escpos_printer._config_flow.bluetooth_helpers import (
 from custom_components.escpos_printer._config_flow.bluetooth_steps import (
     SECTION_BT_ADVANCED,
 )
+from custom_components.escpos_printer.capabilities import PROFILE_AUTO
 from custom_components.escpos_printer.config_flow import EscposConfigFlow
 from custom_components.escpos_printer.const import (
     CONF_BT_MAC,
     CONF_CONNECTION_TYPE,
+    CONF_PROFILE,
     CONF_RFCOMM_CHANNEL,
     CONNECTION_TYPE_BLUETOOTH,
 )
@@ -136,6 +138,45 @@ class TestBluetoothSelectStep:
         assert "AA:BB:CC:DD:EE:FF" in choices
         assert "11:22:33:44:55:66" in choices
         assert "__manual__" in choices
+
+    @pytest.mark.asyncio
+    async def test_select_preselects_suggested_profile(self, hass, mock_paired_devices):
+        """The default device's advertised name preselects a suggested profile.
+
+        "Netum NT-1809DD" resolves through the alias table to NT-5890K; the
+        suggestion must only change the dropdown default, never store anything.
+        """
+        flow = EscposConfigFlow()
+        flow.hass = hass
+        flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH}
+
+        with patch(
+            "custom_components.escpos_printer._config_flow.bluetooth_steps."
+            "_list_paired_bluetooth_devices",
+            return_value=mock_paired_devices,
+        ):
+            result = await flow.async_step_bluetooth_select()
+
+        profile_key = next(k for k in result["data_schema"].schema if k == CONF_PROFILE)
+        assert profile_key.default() == "NT-5890K"
+
+    @pytest.mark.asyncio
+    async def test_select_generic_name_keeps_auto_profile(self, hass, mock_paired_devices):
+        """A generic device name yields no suggestion — default stays auto."""
+        mock_paired_devices[0]["name"] = "BlueTooth Printer"
+        flow = EscposConfigFlow()
+        flow.hass = hass
+        flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH}
+
+        with patch(
+            "custom_components.escpos_printer._config_flow.bluetooth_steps."
+            "_list_paired_bluetooth_devices",
+            return_value=mock_paired_devices,
+        ):
+            result = await flow.async_step_bluetooth_select()
+
+        profile_key = next(k for k in result["data_schema"].schema if k == CONF_PROFILE)
+        assert profile_key.default() == PROFILE_AUTO
 
     @pytest.mark.asyncio
     async def test_no_paired_devices_routes_to_guidance(self, hass):

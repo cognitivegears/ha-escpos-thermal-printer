@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   no user-side fix).
 - USB config flow now preselects a suggested profile from the device's
   USB descriptor or a curated VID:PID list.
+- Bluetooth config flow now preselects a suggested profile from the
+  paired device's advertised name (same preselect-only matching as USB).
 - Clone/equivalent model aliases (e.g. Citizen CT-S601II → CT-S651,
   ZJ-5890 → POS-5890) accepted in the custom profile field.
 - 16 more researched clone/equivalent model aliases: Epson TM-T20III/
@@ -23,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   XP-80C/XP-N160II/XP-T80A, Zjiang ZJ-5802, HOIN HOP-E58, Goojprt
   PT-210, Netum NT-1809DD, Sunmi V1/T2.
 - Aliased models now appear directly in the profile dropdown as
-  "<Model> (compatible)" entries, so users can find a rebadged printer
+  "Model (compatible)" entries, so users can find a rebadged printer
   without knowing the custom-profile field exists.
 - Per-entry "Image printing implementation" option (Auto/Raster/Column/
   Graphics) with plain-language guidance.

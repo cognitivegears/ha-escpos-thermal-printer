@@ -14,6 +14,7 @@ from ..capabilities import (
     PROFILE_AUTO,
     PROFILE_CUSTOM,
     get_profile_choices_dict,
+    suggest_profile,
 )
 from ..const import (
     BT_MANUAL_ENTRY_KEY,
@@ -44,6 +45,27 @@ _LOGGER = logging.getLogger(__name__)
 # bluetooth_select form. Mirrored in strings.json / translations under
 # config.step.bluetooth_select.sections.
 SECTION_BT_ADVANCED = "advanced_options"
+
+
+async def _suggest_bt_default_profile(
+    hass: Any,
+    devices: list[dict[str, Any]],
+    default_key: str,
+    profile_choices: dict[str, str],
+) -> str:
+    """Suggest a profile from the default device's advertised BT name.
+
+    Same preselect-only pattern as the USB flow's descriptor matching:
+    portable BT printers often advertise their model ("PT-210",
+    "NT-1809DD"); generic names yield no suggestion and the dropdown
+    default stays on auto.
+    """
+    device = next((d for d in devices if d.get("_choice_key") == default_key), None)
+    if device and device.get("name"):
+        suggestion = await hass.async_add_executor_job(suggest_profile, device["name"], None, None)
+        if suggestion and suggestion in profile_choices:
+            return str(suggestion)
+    return PROFILE_AUTO
 
 
 class BluetoothFlowMixin:
@@ -147,6 +169,9 @@ class BluetoothFlowMixin:
         )
         profile_choices = await self.hass.async_add_executor_job(get_profile_choices_dict)
         default_device = next(iter(device_choices.keys()))
+        default_profile = await _suggest_bt_default_profile(
+            self.hass, self._paired_bt_devices, default_device, profile_choices
+        )
 
         # Channel lives in a collapsed "Advanced options" section — almost
         # every ESC/POS printer uses 1, and a refused default channel routes
@@ -157,7 +182,7 @@ class BluetoothFlowMixin:
         schema_dict: dict[Any, Any] = {
             vol.Required(CONF_BT_DEVICE, default=default_device): vol.In(device_choices),
             vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
-            vol.Optional(CONF_PROFILE, default=PROFILE_AUTO): vol.In(profile_choices),
+            vol.Optional(CONF_PROFILE, default=default_profile): vol.In(profile_choices),
             vol.Required(SECTION_BT_ADVANCED): section(
                 vol.Schema(
                     {
