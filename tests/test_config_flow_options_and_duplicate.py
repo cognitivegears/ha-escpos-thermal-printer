@@ -20,6 +20,32 @@ from custom_components.escpos_printer.const import (
 )
 
 
+async def test_options_flow_shows_menu_first(hass):  # type: ignore[no-untyped-def]
+    """Opening options shows a menu; "settings" leads to the regular form."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="1.2.3.4:9100",
+        data={
+            CONF_HOST: "1.2.3.4",
+            CONF_PORT: 9100,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK,
+        },
+        unique_id="1.2.3.4:9100",
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] == "menu"
+    assert set(result["menu_options"]) == {"settings", "calibrate"}
+
+    result2 = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "settings"}
+    )
+    assert result2["type"] == "form"
+    assert result2["step_id"] == "settings"
+
+
 async def test_options_flow_update(hass):  # type: ignore[no-untyped-def]
     """Test options flow allows updating settings."""
     entry = MockConfigEntry(
@@ -37,6 +63,9 @@ async def test_options_flow_update(hass):  # type: ignore[no-untyped-def]
 
     # Show the options form
     result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "settings"}
+    )
     assert result["type"] == "form"
 
     # Submit options. Saving schedules an automatic entry reload
@@ -77,6 +106,9 @@ async def test_options_flow_allow_local_image_urls_roundtrips(hass):  # type: ig
     entry.add_to_hass(hass)
 
     result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "settings"}
+    )
     assert result["type"] == "form"
     # Default must be off (secure-by-default).
     schema_defaults = {

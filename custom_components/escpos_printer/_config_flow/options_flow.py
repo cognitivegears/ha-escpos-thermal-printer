@@ -97,7 +97,19 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
         self._pending_data: dict[str, Any] = {}
         super().__init__()
 
-    async def async_step_init(  # noqa: PLR0912, PLR0915
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Entry menu: regular settings or the calibration wizard."""
+        return self.async_show_menu(step_id="init", menu_options=["settings", "calibrate"])
+
+    async def async_step_calibrate(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Calibration wizard entry -- implemented in CalibrationFlowMixin (Task 3)."""
+        return self.async_abort(reason="calibration_unavailable")
+
+    async def async_step_settings(  # noqa: PLR0912, PLR0915
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Handle the options flow initialization.
@@ -276,7 +288,7 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
             data_schema = self.add_suggested_values_to_schema(data_schema, user_input)
 
         _LOGGER.debug("Showing options form for entry %s", self.config_entry.entry_id)
-        return self.async_show_form(step_id="init", data_schema=data_schema, errors=errors)
+        return self.async_show_form(step_id="settings", data_schema=data_schema, errors=errors)
 
     def _build_options_schema(
         self,

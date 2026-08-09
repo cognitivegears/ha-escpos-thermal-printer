@@ -60,6 +60,9 @@ async def test_options_flow_clears_width_override(hass) -> None:  # type: ignore
     entry.add_to_hass(hass)
 
     result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "settings"}
+    )
     assert result["type"] == "form"
 
     with patch("custom_components.escpos_printer.async_setup_entry", return_value=True):

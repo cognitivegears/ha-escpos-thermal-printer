@@ -24,6 +24,14 @@ from custom_components.escpos_printer.const import (
 )
 
 
+async def _open_settings(hass, entry: MockConfigEntry):  # type: ignore[no-untyped-def]
+    """Open the options flow and hop through the menu to the settings form."""
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    return await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "settings"}
+    )
+
+
 async def _setup_entry(hass) -> MockConfigEntry:  # type: ignore[no-untyped-def]
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -47,7 +55,7 @@ async def test_options_flow_custom_profile_invalid(hass):  # type: ignore[no-unt
     """An invalid custom profile name should surface an error and stay on the form."""
     entry = await _setup_entry(hass)
 
-    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await _open_settings(hass, entry)
     assert result["type"] == "form"
 
     # Submit "Custom" profile choice -> opens custom_profile step
@@ -81,7 +89,7 @@ async def test_options_flow_custom_line_width_invalid_out_of_range(hass):  # typ
     """A line width outside 1-255 should error."""
     entry = await _setup_entry(hass)
 
-    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await _open_settings(hass, entry)
     # Submit options with custom line width
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
@@ -113,7 +121,7 @@ async def test_options_flow_custom_line_width_valid(hass):  # type: ignore[no-un
     """A valid custom line width should create the entry."""
     entry = await _setup_entry(hass)
 
-    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await _open_settings(hass, entry)
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         user_input={
@@ -161,7 +169,7 @@ async def test_options_flow_bluetooth_reliability_defaults_to_auto(hass):  # typ
     )
     entry.add_to_hass(hass)
 
-    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await _open_settings(hass, entry)
     assert result["type"] == "form"
 
     defaults = {
@@ -191,7 +199,7 @@ async def test_options_flow_bluetooth_status_interval_still_defaults_to_0(hass):
     )
     entry.add_to_hass(hass)
 
-    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await _open_settings(hass, entry)
     assert result["type"] == "form"
 
     defaults = {
@@ -206,7 +214,7 @@ async def test_options_flow_network_status_interval_still_defaults_to_0(hass):  
     """A network entry's status_interval default is unaffected (stays 0)."""
     entry = await _setup_entry(hass)
 
-    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await _open_settings(hass, entry)
     assert result["type"] == "form"
 
     defaults = {
@@ -221,7 +229,7 @@ async def test_options_flow_custom_codepage_invalid(hass):  # type: ignore[no-un
     """An invalid custom codepage should error."""
     entry = await _setup_entry(hass)
 
-    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await _open_settings(hass, entry)
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         user_input={
@@ -282,13 +290,13 @@ async def test_options_flow_bt_status_interval_below_floor_errors(hass):  # type
     entry = _bt_entry()
     entry.add_to_hass(hass)
 
-    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await _open_settings(hass, entry)
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         user_input=_options_submission(status_interval=30),
     )
     assert result["type"] == "form"
-    assert result["step_id"] == "init"
+    assert result["step_id"] == "settings"
     assert result["errors"] == {"base": "bt_status_interval_too_low"}
     # Entry untouched -- the invalid submission was never saved.
     assert entry.options.get("status_interval") is None
@@ -299,7 +307,7 @@ async def test_options_flow_bt_status_interval_zero_accepted(hass):  # type: ign
     entry = _bt_entry()
     entry.add_to_hass(hass)
 
-    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await _open_settings(hass, entry)
     with patch("custom_components.escpos_printer.async_setup_entry", return_value=True):
         result = await hass.config_entries.options.async_configure(
             result["flow_id"],
@@ -315,7 +323,7 @@ async def test_options_flow_bt_status_interval_floor_accepted(hass):  # type: ig
     entry = _bt_entry()
     entry.add_to_hass(hass)
 
-    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await _open_settings(hass, entry)
     with patch("custom_components.escpos_printer.async_setup_entry", return_value=True):
         result = await hass.config_entries.options.async_configure(
             result["flow_id"],
@@ -330,7 +338,7 @@ async def test_options_flow_non_bt_entry_status_interval_below_60_accepted(hass)
     """The floor only applies to Bluetooth entries -- a network entry accepts 30s."""
     entry = await _setup_entry(hass)
 
-    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await _open_settings(hass, entry)
     with patch("custom_components.escpos_printer.async_setup_entry", return_value=True):
         result = await hass.config_entries.options.async_configure(
             result["flow_id"],
