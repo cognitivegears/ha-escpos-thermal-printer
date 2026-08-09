@@ -7,7 +7,7 @@ profiles, supported codepages, line widths, and cut modes.
 
 from __future__ import annotations
 
-from .aliases import PROFILE_ALIASES, normalize_model, resolve_alias
+from .aliases import PROFILE_ALIASES, canonical_profile_key, normalize_model, resolve_alias
 from .codepages import (
     get_all_codepages,
     get_profile_codepages,
@@ -47,6 +47,7 @@ __all__ = [
     "PROFILE_ALIASES",
     "PROFILE_AUTO",
     "PROFILE_CUSTOM",
+    "canonical_profile_key",
     "clear_capabilities_cache",
     "get_all_codepages",
     "get_all_line_widths",

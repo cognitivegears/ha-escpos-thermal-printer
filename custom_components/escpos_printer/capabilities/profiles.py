@@ -29,10 +29,22 @@ def get_profile_choices() -> list[tuple[str, str]]:
         display = f"{vendor} {name}" if vendor and vendor != "Generic" else name
         profile_list.append((key, display))
 
-    # Sort by display name, case-insensitive
-    profile_list.sort(key=lambda x: x[1].lower())
+    from .aliases import ALIAS_MODELS, normalize_model  # noqa: PLC0415
 
-    choices.extend(profile_list)
+    # Skip any alias whose normalized key collides with a real profile key.
+    real_normalized = {normalize_model(key) for key in profiles}
+    alias_list = [
+        (normalize_model(display), f"{display} (compatible)")
+        for display in ALIAS_MODELS
+        if normalize_model(display) not in real_normalized
+    ]
+
+    # Single sort over the combined list so e.g. "Epson TM-T20III
+    # (compatible)" sits next to "Epson TM-T20II".
+    combined = profile_list + alias_list
+    combined.sort(key=lambda x: x[1].lower())
+
+    choices.extend(combined)
 
     # Add Custom option at the end
     choices.append((PROFILE_CUSTOM, "Custom (enter profile name)..."))
@@ -56,16 +68,15 @@ def is_valid_profile(profile_key: str | None) -> bool:
         profile_key: Profile key to validate.
 
     Returns:
-        True if profile is valid, empty (auto), or custom marker.
+        True if profile is valid (including a case variant or clone
+        alias), empty (auto), or custom marker.
     """
     if not profile_key or profile_key == PROFILE_AUTO:
         return True  # Empty means auto
     if profile_key == PROFILE_CUSTOM:
         return True  # Custom marker is valid
 
-    capabilities = _get_capabilities()
-    profiles = capabilities.get("profiles", {})
-    return profile_key in profiles
+    return resolve_profile_name(profile_key) is not None
 
 
 def resolve_profile_name(raw: str | None) -> str | None:

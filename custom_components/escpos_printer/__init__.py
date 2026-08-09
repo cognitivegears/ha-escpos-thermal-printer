@@ -12,7 +12,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 
-from .capabilities import PROFILE_AUTO, is_valid_profile, pick_impl, profile_declares_no_images
+from .capabilities import (
+    PROFILE_AUTO,
+    canonical_profile_key,
+    is_valid_profile,
+    pick_impl,
+    profile_declares_no_images,
+)
 from .const import (
     CONF_ALLOW_LOCAL_IMAGE_URLS,
     CONF_BAUDRATE,
@@ -228,6 +234,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bo
     connection_type = entry.data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
 
     shared = _shared_print_config(entry)
+    # Resolve a stored clone alias to its bundled target *before* building
+    # the printer config, so the adapter/python-escpos constructor only
+    # ever sees real profile names. Executor: resolution loads the
+    # capabilities YAML.
+    shared["profile"] = await hass.async_add_executor_job(canonical_profile_key, shared["profile"])
     config: UsbPrinterConfig | NetworkPrinterConfig | BluetoothPrinterConfig | SerialPrinterConfig
     if connection_type == CONNECTION_TYPE_USB:
         config = UsbPrinterConfig(

@@ -26,6 +26,10 @@ def get_profile_codepages(profile_key: str | None) -> list[str]:
         # For custom profiles, return all available codepages
         return get_all_codepages()
 
+    from .aliases import canonical_profile_key  # noqa: PLC0415
+
+    profile_key = canonical_profile_key(profile_key)
+
     capabilities = _get_capabilities()
     profiles = capabilities.get("profiles", {})
 

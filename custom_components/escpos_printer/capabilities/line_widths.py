@@ -24,6 +24,10 @@ def get_profile_line_widths(profile_key: str | None) -> list[int]:
     if not profile_key or profile_key in (PROFILE_AUTO, PROFILE_CUSTOM):
         return COMMON_LINE_WIDTHS.copy()
 
+    from .aliases import canonical_profile_key  # noqa: PLC0415
+
+    profile_key = canonical_profile_key(profile_key)
+
     capabilities = _get_capabilities()
     profiles = capabilities.get("profiles", {})
 

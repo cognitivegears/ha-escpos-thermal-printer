@@ -21,6 +21,10 @@ def get_profile_cut_modes(profile_key: str | None) -> list[str]:
     if not profile_key or profile_key in (PROFILE_AUTO, PROFILE_CUSTOM):
         return DEFAULT_CUT_MODES.copy()
 
+    from .aliases import canonical_profile_key  # noqa: PLC0415
+
+    profile_key = canonical_profile_key(profile_key)
+
     capabilities = _get_capabilities()
     profiles = capabilities.get("profiles", {})
 
@@ -55,6 +59,10 @@ def profile_supports_feature(profile_key: str | None, feature: str) -> bool:
         # For auto/custom profiles, assume all features available
         return True
 
+    from .aliases import canonical_profile_key  # noqa: PLC0415
+
+    profile_key = canonical_profile_key(profile_key)
+
     capabilities = _get_capabilities()
     profiles = capabilities.get("profiles", {})
 
@@ -79,6 +87,10 @@ def get_profile_features(profile_key: str | None) -> dict[str, bool]:
     if not profile_key or profile_key in (PROFILE_AUTO, PROFILE_CUSTOM):
         return {}
 
+    from .aliases import canonical_profile_key  # noqa: PLC0415
+
+    profile_key = canonical_profile_key(profile_key)
+
     capabilities = _get_capabilities()
     profiles = capabilities.get("profiles", {})
 
@@ -102,6 +114,10 @@ def get_profile_info(profile_key: str | None) -> dict[str, Any]:
     """
     if not profile_key or profile_key in (PROFILE_AUTO, PROFILE_CUSTOM):
         return {}
+
+    from .aliases import canonical_profile_key  # noqa: PLC0415
+
+    profile_key = canonical_profile_key(profile_key)
 
     capabilities = _get_capabilities()
     profiles = capabilities.get("profiles", {})
