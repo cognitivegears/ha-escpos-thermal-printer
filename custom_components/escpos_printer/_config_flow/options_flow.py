@@ -26,6 +26,7 @@ from ..const import (
     CONF_CONNECTION_TYPE,
     CONF_DEFAULT_ALIGN,
     CONF_DEFAULT_CUT,
+    CONF_IMPL,
     CONF_KEEPALIVE,
     CONF_LINE_WIDTH,
     CONF_PROFILE,
@@ -47,6 +48,8 @@ from ..const import (
     DEFAULT_SERIAL_WRITE_CHUNK_SIZE,
     DEFAULT_STATUS_INTERVAL_SERIAL,
     DEFAULT_TIMEOUT,
+    IMPL_AUTO,
+    IMPL_CHOICE_LABELS,
     RELIABILITY_PROFILE_AUTO,
     RELIABILITY_PROFILE_BALANCED,
     RELIABILITY_PROFILE_BLUETOOTH,
@@ -250,6 +253,7 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
             CONF_RELIABILITY_PROFILE, RELIABILITY_PROFILE_AUTO
         )
         reliability_choices = dict(_RELIABILITY_LABELS)
+        current_impl = self.config_entry.options.get(CONF_IMPL, IMPL_AUTO)
 
         data_schema = self._build_options_schema(
             connection_type=connection_type,
@@ -258,6 +262,7 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
             current_line_width_str=current_line_width_str,
             current_cut=current_cut,
             current_reliability=current_reliability,
+            current_impl=current_impl,
             profile_choices=profile_choices,
             codepage_choices=codepage_choices,
             width_choices=width_choices,
@@ -282,6 +287,7 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
         current_line_width_str: str,
         current_cut: str,
         current_reliability: str,
+        current_impl: str,
         profile_choices: dict[str, str],
         codepage_choices: dict[str, str],
         width_choices: dict[str, str],
@@ -313,6 +319,7 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
             vol.Optional(CONF_RELIABILITY_PROFILE, default=current_reliability): vol.In(
                 reliability_choices
             ),
+            vol.Optional(CONF_IMPL, default=current_impl): vol.In(IMPL_CHOICE_LABELS),
             vol.Optional(
                 CONF_STATUS_INTERVAL,
                 default=opts.get(

@@ -114,6 +114,13 @@ class EscposPrinterAdapterBase(
         # Per-printer reliability profile defaults, populated by
         # ``async_setup_entry``. Empty dict means "use transport defaults".
         self.reliability_profile_defaults = {}
+        # Per-entry default image implementation, resolved at setup from
+        # CONF_IMPL / pick_impl(profile). None -> DEFAULT_IMPL at use time.
+        self.default_impl: str | None = None
+        # True when the profile explicitly declares no image support;
+        # prepare_image warns once but still prints (hints, not gates).
+        self.profile_no_image_support: bool = False
+        self._no_image_warned: bool = False
 
     @property
     def config(self) -> BasePrinterConfig:

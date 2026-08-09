@@ -279,6 +279,15 @@ DITHER_MODES: frozenset[str] = frozenset({"floyd-steinberg", "none", "threshold"
 IMPL_MODES: frozenset[str] = frozenset({"bitImageRaster", "graphics", "bitImageColumn"})
 ROTATION_VALUES: frozenset[int] = frozenset({0, 90, 180, 270})
 
+CONF_IMPL = "impl"  # per-entry default image implementation
+IMPL_AUTO = "auto"  # follow the printer profile (pick_impl)
+IMPL_CHOICE_LABELS: dict[str, str] = {
+    IMPL_AUTO: "Auto (recommended) — follow the printer profile",
+    "bitImageRaster": "Raster — works on most printers",
+    "bitImageColumn": "Column — older/impact printers; try this if images print as garbled text",
+    "graphics": "Graphics — modern Epson printers",
+}
+
 # Reliability profile presets used by the options flow.
 # A preset picks transport pacing (fragment_height + chunk_delay_ms) only;
 # image implementation is a printer property resolved from the printer

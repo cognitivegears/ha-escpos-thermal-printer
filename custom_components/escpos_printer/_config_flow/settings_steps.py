@@ -24,6 +24,7 @@ from ..const import (
     CONF_DEFAULT_ALIGN,
     CONF_DEFAULT_CUT,
     CONF_HOST,
+    CONF_IMPL,
     CONF_LINE_WIDTH,
     CONF_PORT,
     CONF_PRODUCT_ID,
@@ -38,6 +39,8 @@ from ..const import (
     DEFAULT_ALIGN,
     DEFAULT_CUT,
     DEFAULT_LINE_WIDTH,
+    IMPL_AUTO,
+    IMPL_CHOICE_LABELS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -180,6 +183,8 @@ class SettingsFlowMixin:
             if user_input.get(CONF_WIDTH_PIXELS):
                 data[CONF_WIDTH_PIXELS] = int(user_input[CONF_WIDTH_PIXELS])
 
+            data[CONF_IMPL] = user_input.get(CONF_IMPL, IMPL_AUTO)
+
             # Remove internal keys
             data.pop("_printer_name", None)
 
@@ -228,6 +233,7 @@ class SettingsFlowMixin:
                 vol.Optional(CONF_WIDTH_PIXELS): vol.All(
                     vol.Coerce(int), vol.Range(min=16, max=2048)
                 ),
+                vol.Optional(CONF_IMPL, default=IMPL_AUTO): vol.In(IMPL_CHOICE_LABELS),
             }
         )
 

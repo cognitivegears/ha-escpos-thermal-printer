@@ -12,7 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 
-from .capabilities import PROFILE_AUTO, is_valid_profile
+from .capabilities import PROFILE_AUTO, is_valid_profile, pick_impl, profile_declares_no_images
 from .const import (
     CONF_ALLOW_LOCAL_IMAGE_URLS,
     CONF_BAUDRATE,
@@ -21,6 +21,7 @@ from .const import (
     CONF_CONNECTION_TYPE,
     CONF_DEFAULT_ALIGN,
     CONF_DEFAULT_CUT,
+    CONF_IMPL,
     CONF_IN_EP,
     CONF_KEEPALIVE,
     CONF_LINE_WIDTH,
@@ -52,6 +53,8 @@ from .const import (
     DEFAULT_SERIAL_WRITE_CHUNK_SIZE,
     DEFAULT_STATUS_INTERVAL_SERIAL,
     DOMAIN,
+    IMPL_AUTO,
+    IMPL_MODES,
     RELIABILITY_PROFILE_AUTO,
     RELIABILITY_PROFILE_PRESETS,
 )
@@ -265,6 +268,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bo
     reliability_profile = entry.options.get(CONF_RELIABILITY_PROFILE, RELIABILITY_PROFILE_AUTO)
     adapter.reliability_profile_defaults = dict(
         RELIABILITY_PROFILE_PRESETS.get(reliability_profile, {})
+    )
+
+    entry_impl = entry.options.get(CONF_IMPL, entry.data.get(CONF_IMPL, IMPL_AUTO))
+    if entry_impl in IMPL_MODES:
+        adapter.default_impl = entry_impl
+    else:
+        adapter.default_impl = await hass.async_add_executor_job(pick_impl, shared["profile"])
+    adapter.profile_no_image_support = await hass.async_add_executor_job(
+        profile_declares_no_images, shared["profile"]
     )
 
     entry.runtime_data = EscposRuntimeData(

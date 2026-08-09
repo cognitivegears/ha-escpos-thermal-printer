@@ -105,7 +105,18 @@ async def prepare_image_for_print(
 
     profile_defaults = getattr(host, "reliability_profile_defaults", {}) or {}
     if impl is None:
-        impl = profile_defaults.get("impl", DEFAULT_IMPL)
+        # Resolution chain: legacy per-profile-preset impl (presets no
+        # longer carry one, but honor it if present) -> adapter's
+        # per-entry default (CONF_IMPL / pick_impl) -> hard-coded default.
+        impl = profile_defaults.get("impl") or getattr(host, "default_impl", None) or DEFAULT_IMPL
+    if getattr(host, "profile_no_image_support", False) and not getattr(
+        host, "_no_image_warned", True
+    ):
+        _LOGGER.warning(
+            "Printer profile reports no image support; attempting impl=%s anyway",
+            impl,
+        )
+        host._no_image_warned = True
     if fragment_height is None:
         fragment_height = profile_defaults.get("fragment_height", DEFAULT_FRAGMENT_HEIGHT)
     if chunk_delay_ms is None:

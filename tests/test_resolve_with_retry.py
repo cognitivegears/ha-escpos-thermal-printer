@@ -140,6 +140,8 @@ async def test_prepare_image_for_print_reads_adapter_allow_local(hass):  # type:
     host.get_profile_pixel_width.return_value = 384
     host.reliability_profile_defaults = {}
     host.default_chunk_delay_ms = 0
+    host.default_impl = None
+    host.profile_no_image_support = False
     host._image_stats = None
 
     seen: dict[str, object] = {}
@@ -173,6 +175,8 @@ async def test_prepare_image_records_failure_when_classify_source_raises(hass): 
     host.get_profile_pixel_width.return_value = 384
     host.reliability_profile_defaults = {}
     host.default_chunk_delay_ms = 0
+    host.default_impl = None
+    host.profile_no_image_support = False
     host._image_stats = ImageStats()
 
     with pytest.raises(ServiceValidationError):

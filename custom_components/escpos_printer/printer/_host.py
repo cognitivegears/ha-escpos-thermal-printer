@@ -34,6 +34,9 @@ class _PrinterHost(Protocol):
     _config: BasePrinterConfig
     _printer: Any
     _lock: asyncio.Lock
+    # Written directly (not just read via getattr) by ImageOperationsMixin
+    # to latch the "no image support" warning to once-per-adapter.
+    _no_image_warned: bool
 
     # PEP 544 Protocol stubs. Docstring bodies keep the surface readable
     # without tripping CodeQL's ``py/ineffectual-statement`` rule (which
