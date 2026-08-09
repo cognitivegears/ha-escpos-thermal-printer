@@ -120,3 +120,58 @@ async def test_impl_continue_stores_choice_and_advances_to_width(hass):  # type:
     width_calls = adapter.print_image.await_args_list[3:]
     assert len(width_calls) == 4
     assert all(call.kwargs["impl"] == "bitImageColumn" for call in width_calls)
+
+
+async def test_impl_partial_candidate_failure_is_tolerated(hass):  # type: ignore[no-untyped-def]
+    """One candidate (graphics) failing to send doesn't fail the whole step."""
+    entry, adapter = _make_entry(hass)
+    adapter.print_image.side_effect = [None, None, RuntimeError("boom")]
+
+    result = await _open_calibrate(hass, entry)
+
+    assert result["type"] == "form"
+    assert result["step_id"] == "calibrate_impl"
+    assert result.get("errors") in (None, {})
+
+    fallback_texts = [
+        call.kwargs["text"]
+        for call in adapter.print_text.await_args_list
+        if "FAILED" in call.kwargs["text"]
+    ]
+    assert fallback_texts == ["TEST 3: FAILED TO SEND"]
+
+
+async def test_width_continue_with_bar_stores_pixels_then_aborts(hass):  # type: ignore[no-untyped-def]
+    """Picking a matching bar stores width_pixels before the (temporary) abort."""
+    entry, _adapter = _make_entry(hass)
+    result = await _open_calibrate(hass, entry)
+    result2 = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"impls_clean": [], "action": "continue"}
+    )
+    flow = hass.config_entries.options._progress[result2["flow_id"]]
+
+    result3 = await hass.config_entries.options.async_configure(
+        result2["flow_id"], {"first_equal": "576", "action": "continue"}
+    )
+
+    assert result3["type"] == "abort"
+    assert result3["reason"] == "calibration_unavailable"
+    assert flow._calib["width_pixels"] == 576
+
+
+async def test_width_continue_with_none_stores_nothing_then_aborts(hass):  # type: ignore[no-untyped-def]
+    """"Not sure / bars unclear" leaves width_pixels unset."""
+    entry, _adapter = _make_entry(hass)
+    result = await _open_calibrate(hass, entry)
+    result2 = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"impls_clean": [], "action": "continue"}
+    )
+    flow = hass.config_entries.options._progress[result2["flow_id"]]
+
+    result3 = await hass.config_entries.options.async_configure(
+        result2["flow_id"], {"first_equal": "none", "action": "continue"}
+    )
+
+    assert result3["type"] == "abort"
+    assert result3["reason"] == "calibration_unavailable"
+    assert "width_pixels" not in flow._calib

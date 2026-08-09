@@ -377,6 +377,22 @@
           "serial_write_chunk_delay_ms": "Pause between consecutive chunks (milliseconds). Allows the receiving device time to drain its buffer. Only applies when chunk size is non-zero."
         }
       },
+      "calibrate_impl": {
+        "title": "Calibrate: image implementation",
+        "description": "Your printer just printed three numbered test patterns. A working pattern is a crisp checkerboard; a failing one prints stray letters or nothing. Check every pattern that printed cleanly.",
+        "data": {
+          "impls_clean": "Patterns that printed cleanly",
+          "action": "Action"
+        }
+      },
+      "calibrate_width": {
+        "title": "Calibrate: paper width",
+        "description": "Your printer just printed four numbered bars. Bars wider than your printer's true width get cut off at the same length. Counting from the top, pick the first bar that is the SAME length as the bottom bar.",
+        "data": {
+          "first_equal": "First bar equal to the bottom bar",
+          "action": "Action"
+        }
+      },
       "custom_profile": {
         "title": "Custom printer profile",
         "description": "Enter the profile name as defined in escpos-printer-db.",
