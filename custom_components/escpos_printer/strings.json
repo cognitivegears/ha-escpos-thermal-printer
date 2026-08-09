@@ -393,6 +393,22 @@
           "action": "Action"
         }
       },
+      "calibrate_ruler": {
+        "title": "Calibrate: characters per line",
+        "description": "Your printer just printed a ruler of dots, with a digit every 10 columns (10, 20, 30...) and a '|' every 5. Find the LAST marker that printed fully before the line wrapped or ran off the paper, and enter its column number (e.g. if the '4' at column 40 is the last one that fully fits, enter 40). Enter 0 if you're not sure.",
+        "data": {
+          "last_marker": "Last marker that fully fit (0 = don't know / skip)",
+          "action": "Action"
+        }
+      },
+      "calibrate_codepage": {
+        "title": "Calibrate: character encoding",
+        "description": "Your printer just printed one numbered line per candidate encoding, each rendering this reference text: \"{sample}\". Compare each printed line to the reference above, character for character, and check every line that matches exactly. Lines with wrong or missing accented characters don't match.",
+        "data": {
+          "codepages_match": "Lines that matched the reference exactly",
+          "action": "Action"
+        }
+      },
       "custom_profile": {
         "title": "Custom printer profile",
         "description": "Enter the profile name as defined in escpos-printer-db.",
