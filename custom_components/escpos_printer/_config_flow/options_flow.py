@@ -56,6 +56,7 @@ from ..const import (
     RELIABILITY_PROFILE_CONSERVATIVE,
     RELIABILITY_PROFILE_FAST_LAN,
 )
+from .calibration_steps import CalibrationFlowMixin
 
 _RELIABILITY_LABELS: dict[str, str] = {
     RELIABILITY_PROFILE_AUTO: "Auto (recommended)",
@@ -72,7 +73,7 @@ _MIN_BT_STATUS_INTERVAL = 60
 _LOGGER = logging.getLogger(__name__)
 
 
-class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
+class EscposOptionsFlowHandler(CalibrationFlowMixin, config_entries.OptionsFlowWithReload):
     """Options flow handler for ESC/POS Thermal Printer.
 
     Extends ``OptionsFlowWithReload`` so HA reloads the entry automatically
@@ -95,6 +96,8 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
         onto the instance via the ``OptionsFlow`` base class.
         """
         self._pending_data: dict[str, Any] = {}
+        self._calib: dict[str, Any] = {}
+        self._calib_extra: dict[str, Any] = {}
         super().__init__()
 
     async def async_step_init(
@@ -102,12 +105,6 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
     ) -> ConfigFlowResult:
         """Entry menu: regular settings or the calibration wizard."""
         return self.async_show_menu(step_id="init", menu_options=["settings", "calibrate"])
-
-    async def async_step_calibrate(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Calibration wizard entry -- implemented in CalibrationFlowMixin (Task 3)."""
-        return self.async_abort(reason="calibration_unavailable")
 
     async def async_step_settings(  # noqa: PLR0912, PLR0915
         self, user_input: dict[str, Any] | None = None

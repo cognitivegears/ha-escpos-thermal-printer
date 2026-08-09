@@ -327,10 +327,12 @@
       "invalid_profile": "Invalid printer profile name.",
       "invalid_codepage": "Invalid codepage/encoding.",
       "invalid_line_width": "Invalid line width. Must be a positive number.",
-      "bt_status_interval_too_low": "Status check interval must be 0 (disabled) or at least 60 seconds for Bluetooth printers."
+      "bt_status_interval_too_low": "Status check interval must be 0 (disabled) or at least 60 seconds for Bluetooth printers.",
+      "calibration_print_failed": "Printing the test page failed. Check the printer and try again."
     },
     "abort": {
-      "calibration_unavailable": "Calibration is not available."
+      "calibration_unavailable": "Calibration is not available.",
+      "printer_not_ready": "The printer is not connected — load the integration before calibrating."
     },
     "step": {
       "init": {
