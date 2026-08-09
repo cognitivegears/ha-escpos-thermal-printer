@@ -47,11 +47,14 @@ abandoned by closing the flow — nothing is stored until the final step.
 1. **`calibrate_impl`** — prints three sections, each a text label line
    ("TEST 1/2/3" — text always works even when images garble) followed by a
    small checkerboard printed with `bitImageRaster` / `bitImageColumn` /
-   `graphics` respectively. Question: "What is the first number whose pattern
-   printed cleanly (a crisp checkerboard, no stray letters)?" → choices 1/2/3 /
-   "none printed cleanly" / reprint. Result → pending `impl` ("none" → leave
-   `auto`, show an explanatory abort-or-continue message since later image steps
-   depend on a working impl; continuing uses raster).
+   `graphics` respectively. Question: "Which numbered patterns printed cleanly
+   (a crisp checkerboard, no stray letters)? Check all that apply." — a
+   `cv.multi_select` checkbox list (1/2/3), plus an action dropdown
+   (continue / reprint). Result → pending `impl` = first clean one in
+   preference order raster → column → graphics; the FULL checked set is kept
+   for the share link (it is exactly the profile `features` booleans). Empty
+   set → leave `auto`, show an explanatory continue-or-abort message since
+   later image steps depend on a working impl; continuing uses raster.
 
 2. **`calibrate_width`** — prints four bars at 384 / 512 / 576 / 640 px using
    the chosen impl, each labeled at its LEFT edge (labels survive right-edge
@@ -73,19 +76,19 @@ abandoned by closing the flow — nothing is stored until the final step.
    for the € sign). The **on-screen step description displays the reference
    string** — the paper cannot be its own reference (a wrong codepage prints
    plausible-but-different glyphs), so the form text is the source of truth:
-   "Each printed line should read exactly: `café ñ ü é ß ° €`. Which numbered
-   line matches this, character for character? **If more than one matches,
-   pick the lowest number.**" → numbered choices / "none match" / skip /
-   reprint. Result → pending `codepage` ("none"/skip → unchanged).
-   Ties are expected, not exceptional (CP850 vs CP858 differ only at €;
-   CP1252 vs ISO-8859-1 overlap heavily) — and any matching line is a
-   *correct* codepage for the tested characters, so the tie-break only has
-   to be favorable, not perfect: **candidates are printed most-capable-first**
-   (CP858 before CP850, CP1252 before ISO-8859-1), making "lowest matching
-   number" resolve to the broadest encoding automatically. Characters that a
-   candidate encoding cannot represent at all are printed as `?` by the
-   sample generator (never dropped), so a partial match still looks visibly
-   wrong rather than deceptively clean.
+   "Each printed line should read exactly: `café ñ ü é ß ° €`. Check every
+   numbered line that matches this, character for character." — a
+   `cv.multi_select` checkbox list of the candidates, plus an action dropdown
+   (continue / reprint / skip step). Ties are expected, not exceptional
+   (CP850 vs CP858 differ only at €; CP1252 vs ISO-8859-1 overlap heavily),
+   and any matching line is a *correct* codepage for the tested characters —
+   so the wizard stores pending `codepage` = the first checked candidate in
+   capability order (CP858 before CP850, CP1252 before ISO-8859-1), and keeps
+   the FULL checked set for the share link (a printer's supported-codepage
+   list is core profile data). Empty set or skip → unchanged. Characters
+   that a candidate encoding cannot represent at all are printed as `?` by
+   the sample generator (never dropped), so a partial match still looks
+   visibly wrong rather than deceptively clean.
 
 5. **`calibrate_summary`** — shows the measured values via description
    placeholders, plus:
@@ -94,9 +97,12 @@ abandoned by closing the flow — nothing is stored until the final step.
    - A **share link** in the step description: a prefilled GitHub new-issue URL
      (`https://github.com/cognitivegears/ha-escpos-thermal-printer/issues/new`
      with URL-encoded `title="Printer calibration: <model>"` and a body
-     containing model, measured impl/width/line-width/codepage, the configured
-     profile, integration version, and python-escpos version). This is exactly
-     the dataset an alias-table entry needs, hardware-verified by construction.
+     containing model, the stored impl/width/line-width/codepage, the FULL
+     clean-impl set and matching-codepage set from the multi-select steps, the
+     configured profile, integration version, and python-escpos version — plus
+     a ready-to-paste draft escpos-printer-db profile YAML snippet built from
+     those values). This is a hardware-verified alias-table entry AND most of
+     an upstream profile contribution in one issue.
      The link is rendered via description placeholders; it must be built lazily
      and URL-encoded with `urllib.parse.quote`.
    - Submitting **saves**: new options = `{**entry.options, **measured}` —
