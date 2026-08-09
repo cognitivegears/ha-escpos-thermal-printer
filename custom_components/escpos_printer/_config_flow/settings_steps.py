@@ -149,6 +149,9 @@ class SettingsFlowMixin:
                     CONF_DEFAULT_ALIGN, DEFAULT_ALIGN
                 )
                 self._user_data[CONF_DEFAULT_CUT] = user_input.get(CONF_DEFAULT_CUT, DEFAULT_CUT)
+                self._user_data[CONF_IMPL] = user_input.get(CONF_IMPL, IMPL_AUTO)
+                if user_input.get(CONF_WIDTH_PIXELS):
+                    self._user_data[CONF_WIDTH_PIXELS] = int(user_input[CONF_WIDTH_PIXELS])
                 # Preserve the custom-line-width sentinel so the custom
                 # codepage step can chain to the custom-line-width step.
                 # (Collapsing it to DEFAULT_LINE_WIDTH here silently
@@ -169,6 +172,9 @@ class SettingsFlowMixin:
                     CONF_DEFAULT_ALIGN, DEFAULT_ALIGN
                 )
                 self._user_data[CONF_DEFAULT_CUT] = user_input.get(CONF_DEFAULT_CUT, DEFAULT_CUT)
+                self._user_data[CONF_IMPL] = user_input.get(CONF_IMPL, IMPL_AUTO)
+                if user_input.get(CONF_WIDTH_PIXELS):
+                    self._user_data[CONF_WIDTH_PIXELS] = int(user_input[CONF_WIDTH_PIXELS])
                 return await self.async_step_custom_line_width()
 
             # Merge with data from previous steps and create entry
