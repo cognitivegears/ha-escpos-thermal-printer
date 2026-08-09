@@ -35,6 +35,7 @@ from .profiles import (
     is_valid_profile,
     resolve_profile_name,
 )
+from .suggestions import suggest_profile
 
 __all__ = [
     "COMMON_CODEPAGES",
@@ -60,4 +61,5 @@ __all__ = [
     "profile_supports_feature",
     "resolve_alias",
     "resolve_profile_name",
+    "suggest_profile",
 ]
