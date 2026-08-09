@@ -942,7 +942,7 @@
           "name": "Width (pixels)"
         },
         "impl": {
-          "description": "ESC/POS image command to use. Leave unset to honor the printer's Reliability profile (default raster). If the chosen impl isn't supported by the installed python-escpos, the integration silently falls back to a kwarg-less printer.image() call.",
+          "description": "Image implementation. Leave unset to follow the printer profile. Raster (bitImageRaster) works on most printers; Column (bitImageColumn) suits older/impact printers — try it if images print as garbled text; Graphics is for modern Epson printers.",
           "name": "Print Implementation"
         },
         "invert": {
@@ -1034,7 +1034,7 @@
           "name": "Width (pixels)"
         },
         "impl": {
-          "description": "ESC/POS image command to use. Leave unset to honor the printer's Reliability profile (default raster). If the chosen impl isn't supported by the installed python-escpos, the integration silently falls back to a kwarg-less printer.image() call.",
+          "description": "Image implementation. Leave unset to follow the printer profile. Raster (bitImageRaster) works on most printers; Column (bitImageColumn) suits older/impact printers — try it if images print as garbled text; Graphics is for modern Epson printers.",
           "name": "Print Implementation"
         },
         "invert": {
@@ -1126,7 +1126,7 @@
           "name": "Width (pixels)"
         },
         "impl": {
-          "description": "ESC/POS image command to use. Leave unset to honor the printer's Reliability profile (default raster). If the chosen impl isn't supported by the installed python-escpos, the integration silently falls back to a kwarg-less printer.image() call.",
+          "description": "Image implementation. Leave unset to follow the printer profile. Raster (bitImageRaster) works on most printers; Column (bitImageColumn) suits older/impact printers — try it if images print as garbled text; Graphics is for modern Epson printers.",
           "name": "Print Implementation"
         },
         "invert": {
@@ -1214,7 +1214,7 @@
           "name": "Width (pixels)"
         },
         "impl": {
-          "description": "ESC/POS image command to use. Leave unset to honor the printer's Reliability profile (default raster). If the chosen impl isn't supported by the installed python-escpos, the integration silently falls back to a kwarg-less printer.image() call.",
+          "description": "Image implementation. Leave unset to follow the printer profile. Raster (bitImageRaster) works on most printers; Column (bitImageColumn) suits older/impact printers — try it if images print as garbled text; Graphics is for modern Epson printers.",
           "name": "Print Implementation"
         },
         "invert": {
@@ -1306,7 +1306,7 @@
           "name": "Width (pixels)"
         },
         "impl": {
-          "description": "ESC/POS image command to use. Leave unset to honor the printer's Reliability profile (default raster). If the chosen impl isn't supported by the installed python-escpos, the integration silently falls back to a kwarg-less printer.image() call.",
+          "description": "Image implementation. Leave unset to follow the printer profile. Raster (bitImageRaster) works on most printers; Column (bitImageColumn) suits older/impact printers — try it if images print as garbled text; Graphics is for modern Epson printers.",
           "name": "Print Implementation"
         },
         "invert": {
