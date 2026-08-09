@@ -25,6 +25,8 @@ from .features import (
     get_profile_cut_modes,
     get_profile_features,
     get_profile_info,
+    pick_impl,
+    profile_declares_no_images,
     profile_supports_feature,
 )
 from .line_widths import get_all_line_widths, get_profile_line_widths
@@ -58,6 +60,8 @@ __all__ = [
     "is_valid_codepage_for_profile",
     "is_valid_profile",
     "normalize_model",
+    "pick_impl",
+    "profile_declares_no_images",
     "profile_supports_feature",
     "resolve_alias",
     "resolve_profile_name",

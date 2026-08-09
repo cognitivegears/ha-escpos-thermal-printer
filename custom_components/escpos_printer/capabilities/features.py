@@ -108,3 +108,34 @@ def get_profile_info(profile_key: str | None) -> dict[str, Any]:
 
     result: dict[str, Any] = profiles.get(profile_key, {})
     return result
+
+
+# Preference order for automatic image implementation selection.
+# graphics is deliberately absent: every bundled profile with graphics
+# also declares bitImageRaster, so raster strictly dominates it for
+# compatibility; graphics stays a manual choice.
+_IMPL_PREFERENCE = ("bitImageRaster", "bitImageColumn")
+
+_IMAGE_FEATURES = ("bitImageRaster", "bitImageColumn", "graphics")
+
+
+def pick_impl(profile_key: str | None) -> str | None:
+    """Pick the image implementation a profile declares support for.
+
+    Returns None for auto/custom/unknown profiles (caller falls back to
+    DEFAULT_IMPL) and for profiles that declare no image support at all
+    (caller warns but still prints — feature flags are hints, not gates).
+    """
+    features = get_profile_features(profile_key)
+    for impl in _IMPL_PREFERENCE:
+        if features.get(impl):
+            return impl
+    return None
+
+
+def profile_declares_no_images(profile_key: str | None) -> bool:
+    """True when a known profile explicitly declares no image support."""
+    features = get_profile_features(profile_key)
+    if not features:
+        return False  # auto/custom/unknown: assume capable, stay silent
+    return not any(features.get(feature) for feature in _IMAGE_FEATURES)

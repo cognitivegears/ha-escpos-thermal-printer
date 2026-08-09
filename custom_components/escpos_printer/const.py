@@ -280,8 +280,9 @@ IMPL_MODES: frozenset[str] = frozenset({"bitImageRaster", "graphics", "bitImageC
 ROTATION_VALUES: frozenset[int] = frozenset({0, 90, 180, 270})
 
 # Reliability profile presets used by the options flow.
-# A profile picks fragment_height + chunk_delay_ms + impl; the user can
-# still override any of these per service call.
+# A preset picks transport pacing (fragment_height + chunk_delay_ms) only;
+# image implementation is a printer property resolved from the printer
+# profile / CONF_IMPL. The user can still override per service call.
 RELIABILITY_PROFILE_AUTO = "auto"
 RELIABILITY_PROFILE_FAST_LAN = "fast_lan"
 RELIABILITY_PROFILE_BALANCED = "balanced"
@@ -294,21 +295,17 @@ RELIABILITY_PROFILE_PRESETS: dict[str, dict[str, Any]] = {
     RELIABILITY_PROFILE_FAST_LAN: {
         "fragment_height": 512,
         "chunk_delay_ms": 0,
-        "impl": "bitImageRaster",
     },
     RELIABILITY_PROFILE_BALANCED: {
         "fragment_height": 256,
         "chunk_delay_ms": 20,
-        "impl": "bitImageRaster",
     },
     RELIABILITY_PROFILE_CONSERVATIVE: {
         "fragment_height": 128,
         "chunk_delay_ms": 100,
-        "impl": "bitImageRaster",
     },
     RELIABILITY_PROFILE_BLUETOOTH: {
         "fragment_height": 128,
         "chunk_delay_ms": 150,
-        "impl": "bitImageRaster",
     },
 }
