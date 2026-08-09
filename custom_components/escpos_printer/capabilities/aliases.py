@@ -64,9 +64,25 @@ ALIAS_MODELS: dict[str, str] = {
     "Sunmi T2": "NT-80-V-UL",
 }
 
-PROFILE_ALIASES: dict[str, str] = {
-    normalize_model(display): target for display, target in ALIAS_MODELS.items()
-}
+
+def _build_alias_table(models: dict[str, str]) -> dict[str, str]:
+    """Normalize each display name into a full key AND a bare-model key
+    (vendor word stripped), so both "Citizen CT-S601II" and bare
+    "CT-S601II" resolve — the latter matters for the custom-profile field
+    and for USB descriptors that omit the vendor name.
+    """
+    table: dict[str, str] = {}
+    for display, target in models.items():
+        keys = {normalize_model(display)}
+        _vendor, _sep, rest = display.partition(" ")
+        if rest:
+            keys.add(normalize_model(rest))
+        for key in keys:
+            table[key] = target
+    return table
+
+
+PROFILE_ALIASES: dict[str, str] = _build_alias_table(ALIAS_MODELS)
 
 
 def resolve_alias(name: str) -> str | None:

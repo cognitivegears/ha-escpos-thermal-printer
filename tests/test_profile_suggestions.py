@@ -21,6 +21,18 @@ def test_alias_in_descriptor() -> None:
     assert suggest_profile("CITIZEN CT-S601II", None, None) == "CT-S651"
 
 
+def test_alias_in_descriptor_without_vendor_word() -> None:
+    # Bare-model descriptor (no "Citizen" word) must still match the alias.
+    assert suggest_profile("CT-S601II Receipt Printer", None, None) == "CT-S651"
+
+
+def test_short_alias_key_never_substring_matches() -> None:
+    # "Sunmi V1" derives the bare key "v1"; without the length guard this
+    # would wrongly match any descriptor containing "v1" (e.g. a version
+    # string), not just an actual Sunmi V1.
+    assert suggest_profile("USB Printer v1.0", None, None) is None
+
+
 def test_vid_pid_fallback() -> None:
     assert suggest_profile("USB Printer", 0x0416, 0x5011) == "POS-5890"
 

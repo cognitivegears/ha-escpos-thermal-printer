@@ -38,7 +38,7 @@ def suggest_profile(product: str | None, vid: int | None, pid: int | None) -> st
                 # Longest normalized key wins: "tmt88iii" over "tmt88ii".
                 return max(candidates, key=lambda key: len(normalize_model(key)))
             for alias_norm, target in PROFILE_ALIASES.items():
-                if alias_norm in norm and target in profiles:
+                if len(alias_norm) >= _MIN_KEY_LEN and alias_norm in norm and target in profiles:
                     return target
     if vid is not None and pid is not None:
         return VID_PID_PROFILES.get((vid, pid))

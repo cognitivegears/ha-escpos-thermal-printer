@@ -43,7 +43,29 @@ def test_every_alias_target_declares_a_pixel_width() -> None:
 
 
 def test_no_display_name_normalization_collisions() -> None:
-    assert len(PROFILE_ALIASES) == len(ALIAS_MODELS)
+    """No derived key (full display name or bare vendor-stripped model)
+    may map to two different targets."""
+    derived: dict[str, str] = {}
+    for display, target in ALIAS_MODELS.items():
+        keys = {normalize_model(display)}
+        _vendor, _sep, rest = display.partition(" ")
+        if rest:
+            keys.add(normalize_model(rest))
+        for key in keys:
+            assert key not in derived or derived[key] == target, (
+                f"derived key {key!r} maps to both {derived.get(key)!r} and {target!r}"
+            )
+            derived[key] = target
+    assert derived == PROFILE_ALIASES
+
+
+def test_bare_model_keys_also_resolve() -> None:
+    """A key with the vendor word stripped must resolve too (custom-profile
+    field entry, and USB descriptors that omit the vendor name)."""
+    assert PROFILE_ALIASES["cts601ii"] == "CT-S651"
+    assert PROFILE_ALIASES["zj5890"] == "POS-5890"
+    assert PROFILE_ALIASES["tmt20iii"] == "TM-T20II"
+    assert PROFILE_ALIASES["v1"] == "Sunmi-V2"
 
 
 def test_no_alias_collides_with_a_real_profile_key() -> None:
@@ -58,8 +80,8 @@ def test_expanded_alias_count() -> None:
 
 
 def test_resolve_alias() -> None:
-    # Display names carry a vendor prefix (e.g. "Citizen CT-S601II"), so
-    # normalized alias keys include it too.
+    # Both the bare model name and the vendor-prefixed display name resolve.
+    assert resolve_alias("CT-S601II") == "CT-S651"
     assert resolve_alias("Citizen CT-S601II") == "CT-S651"
     assert resolve_alias("Epson TM-T20III") == "TM-T20II"
     assert resolve_alias("nonsense-model") is None
@@ -68,7 +90,8 @@ def test_resolve_alias() -> None:
 def test_resolve_profile_name() -> None:
     assert resolve_profile_name("TM-T20II") == "TM-T20II"  # exact
     assert resolve_profile_name("tm-t20ii") == "TM-T20II"  # case-insensitive
-    assert resolve_profile_name("Citizen CT-S601II") == "CT-S651"  # alias
+    assert resolve_profile_name("CT-S601II") == "CT-S651"  # bare-model alias
+    assert resolve_profile_name("Citizen CT-S601II") == "CT-S651"  # vendor-prefixed alias
     assert resolve_profile_name("no-such-printer") is None
     assert resolve_profile_name("") is None
     assert resolve_profile_name(None) is None
