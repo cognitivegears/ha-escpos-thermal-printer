@@ -108,6 +108,20 @@ class EscposOptionsFlowHandler(config_entries.OptionsFlowWithReload):
         errors: dict[str, str] = {}
 
         if user_input is not None:
+            # CONF_WIDTH_PIXELS has no schema default, so clearing it in the
+            # UI simply omits the key from user_input. Without this, the
+            # options dict created below would lack the key entirely, and
+            # _shared_print_config's opt.get(K, data.get(K)) would fall
+            # back to the setup-time value in entry.data -- making a
+            # width override impossible to clear once set. Storing an
+            # explicit None makes the options dict "win" with a falsy
+            # value, which _shared_print_config already treats as "use
+            # the profile". Set before every async_create_entry exit
+            # (including the custom_profile/codepage/line_width chain,
+            # which all build their data from _pending_data == this
+            # user_input) by setting it here, first.
+            user_input.setdefault(CONF_WIDTH_PIXELS, None)
+
             _LOGGER.debug(
                 "Options flow update for entry %s: %s",
                 self.config_entry.entry_id,
