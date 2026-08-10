@@ -9,7 +9,7 @@ Native Home Assistant control for ESC/POS thermal receipt printers connected via
 - **Paper status sensor**: `ok` / `low` / `out` for network and USB printers, so you can automate on paper running low
 - **Battery sensor**: reports battery level for portable BT printers that expose `org.bluez.Battery1`
 - **Image-print diagnostics sensor**: tracks image print success/failure counts and details of the last print, for every connection type
-- **Auto-discovery**: USB printers matched against known thermal-printer vendor IDs
+- **Auto-discovery**: USB printers matched against known thermal-printer vendor IDs; Epson/Rongta network printers matched by DHCP hostname plus a connection probe
 - **Fully local**: no cloud, no account
 
 ## Setup

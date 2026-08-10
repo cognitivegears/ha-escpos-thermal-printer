@@ -16,7 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   device page shows the real manufacturer/model (e.g. EPSON TM-T20II), the
   calibration share link prefills the model name, and the detected
   manufacturer/model are included in diagnostics downloads. Printers that
-  don't answer (most clones) behave exactly as before.
+  don't answer (most clones) behave exactly as before. Existing network
+  printer entries pick up the detected model the next time they are
+  reconfigured.
 - DHCP discovery for network thermal printers: Home Assistant now offers to
   set up Epson TM-series (`tm-*`) and Rongta (`rongta_*`) printers it sees
   join the network. Candidates are probed on port 9100 first, so matches
