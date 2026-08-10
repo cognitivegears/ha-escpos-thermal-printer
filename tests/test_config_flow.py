@@ -69,6 +69,8 @@ async def test_config_flow_success(hass):  # type: ignore[no-untyped-def]
         assert result4["data"].get(CONF_CODEPAGE) == ""
         assert result4["data"].get(CONF_LINE_WIDTH) == DEFAULT_LINE_WIDTH
         assert result4["data"].get(CONF_CONNECTION_TYPE) == CONNECTION_TYPE_NETWORK
+        # Generic (no profile): success screen carries the calibrate hint.
+        assert result4["description"] == "generic_profile"
 
 
 async def test_config_flow_connection_failure(hass):  # type: ignore[no-untyped-def]
@@ -146,6 +148,8 @@ async def test_config_flow_with_profile_selection(hass):  # type: ignore[no-unty
         assert result4["data"][CONF_LINE_WIDTH] == 42
         assert result4["data"][CONF_DEFAULT_ALIGN] == "center"
         assert result4["data"][CONF_DEFAULT_CUT] == "partial"
+        # The escpos-printer-db "default" profile is generic too.
+        assert result4["description"] == "generic_profile"
 
 
 async def test_config_flow_custom_profile(hass):  # type: ignore[no-untyped-def]
@@ -196,6 +200,8 @@ async def test_config_flow_custom_profile(hass):  # type: ignore[no-untyped-def]
 
         assert result5["type"] == "create_entry"
         assert result5["data"][CONF_PROFILE] == "TM-T88V"
+        # A real profile was chosen -- no calibrate hint on the success screen.
+        assert result5["description"] is None
 
 
 async def test_config_flow_custom_codepage(hass):  # type: ignore[no-untyped-def]
@@ -247,6 +253,8 @@ async def test_config_flow_custom_codepage(hass):  # type: ignore[no-untyped-def
 
         assert result5["type"] == "create_entry"
         assert result5["data"][CONF_CODEPAGE] == "CP932"
+        # Custom-codepage path, still no profile: hint present here too.
+        assert result5["description"] == "generic_profile"
 
 
 async def test_config_flow_custom_line_width(hass):  # type: ignore[no-untyped-def]

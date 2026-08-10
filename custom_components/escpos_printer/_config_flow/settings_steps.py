@@ -73,6 +73,19 @@ def _make_entry_title(data: dict[str, Any], user_data: dict[str, Any]) -> str:
     return f"{data[CONF_HOST]}:{data[CONF_PORT]}"
 
 
+def _create_entry_description(data: dict[str, Any]) -> str | None:
+    """Success-screen text key for ``async_create_entry``.
+
+    Calibration can't run during the add flow (it needs the loaded
+    entry's adapter), so when the user picked no real profile — the
+    "Generic (no profile)" choice or the escpos-printer-db ``default``
+    profile — the success screen points at the calibration wizard.
+    A missing translation key degrades to the plain success screen, so
+    this can never break entry creation.
+    """
+    return "generic_profile" if data.get(CONF_PROFILE) in (PROFILE_AUTO, "default", None) else None
+
+
 class SettingsFlowMixin:
     """Mixin providing settings configuration steps.
 
@@ -203,7 +216,9 @@ class SettingsFlowMixin:
                 data.get(CONF_CODEPAGE),
             )
 
-            return self.async_create_entry(title=title, data=data)  # type: ignore[attr-defined,no-any-return]
+            return self.async_create_entry(  # type: ignore[attr-defined,no-any-return]
+                title=title, data=data, description=_create_entry_description(data)
+            )
 
         # Get profile-specific options
         profile = self._user_data.get(CONF_PROFILE, PROFILE_AUTO)
@@ -288,7 +303,9 @@ class SettingsFlowMixin:
 
                 title = _make_entry_title(data, self._user_data)
 
-                return self.async_create_entry(title=title, data=data)  # type: ignore[attr-defined,no-any-return]
+                return self.async_create_entry(  # type: ignore[attr-defined,no-any-return]
+                    title=title, data=data, description=_create_entry_description(data)
+                )
 
         data_schema = vol.Schema(
             {
@@ -337,7 +354,9 @@ class SettingsFlowMixin:
 
                 title = _make_entry_title(data, self._user_data)
 
-                return self.async_create_entry(title=title, data=data)  # type: ignore[attr-defined,no-any-return]
+                return self.async_create_entry(  # type: ignore[attr-defined,no-any-return]
+                    title=title, data=data, description=_create_entry_description(data)
+                )
 
         data_schema = vol.Schema(
             {

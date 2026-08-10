@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Adding a printer without a real profile ("Generic (no profile)" or the
+  generic `default` profile) now shows a tip on the success screen
+  pointing at the calibration wizard (Configure → Calibrate printer).
+
 ### Changed
 
 - Calibration summary step simplified: the confusing "Update share link
