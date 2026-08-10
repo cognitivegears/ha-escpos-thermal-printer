@@ -133,6 +133,38 @@ async def test_dhcp_discovery_edited_host_requeries_instead_of_reusing_detection
     mock_query.assert_called_once_with(edited_host, 9100, ANY)
 
 
+async def test_dhcp_discovery_edited_port_requeries_instead_of_reusing_detection(hass):
+    """Editing only the port (same discovery host) must not carry over the
+    discovery-time GS I result -- DHCP always probes DEFAULT_PORT, so a
+    different port may be a different service on the same address."""
+    result = await _start_dhcp_flow(
+        hass, query_result={"manufacturer": "EPSON", "model": "TM-T20II"}
+    )
+    assert result["step_id"] == "network"
+
+    edited_port = 9101
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=True,
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value={"manufacturer": "OTHER", "model": "RP820"},
+        ) as mock_query,
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"host": "192.168.10.157", "port": edited_port}
+        )
+        # Complete the codepage step with defaults to create the entry.
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["data"]["detected_manufacturer"] == "OTHER"
+    assert result["data"]["detected_model"] == "RP820"
+    mock_query.assert_called_once_with("192.168.10.157", edited_port, ANY)
+
+
 async def test_dhcp_discovery_aborts_when_already_configured(hass):
     MockConfigEntry(
         domain=DOMAIN,

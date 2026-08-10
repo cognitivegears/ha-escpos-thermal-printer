@@ -6,6 +6,8 @@ import socket
 from unittest.mock import MagicMock, patch
 
 from custom_components.escpos_printer._config_flow.network_helpers import (
+    _ID_DRAIN_MAX,
+    _ID_MAX_LEN,
     _read_id_reply,
     query_printer_id,
 )
@@ -65,6 +67,35 @@ def test_read_id_reply_strips_nonascii():
 def test_read_id_reply_strips_control_bytes():
     # An untrusted peer could stuff C0 control/escape bytes into the reply.
     assert _read_id_reply(FakeSocket(b"\x5fTM\x07-T20\x1b\x00")) == "TM-T20"
+
+
+class DripFeedSocket:
+    """recv() never runs dry -- proves the drain loop is capped, not hung."""
+
+    def __init__(self) -> None:
+        self.recv_calls = 0
+
+    def recv(self, _n: int) -> bytes:
+        self.recv_calls += 1
+        return b"\x5f" if self.recv_calls == 1 else b"A"
+
+    def settimeout(self, _t: float) -> None:
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+
+def test_read_id_reply_drain_loop_is_capped():
+    # A device that drip-feeds bytes forever (each recv resets the 2s
+    # timeout) must not hang the drain loop -- it stops after _ID_DRAIN_MAX
+    # bytes instead of consuming the stream forever.
+    sock = DripFeedSocket()
+    assert _read_id_reply(sock) == "A" * (_ID_MAX_LEN - 1)
+    assert sock.recv_calls == _ID_MAX_LEN + _ID_DRAIN_MAX
 
 
 def test_read_id_reply_oversized_reply_drains_before_returning():

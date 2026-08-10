@@ -58,6 +58,11 @@ _GS_I_MODEL = b"\x1d\x49\x43"  # GS I 67 -> model name ("TM-T20II")
 _ID_HEADER = 0x5F
 _ID_MAX_LEN = 80
 _ID_READ_TIMEOUT = 2.0
+# Each recv() below resets the read timeout, so an unbounded drain would let
+# a misbehaving/malicious device drip-feed one byte at a time and hold the
+# connection (and an HA executor thread) open indefinitely. Cap total bytes
+# drained; if the cap is hit the stream is abandoned as unrecoverable.
+_ID_DRAIN_MAX = 4096
 
 
 def _read_id_reply(sock: socket.socket) -> str | None:
@@ -73,11 +78,14 @@ def _read_id_reply(sock: socket.socket) -> str | None:
             # Hit the length cap without a NUL terminator: bytes from this
             # oversized reply are still queued on the socket and would
             # desync the framing of the NEXT reply. Drain them (discarding)
-            # until NUL/timeout/closed so the stream resyncs.
-            while True:
+            # until NUL/timeout/closed so the stream resyncs -- bounded by
+            # _ID_DRAIN_MAX so a drip-fed stream can't hang this forever.
+            drained = 0
+            while drained < _ID_DRAIN_MAX:
                 chunk = sock.recv(1)
                 if not chunk or chunk == b"\x00":
                     break
+                drained += 1
     except OSError:
         pass  # timeout mid-reply: fall through and parse what we have
     if not data or data[0] != _ID_HEADER:
