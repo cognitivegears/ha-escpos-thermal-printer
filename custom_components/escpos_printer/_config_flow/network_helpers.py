@@ -44,3 +44,55 @@ def _can_connect(host: str, port: int, timeout: float) -> bool:
             return True
     except OSError:
         return False
+
+
+# --- GS I (Transmit Printer ID) query -------------------------------------
+#
+# Epson network printers answer GS I 66/67 with the maker/model name framed
+# as 0x5F <ascii> 0x00. Clones typically ignore the command entirely; the
+# short read timeout turns that silence into a clean None. The commands are
+# read-only: nothing is printed and no printer state changes.
+
+_GS_I_MAKER = b"\x1d\x49\x42"  # GS I 66 -> maker name ("EPSON")
+_GS_I_MODEL = b"\x1d\x49\x43"  # GS I 67 -> model name ("TM-T20II")
+_ID_HEADER = 0x5F
+_ID_MAX_LEN = 80
+_ID_READ_TIMEOUT = 2.0
+
+
+def _read_id_reply(sock: socket.socket) -> str | None:
+    """Read one 0x5F...0x00 framed reply; None on timeout/garbage/empty."""
+    data = bytearray()
+    try:
+        while len(data) < _ID_MAX_LEN:
+            chunk = sock.recv(1)
+            if not chunk or chunk == b"\x00":
+                break
+            data += chunk
+    except OSError:
+        pass  # timeout mid-reply: fall through and parse what we have
+    if not data or data[0] != _ID_HEADER:
+        return None
+    text = data[1:].decode("ascii", errors="ignore").strip()
+    return text or None
+
+
+def query_printer_id(host: str, port: int, timeout: float) -> dict[str, str] | None:
+    """Best-effort printer identification via GS I over raw TCP.
+
+    Returns {"manufacturer": ..., "model": ...} (either key may be
+    absent), or None when nothing was identified. Never raises.
+    """
+    result: dict[str, str] = {}
+    try:
+        with socket.create_connection((host, port), timeout=timeout) as sock:
+            sock.settimeout(_ID_READ_TIMEOUT)
+            for key, command in (("manufacturer", _GS_I_MAKER), ("model", _GS_I_MODEL)):
+                sock.sendall(command)
+                value = _read_id_reply(sock)
+                if value is None:
+                    break  # no answer: don't wait out a second timeout
+                result[key] = value
+    except OSError:
+        _LOGGER.debug("GS I query failed for %s:%s", host, port)
+    return result or None
