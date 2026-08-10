@@ -34,10 +34,10 @@ Two features sharing one core:
   Bixolon's `00:15:94` is the one credible candidate (single-purpose printer
   vendor) but guarantees only "Bixolon printer", not "ESC/POS receipt
   printer" — deferred until a user report confirms one working.
-- **MAC-based unique IDs.** unique_id stays `host:port`; a printer whose DHCP
-  lease changes IP is re-discovered as a new device. The fix (entry migration
-  to MAC-keyed IDs) isn't worth it now; a DHCP reservation is the standard
-  answer.
+- **MAC-based unique IDs.** unique_id stays `host:port`. (Superseded in part —
+  see "Follow-up: MAC-tracked discovery identity" below, added after the
+  product review showed discovery turns lease changes into a duplicate-entry
+  trap.)
 - **Querying at adapter start / device-registry refresh after setup.** The
   model can't change between setups of the same printer; existing entries pick
   the fields up on their next reconfigure.
@@ -138,6 +138,25 @@ layout) added to `EscposConfigFlow`:
 
 Discovery card title uses the detected model when available ("TM-T20II at
 192.168.10.157"), else the DHCP hostname.
+
+## Follow-up: MAC-tracked discovery identity (added 2026-08-10)
+
+unique_id stays `host:port`, but discovery-created entries additionally
+persist `entry.data["mac_address"]` (`CONF_MAC_ADDRESS`, normalized via HA's
+`format_mac`) — captured from `DhcpServiceInfo.macaddress`, and only when the
+submitted host/port still match the probed discovery target (the same gate
+that guards detection reuse). Manual entries never carry a MAC.
+
+`async_step_dhcp` checks for an entry with the discovered MAC before anything
+else. Match with a different IP → update that entry's `CONF_HOST` and
+`host:port` unique_id in place (keeping the entry's stored port), schedule a
+reload, abort silently. If the new `ip:port` unique_id collides with a
+*different* entry, skip the auto-update and fall through to normal dedupe.
+Match with the same IP → normal already-configured abort.
+
+Reconfigure that changes the address clears the stored MAC, mirroring the
+detected-identity clearing rule: an address edit may repoint the entry at
+different hardware the MAC no longer describes.
 
 ## Strings & docs
 
