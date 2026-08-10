@@ -77,6 +77,17 @@ This integration is in the HACS default store. No custom repository needed.
 **Note:** USB printers may be auto-discovered when connected. Check your Home
 Assistant notifications.
 
+### Automatic discovery
+
+Epson TM-series and Rongta network printers announce recognizable DHCP
+hostnames; Home Assistant will offer to set them up automatically when they
+appear on your network (Settings → Devices & Services → Discovered). Other
+brands and printers with hostname broadcasting disabled can always be added
+manually by IP address. During setup, the integration asks the printer to
+identify itself (ESC/POS `GS I`); Epson printers answer with their real
+model name, which fills the device page and suggests the matching profile.
+Printers that don't answer are configured exactly as before.
+
 ## Basic Examples
 
 ### Print a Message
