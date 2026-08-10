@@ -114,6 +114,25 @@ def test_dropdown_includes_alias_rows() -> None:
     assert choices[-1][1] == "Custom (enter profile name)..."
 
 
+def test_dropdown_skips_alias_colliding_with_a_future_bundled_profile(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """Regression: the skip-guard used to compare the vendor-prefixed alias
+    normalization ("epsontmt20iii") against real profile keys, which are
+    bare-model ("tmt20ii") -- a collision could never fire. Simulate a
+    future escpos-printer-db release that bundles TM-T20III directly and
+    confirm the alias row disappears instead of duplicating it.
+    """
+    from custom_components.escpos_printer.capabilities import profiles as profiles_mod
+
+    real_caps = _get_capabilities()
+    fake_profiles = dict(real_caps["profiles"])
+    fake_profiles["TM-T20III"] = {"vendor": "Epson", "name": "TM-T20III"}
+    fake_caps = {**real_caps, "profiles": fake_profiles}
+    monkeypatch.setattr(profiles_mod, "_get_capabilities", lambda: fake_caps)
+
+    display_names = [display for _key, display in profiles_mod.get_profile_choices()]
+    assert "Epson TM-T20III (compatible)" not in display_names
+
+
 def test_dropdown_stays_sorted_with_aliases_merged_in() -> None:
     choices = get_profile_choices()
     middle = choices[1:-1]

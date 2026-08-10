@@ -32,12 +32,21 @@ def get_profile_choices() -> list[tuple[str, str]]:
     from .aliases import ALIAS_MODELS, normalize_model  # noqa: PLC0415
 
     # Skip any alias whose normalized key collides with a real profile key.
+    # A collision can show up in either derivation -- the full display name
+    # ("Epson TM-T20III" -> "epsontmt20iii") or the bare model with the
+    # vendor word stripped ("TM-T20III" -> "tmt20iii", matching how bundled
+    # profile keys are usually spelled) -- so check both, mirroring
+    # ``_build_alias_table``'s own key derivation.
     real_normalized = {normalize_model(key) for key in profiles}
-    alias_list = [
-        (normalize_model(display), f"{display} (compatible)")
-        for display in ALIAS_MODELS
-        if normalize_model(display) not in real_normalized
-    ]
+    alias_list = []
+    for display in ALIAS_MODELS:
+        derived_keys = {normalize_model(display)}
+        _vendor, _sep, rest = display.partition(" ")
+        if rest:
+            derived_keys.add(normalize_model(rest))
+        if derived_keys & real_normalized:
+            continue
+        alias_list.append((normalize_model(display), f"{display} (compatible)"))
 
     # Single sort over the combined list so e.g. "Epson TM-T20III
     # (compatible)" sits next to "Epson TM-T20II".
