@@ -79,11 +79,15 @@ Two new `entry.data` keys, written on create and on reconfigure:
 1. **Device registry** — `build_device_info()` prefers
    `entry.data[detected_manufacturer/detected_model]`, falling back to the
    current `"ESC/POS"` / `_MODEL_BY_CONNECTION_TYPE` values.
-2. **Profile preselect** — the network step feeds the detected model through
-   the existing `suggest_profile(model, None, None)`
+2. **Profile preselect (discovery flows only)** — when discovery ran the
+   query before the network form is shown, the detected model feeds the
+   existing `suggest_profile(model, None, None)`
    (`capabilities/suggestions.py:26-45`) to preselect the profile dropdown
    default, exactly as Bluetooth does with the advertised name
-   (`bluetooth_steps.py:55-68`). Preselect only — never auto-commit.
+   (`bluetooth_steps.py:55-68`). Preselect only — never auto-commit. In the
+   *manual* flow the profile dropdown is on the same form as the host field,
+   so the query (which runs on submit) cannot preselect it — manual entries
+   get the detected fields persisted but keep their chosen profile.
 3. **Calibrate share link** — the free-text model field on the calibration
    summary (`calibration_steps.py:537-538`) defaults to
    `entry.data[detected_model]` when present, instead of the empty
@@ -125,11 +129,12 @@ layout) added to `EscposConfigFlow`:
    that isn't listening on 9100 aborts silently (`abort` reason
    `cannot_connect`), so matcher false positives never nag the user.
 3. `query_printer_id(...)` — best-effort, result carried into the flow.
-4. Hand off to the existing `async_step_network` form with host prefilled and
-   the detected model (or the DHCP hostname) in the step's
-   `description_placeholders`. The network form is the confirmation step — no
-   new confirm UI; everything downstream (profile preselect, codepage,
-   calibrate) is reused unchanged.
+4. Hand off to the existing `async_step_network` form with host prefilled.
+   The network form is the confirmation step — no new confirm UI; everything
+   downstream (profile preselect, codepage, calibrate) is reused unchanged.
+   The network step's strings.json description stays static (it is shared
+   with the manual flow, which supplies no placeholders); the discovery card
+   title carries the identification instead.
 
 Discovery card title uses the detected model when available ("TM-T20II at
 192.168.10.157"), else the DHCP hostname.
