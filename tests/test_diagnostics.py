@@ -8,6 +8,8 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.escpos_printer.const import (
     CONF_BT_MAC,
     CONF_CONNECTION_TYPE,
+    CONF_DETECTED_MANUFACTURER,
+    CONF_DETECTED_MODEL,
     CONF_IN_EP,
     CONF_OUT_EP,
     CONF_PRODUCT_ID,
@@ -28,7 +30,12 @@ async def test_diagnostics_network_entry(hass):  # type: ignore[no-untyped-def]
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="1.2.3.4:9100",
-        data={CONF_HOST: "1.2.3.4", CONF_PORT: 9100},
+        data={
+            CONF_HOST: "1.2.3.4",
+            CONF_PORT: 9100,
+            CONF_DETECTED_MANUFACTURER: "EPSON",
+            CONF_DETECTED_MODEL: "TM-T20II",
+        },
         unique_id="1.2.3.4:9100",
     )
     entry.add_to_hass(hass)
@@ -45,6 +52,9 @@ async def test_diagnostics_network_entry(hass):  # type: ignore[no-untyped-def]
     # Host is redacted
     assert diag["entry"]["data"][CONF_HOST] == "**REDACTED**"
     assert diag["entry"]["data"][CONF_PORT] == 9100
+    # GS I detection fields surface for triage
+    assert diag["entry"]["data"][CONF_DETECTED_MANUFACTURER] == "EPSON"
+    assert diag["entry"]["data"][CONF_DETECTED_MODEL] == "TM-T20II"
     # Runtime contains adapter-derived fields
     assert diag["runtime"]["connection_type"] == CONNECTION_TYPE_NETWORK
     assert "profile" in diag["runtime"]

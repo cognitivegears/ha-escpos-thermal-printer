@@ -62,6 +62,22 @@ def test_read_id_reply_strips_nonascii():
     assert _read_id_reply(FakeSocket(b"\x5fTM\xff-T20\x00")) == "TM-T20"
 
 
+def test_read_id_reply_strips_control_bytes():
+    # An untrusted peer could stuff C0 control/escape bytes into the reply.
+    assert _read_id_reply(FakeSocket(b"\x5fTM\x07-T20\x1b\x00")) == "TM-T20"
+
+
+def test_read_id_reply_oversized_reply_drains_before_returning():
+    # Longer than the cap but properly NUL-terminated: the excess must be
+    # drained so the socket is left positioned at the start of the NEXT
+    # reply, not mid-payload.
+    sock = FakeSocket(b"\x5f" + b"A" * 150 + b"\x00" + b"\x5fTM-T20II\x00")
+    assert _read_id_reply(sock) == "A" * 79
+    # The drain consumed the rest of the oversized reply including its NUL;
+    # the next read starts cleanly on the following reply.
+    assert _read_id_reply(sock) == "TM-T20II"
+
+
 def test_query_printer_id_both_replies():
     payload = b"\x5fEPSON\x00\x5fTM-T20II\x00"
     fake = FakeSocket(payload)
@@ -81,6 +97,20 @@ def test_query_printer_id_silent_clone_returns_none():
         return_value=FakeSocket(b""),
     ):
         assert query_printer_id("192.168.10.157", 9100, 4.0) is None
+
+
+def test_query_printer_id_oversized_maker_reply_still_parses_model():
+    # Maker answers with an oversized, NUL-terminated reply (capped and
+    # drained); the model reply that follows on the same stream must still
+    # parse cleanly instead of desyncing.
+    payload = b"\x5f" + b"A" * 150 + b"\x00" + b"\x5fTM-T20II\x00"
+    fake = FakeSocket(payload)
+    with patch(
+        "custom_components.escpos_printer._config_flow.network_helpers.socket.create_connection",
+        return_value=fake,
+    ):
+        result = query_printer_id("192.168.10.157", 9100, 4.0)
+    assert result == {"manufacturer": "A" * 79, "model": "TM-T20II"}
 
 
 def test_query_printer_id_maker_only():

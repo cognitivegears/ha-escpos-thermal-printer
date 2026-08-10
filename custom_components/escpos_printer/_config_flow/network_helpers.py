@@ -69,11 +69,24 @@ def _read_id_reply(sock: socket.socket) -> str | None:
             if not chunk or chunk == b"\x00":
                 break
             data += chunk
+        else:
+            # Hit the length cap without a NUL terminator: bytes from this
+            # oversized reply are still queued on the socket and would
+            # desync the framing of the NEXT reply. Drain them (discarding)
+            # until NUL/timeout/closed so the stream resyncs.
+            while True:
+                chunk = sock.recv(1)
+                if not chunk or chunk == b"\x00":
+                    break
     except OSError:
         pass  # timeout mid-reply: fall through and parse what we have
     if not data or data[0] != _ID_HEADER:
         return None
-    text = data[1:].decode("ascii", errors="ignore").strip()
+    text = data[1:].decode("ascii", errors="ignore")
+    # Drop C0 control/escape bytes an untrusted peer could stuff into the
+    # reply; leading/trailing whitespace is stripped last so filtering
+    # doesn't leave it exposed at the ends.
+    text = "".join(c for c in text if c.isprintable()).strip()
     return text or None
 
 
