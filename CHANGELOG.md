@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Calibration summary step simplified: the confusing "Update share link
+  with my model" action is gone. Enter the model (optional), Save or
+  Discard — the personalized GitHub share link now appears on the
+  final confirmation screen after saving (and still in a notification).
+
 ### Fixed
 
 - Text wrapping no longer strips a trailing newline, so calibration

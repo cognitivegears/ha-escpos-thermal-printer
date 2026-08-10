@@ -72,7 +72,6 @@ _CODEPAGE_ACTION_CHOICES = {
 }
 _SUMMARY_ACTION_CHOICES = {
     "save": "Save calibration",
-    "refresh_link": "Update share link with my model",
     "discard": "Discard (save nothing)",
 }
 # results-dict key -> options-storage const; only keys present in self._calib
@@ -508,63 +507,66 @@ class CalibrationFlowMixin:
         }
 
     async def _save_calibration(self, user_input: dict[str, Any]) -> ConfigFlowResult:
-        """Merge measured values into the existing options and create the entry.
+        """Merge measured values into the existing options and apply them.
 
         Only keys actually present in ``self._calib`` are applied, so a
         setting the user never measured (or skipped) is left untouched.
-        Save also closes the flow, which takes the on-screen share link
-        with it -- post a persistent notification carrying the same link
-        (built from the submitted model field) so it's still reachable
-        afterwards.
+
+        Options are applied via ``async_update_entry`` + an explicit
+        reload instead of ``async_create_entry``: create_entry ends the
+        flow on the frontend's hardcoded "Options successfully saved."
+        screen, whereas an abort screen renders our own text — which is
+        the only way to show the share link *after* saving. A persistent
+        notification carries the same link for after the dialog closes.
         """
         merged: dict[str, Any] = {**dict(self.config_entry.options)}
         for calib_key, conf_key in _CALIB_TO_CONF.items():
             if calib_key in self._calib:
                 merged[conf_key] = self._calib[calib_key]
 
-        if self._calib:
-            model = user_input.get("model", "").strip() or _SHARE_LINK_MODEL_PLACEHOLDER
-            share_url = build_share_url(model, await self._calib_results())
-            pn_create(
-                self.hass,
-                f"[Open a prefilled GitHub issue]({share_url}) to contribute your printer's "
-                "calibration results.",
-                title="Printer calibration saved",
-                notification_id=f"escpos_calibration_{self.config_entry.entry_id}",
+        if self.hass.config_entries.async_update_entry(self.config_entry, options=merged):
+            # OptionsFlowWithReload only auto-reloads on create_entry;
+            # this path ends in an abort, so reload explicitly.
+            self.hass.config_entries.async_schedule_reload(self.config_entry.entry_id)
+
+        if not self._calib:
+            return self.async_abort(  # type: ignore[attr-defined,no-any-return]
+                reason="calibration_saved_no_changes"
             )
 
-        return self.async_create_entry(  # type: ignore[attr-defined,no-any-return]
-            title="", data=merged
+        model = user_input.get("model", "").strip() or _SHARE_LINK_MODEL_PLACEHOLDER
+        share_url = build_share_url(model, await self._calib_results())
+        pn_create(
+            self.hass,
+            f"[Open a prefilled GitHub issue]({share_url}) to contribute your printer's "
+            "calibration results.",
+            title="Printer calibration saved",
+            notification_id=f"escpos_calibration_{self.config_entry.entry_id}",
+        )
+        return self.async_abort(  # type: ignore[attr-defined,no-any-return]
+            reason="calibration_saved",
+            description_placeholders={"share_url": share_url},
         )
 
     async def async_step_calibrate_summary(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Show measured results + a share link, then merge-save or discard.
+        """Show measured results, then merge-save or discard.
 
-        ``action: refresh_link`` is the only submission that re-shows this
-        same form; it swaps the share-link model text and nothing else.
+        The share link itself is shown on the post-save abort screen
+        (and in a persistent notification) — the model field here only
+        feeds it.
         """
         if user_input is not None:
-            action = user_input.get("action", "save")
-            if action == "save":
+            if user_input.get("action", "save") == "save":
                 return await self._save_calibration(user_input)
-            if action == "discard":
-                return self.async_abort(  # type: ignore[attr-defined,no-any-return]
-                    reason="calibration_discarded"
-                )
-
-        model = _SHARE_LINK_MODEL_PLACEHOLDER
-        model_field_default = ""
-        if user_input is not None and user_input.get("action") == "refresh_link":
-            model_field_default = user_input.get("model", "").strip()
-            model = model_field_default or model
-
-        share_url = build_share_url(model, await self._calib_results())
+            return self.async_abort(  # type: ignore[attr-defined,no-any-return]
+                reason="calibration_discarded"
+            )
 
         schema = vol.Schema(
             {
-                vol.Optional("model", default=model_field_default): str,
+                vol.Optional("model", default=""): str,
                 vol.Required("action", default="save"): vol.In(_SUMMARY_ACTION_CHOICES),
             }
         )
@@ -576,6 +578,5 @@ class CalibrationFlowMixin:
                 "width_pixels": str(self._calib.get("width_pixels") or "unchanged"),
                 "line_width": str(self._calib.get("line_width") or "unchanged"),
                 "codepage": str(self._calib.get("codepage") or "unchanged"),
-                "share_url": share_url,
             },
         )

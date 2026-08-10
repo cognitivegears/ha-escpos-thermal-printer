@@ -333,7 +333,9 @@
     },
     "abort": {
       "calibration_discarded": "Calibration discarded — no options were changed.",
-      "printer_not_ready": "The printer is not connected — load the integration before calibrating."
+      "printer_not_ready": "The printer is not connected — load the integration before calibrating.",
+      "calibration_saved": "Calibration saved and applied. [Open a prefilled GitHub issue]({share_url}) to help add this printer to escpos-printer-db.",
+      "calibration_saved_no_changes": "Calibration finished — no settings were measured, so nothing was changed."
     },
     "step": {
       "init": {
@@ -419,7 +421,7 @@
       },
       "calibrate_summary": {
         "title": "Calibrate: summary",
-        "description": "Measured settings — image implementation: {impl}; paper width: {width_pixels} px; characters per line: {line_width}; character encoding: {codepage}. Save applies these to the printer's options (any setting not measured above is left unchanged). Enter your printer model and choose \"Update share link with my model\" to personalize the link below, or use it as-is: [Open a prefilled GitHub issue]({share_url}) to help add this printer to escpos-printer-db.",
+        "description": "Measured settings — image implementation: {impl}; paper width: {width_pixels} px; characters per line: {line_width}; character encoding: {codepage}. Save applies these to the printer's options (any setting not measured above is left unchanged). Optionally enter your printer model first — the next screen and a notification will carry a share link to help add this printer to escpos-printer-db.",
         "data": {
           "model": "Printer model (optional, for the share link)",
           "action": "Action"

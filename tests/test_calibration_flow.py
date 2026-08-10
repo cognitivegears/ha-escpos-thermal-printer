@@ -712,8 +712,9 @@ async def test_full_wizard_save_merges_and_preserves_unrelated_option(hass, monk
         result["flow_id"], {"model": "", "action": "save"}
     )
 
-    assert result2["type"] == "create_entry"
-    data = result2["data"]
+    assert result2["type"] == "abort"
+    assert result2["reason"] == "calibration_saved"
+    data = entry.options
     assert data[CONF_TIMEOUT] == 7.0
     assert data[CONF_IMPL] == "bitImageColumn"
     assert data[CONF_WIDTH_PIXELS] == 576
@@ -730,16 +731,17 @@ async def test_skip_codepage_then_save_omits_codepage_key(hass, monkeypatch):  #
         result["flow_id"], {"model": "", "action": "save"}
     )
 
-    assert result2["type"] == "create_entry"
-    assert CONF_CODEPAGE not in result2["data"]
-    assert result2["data"][CONF_WIDTH_PIXELS] == 576
+    assert result2["type"] == "abort"
+    assert result2["reason"] == "calibration_saved"
+    assert CONF_CODEPAGE not in entry.options
+    assert entry.options[CONF_WIDTH_PIXELS] == 576
 
 
 async def test_save_creates_persistent_notification_with_share_link(hass, monkeypatch):  # type: ignore[no-untyped-def]
     """Saving posts a persistent notification carrying the share link.
 
-    Save closes the flow, so the on-screen GitHub link disappears with
-    it; the notification is the only place to find it again afterwards.
+    The post-save abort screen shows the link once; the notification is
+    the only place to find it again after the dialog closes.
     """
     entry, _adapter = _make_entry(hass)
     result = await _advance_to_summary(hass, entry)
@@ -748,7 +750,8 @@ async def test_save_creates_persistent_notification_with_share_link(hass, monkey
         result["flow_id"], {"model": "Rongta RP850P", "action": "save"}
     )
 
-    assert result2["type"] == "create_entry"
+    assert result2["type"] == "abort"
+    assert result2["reason"] == "calibration_saved"
     notifications = hass.data[pn.DOMAIN]
     notification_id = f"escpos_calibration_{entry.entry_id}"
     assert notification_id in notifications
@@ -775,7 +778,8 @@ async def test_save_with_nothing_measured_creates_no_notification(hass):  # type
         result["flow_id"], {"model": "", "action": "save"}
     )
 
-    assert result2["type"] == "create_entry"
+    assert result2["type"] == "abort"
+    assert result2["reason"] == "calibration_saved_no_changes"
     assert not hass.data.get(pn.DOMAIN)
 
 
@@ -806,28 +810,17 @@ async def test_discard_aborts_without_touching_options(hass, monkeypatch):  # ty
     assert entry.options == {CONF_TIMEOUT: 7.0}
 
 
-async def test_summary_description_placeholders_include_share_url_with_width(hass, monkeypatch):  # type: ignore[no-untyped-def]
-    """The summary form's share_url placeholder reflects the measured width."""
-    entry, _adapter = _make_entry(hass)
-
-    result = await _advance_to_summary(hass, entry)
-
-    assert result["type"] == "form"
-    assert result["step_id"] == "calibrate_summary"
-    share_url = result["description_placeholders"]["share_url"]
-    assert "576" in share_url
-
-
-async def test_refresh_link_with_model_produces_url_with_encoded_model(hass, monkeypatch):  # type: ignore[no-untyped-def]
-    """action: refresh_link re-renders the summary with the model baked into the URL."""
+async def test_save_abort_screen_carries_personalized_share_url(hass, monkeypatch):  # type: ignore[no-untyped-def]
+    """The post-save abort screen's share_url has the model and width baked in."""
     entry, _adapter = _make_entry(hass)
     result = await _advance_to_summary(hass, entry)
 
     result2 = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"model": "Rongta RP850P", "action": "refresh_link"}
+        result["flow_id"], {"model": "Rongta RP850P", "action": "save"}
     )
 
-    assert result2["type"] == "form"
-    assert result2["step_id"] == "calibrate_summary"
+    assert result2["type"] == "abort"
+    assert result2["reason"] == "calibration_saved"
     share_url = result2["description_placeholders"]["share_url"]
     assert "Rongta%20RP850P" in share_url
+    assert "576" in share_url
