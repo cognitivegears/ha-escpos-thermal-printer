@@ -435,7 +435,8 @@ async def test_ruler_reprint_reprints_and_reshows_same_step(hass):  # type: igno
 
     assert result2["type"] == "form"
     assert result2["step_id"] == "calibrate_ruler"
-    assert adapter.print_text.await_count == before + 1
+    # Reprint sends the on-paper instruction line + the ruler itself.
+    assert adapter.print_text.await_count == before + 2
 
 
 async def test_ruler_reprint_preserves_entered_marker(hass):  # type: ignore[no-untyped-def]

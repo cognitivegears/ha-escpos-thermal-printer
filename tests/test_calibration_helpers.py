@@ -59,17 +59,22 @@ def test_width_bar_outline_exact_width_and_label_at_left() -> None:
 def test_ruler_layout() -> None:
     ruler = build_ruler(64)
     assert len(ruler) == 64
-    # Tens digits sit at the multiple-of-10 positions (1-based)
-    for tens in range(1, 7):
-        assert ruler[tens * 10 - 1] == str(tens)
+    # Full numbers, right-aligned so the LAST digit sits on the
+    # multiple-of-10 position (1-based): "........10........20..."
+    for tens in range(10, 61, 10):
+        label = str(tens)
+        assert ruler[tens - len(label) : tens] == label
+    # No pipe noise, and everything else is dots
+    assert "|" not in ruler
 
 
 def test_ruler_layout_at_96_cols() -> None:
     """The wizard prints the ruler at 96 cols (its widest supported line_width)."""
     ruler = build_ruler(96)
     assert len(ruler) == 96
-    for tens in range(7, 10):
-        assert ruler[tens * 10 - 1] == str(tens)
+    for tens in range(70, 91, 10):
+        label = str(tens)
+        assert ruler[tens - len(label) : tens] == label
 
 
 def test_codepage_sample_replaces_unencodable() -> None:

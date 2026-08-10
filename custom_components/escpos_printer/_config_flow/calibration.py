@@ -61,15 +61,19 @@ def width_bar_data_uri(width_px: int) -> str:
 
 
 def build_ruler(cols: int = 64) -> str:
-    """ASCII column ruler: tens digits at 10/20/..., '|' at other 5s, '.' fill."""
-    chars = []
-    for i in range(1, cols + 1):
-        if i % 10 == 0:
-            chars.append(str(i // 10))
-        elif i % 5 == 0:
-            chars.append("|")
-        else:
-            chars.append(".")
+    """ASCII column ruler with full numbers at the tens positions.
+
+    Each number is right-aligned so its LAST digit sits exactly on the
+    multiple of ten (``........10........20...``): the reader takes the
+    last complete number on the first printed line and adds one per dot
+    after it — no "4 means 40" decoding, no pipe noise. Hardware-wrapped
+    remainder lines carry the later numbers and are ignorable.
+    """
+    chars = ["."] * cols
+    for tens in range(10, cols + 1, 10):
+        label = str(tens)
+        for offset, digit in enumerate(label):
+            chars[tens - len(label) + offset] = digit
     return "".join(chars)
 
 

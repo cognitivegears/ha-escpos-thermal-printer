@@ -403,9 +403,9 @@
       },
       "calibrate_ruler": {
         "title": "Calibrate: characters per line",
-        "description": "Your printer just printed a ruler of dots, with a digit every 10 columns (10, 20, 30...) and a '|' every 5. Find the LAST marker that printed fully before the line wrapped or ran off the paper, and enter its column number (e.g. if the '4' at column 40 is the last one that fully fits, enter 40). Enter 0 if you're not sure.",
+        "description": "Your printer just printed a ruler line of dots with the numbers 10, 20, 30... embedded in it, followed by one or two leftover lines you can ignore. Look at the FIRST printed line only: find the last complete number on it, then add 1 for every dot printed after that number. Example: if the line ends with \"40..\", enter 42. Enter 0 if you're not sure.",
         "data": {
-          "last_marker": "Last marker that fully fit (0 = don't know / skip)",
+          "last_marker": "Characters on the first line (0 = don't know / skip)",
           "action": "Action"
         }
       },

@@ -68,14 +68,15 @@ paper width unmeasured.
 
 ### 3. Characters per line
 
-The printer prints a 96-column ruler: a digit every 10 columns (`1`, `2`,
-`3`...) and a `|` every 5, with `.` filling the rest.
+The printer prints a short instruction line, then a 96-column ruler of
+dots with the numbers `10`, `20`, `30`... embedded in it. The ruler is
+longer than most printers are wide, so the leftover columns wrap onto one
+or two extra lines — **ignore those; only the first ruler line matters**.
 
-Find the **last marker that printed fully** before the line wrapped or ran
-off the edge of the paper, and enter its column number (for example, if
-the `4` at column 40 is the last one that fully fits, enter `40`). Enter
-`0` if you're not sure — that leaves the setting unmeasured rather than
-guessing.
+On that first line, find the **last complete number**, then **add 1 for
+every dot printed after it**. For example, if the line ends with `40..`,
+enter `42`. Enter `0` if you're not sure — that leaves the setting
+unmeasured rather than guessing.
 
 ### 4. Codepage (skipped if your profile supports none of the candidates)
 

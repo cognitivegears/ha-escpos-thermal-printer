@@ -314,6 +314,14 @@ class CalibrationFlowMixin:
                     reason="printer_not_ready"
                 )
             try:
+                # On-paper instruction so the wrapped remainder lines are
+                # explicitly ignorable without consulting the screen.
+                await adapter.print_text(
+                    self.hass,
+                    text="Read FIRST line: last number + dots after it\n",
+                    cut="none",
+                    feed=0,
+                )
                 await adapter.print_text(
                     self.hass, text=build_ruler(96), cut="none", feed=1, wrap=False
                 )

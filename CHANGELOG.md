@@ -58,6 +58,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   (kinder to the print head on battery-powered Bluetooth printers).
 
 ### Fixed
+- Calibration ruler readability: full numbers (10, 20, 30...) embedded in the
+  ruler instead of single tens digits and pipe marks, plus a printed
+  instruction line — read the last complete number on the first line and add
+  the dots after it.
 - Calibration width bars: the size label inside each bar was printed with an
   ~11px bitmap font (about 1.4mm on paper — unreadable); bars are now taller
   with a 30px label.
