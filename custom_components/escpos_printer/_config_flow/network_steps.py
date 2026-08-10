@@ -180,25 +180,29 @@ class NetworkFlowMixin:
                 old_port = reconfigure_entry.data.get(CONF_PORT, DEFAULT_PORT)
                 if reconfigure_entry.title == f"{old_host}:{old_port}":
                     title = f"{host}:{port}"
+                # A fresh GS I query result REPLACES prior detected state
+                # (present -> overwrite, absent -> key removed) since
+                # reconfigure may point the entry at a different printer.
+                # data_updates can only add/override keys, never delete
+                # them, so build the full replacement dict instead.
+                new_data = {
+                    **reconfigure_entry.data,
+                    CONF_HOST: host,
+                    CONF_PORT: port,
+                    CONF_TIMEOUT: timeout,
+                }
+                new_data.pop(CONF_DETECTED_MANUFACTURER, None)
+                new_data.pop(CONF_DETECTED_MODEL, None)
+                if detected.get("manufacturer"):
+                    new_data[CONF_DETECTED_MANUFACTURER] = detected["manufacturer"]
+                if detected.get("model"):
+                    new_data[CONF_DETECTED_MODEL] = detected["model"]
+
                 return self.async_update_reload_and_abort(  # type: ignore[attr-defined,no-any-return]
                     reconfigure_entry,
                     unique_id=new_unique_id,
                     title=title,
-                    data_updates={
-                        CONF_HOST: host,
-                        CONF_PORT: port,
-                        CONF_TIMEOUT: timeout,
-                        **(
-                            {CONF_DETECTED_MANUFACTURER: detected["manufacturer"]}
-                            if detected.get("manufacturer")
-                            else {}
-                        ),
-                        **(
-                            {CONF_DETECTED_MODEL: detected["model"]}
-                            if detected.get("model")
-                            else {}
-                        ),
-                    },
+                    data=new_data,
                 )
             errors["base"] = "cannot_connect"
 

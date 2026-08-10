@@ -479,7 +479,10 @@ async def test_network_flow_persists_detected_fields(hass):  # type: ignore[no-u
 
 async def test_network_flow_no_reply_omits_detected_fields(hass):  # type: ignore[no-untyped-def]
     """query_printer_id -> None leaves entry.data without detected keys."""
-    from custom_components.escpos_printer.const import CONF_DETECTED_MODEL
+    from custom_components.escpos_printer.const import (
+        CONF_DETECTED_MANUFACTURER,
+        CONF_DETECTED_MODEL,
+    )
 
     with (
         patch(
@@ -502,3 +505,34 @@ async def test_network_flow_no_reply_omits_detected_fields(hass):  # type: ignor
 
     assert result["type"] == "create_entry"
     assert CONF_DETECTED_MODEL not in result["data"]
+    assert CONF_DETECTED_MANUFACTURER not in result["data"]
+
+
+async def test_network_flow_reuses_preset_detected_result(hass):  # type: ignore[no-untyped-def]
+    """A pre-populated self._detected (e.g. from discovery) short-circuits the query."""
+    from custom_components.escpos_printer.const import CONF_DETECTED_MODEL
+
+    with patch(
+        "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+        return_value=True,
+    ):
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK}
+        )
+
+        flow = hass.config_entries.flow._progress[result["flow_id"]]
+        flow._detected = {"model": "TM-T20II"}
+
+        with patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+        ) as mock_query:
+            result = await hass.config_entries.flow.async_configure(
+                result["flow_id"], {CONF_HOST: "192.168.10.157", CONF_PORT: 9100}
+            )
+        mock_query.assert_not_called()
+
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+
+    assert result["type"] == "create_entry"
+    assert result["data"][CONF_DETECTED_MODEL] == "TM-T20II"
