@@ -14,7 +14,7 @@ Selects your printer model from the bundled [escpos-printer-db](https://github.c
 ### Rebadged and compatible printers
 
 Many cheap thermal printers are rebadges of, or share a command set with,
-an already-bundled profile. 22 such clone/equivalent models appear
+an already-bundled profile. 23 such clone/equivalent models appear
 directly in the profile dropdown as **"Model (compatible)"** entries — for
 example, **Epson TM-T20III (compatible)**, **Xprinter XP-80C
 (compatible)**, and **Citizen CT-S601II (compatible)** all route to an

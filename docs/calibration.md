@@ -20,8 +20,8 @@ Configure → **"Calibrate printer (prints test pages)"**.
 |---------|--------------------------|-------------------|
 | Image implementation | "Image printing implementation" | Which ESC/POS image command is used (raster / column / graphics) |
 | Paper width (pixels) | "Paper width in pixels" | Target width images are scaled to |
-| Characters per line | "Line Width" | Text wrap width in the printer's built-in font |
-| Codepage | "Codepage" | Character encoding used for text |
+| Characters per line | "Characters per line" | Text wrap width in the printer's built-in font |
+| Codepage | "Character encoding" | Character encoding used for text |
 
 Every setting the wizard measures, you can also set by hand in the
 options form — the wizard just automates the trial-and-error and writes
@@ -103,9 +103,11 @@ Choose one:
 - **Discard (save nothing)** — closes the wizard without changing
   anything.
 
-Saving closes the wizard, which takes the on-screen share link with it —
-a persistent notification carrying the same link is posted so you can
-still find it afterwards.
+Saving closes the wizard, which takes the on-screen share link with it. If
+at least one setting was measured, a persistent notification carrying the
+same link is posted so you can still find it afterwards. A run where every
+step was skipped or left unmeasured saves nothing and posts no
+notification.
 
 ### Contributing your results
 
@@ -125,13 +127,17 @@ must be connected and the config entry loaded):
 - **Printer self-test.** Hold the FEED button while powering the printer
   on. Most printers print a self-test sheet showing the model, interface
   type, and often the dots-per-line (printable width in pixels).
-- **Two-bar width test.** Print a 576px-wide and a 640px-wide image with
-  `width:` forced and `auto_resize: false`:
+- **Two-bar width test.** Print the same source image once at
+  `image_width: 576` and once at `image_width: 640`, with
+  `auto_resize: false`. The source image must be **at least 640px wide** —
+  images are only ever downscaled, never upscaled, so a narrower source
+  would print identically at both settings regardless of the printer's
+  true width, giving a false result.
 
   ```yaml
   service: escpos_printer.print_image
   data:
-    image: /config/www/width_test.png
+    image: /config/www/width_test.png  # 640px wide or larger
     image_width: 576
     auto_resize: false
   ```

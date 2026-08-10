@@ -34,7 +34,7 @@ start printing in minutes.
 - Image-print diagnostics sensor: success/failure counts and last-print details for tuning image options ([guide](docs/images.md#diagnostics-sensor))
 - Buzzer/beeper support
 - UTF-8 text with automatic character conversion
-- 35+ printer profiles with automatic feature detection, plus 22 rebadged/clone models available directly as "(compatible)" dropdown entries
+- 35+ printer profiles with automatic feature detection, plus 23 rebadged/clone models available directly as "(compatible)" dropdown entries
 - Guided calibration wizard: prints test pages to measure image implementation, paper width, columns, and codepage, then saves them for you ([guide](docs/calibration.md))
 - Full UI configuration, no YAML required
 
@@ -235,7 +235,7 @@ See [`blueprints/README.md`](blueprints/README.md) for import instructions, per-
 |----------|-------------|
 | [Installation](docs/installation.md) | HACS / manual install, removal |
 | [Configuration](docs/configuration.md) | Common settings reference (codepage, line width, defaults) |
-| [Calibration](docs/calibration.md) | Calibration — guided printer setup wizard |
+| [Calibration](docs/calibration.md) | Guided wizard that measures and saves your printer's settings |
 | [Network printers](docs/network.md) | TCP/IP setup |
 | [USB printers](docs/usb.md) | USB setup, permissions, container pass-through |
 | [Bluetooth printers](docs/bluetooth.md) | Pairing, RFCOMM, container caveats |
