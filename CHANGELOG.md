@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   with my model" action is gone. Enter the model (optional), Save or
   Discard — the personalized GitHub share link now appears on the
   final confirmation screen after saving (and still in a notification).
+- Calibration test pages feed two extra blank lines after each test, so
+  the results clear the tear bar without a manual feed.
 
 ### Fixed
 
