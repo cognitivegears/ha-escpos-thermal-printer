@@ -12,7 +12,12 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.escpos_printer._config_flow.calibration import CODEPAGE_CANDIDATES
 from custom_components.escpos_printer.capabilities.loader import _get_capabilities
 from custom_components.escpos_printer.const import (
+    CONF_CODEPAGE,
     CONF_CONNECTION_TYPE,
+    CONF_IMPL,
+    CONF_LINE_WIDTH,
+    CONF_TIMEOUT,
+    CONF_WIDTH_PIXELS,
     CONNECTION_TYPE_NETWORK,
     DOMAIN,
 )
@@ -30,7 +35,9 @@ def test_codepage_candidates_are_real_encodings():
     assert not missing, f"CODEPAGE_CANDIDATES has unknown encoding name(s): {missing}"
 
 
-def _make_entry(hass, *, loaded: bool = True) -> tuple[MockConfigEntry, MagicMock]:
+def _make_entry(
+    hass, *, loaded: bool = True, options: dict | None = None
+) -> tuple[MockConfigEntry, MagicMock]:
     """A MockConfigEntry with a mock adapter wired onto runtime_data."""
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -40,6 +47,7 @@ def _make_entry(hass, *, loaded: bool = True) -> tuple[MockConfigEntry, MagicMoc
             CONF_PORT: 9100,
             CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK,
         },
+        options=options or {},
         unique_id="1.2.3.4:9100",
     )
     entry.add_to_hass(hass)
@@ -346,8 +354,8 @@ async def test_codepage_continue_stores_first_in_candidate_order(hass, monkeypat
         result["flow_id"], {"codepages_match": ["CP850", "CP858"], "action": "continue"}
     )
 
-    assert result2["type"] == "abort"
-    assert result2["reason"] == "calibration_unavailable"
+    assert result2["type"] == "form"
+    assert result2["step_id"] == "calibrate_summary"
     assert flow._calib["codepage"] == "CP858"
     assert flow._calib_extra["codepages_match"] == ["CP850", "CP858"]
 
@@ -366,8 +374,8 @@ async def test_codepage_skip_stores_nothing(hass, monkeypatch):  # type: ignore[
         result["flow_id"], {"codepages_match": ["CP850"], "action": "skip"}
     )
 
-    assert result2["type"] == "abort"
-    assert result2["reason"] == "calibration_unavailable"
+    assert result2["type"] == "form"
+    assert result2["step_id"] == "calibrate_summary"
     assert "codepage" not in flow._calib
     assert "codepages_match" not in flow._calib_extra
 
@@ -406,3 +414,122 @@ async def test_codepage_profile_aware_narrowing(hass, monkeypatch):  # type: ign
     ]
     # Capability order (CODEPAGE_CANDIDATES), restricted to the profile's list.
     assert encodings == ["CP850", "CP437"]
+
+
+async def _advance_to_summary(  # type: ignore[no-untyped-def]
+    hass, entry, *, codepage_action: str = "continue"
+):
+    """Hop through the full wizard chain to land on the summary step.
+
+    Picks impl "bitImageColumn", width bar 576, ruler marker 48, and (unless
+    ``codepage_action`` is "skip") codepage match "CP858".
+    """
+    result = await _open_calibrate(hass, entry)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"impls_clean": ["bitImageColumn"], "action": "continue"}
+    )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"first_equal": "576", "action": "continue"}
+    )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"last_marker": 48, "action": "continue"}
+    )
+    codepages_match = [] if codepage_action == "skip" else ["CP858"]
+    return await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {"codepages_match": codepages_match, "action": codepage_action},
+    )
+
+
+async def test_full_wizard_save_merges_and_preserves_unrelated_option(hass, monkeypatch):  # type: ignore[no-untyped-def]
+    """Save merges measured keys into options without dropping an unrelated one."""
+    monkeypatch.setattr(
+        "custom_components.escpos_printer._config_flow.calibration_steps.get_profile_codepages",
+        lambda profile: [],
+    )
+    entry, _adapter = _make_entry(hass, options={CONF_TIMEOUT: 7.0})
+    result = await _advance_to_summary(hass, entry)
+    assert result["step_id"] == "calibrate_summary"
+
+    result2 = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"model": "", "action": "save"}
+    )
+
+    assert result2["type"] == "create_entry"
+    data = result2["data"]
+    assert data[CONF_TIMEOUT] == 7.0
+    assert data[CONF_IMPL] == "bitImageColumn"
+    assert data[CONF_WIDTH_PIXELS] == 576
+    assert data[CONF_LINE_WIDTH] == 48
+    assert data[CONF_CODEPAGE] == "CP858"
+
+
+async def test_skip_codepage_then_save_omits_codepage_key(hass, monkeypatch):  # type: ignore[no-untyped-def]
+    """Skipping the codepage step leaves CONF_CODEPAGE out of the saved options."""
+    monkeypatch.setattr(
+        "custom_components.escpos_printer._config_flow.calibration_steps.get_profile_codepages",
+        lambda profile: [],
+    )
+    entry, _adapter = _make_entry(hass)
+    result = await _advance_to_summary(hass, entry, codepage_action="skip")
+
+    result2 = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"model": "", "action": "save"}
+    )
+
+    assert result2["type"] == "create_entry"
+    assert CONF_CODEPAGE not in result2["data"]
+    assert result2["data"][CONF_WIDTH_PIXELS] == 576
+
+
+async def test_discard_aborts_without_touching_options(hass, monkeypatch):  # type: ignore[no-untyped-def]
+    """Discard aborts the flow and leaves the entry's options untouched."""
+    monkeypatch.setattr(
+        "custom_components.escpos_printer._config_flow.calibration_steps.get_profile_codepages",
+        lambda profile: [],
+    )
+    entry, _adapter = _make_entry(hass, options={CONF_TIMEOUT: 7.0})
+    result = await _advance_to_summary(hass, entry)
+
+    result2 = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"model": "", "action": "discard"}
+    )
+
+    assert result2["type"] == "abort"
+    assert result2["reason"] == "calibration_discarded"
+    assert entry.options == {CONF_TIMEOUT: 7.0}
+
+
+async def test_summary_description_placeholders_include_share_url_with_width(hass, monkeypatch):  # type: ignore[no-untyped-def]
+    """The summary form's share_url placeholder reflects the measured width."""
+    monkeypatch.setattr(
+        "custom_components.escpos_printer._config_flow.calibration_steps.get_profile_codepages",
+        lambda profile: [],
+    )
+    entry, _adapter = _make_entry(hass)
+
+    result = await _advance_to_summary(hass, entry)
+
+    assert result["type"] == "form"
+    assert result["step_id"] == "calibrate_summary"
+    share_url = result["description_placeholders"]["share_url"]
+    assert "576" in share_url
+
+
+async def test_refresh_link_with_model_produces_url_with_encoded_model(hass, monkeypatch):  # type: ignore[no-untyped-def]
+    """action: refresh_link re-renders the summary with the model baked into the URL."""
+    monkeypatch.setattr(
+        "custom_components.escpos_printer._config_flow.calibration_steps.get_profile_codepages",
+        lambda profile: [],
+    )
+    entry, _adapter = _make_entry(hass)
+    result = await _advance_to_summary(hass, entry)
+
+    result2 = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"model": "Rongta RP850P", "action": "refresh_link"}
+    )
+
+    assert result2["type"] == "form"
+    assert result2["step_id"] == "calibrate_summary"
+    share_url = result2["description_placeholders"]["share_url"]
+    assert "Rongta%20RP850P" in share_url

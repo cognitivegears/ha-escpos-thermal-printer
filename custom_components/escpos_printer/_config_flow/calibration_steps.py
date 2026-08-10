@@ -11,7 +11,11 @@ goes through the live adapter at ``self.config_entry.runtime_data.adapter``
 from __future__ import annotations
 
 import contextlib
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as pkg_version
+import json
 import logging
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.config_entries import ConfigEntryState
@@ -19,7 +23,7 @@ from homeassistant.helpers import config_validation as cv
 import voluptuous as vol
 
 from ..capabilities import get_profile_codepages
-from ..const import CONF_PROFILE
+from ..const import CONF_CODEPAGE, CONF_IMPL, CONF_LINE_WIDTH, CONF_PROFILE, CONF_WIDTH_PIXELS
 from ..security import sanitize_log_message
 from .calibration import (
     CODEPAGE_CANDIDATES,
@@ -27,6 +31,7 @@ from .calibration import (
     IMPL_CANDIDATES,
     WIDTH_CANDIDATES,
     build_ruler,
+    build_share_url,
     checkerboard_data_uri,
     codepage_sample_line,
     width_bar_data_uri,
@@ -58,6 +63,30 @@ _CODEPAGE_ACTION_CHOICES = {
     "reprint": "Reprint the test lines",
     "skip": "Skip this step",
 }
+_SUMMARY_ACTION_CHOICES = {
+    "save": "Save calibration",
+    "refresh_link": "Update share link with my model",
+    "discard": "Discard (save nothing)",
+}
+# results-dict key -> options-storage const; only keys present in self._calib
+# get merged in, so an unmeasured setting is never touched on save.
+_CALIB_TO_CONF = {
+    "impl": CONF_IMPL,
+    "width_pixels": CONF_WIDTH_PIXELS,
+    "line_width": CONF_LINE_WIDTH,
+    "codepage": CONF_CODEPAGE,
+}
+_SHARE_LINK_MODEL_PLACEHOLDER = "YOUR-PRINTER-MODEL"
+
+
+def _read_versions() -> tuple[str, str]:
+    """Integration + python-escpos versions (blocking; run via executor)."""
+    try:
+        integration_version = pkg_version("ha-escpos-thermal-printer")
+    except PackageNotFoundError:
+        manifest_path = Path(__file__).resolve().parent.parent / "manifest.json"
+        integration_version = json.loads(manifest_path.read_text())["version"]
+    return integration_version, pkg_version("python-escpos")
 
 
 class CalibrationFlowMixin:
@@ -295,10 +324,7 @@ class CalibrationFlowMixin:
                     self._calib["codepage"] = next(
                         cp for cp in candidates if cp in selection
                     )
-            # Task 5 wires the summary; abort here for now.
-            return self.async_abort(  # type: ignore[attr-defined,no-any-return]
-                reason="calibration_unavailable"
-            )
+            return await self.async_step_calibrate_summary()
 
         choices = {cp: f"Line {n}: {cp}" for cp, n in printed.items()}
         schema = vol.Schema(
@@ -314,4 +340,72 @@ class CalibrationFlowMixin:
             data_schema=schema,
             errors=errors,
             description_placeholders={"sample": CODEPAGE_SAMPLE},
+        )
+
+    def _save_calibration(self) -> ConfigFlowResult:
+        """Merge measured values into the existing options and create the entry.
+
+        Only keys actually present in ``self._calib`` are applied, so a
+        setting the user never measured (or skipped) is left untouched.
+        """
+        merged: dict[str, Any] = {**dict(self.config_entry.options)}
+        for calib_key, conf_key in _CALIB_TO_CONF.items():
+            if calib_key in self._calib:
+                merged[conf_key] = self._calib[calib_key]
+        return self.async_create_entry(  # type: ignore[attr-defined,no-any-return]
+            title="", data=merged
+        )
+
+    async def async_step_calibrate_summary(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Show measured results + a share link, then merge-save or discard.
+
+        ``action: refresh_link`` is the only submission that re-shows this
+        same form; it swaps the share-link model text and nothing else.
+        """
+        if user_input is not None:
+            action = user_input.get("action", "save")
+            if action == "save":
+                return self._save_calibration()
+            if action == "discard":
+                return self.async_abort(  # type: ignore[attr-defined,no-any-return]
+                    reason="calibration_discarded"
+                )
+
+        model = _SHARE_LINK_MODEL_PLACEHOLDER
+        if user_input is not None and user_input.get("action") == "refresh_link":
+            model = user_input.get("model", "").strip() or model
+
+        profile = self.config_entry.options.get(
+            CONF_PROFILE, self.config_entry.data.get(CONF_PROFILE)
+        )
+        integration_version, escpos_version = await self.hass.async_add_executor_job(
+            _read_versions
+        )
+        results: dict[str, Any] = {
+            **self._calib,
+            **self._calib_extra,
+            "profile": profile,
+            "integration_version": integration_version,
+            "escpos_version": escpos_version,
+        }
+        share_url = build_share_url(model, results)
+
+        schema = vol.Schema(
+            {
+                vol.Optional("model", default=""): str,
+                vol.Required("action", default="save"): vol.In(_SUMMARY_ACTION_CHOICES),
+            }
+        )
+        return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
+            step_id="calibrate_summary",
+            data_schema=schema,
+            description_placeholders={
+                "impl": str(self._calib.get("impl") or "unchanged"),
+                "width_pixels": str(self._calib.get("width_pixels") or "unchanged"),
+                "line_width": str(self._calib.get("line_width") or "unchanged"),
+                "codepage": str(self._calib.get("codepage") or "unchanged"),
+                "share_url": share_url,
+            },
         )
