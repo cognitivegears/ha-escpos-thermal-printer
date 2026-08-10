@@ -50,6 +50,7 @@ class EscposConfigFlow(
         self._user_data: dict[str, Any] = {}
         self._detected: dict[str, str] = {}
         self._discovery_host: str | None = None
+        self._discovery_port: int | None = None
         self._discovered_printers: list[dict[str, Any]] = []
         self._all_usb_devices: list[dict[str, Any]] = []
         self._paired_bt_devices: list[dict[str, Any]] = []

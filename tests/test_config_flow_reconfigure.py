@@ -260,6 +260,55 @@ async def test_reconfigure_network_detected_fields_replace_on_requery(hass):  # 
     assert CONF_DETECTED_MODEL not in updated2.data
 
 
+async def test_reconfigure_network_detected_fields_survive_transient_requery_failure(
+    hass,
+):  # type: ignore[no-untyped-def]
+    """Reconfiguring only the timeout (same host/port) while the printer is
+    busy (query returns None) must not destroy a good prior detection."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="1.2.3.4:9100",
+        data={
+            CONF_HOST: "1.2.3.4",
+            CONF_PORT: 9100,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK,
+            CONF_DETECTED_MANUFACTURER: "EPSON",
+            CONF_DETECTED_MODEL: "TM-T20II",
+        },
+        unique_id="1.2.3.4:9100",
+    )
+    entry.add_to_hass(hass)
+    entry_id = entry.entry_id
+
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=True,
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
+        patch("custom_components.escpos_printer.async_setup_entry", return_value=True),
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_HOST: "1.2.3.4", CONF_PORT: 9100, CONF_TIMEOUT: 8.0},
+        )
+        await hass.async_block_till_done()
+
+    assert result2["type"] == "abort"
+    assert result2["reason"] == "reconfigure_successful"
+
+    updated = hass.config_entries.async_get_entry(entry_id)
+    assert updated is not None
+    assert updated.data[CONF_TIMEOUT] == 8.0
+    assert updated.data[CONF_DETECTED_MANUFACTURER] == "EPSON"
+    assert updated.data[CONF_DETECTED_MODEL] == "TM-T20II"
+
+
 async def test_reconfigure_network_cannot_connect(hass):  # type: ignore[no-untyped-def]
     """A failed connection probe re-renders the form with cannot_connect and leaves the entry alone."""
     entry = MockConfigEntry(

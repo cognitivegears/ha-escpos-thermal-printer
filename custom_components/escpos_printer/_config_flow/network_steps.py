@@ -50,6 +50,7 @@ class NetworkFlowMixin:
     _user_data: dict[str, Any]
     _detected: dict[str, str]
     _discovery_host: str | None
+    _discovery_port: int | None
 
     async def async_step_network(
         self, user_input: dict[str, Any] | None = None
@@ -85,13 +86,17 @@ class NetworkFlowMixin:
 
                 # Best-effort GS I identification. Reuse a discovery-time
                 # result (e.g. DHCP discovery step) only when the submitted
-                # host still matches the discovered one -- the host field is
-                # just a suggested value, and if the user points it at a
-                # different printer the discovery-time result must not be
-                # attributed to it.
+                # host AND port still match the discovered ones -- the host
+                # field is just a suggested value, and if the user points it
+                # at a different printer (or a different port on the same
+                # host) the discovery-time result must not be attributed to
+                # it. DHCP always probes DEFAULT_PORT, so an edited port
+                # alone is enough to misattribute identity.
                 detected = (
                     self._detected
-                    if self._detected and host == self._discovery_host
+                    if self._detected
+                    and host == self._discovery_host
+                    and port == self._discovery_port
                     else (
                         await self.hass.async_add_executor_job(
                             query_printer_id, host, port, timeout
@@ -130,8 +135,14 @@ class NetworkFlowMixin:
         # Discovery flows ran the GS I query before this form is shown, so
         # the detected model can preselect the profile dropdown (preselect
         # only -- the user always confirms). Manual flows query on submit.
+        # Only preselect while the form's suggested host still equals the
+        # discovery host: once the user edits the host on an error
+        # redisplay, the detected model no longer describes that address.
         default_profile = PROFILE_AUTO
-        detected_model = self._detected.get("model") if self._discovery_host else None
+        suggested_host_matches_discovery = self._discovery_host and (
+            (user_input or {}).get(CONF_HOST, self._discovery_host) == self._discovery_host
+        )
+        detected_model = self._detected.get("model") if suggested_host_matches_discovery else None
         if detected_model:
             suggestion = await self.hass.async_add_executor_job(
                 suggest_profile, detected_model, None, None
@@ -149,11 +160,12 @@ class NetworkFlowMixin:
                 vol.Optional(CONF_PROFILE, default=default_profile): vol.In(profile_choices),
             }
         )
-        if self._discovery_host:
-            # Prefer the host the user just typed (on error redisplay) over
-            # the original discovery suggestion, so a typo fix isn't
-            # clobbered back to the discovered address.
-            suggested_host = (user_input or {}).get(CONF_HOST) or self._discovery_host
+        # Prefer the host the user just typed (on error redisplay) over the
+        # original discovery suggestion, so a typo fix isn't clobbered back
+        # to the discovered address. This also preserves a manually typed
+        # host across an error redisplay on non-discovery flows.
+        suggested_host = (user_input or {}).get(CONF_HOST) or self._discovery_host
+        if suggested_host:
             data_schema = self.add_suggested_values_to_schema(  # type: ignore[attr-defined]
                 data_schema, {CONF_HOST: suggested_host}
             )
@@ -215,19 +227,29 @@ class NetworkFlowMixin:
                 # (present -> overwrite, absent -> key removed) since
                 # reconfigure may point the entry at a different printer.
                 # data_updates can only add/override keys, never delete
-                # them, so build the full replacement dict instead.
+                # them, so build the full replacement dict instead. But
+                # only clear the existing keys when the query actually
+                # answered or the address changed -- reconfiguring just the
+                # timeout while the printer is transiently busy (query
+                # returns None) must not silently destroy a good prior
+                # detection for the SAME address.
+                addr_changed = (host.lower(), port) != (
+                    str(reconfigure_entry.data.get(CONF_HOST, "")).lower(),
+                    reconfigure_entry.data.get(CONF_PORT, DEFAULT_PORT),
+                )
                 new_data = {
                     **reconfigure_entry.data,
                     CONF_HOST: host,
                     CONF_PORT: port,
                     CONF_TIMEOUT: timeout,
                 }
-                new_data.pop(CONF_DETECTED_MANUFACTURER, None)
-                new_data.pop(CONF_DETECTED_MODEL, None)
-                if detected.get("manufacturer"):
-                    new_data[CONF_DETECTED_MANUFACTURER] = detected["manufacturer"]
-                if detected.get("model"):
-                    new_data[CONF_DETECTED_MODEL] = detected["model"]
+                if detected or addr_changed:
+                    new_data.pop(CONF_DETECTED_MANUFACTURER, None)
+                    new_data.pop(CONF_DETECTED_MODEL, None)
+                    if detected.get("manufacturer"):
+                        new_data[CONF_DETECTED_MANUFACTURER] = detected["manufacturer"]
+                    if detected.get("model"):
+                        new_data[CONF_DETECTED_MODEL] = detected["model"]
 
                 return self.async_update_reload_and_abort(  # type: ignore[attr-defined,no-any-return]
                     reconfigure_entry,

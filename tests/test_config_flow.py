@@ -525,6 +525,7 @@ async def test_network_flow_reuses_preset_detected_result(hass):  # type: ignore
         flow = hass.config_entries.flow._progress[result["flow_id"]]
         flow._detected = {"model": "TM-T20II"}
         flow._discovery_host = "192.168.10.157"
+        flow._discovery_port = 9100
 
         with patch(
             "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
