@@ -545,8 +545,10 @@ def test_no_stale_raster_epson_only_label() -> None:
             options = ((fdef.get("selector") or {}).get("select") or {}).get("options") or []
             for opt in options:
                 if isinstance(opt, dict):
-                    assert opt.get("label") != "Raster (default — Epson)", (
-                        f"{svc}.{field_name} still has the stale Epson-only Raster label"
+                    label = opt.get("label") or ""
+                    assert "Raster" not in label or "Epson" not in label, (
+                        f"{svc}.{field_name} still has an Epson-only-sounding Raster label: "
+                        f"{label!r}"
                     )
 
 

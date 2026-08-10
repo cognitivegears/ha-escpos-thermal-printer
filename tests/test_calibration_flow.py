@@ -17,6 +17,7 @@ from custom_components.escpos_printer.const import (
     CONF_CONNECTION_TYPE,
     CONF_IMPL,
     CONF_LINE_WIDTH,
+    CONF_PROFILE,
     CONF_TIMEOUT,
     CONF_WIDTH_PIXELS,
     CONNECTION_TYPE_NETWORK,
@@ -361,10 +362,6 @@ async def test_ruler_low_value_shows_line_width_out_of_range_error(hass):  # typ
 
 async def test_codepage_step_prints_one_line_per_candidate_with_encoding(hass, monkeypatch):  # type: ignore[no-untyped-def]
     """The codepage step prints one line per candidate, tagged with its encoding."""
-    monkeypatch.setattr(
-        "custom_components.escpos_printer._config_flow.calibration_steps.get_profile_codepages",
-        lambda profile: [],
-    )
     entry, adapter = _make_entry(hass)
 
     result = await _advance_to_codepage(hass, entry)
@@ -389,10 +386,6 @@ async def test_codepage_step_prints_one_line_per_candidate_with_encoding(hass, m
 
 async def test_codepage_reprint_reprints(hass, monkeypatch):  # type: ignore[no-untyped-def]
     """action: reprint re-prints the codepage lines and stays on calibrate_codepage."""
-    monkeypatch.setattr(
-        "custom_components.escpos_printer._config_flow.calibration_steps.get_profile_codepages",
-        lambda profile: [],
-    )
     entry, adapter = _make_entry(hass)
     result = await _advance_to_codepage(hass, entry)
     before = adapter.print_text.await_count
@@ -408,10 +401,6 @@ async def test_codepage_reprint_reprints(hass, monkeypatch):  # type: ignore[no-
 
 async def test_codepage_continue_stores_first_in_candidate_order(hass, monkeypatch):  # type: ignore[no-untyped-def]
     """Multi-select ["CP850", "CP858"] stores "CP858" (capability order)."""
-    monkeypatch.setattr(
-        "custom_components.escpos_printer._config_flow.calibration_steps.get_profile_codepages",
-        lambda profile: [],
-    )
     entry, _adapter = _make_entry(hass)
     result = await _advance_to_codepage(hass, entry)
     flow = hass.config_entries.options._progress[result["flow_id"]]
@@ -428,10 +417,6 @@ async def test_codepage_continue_stores_first_in_candidate_order(hass, monkeypat
 
 async def test_codepage_skip_stores_nothing(hass, monkeypatch):  # type: ignore[no-untyped-def]
     """Skip stores neither codepages_match nor codepage."""
-    monkeypatch.setattr(
-        "custom_components.escpos_printer._config_flow.calibration_steps.get_profile_codepages",
-        lambda profile: [],
-    )
     entry, _adapter = _make_entry(hass)
     result = await _advance_to_codepage(hass, entry)
     flow = hass.config_entries.options._progress[result["flow_id"]]
@@ -454,10 +439,6 @@ async def test_codepage_choice_labels_carry_own_expected_rendering(hass, monkeyp
     against a single shared reference) is impossible to satisfy on a
     correctly-working printer.
     """
-    monkeypatch.setattr(
-        "custom_components.escpos_printer._config_flow.calibration_steps.get_profile_codepages",
-        lambda profile: [],
-    )
     entry, _adapter = _make_entry(hass)
 
     result = await _advance_to_codepage(hass, entry)
@@ -470,10 +451,6 @@ async def test_codepage_choice_labels_carry_own_expected_rendering(hass, monkeyp
 
 async def test_codepage_all_candidates_failing_shows_print_error(hass, monkeypatch):  # type: ignore[no-untyped-def]
     """If every candidate fails to print, the form re-shows a print-failure error."""
-    monkeypatch.setattr(
-        "custom_components.escpos_printer._config_flow.calibration_steps.get_profile_codepages",
-        lambda profile: [],
-    )
     entry, adapter = _make_entry(hass)
     adapter.print_text.side_effect = RuntimeError("boom")
 
@@ -484,22 +461,14 @@ async def test_codepage_all_candidates_failing_shows_print_error(hass, monkeypat
     assert result["errors"]["base"] == "calibration_print_failed"
 
 
-async def test_codepage_candidate_the_profile_cannot_switch_to_is_dropped(hass, monkeypatch):  # type: ignore[no-untyped-def]
-    """A candidate is_valid_codepage_for_profile rejects is never printed or offered.
+async def test_codepage_candidates_narrowed_to_profile_using_real_capabilities_db(hass):  # type: ignore[no-untyped-def]
+    """No monkeypatching: a real bundled profile (TM-T88II) narrows to its own codepages.
 
-    Without this guard the candidate could print under the printer's
-    PREVIOUS (still-active) codepage while carrying the new label --
-    false verification for an odd/Generic profile.
+    TM-T88II's real codePages list omits CP858 and ISO_8859-1 -- this
+    guards the narrowing logic against the real capabilities DB, not a
+    fake stand-in.
     """
-    monkeypatch.setattr(
-        "custom_components.escpos_printer._config_flow.calibration_steps.get_profile_codepages",
-        lambda profile: [],
-    )
-    monkeypatch.setattr(
-        "custom_components.escpos_printer._config_flow.calibration_steps.is_valid_codepage_for_profile",
-        lambda cp, profile: cp != "CP437",
-    )
-    entry, adapter = _make_entry(hass)
+    entry, adapter = _make_entry(hass, options={CONF_PROFILE: "TM-T88II"})
 
     result = await _advance_to_codepage(hass, entry)
 
@@ -509,10 +478,29 @@ async def test_codepage_candidate_the_profile_cannot_switch_to_is_dropped(hass, 
         for call in adapter.print_text.await_args_list
         if call.kwargs.get("encoding") is not None
     ]
-    assert "CP437" not in encodings
-    assert set(encodings) == set(CODEPAGE_CANDIDATES) - {"CP437"}
-    offered = result["data_schema"].schema["codepages_match"].options
-    assert "CP437" not in offered
+    # Capability order (CODEPAGE_CANDIDATES), restricted to TM-T88II's real list.
+    assert encodings == ["CP1252", "CP850", "CP437"]
+
+
+async def test_codepage_step_skipped_when_profile_supports_none_of_the_candidates(hass):  # type: ignore[no-untyped-def]
+    """AF-240's real codepage list (OXHOO-EUROPEAN) excludes all five candidates.
+
+    No fallback to the full candidate list here -- that fallback IS the
+    false-verification bug (printing a line under a codepage the printer
+    can't actually switch to). With nothing left to test, the step is
+    skipped entirely instead of showing a form with no working choices.
+    """
+    entry, adapter = _make_entry(hass, options={CONF_PROFILE: "AF-240"})
+    result = await _advance_to_ruler(hass, entry)
+    prints_before = adapter.print_text.await_count
+
+    result2 = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"last_marker": 0, "action": "continue"}
+    )
+
+    assert result2["type"] == "form"
+    assert result2["step_id"] == "calibrate_summary"
+    assert adapter.print_text.await_count == prints_before
 
 
 async def test_codepage_profile_aware_narrowing(hass, monkeypatch):  # type: ignore[no-untyped-def]
@@ -562,10 +550,6 @@ async def _advance_to_summary(  # type: ignore[no-untyped-def]
 
 async def test_full_wizard_save_merges_and_preserves_unrelated_option(hass, monkeypatch):  # type: ignore[no-untyped-def]
     """Save merges measured keys into options without dropping an unrelated one."""
-    monkeypatch.setattr(
-        "custom_components.escpos_printer._config_flow.calibration_steps.get_profile_codepages",
-        lambda profile: [],
-    )
     entry, _adapter = _make_entry(hass, options={CONF_TIMEOUT: 7.0})
     result = await _advance_to_summary(hass, entry)
     assert result["step_id"] == "calibrate_summary"
@@ -585,10 +569,6 @@ async def test_full_wizard_save_merges_and_preserves_unrelated_option(hass, monk
 
 async def test_skip_codepage_then_save_omits_codepage_key(hass, monkeypatch):  # type: ignore[no-untyped-def]
     """Skipping the codepage step leaves CONF_CODEPAGE out of the saved options."""
-    monkeypatch.setattr(
-        "custom_components.escpos_printer._config_flow.calibration_steps.get_profile_codepages",
-        lambda profile: [],
-    )
     entry, _adapter = _make_entry(hass)
     result = await _advance_to_summary(hass, entry, codepage_action="skip")
 
@@ -607,10 +587,6 @@ async def test_save_creates_persistent_notification_with_share_link(hass, monkey
     Save closes the flow, so the on-screen GitHub link disappears with
     it; the notification is the only place to find it again afterwards.
     """
-    monkeypatch.setattr(
-        "custom_components.escpos_printer._config_flow.calibration_steps.get_profile_codepages",
-        lambda profile: [],
-    )
     entry, _adapter = _make_entry(hass)
     result = await _advance_to_summary(hass, entry)
 
@@ -625,12 +601,32 @@ async def test_save_creates_persistent_notification_with_share_link(hass, monkey
     assert "Rongta%20RP850P" in notifications[notification_id][pn.ATTR_MESSAGE]
 
 
+async def test_save_with_nothing_measured_creates_no_notification(hass):  # type: ignore[no-untyped-def]
+    """A run where every step was skipped shouldn't advertise "(unchanged)" results."""
+    entry, _adapter = _make_entry(hass)
+    result = await _open_calibrate(hass, entry)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"impls_clean": [], "action": "continue"}
+    )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"last_marker": 0, "action": "continue"}
+    )
+    assert result["step_id"] == "calibrate_codepage"
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"codepages_match": [], "action": "skip"}
+    )
+    assert result["step_id"] == "calibrate_summary"
+
+    result2 = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"model": "", "action": "save"}
+    )
+
+    assert result2["type"] == "create_entry"
+    assert not hass.data.get(pn.DOMAIN)
+
+
 async def test_discard_creates_no_persistent_notification(hass, monkeypatch):  # type: ignore[no-untyped-def]
     """Discard doesn't post a notification -- nothing was saved to share."""
-    monkeypatch.setattr(
-        "custom_components.escpos_printer._config_flow.calibration_steps.get_profile_codepages",
-        lambda profile: [],
-    )
     entry, _adapter = _make_entry(hass)
     result = await _advance_to_summary(hass, entry)
 
@@ -644,10 +640,6 @@ async def test_discard_creates_no_persistent_notification(hass, monkeypatch):  #
 
 async def test_discard_aborts_without_touching_options(hass, monkeypatch):  # type: ignore[no-untyped-def]
     """Discard aborts the flow and leaves the entry's options untouched."""
-    monkeypatch.setattr(
-        "custom_components.escpos_printer._config_flow.calibration_steps.get_profile_codepages",
-        lambda profile: [],
-    )
     entry, _adapter = _make_entry(hass, options={CONF_TIMEOUT: 7.0})
     result = await _advance_to_summary(hass, entry)
 
@@ -662,10 +654,6 @@ async def test_discard_aborts_without_touching_options(hass, monkeypatch):  # ty
 
 async def test_summary_description_placeholders_include_share_url_with_width(hass, monkeypatch):  # type: ignore[no-untyped-def]
     """The summary form's share_url placeholder reflects the measured width."""
-    monkeypatch.setattr(
-        "custom_components.escpos_printer._config_flow.calibration_steps.get_profile_codepages",
-        lambda profile: [],
-    )
     entry, _adapter = _make_entry(hass)
 
     result = await _advance_to_summary(hass, entry)
@@ -678,10 +666,6 @@ async def test_summary_description_placeholders_include_share_url_with_width(has
 
 async def test_refresh_link_with_model_produces_url_with_encoded_model(hass, monkeypatch):  # type: ignore[no-untyped-def]
     """action: refresh_link re-renders the summary with the model baked into the URL."""
-    monkeypatch.setattr(
-        "custom_components.escpos_printer._config_flow.calibration_steps.get_profile_codepages",
-        lambda profile: [],
-    )
     entry, _adapter = _make_entry(hass)
     result = await _advance_to_summary(hass, entry)
 

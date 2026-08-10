@@ -406,7 +406,7 @@
         "title": "Calibrate: character encoding",
         "description": "Your printer just printed one numbered line per candidate encoding, each attempting to render \"{sample}\", the ideal text. Check every line whose printout matches its own expected text shown in the checkbox label — including any ? marks. A line that prints exactly what its label shows is a working codepage. If none match, or you'd rather leave the character encoding unchanged, choose \"Skip this step\".",
         "data": {
-          "codepages_match": "Lines that matched the reference exactly",
+          "codepages_match": "Lines that match their own expected text",
           "action": "Action"
         }
       },

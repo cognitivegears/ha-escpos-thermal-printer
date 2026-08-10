@@ -23,8 +23,15 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.helpers import config_validation as cv
 import voluptuous as vol
 
-from ..capabilities import get_profile_codepages, is_valid_codepage_for_profile
-from ..const import CONF_CODEPAGE, CONF_IMPL, CONF_LINE_WIDTH, CONF_PROFILE, CONF_WIDTH_PIXELS
+from ..capabilities import get_profile_codepages
+from ..const import (
+    CONF_CODEPAGE,
+    CONF_IMPL,
+    CONF_LINE_WIDTH,
+    CONF_PROFILE,
+    CONF_WIDTH_PIXELS,
+    DEFAULT_IMPL,
+)
 from ..security import sanitize_log_message
 from .calibration import (
     CODEPAGE_CANDIDATES,
@@ -194,7 +201,7 @@ class CalibrationFlowMixin:
     async def _print_width_bars(self) -> None:
         """Print one bar per candidate width, using the impl chosen so far."""
         adapter = self.config_entry.runtime_data.adapter
-        impl = self._calib.get("impl") or getattr(adapter, "default_impl", None) or "bitImageRaster"
+        impl = self._calib.get("impl") or getattr(adapter, "default_impl", None) or DEFAULT_IMPL
         for w in WIDTH_CANDIDATES:
             # width=w beats a narrower profile/opts width in the image
             # pipeline (process_image only ever downscales, never
@@ -273,24 +280,22 @@ class CalibrationFlowMixin:
         )
 
     async def _get_codepage_candidates(self) -> tuple[str, ...]:
-        """Codepage candidates, narrowed to the configured profile's list when possible."""
+        """Codepage candidates the configured profile can actually switch to.
+
+        ``get_profile_codepages`` already falls back to the common
+        codepage list (a superset of every candidate here) when no
+        profile is configured or the profile's own list is unknown, so
+        intersecting is enough -- no separate "no profile" branch needed.
+        Deliberately NO fallback to the full candidate tuple when the
+        intersection is empty: that fallback is exactly the
+        false-verification bug (a candidate printing under a codepage the
+        profile can't switch to) this narrowing exists to prevent.
+        """
         profile = self.config_entry.options.get(
             CONF_PROFILE, self.config_entry.data.get(CONF_PROFILE)
         )
         profile_codepages = await self.hass.async_add_executor_job(get_profile_codepages, profile)
-        narrowed = tuple(cp for cp in CODEPAGE_CANDIDATES if cp in profile_codepages)
-        candidates = narrowed or CODEPAGE_CANDIDATES
-        # Drop any candidate the profile can't actually switch to *before*
-        # printing -- profile-listed candidates already pass by
-        # construction, this protects the Generic/odd-profile path where a
-        # candidate could otherwise print under the printer's previous
-        # (still-active) codepage while carrying the new label.
-        valid = [
-            cp
-            for cp in candidates
-            if await self.hass.async_add_executor_job(is_valid_codepage_for_profile, cp, profile)
-        ]
-        return tuple(valid)
+        return tuple(cp for cp in CODEPAGE_CANDIDATES if cp in profile_codepages)
 
     async def _print_codepage_candidates(self, candidates: tuple[str, ...]) -> dict[str, int]:
         """Print a labeled sample line per codepage candidate.
@@ -333,6 +338,11 @@ class CalibrationFlowMixin:
         """Print a sample line per codepage candidate, then record which match."""
         errors: dict[str, str] = {}
         candidates = await self._get_codepage_candidates()
+        if not candidates:
+            # The profile supports none of the candidates -- there's
+            # nothing to test (and nothing to show a form for), so skip
+            # straight to the summary instead of an empty/broken step.
+            return await self.async_step_calibrate_summary()
         printed: dict[str, int] = {}
         if user_input is None or user_input.get("action") == "reprint":
             try:
@@ -396,15 +406,16 @@ class CalibrationFlowMixin:
             if calib_key in self._calib:
                 merged[conf_key] = self._calib[calib_key]
 
-        model = user_input.get("model", "").strip() or _SHARE_LINK_MODEL_PLACEHOLDER
-        share_url = build_share_url(model, await self._calib_results())
-        pn_create(
-            self.hass,
-            f"[Open a prefilled GitHub issue]({share_url}) to contribute your printer's "
-            "calibration results.",
-            title="Printer calibration saved",
-            notification_id=f"escpos_calibration_{self.config_entry.entry_id}",
-        )
+        if self._calib:
+            model = user_input.get("model", "").strip() or _SHARE_LINK_MODEL_PLACEHOLDER
+            share_url = build_share_url(model, await self._calib_results())
+            pn_create(
+                self.hass,
+                f"[Open a prefilled GitHub issue]({share_url}) to contribute your printer's "
+                "calibration results.",
+                title="Printer calibration saved",
+                notification_id=f"escpos_calibration_{self.config_entry.entry_id}",
+            )
 
         return self.async_create_entry(  # type: ignore[attr-defined,no-any-return]
             title="", data=merged

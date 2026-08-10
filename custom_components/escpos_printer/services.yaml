@@ -1642,7 +1642,7 @@ print_barcode:
                   value: "graphics"
                 - label: "Software: Column (legacy POS-58/80)"
                   value: "bitImageColumn"
-                - label: "Software: Raster (Epson)"
+                - label: "Software: Raster (works on most printers)"
                   value: "bitImageRaster"
 
 feed:
