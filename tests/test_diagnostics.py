@@ -144,6 +144,31 @@ async def test_diagnostics_options_dumps_full_options_dict(hass):  # type: ignor
     assert diag["entry"]["options"][CONF_ALLOW_LOCAL_IMAGE_URLS] is True
 
 
+async def test_diagnostics_includes_width_and_impl_fields(hass):  # type: ignore[no-untyped-def]
+    """width_pixels/impl are neither sensitive nor derivable from the
+    other diagnostics fields -- they must be visible for triage."""
+    from custom_components.escpos_printer.const import CONF_IMPL, CONF_WIDTH_PIXELS
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="1.2.3.4:9100",
+        data={CONF_HOST: "1.2.3.4", CONF_PORT: 9100, CONF_WIDTH_PIXELS: 640, CONF_IMPL: "graphics"},
+        unique_id="1.2.3.4:9100",
+    )
+    entry.add_to_hass(hass)
+    with patch("escpos.printer.Network"):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    diag = await async_get_config_entry_diagnostics(hass, entry)
+
+    assert diag["entry"]["data"][CONF_WIDTH_PIXELS] == 640
+    assert diag["entry"]["data"][CONF_IMPL] == "graphics"
+    assert diag["runtime"]["width_pixels"] == 640
+    assert "default_impl" in diag["runtime"]
+    assert "profile_no_image_support" in diag["runtime"]
+
+
 async def test_diagnostics_without_runtime_data(hass):  # type: ignore[no-untyped-def]
     """Diagnostics must work even when runtime_data hasn't been set (e.g. setup failed)."""
     entry = MockConfigEntry(

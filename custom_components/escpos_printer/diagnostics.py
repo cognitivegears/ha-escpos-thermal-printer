@@ -11,6 +11,7 @@ from .const import (
     CONF_BT_MAC,
     CONF_CODEPAGE,
     CONF_CONNECTION_TYPE,
+    CONF_IMPL,
     CONF_IN_EP,
     CONF_LINE_WIDTH,
     CONF_OUT_EP,
@@ -19,6 +20,7 @@ from .const import (
     CONF_RFCOMM_CHANNEL,
     CONF_SERIAL_PORT,
     CONF_VENDOR_ID,
+    CONF_WIDTH_PIXELS,
     CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
     CONNECTION_TYPE_SERIAL,
@@ -84,6 +86,9 @@ async def async_get_config_entry_diagnostics(
             "profile": config.profile,
             "codepage": config.codepage,
             "line_width": config.line_width,
+            "width_pixels": adapter.get_profile_pixel_width(),
+            "default_impl": getattr(adapter, "default_impl", None),
+            "profile_no_image_support": getattr(adapter, "profile_no_image_support", None),
             "keepalive": getattr(adapter, "_keepalive", None),
             "status_interval": getattr(adapter, "_status_interval", None),
         }
@@ -119,6 +124,8 @@ async def async_get_config_entry_diagnostics(
             CONF_CODEPAGE: data.get(CONF_CODEPAGE),
             CONF_PROFILE: data.get(CONF_PROFILE),
             CONF_LINE_WIDTH: data.get(CONF_LINE_WIDTH),
+            CONF_WIDTH_PIXELS: data.get(CONF_WIDTH_PIXELS),
+            CONF_IMPL: data.get(CONF_IMPL),
         }
     elif connection_type == CONNECTION_TYPE_BLUETOOTH:
         entry_data = {
@@ -128,6 +135,8 @@ async def async_get_config_entry_diagnostics(
             CONF_CODEPAGE: data.get(CONF_CODEPAGE),
             CONF_PROFILE: data.get(CONF_PROFILE),
             CONF_LINE_WIDTH: data.get(CONF_LINE_WIDTH),
+            CONF_WIDTH_PIXELS: data.get(CONF_WIDTH_PIXELS),
+            CONF_IMPL: data.get(CONF_IMPL),
         }
     elif connection_type == CONNECTION_TYPE_SERIAL:
         entry_data = {
@@ -137,6 +146,8 @@ async def async_get_config_entry_diagnostics(
             CONF_CODEPAGE: data.get(CONF_CODEPAGE),
             CONF_PROFILE: data.get(CONF_PROFILE),
             CONF_LINE_WIDTH: data.get(CONF_LINE_WIDTH),
+            CONF_WIDTH_PIXELS: data.get(CONF_WIDTH_PIXELS),
+            CONF_IMPL: data.get(CONF_IMPL),
         }
     else:
         entry_data = {
@@ -146,6 +157,8 @@ async def async_get_config_entry_diagnostics(
             CONF_CODEPAGE: data.get(CONF_CODEPAGE),
             CONF_PROFILE: data.get(CONF_PROFILE),
             CONF_LINE_WIDTH: data.get(CONF_LINE_WIDTH),
+            CONF_WIDTH_PIXELS: data.get(CONF_WIDTH_PIXELS),
+            CONF_IMPL: data.get(CONF_IMPL),
         }
 
     payload = {
