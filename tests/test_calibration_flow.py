@@ -203,6 +203,14 @@ async def test_impl_reprint_preserves_checked_selection(hass):  # type: ignore[n
     schema = result2["data_schema"].schema
     impls_key = next(k for k in schema if k.schema == "impls_clean")
     assert impls_key.description == {"suggested_value": ["bitImageColumn"]}
+    # The "reprint" action itself must NOT carry a suggested_value --
+    # otherwise the frontend would pre-select "Reprint the test page"
+    # again, turning a routine Continue click into an accidental
+    # paper-burning reprint loop.
+    action_key = next(k for k in schema if k.schema == "action")
+    assert (
+        action_key.description is None or action_key.description.get("suggested_value") != "reprint"
+    )
 
 
 async def test_impl_all_candidates_failing_shows_print_error(hass):  # type: ignore[no-untyped-def]

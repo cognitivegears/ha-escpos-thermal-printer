@@ -70,19 +70,25 @@ ALIAS_MODELS: dict[str, str] = {
 }
 
 
-def _build_alias_table(models: dict[str, str]) -> dict[str, str]:
-    """Normalize each display name into a full key AND a bare-model key
-    (vendor word stripped), so both "Citizen CT-S601II" and bare
-    "CT-S601II" resolve — the latter matters for the custom-profile field
-    and for USB descriptors that omit the vendor name.
+def _alias_keys(display: str) -> tuple[str, ...]:
+    """Normalize a display name into its full key AND its bare-model key
+    (vendor word stripped) -- e.g. "Citizen CT-S601II" -> ("citizencts601ii",
+    "cts601ii"). Both matter for resolution: the bare key covers the
+    custom-profile field and USB descriptors that omit the vendor name;
+    the bare key is also how real bundled profile keys are normalized, so
+    it's what a collision check must compare against too.
     """
+    _vendor, _sep, rest = display.partition(" ")
+    if not rest:
+        return (normalize_model(display),)
+    return (normalize_model(display), normalize_model(rest))
+
+
+def _build_alias_table(models: dict[str, str]) -> dict[str, str]:
+    """Normalize each display name into its alias keys (see ``_alias_keys``)."""
     table: dict[str, str] = {}
     for display, target in models.items():
-        keys = {normalize_model(display)}
-        _vendor, _sep, rest = display.partition(" ")
-        if rest:
-            keys.add(normalize_model(rest))
-        for key in keys:
+        for key in _alias_keys(display):
             table[key] = target
     return table
 

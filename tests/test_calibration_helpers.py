@@ -47,7 +47,9 @@ def test_width_bar_outline_exact_width_and_label_at_left() -> None:
         # filled bar would use.
         assert img.getpixel((width // 2, 14)) > 192
         # The label (dark text on white) is still visible in the left 80px.
-        left = img.crop((0, 0, 80, 28))
+        # Cropped from x=4 (inside the 3px border) so this actually
+        # requires label pixels, not just the border's own left edge.
+        left = img.crop((4, 4, 80, 24))
         assert left.getextrema()[0] < 64
 
 

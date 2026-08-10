@@ -233,7 +233,11 @@ class CalibrationFlowMixin:
         if user_input is not None:
             # Reprint: keep the boxes the user already checked instead of
             # wiping them back to the schema defaults.
-            schema = self.add_suggested_values_to_schema(schema, user_input)  # type: ignore[attr-defined]
+            # Exclude "action" -- suggesting the previous "reprint" value
+            # would pre-select "Reprint the test page" again, turning one
+            # extra Continue click into an accidental reprint loop.
+            suggested = {k: v for k, v in user_input.items() if k != "action"}
+            schema = self.add_suggested_values_to_schema(schema, suggested)  # type: ignore[attr-defined]
         return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
             step_id="calibrate_impl", data_schema=schema, errors=errors
         )
@@ -285,7 +289,11 @@ class CalibrationFlowMixin:
             }
         )
         if user_input is not None:
-            schema = self.add_suggested_values_to_schema(schema, user_input)  # type: ignore[attr-defined]
+            # Exclude "action" -- suggesting the previous "reprint" value
+            # would pre-select "Reprint the test page" again, turning one
+            # extra Continue click into an accidental reprint loop.
+            suggested = {k: v for k, v in user_input.items() if k != "action"}
+            schema = self.add_suggested_values_to_schema(schema, suggested)  # type: ignore[attr-defined]
         return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
             step_id="calibrate_width", data_schema=schema, errors=errors
         )
@@ -326,7 +334,11 @@ class CalibrationFlowMixin:
             }
         )
         if user_input is not None:
-            schema = self.add_suggested_values_to_schema(schema, user_input)  # type: ignore[attr-defined]
+            # Exclude "action" -- suggesting the previous "reprint" value
+            # would pre-select "Reprint the test page" again, turning one
+            # extra Continue click into an accidental reprint loop.
+            suggested = {k: v for k, v in user_input.items() if k != "action"}
+            schema = self.add_suggested_values_to_schema(schema, suggested)  # type: ignore[attr-defined]
         return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
             step_id="calibrate_ruler", data_schema=schema, errors=errors
         )
@@ -429,7 +441,11 @@ class CalibrationFlowMixin:
             }
         )
         if user_input is not None:
-            schema = self.add_suggested_values_to_schema(schema, user_input)  # type: ignore[attr-defined]
+            # Exclude "action" -- suggesting the previous "reprint" value
+            # would pre-select "Reprint the test page" again, turning one
+            # extra Continue click into an accidental reprint loop.
+            suggested = {k: v for k, v in user_input.items() if k != "action"}
+            schema = self.add_suggested_values_to_schema(schema, suggested)  # type: ignore[attr-defined]
         return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
             step_id="calibrate_codepage",
             data_schema=schema,
