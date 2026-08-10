@@ -182,7 +182,7 @@ async def test_width_continue_with_bar_stores_pixels_then_advances_to_ruler(hass
 
 
 async def test_width_continue_with_none_stores_nothing_then_advances_to_ruler(hass):  # type: ignore[no-untyped-def]
-    """"Not sure / bars unclear" leaves width_pixels unset but still advances."""
+    """ "Not sure / bars unclear" leaves width_pixels unset but still advances."""
     entry, _adapter = _make_entry(hass)
     result = await _open_calibrate(hass, entry)
     result2 = await hass.config_entries.options.async_configure(

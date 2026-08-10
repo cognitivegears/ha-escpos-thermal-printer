@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   without knowing the custom-profile field exists.
 - Per-entry "Image printing implementation" option (Auto/Raster/Column/
   Graphics) with plain-language guidance.
+- Printer calibration wizard (Settings → Configure → "Calibrate printer"):
+  prints guided test pages to dial in image implementation, paper width,
+  columns, and (optionally) codepage, then saves them for the entry — and
+  offers a prefilled GitHub issue link with the full measured support matrix
+  and a draft printer profile for contributing back.
 
 ### Changed
 

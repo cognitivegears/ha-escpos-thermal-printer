@@ -80,13 +80,21 @@ _SHARE_LINK_MODEL_PLACEHOLDER = "YOUR-PRINTER-MODEL"
 
 
 def _read_versions() -> tuple[str, str]:
-    """Integration + python-escpos versions (blocking; run via executor)."""
+    """Integration + python-escpos versions (blocking; run via executor).
+
+    A lookup failure on either package must never crash the summary step;
+    ``build_share_url`` already degrades a missing version to "?".
+    """
     try:
         integration_version = pkg_version("ha-escpos-thermal-printer")
     except PackageNotFoundError:
         manifest_path = Path(__file__).resolve().parent.parent / "manifest.json"
         integration_version = json.loads(manifest_path.read_text())["version"]
-    return integration_version, pkg_version("python-escpos")
+    try:
+        escpos_version = pkg_version("python-escpos")
+    except PackageNotFoundError:
+        escpos_version = "?"
+    return integration_version, escpos_version
 
 
 class CalibrationFlowMixin:
@@ -158,9 +166,7 @@ class CalibrationFlowMixin:
                 if not await self._print_impl_candidates():
                     errors["base"] = "calibration_print_failed"
             except Exception as err:
-                _LOGGER.warning(
-                    "Calibration impl step failed: %s", sanitize_log_message(str(err))
-                )
+                _LOGGER.warning("Calibration impl step failed: %s", sanitize_log_message(str(err)))
                 errors["base"] = "calibration_print_failed"
         else:
             selection = user_input.get("impls_clean", [])
@@ -202,9 +208,7 @@ class CalibrationFlowMixin:
             try:
                 await self._print_width_bars()
             except Exception as err:
-                _LOGGER.warning(
-                    "Calibration width step failed: %s", sanitize_log_message(str(err))
-                )
+                _LOGGER.warning("Calibration width step failed: %s", sanitize_log_message(str(err)))
                 errors["base"] = "calibration_print_failed"
         else:
             choice = user_input.get("first_equal", "none")
@@ -232,9 +236,7 @@ class CalibrationFlowMixin:
                 adapter = self.config_entry.runtime_data.adapter
                 await adapter.print_text(self.hass, text=build_ruler(64), cut="none", feed=1)
             except Exception as err:
-                _LOGGER.warning(
-                    "Calibration ruler step failed: %s", sanitize_log_message(str(err))
-                )
+                _LOGGER.warning("Calibration ruler step failed: %s", sanitize_log_message(str(err)))
                 errors["base"] = "calibration_print_failed"
         else:
             marker = user_input.get("last_marker", 0)
@@ -262,15 +264,11 @@ class CalibrationFlowMixin:
         profile = self.config_entry.options.get(
             CONF_PROFILE, self.config_entry.data.get(CONF_PROFILE)
         )
-        profile_codepages = await self.hass.async_add_executor_job(
-            get_profile_codepages, profile
-        )
+        profile_codepages = await self.hass.async_add_executor_job(get_profile_codepages, profile)
         narrowed = tuple(cp for cp in CODEPAGE_CANDIDATES if cp in profile_codepages)
         return narrowed or CODEPAGE_CANDIDATES
 
-    async def _print_codepage_candidates(
-        self, candidates: tuple[str, ...]
-    ) -> dict[str, int]:
+    async def _print_codepage_candidates(self, candidates: tuple[str, ...]) -> dict[str, int]:
         """Print a labeled sample line per codepage candidate.
 
         Each candidate is attempted independently -- one codepage the
@@ -321,18 +319,14 @@ class CalibrationFlowMixin:
                 selection = user_input.get("codepages_match", [])
                 self._calib_extra["codepages_match"] = selection
                 if selection:
-                    self._calib["codepage"] = next(
-                        cp for cp in candidates if cp in selection
-                    )
+                    self._calib["codepage"] = next(cp for cp in candidates if cp in selection)
             return await self.async_step_calibrate_summary()
 
         choices = {cp: f"Line {n}: {cp}" for cp, n in printed.items()}
         schema = vol.Schema(
             {
                 vol.Optional("codepages_match", default=[]): cv.multi_select(choices),
-                vol.Required("action", default="continue"): vol.In(
-                    _CODEPAGE_ACTION_CHOICES
-                ),
+                vol.Required("action", default="continue"): vol.In(_CODEPAGE_ACTION_CHOICES),
             }
         )
         return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
@@ -374,15 +368,15 @@ class CalibrationFlowMixin:
                 )
 
         model = _SHARE_LINK_MODEL_PLACEHOLDER
+        model_field_default = ""
         if user_input is not None and user_input.get("action") == "refresh_link":
-            model = user_input.get("model", "").strip() or model
+            model_field_default = user_input.get("model", "").strip()
+            model = model_field_default or model
 
         profile = self.config_entry.options.get(
             CONF_PROFILE, self.config_entry.data.get(CONF_PROFILE)
         )
-        integration_version, escpos_version = await self.hass.async_add_executor_job(
-            _read_versions
-        )
+        integration_version, escpos_version = await self.hass.async_add_executor_job(_read_versions)
         results: dict[str, Any] = {
             **self._calib,
             **self._calib_extra,
@@ -394,7 +388,7 @@ class CalibrationFlowMixin:
 
         schema = vol.Schema(
             {
-                vol.Optional("model", default=""): str,
+                vol.Optional("model", default=model_field_default): str,
                 vol.Required("action", default="save"): vol.In(_SUMMARY_ACTION_CHOICES),
             }
         )

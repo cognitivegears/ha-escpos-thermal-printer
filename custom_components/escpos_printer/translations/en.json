@@ -403,7 +403,7 @@
       },
       "calibrate_codepage": {
         "title": "Calibrate: character encoding",
-        "description": "Your printer just printed one numbered line per candidate encoding, each rendering this reference text: \"{sample}\". Compare each printed line to the reference above, character for character, and check every line that matches exactly. Lines with wrong or missing accented characters don't match.",
+        "description": "Your printer just printed one numbered line per candidate encoding, each rendering this reference text: \"{sample}\". Compare each printed line to the reference above, character for character, and check every line that matches exactly. Lines with wrong or missing accented characters don't match. If none match, or you'd rather leave the character encoding unchanged, choose \"Skip this step\".",
         "data": {
           "codepages_match": "Lines that matched the reference exactly",
           "action": "Action"

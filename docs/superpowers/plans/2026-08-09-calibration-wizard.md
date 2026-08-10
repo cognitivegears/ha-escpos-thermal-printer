@@ -26,10 +26,12 @@
 ### Task 1: `calibration.py` — patterns, samples, share URL (pure functions)
 
 **Files:**
+
 - Create: `custom_components/escpos_printer/_config_flow/calibration.py`
 - Test: `tests/test_calibration_helpers.py` (new)
 
 **Interfaces:**
+
 - Consumes: PIL (`PIL.Image`, `PIL.ImageDraw`), stdlib `base64`, `io`, `urllib.parse`.
 - Produces (Tasks 3-5 import all of these by exact name):
   - `WIDTH_CANDIDATES: tuple[int, ...] = (384, 512, 576, 640)`
@@ -285,11 +287,13 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ### Task 2: Options-flow menu (settings / calibrate)
 
 **Files:**
+
 - Modify: `custom_components/escpos_printer/_config_flow/options_flow.py`
 - Modify: `custom_components/escpos_printer/strings.json`, `translations/en.json`
 - Modify (mechanical): `tests/test_options_flow_custom.py`, `tests/test_config_flow_options_and_duplicate.py`, `tests/test_width_override.py` (14 `options.async_init` call sites total)
 
 **Interfaces:**
+
 - Produces: `async_step_init` shows a menu with `menu_options=["settings", "calibrate"]`; the old init logic lives unchanged in `async_step_settings` (its form `step_id` becomes `"settings"`); `async_step_calibrate` exists as a stub that Task 3 replaces (for this task it may simply `return await self.async_step_settings()` with a `# ponytail: Task 3 replaces this` comment — NO, see below: implement it as the mixin entry hook named `async_step_calibrate` raising `NotImplementedError` is forbidden in flows; instead have it abort with reason `"calibration_unavailable"` so the menu is honest until Task 3 lands).
 
 - [ ] **Step 1: Write the failing test**
@@ -336,6 +340,7 @@ Rename the current `async_step_init` body to `async_step_settings` (keep its `# 
 ```
 
 `strings.json` (mirror in `translations/en.json`):
+
 - `options.step.init` becomes `{"menu_options": {"settings": "Printer settings", "calibrate": "Calibrate printer (prints test pages)"}}`.
 - The old `options.step.init` `data`/`data_description` content moves verbatim to `options.step.settings`.
 - Add `options.abort.calibration_unavailable: "Calibration is not available."` (Task 3 removes it.)
@@ -363,15 +368,18 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ### Task 3: Wizard steps — impl + width
 
 **Files:**
+
 - Create: `custom_components/escpos_printer/_config_flow/calibration_steps.py`
 - Modify: `custom_components/escpos_printer/_config_flow/options_flow.py` (mix in; replace the Task-2 `async_step_calibrate` stub)
 - Test: `tests/test_calibration_flow.py` (new)
 
 **Interfaces:**
+
 - Consumes: Task 1 helpers; `self.config_entry.runtime_data.adapter` (the live adapter; `print_image(hass, image=<data URI>, impl=..., cut="none", feed=1, dither="threshold", auto_resize=False)` and `print_text(hass, text=..., cut="none", feed=1)`).
 - Produces: `CalibrationFlowMixin` with `async_step_calibrate` (guard + route to impl step), `async_step_calibrate_impl`, `async_step_calibrate_width`; wizard state dicts `self._calib: dict[str, Any]` (pending option values) and `self._calib_extra: dict[str, Any]` (full multi-select sets, for the share link). Task 4 adds the next steps to the same mixin; Task 5 reads both dicts.
 
 **Design (binding):**
+
 - `async_step_calibrate`: if the entry is not loaded (`self.config_entry.state is not ConfigEntryState.LOADED`) → `async_abort(reason="printer_not_ready")`. Else init `self._calib = {}`, `self._calib_extra = {}` and `return await self.async_step_calibrate_impl()`.
 - Print-on-entry pattern for every wizard step: when `user_input is None` **or** the submitted action is `"reprint"`, run the step's prints inside `try/except Exception` — on failure set `errors["base"] = "calibration_print_failed"` (and log with `sanitize_log_message`); always fall through to `async_show_form`. Only a non-reprint submission advances.
 - impl step prints, per candidate in `IMPL_CANDIDATES` order: `print_text(hass, text=f"TEST {n}", cut="none", feed=0)` then `print_image(hass, image=checkerboard_data_uri(), impl=candidate, cut="none", feed=1, dither="threshold", auto_resize=False)`. A per-candidate print failure prints the text label `f"TEST {n}: FAILED TO SEND"` instead where possible and is treated as "not clean" — do NOT fail the whole step if at least one candidate printed (a printer rejecting `graphics` at the transport level must not brick the wizard).
@@ -395,14 +403,17 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ### Task 4: Wizard steps — ruler + codepage
 
 **Files:**
+
 - Modify: `custom_components/escpos_printer/_config_flow/calibration_steps.py`
 - Modify: `tests/test_calibration_flow.py`
 
 **Interfaces:**
+
 - Consumes: `build_ruler`, `CODEPAGE_CANDIDATES`, `codepage_sample_line`, adapter `print_text(hass, text=..., encoding=..., cut="none", feed=...)`.
 - Produces: `async_step_calibrate_ruler`, `async_step_calibrate_codepage`; width step's continue path now routes to the ruler step (replace the Task-3 abort).
 
 **Design (binding):**
+
 - ruler step prints `print_text(hass, text=build_ruler(64), cut="none", feed=1)` (no encoding — plain ASCII). Form: `vol.Required("last_marker", default=0): vol.All(vol.Coerce(int), vol.Range(min=0, max=96))` + action dropdown (`continue`/`reprint`). `0` = "don't know / skip" (described in strings): leaves `line_width` unchanged; any 16–96 value → `self._calib["line_width"] = value`; values 1–15 are rejected by a form error `invalid_line_width` (add to strings). Route → codepage step.
 - codepage candidates: profile-aware — `get_profile_codepages(profile)` intersected with `CODEPAGE_CANDIDATES` order when a profile is configured and the intersection is non-empty, else `CODEPAGE_CANDIDATES` (compute via executor job; the capabilities load is blocking).
 - codepage step prints, per candidate n: `print_text(hass, text=f"{n}: {codepage_sample_line(cp)}", encoding=cp, cut="none", feed=0)` then a final `feed=2` blank print or feed on the last line. A per-candidate encoding/print failure prints nothing for that line and excludes it from the choices shown (log at debug).
@@ -417,14 +428,17 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ### Task 5: Summary step — merge-save + share link
 
 **Files:**
+
 - Modify: `custom_components/escpos_printer/_config_flow/calibration_steps.py`
 - Modify: `tests/test_calibration_flow.py`
 
 **Interfaces:**
+
 - Consumes: `build_share_url` (Task 1); `CONF_IMPL`, `CONF_WIDTH_PIXELS`, `CONF_LINE_WIDTH`, `CONF_CODEPAGE` from `..const`; `importlib.metadata.version` (executor not required — metadata read is cheap, but do it in the executor anyway alongside the profile lookup to stay obviously safe).
 - Produces: `async_step_calibrate_summary`; codepage/width steps route here (replace Task-4 abort).
 
 **Design (binding):**
+
 - Form: `vol.Optional("model", default="")`: str + `vol.Required("action", default="save"): vol.In({"save": "Save calibration", "discard": "Discard (save nothing)"})`.
 - `description_placeholders`: measured values (or "unchanged") AND `share_url` built from `build_share_url(model or "Unknown printer", results)` — note the URL must reflect the CURRENT form's model field only after submit; for the initial render use the placeholder model "your printer model". Simplest compliant approach: render the share link on the summary description using the results with model "—", and ALSO re-show the summary once after a save-with-model? No — keep it simple and honest: the summary form shows measured values; the share link is rendered in the step description from current results with the model appearing as entered-so-far (initial render: generic). After **save**, show a final `async_show_form(step_id="calibrate_done")`-style… **Decision (binding): two-screen finish.** `calibrate_summary` collects `model` + action; on save it computes merged options, creates the entry via `async_create_entry(title="", data=merged)` — but since options flows END on create_entry, the share link must be ON the summary screen. Therefore: build the share URL at summary render time from `self._calib`/`self._calib_extra` with the model slot filled by the literal text `YOUR-PRINTER-MODEL` (users edit the prefilled issue title/body on GitHub anyway — the link is complete except the model). The `model` form field feeds ONLY the URL regeneration on `action == "refresh_link"` (third action choice, "Update share link with my model") which re-shows the summary with the model-substituted URL. This keeps everything in one flow with no post-save screen.
 - Save: `merged = {**dict(self.config_entry.options)}` then apply `self._calib` mappings (`impl`→CONF_IMPL, `width_pixels`→CONF_WIDTH_PIXELS, `line_width`→CONF_LINE_WIDTH, `codepage`→CONF_CODEPAGE — only keys present in `self._calib`); `return self.async_create_entry(title="", data=merged)`. Discard: `return self.async_abort(reason="calibration_discarded")` (add abort string).
@@ -438,6 +452,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ### Task 6: Copy polish, changelog, full validation
 
 **Files:**
+
 - Modify: `custom_components/escpos_printer/strings.json`, `translations/en.json` (read every wizard step's copy end-to-end for coherence; ensure each step description says what the printer should have just printed)
 - Modify: `CHANGELOG.md`
 

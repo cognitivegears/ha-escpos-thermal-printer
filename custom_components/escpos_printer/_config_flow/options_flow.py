@@ -100,9 +100,7 @@ class EscposOptionsFlowHandler(CalibrationFlowMixin, config_entries.OptionsFlowW
         self._calib_extra: dict[str, Any] = {}
         super().__init__()
 
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Entry menu: regular settings or the calibration wizard."""
         return self.async_show_menu(step_id="init", menu_options=["settings", "calibrate"])
 
