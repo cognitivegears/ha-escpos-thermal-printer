@@ -537,6 +537,29 @@ def test_image_services_share_common_field_metadata() -> None:
     )
 
 
+def test_no_stale_raster_epson_only_label() -> None:
+    """Raster works on most printers, not just Epson -- the presets-era label was stale."""
+    services = _load_services_yaml()
+    for svc, svc_def in services.items():
+        for field_name, (_section, fdef) in _flatten_fields(svc_def).items():
+            options = ((fdef.get("selector") or {}).get("select") or {}).get("options") or []
+            for opt in options:
+                if isinstance(opt, dict):
+                    assert opt.get("label") != "Raster (default — Epson)", (
+                        f"{svc}.{field_name} still has the stale Epson-only Raster label"
+                    )
+
+
+def test_print_message_image_impl_description_matches_image_services_wording() -> None:
+    """print_message.image_impl's description no longer references a Reliability profile."""
+    services = _load_services_yaml()
+    desc = services["print_message"]["fields"]["advanced_options"]["fields"]["image_impl"][
+        "description"
+    ]
+    assert "Leave unset to follow the printer profile" in desc
+    assert "Reliability profile" not in desc
+
+
 def test_image_services_no_truncated_descriptions() -> None:
     """Regression guard for unquoted YAML descriptions containing `#`."""
     services = _load_services_yaml()

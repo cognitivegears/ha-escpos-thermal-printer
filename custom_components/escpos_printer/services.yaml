@@ -474,7 +474,7 @@ print_image:
           selector:
             select:
               options:
-                - label: Raster (default — Epson)
+                - label: Raster — works on most printers
                   value: bitImageRaster
                 - label: Graphics (newer ESC/POS)
                   value: graphics
@@ -671,7 +671,7 @@ print_image_url:
           selector:
             select:
               options:
-                - label: Raster (default — Epson)
+                - label: Raster — works on most printers
                   value: bitImageRaster
                 - label: Graphics (newer ESC/POS)
                   value: graphics
@@ -870,7 +870,7 @@ print_image_path:
           selector:
             select:
               options:
-                - label: Raster (default — Epson)
+                - label: Raster — works on most printers
                   value: bitImageRaster
                 - label: Graphics (newer ESC/POS)
                   value: graphics
@@ -1068,7 +1068,7 @@ print_camera_snapshot:
           selector:
             select:
               options:
-                - label: Raster (default — Epson)
+                - label: Raster — works on most printers
                   value: bitImageRaster
                 - label: Graphics (newer ESC/POS)
                   value: graphics
@@ -1266,7 +1266,7 @@ print_image_entity:
           selector:
             select:
               options:
-                - label: Raster (default — Epson)
+                - label: Raster — works on most printers
                   value: bitImageRaster
                 - label: Graphics (newer ESC/POS)
                   value: graphics
@@ -1980,12 +1980,12 @@ print_message:
         image_impl:
           name: Image Implementation
           description: >
-            ESC/POS image command (see print_image). Leave unset to honor the
-            printer's Reliability profile.
+            ESC/POS image command (see print_image). Leave unset to follow
+            the printer profile.
           selector:
             select:
               options:
-                - label: "Raster (default — Epson)"
+                - label: "Raster — works on most printers"
                   value: "bitImageRaster"
                 - label: "Graphics (newer ESC/POS)"
                   value: "graphics"
@@ -2407,7 +2407,7 @@ print_text_image:
           selector:
             select:
               options:
-                - label: "Raster (default — Epson)"
+                - label: "Raster — works on most printers"
                   value: "bitImageRaster"
                 - label: "Graphics (newer ESC/POS)"
                   value: "graphics"
