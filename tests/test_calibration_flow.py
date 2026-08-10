@@ -15,6 +15,7 @@ from custom_components.escpos_printer.capabilities.loader import _get_capabiliti
 from custom_components.escpos_printer.const import (
     CONF_CODEPAGE,
     CONF_CONNECTION_TYPE,
+    CONF_DETECTED_MODEL,
     CONF_IMPL,
     CONF_LINE_WIDTH,
     CONF_PROFILE,
@@ -60,17 +61,20 @@ def test_codepage_candidates_are_real_encodings():
 
 
 def _make_entry(
-    hass, *, loaded: bool = True, options: dict | None = None
+    hass, *, loaded: bool = True, options: dict | None = None, data_extra: dict | None = None
 ) -> tuple[MockConfigEntry, MagicMock]:
     """A MockConfigEntry with a mock adapter wired onto runtime_data."""
+    data = {
+        CONF_HOST: "1.2.3.4",
+        CONF_PORT: 9100,
+        CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK,
+    }
+    if data_extra:
+        data.update(data_extra)
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="1.2.3.4:9100",
-        data={
-            CONF_HOST: "1.2.3.4",
-            CONF_PORT: 9100,
-            CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK,
-        },
+        data=data,
         options=options or {},
         unique_id="1.2.3.4:9100",
     )
@@ -824,3 +828,13 @@ async def test_save_abort_screen_carries_personalized_share_url(hass, monkeypatc
     share_url = result2["description_placeholders"]["share_url"]
     assert "Rongta%20RP850P" in share_url
     assert "576" in share_url
+
+
+async def test_calibrate_summary_prefills_detected_model(hass):  # type: ignore[no-untyped-def]
+    """The share-link model field defaults to entry.data's detected model."""
+    entry, _adapter = _make_entry(hass, data_extra={CONF_DETECTED_MODEL: "TM-T20II"})
+    result = await _advance_to_summary(hass, entry)
+
+    schema = result["data_schema"].schema
+    model_key = next(k for k in schema if k.schema == "model")
+    assert model_key.default() == "TM-T20II"

@@ -21,6 +21,11 @@ CONF_WIDTH_PIXELS = "width_pixels"  # per-entry image width override (overrides 
 # SSRF proxy; cloud-metadata / link-local ranges stay blocked even when on.
 CONF_ALLOW_LOCAL_IMAGE_URLS = "allow_local_image_urls"
 
+# Best-effort GS I identification captured during config flow (network
+# printers only). Absent when the printer didn't answer.
+CONF_DETECTED_MANUFACTURER = "detected_manufacturer"
+CONF_DETECTED_MODEL = "detected_model"
+
 # Connection type configuration
 CONF_CONNECTION_TYPE = "connection_type"
 CONNECTION_TYPE_NETWORK = "network"

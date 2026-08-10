@@ -830,6 +830,10 @@ class TestUsbYamlImport:
                 "custom_components.escpos_printer._config_flow.network_steps._can_connect",
                 return_value=True,
             ),
+            patch(
+                "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+                return_value=None,
+            ),
             patch.object(flow, "async_set_unique_id", return_value=None),
             patch.object(flow, "_abort_if_unique_id_configured"),
         ):

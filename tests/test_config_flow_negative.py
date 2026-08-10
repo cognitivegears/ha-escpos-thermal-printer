@@ -12,9 +12,15 @@ from custom_components.escpos_printer.const import (
 
 async def test_config_flow_cannot_connect(hass):  # type: ignore[no-untyped-def]
     """Test config flow with connection failure shows error."""
-    with patch(
-        "custom_components.escpos_printer._config_flow.network_steps._can_connect",
-        return_value=False,
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=False,
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
     ):
         # Step 1: Connection type selection
         result = await hass.config_entries.flow.async_init(

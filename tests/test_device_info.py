@@ -6,6 +6,8 @@ from typing import Any
 
 from custom_components.escpos_printer.const import (
     CONF_CONNECTION_TYPE,
+    CONF_DETECTED_MANUFACTURER,
+    CONF_DETECTED_MODEL,
     CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
     CONNECTION_TYPE_SERIAL,
@@ -93,3 +95,23 @@ def test_non_usb_transports_never_get_serial_number() -> None:
     )
     info = build_device_info(entry)  # type: ignore[arg-type]
     assert "serial_number" not in info
+
+
+def test_device_info_prefers_detected_fields() -> None:
+    entry = _FakeEntry(
+        data={
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK,
+            CONF_DETECTED_MANUFACTURER: "EPSON",
+            CONF_DETECTED_MODEL: "TM-T20II",
+        }
+    )
+    info = build_device_info(entry)  # type: ignore[arg-type]
+    assert info["manufacturer"] == "EPSON"
+    assert info["model"] == "TM-T20II"
+
+
+def test_device_info_falls_back_without_detected_fields() -> None:
+    entry = _FakeEntry(data={CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK})
+    info = build_device_info(entry)  # type: ignore[arg-type]
+    assert info["manufacturer"] == "ESC/POS"
+    assert info["model"] == "Network Printer"

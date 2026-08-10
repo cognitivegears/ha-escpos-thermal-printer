@@ -100,11 +100,10 @@ skips straight to the summary.
 
 ### 5. Summary — save or discard
 
-The final step lists everything measured so far and builds a **share
-link**: a prefilled GitHub issue containing your measured results and a
-draft `escpos-printer-db` profile entry. Enter your printer's model name
-and choose **Update share link with my model** to personalize it, or
-leave it as-is.
+The final step lists everything measured so far and offers an optional
+**model** field, prefilled with the detected model when the printer
+answered the setup/reconfigure identity query (ESC/POS `GS I`) — clear
+or edit it if you'd rather not include it.
 
 Choose one:
 
@@ -114,11 +113,13 @@ Choose one:
 - **Discard (save nothing)** — closes the wizard without changing
   anything.
 
-Saving closes the wizard, which takes the on-screen share link with it. If
-at least one setting was measured, a persistent notification carrying the
-same link is posted so you can still find it afterwards. A run where every
-step was skipped or left unmeasured saves nothing and posts no
-notification.
+Saving builds the **share link** — a prefilled GitHub issue containing
+your measured results, the model (if entered), and a draft
+`escpos-printer-db` profile entry — and shows it on the post-save
+confirmation screen. If at least one setting was measured, a persistent
+notification carrying the same link is posted so you can still find it
+afterwards. A run where every step was skipped or left unmeasured saves
+nothing and posts no notification.
 
 ### Contributing your results
 

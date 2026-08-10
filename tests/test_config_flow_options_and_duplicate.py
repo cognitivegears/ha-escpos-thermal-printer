@@ -150,9 +150,15 @@ async def test_duplicate_unique_id_aborts(hass):  # type: ignore[no-untyped-def]
     entry.add_to_hass(hass)
 
     # Start new flow with same host/port
-    with patch(
-        "custom_components.escpos_printer._config_flow.network_steps._can_connect",
-        return_value=True,
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=True,
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
     ):
         # Step 1: Connection type selection
         result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})

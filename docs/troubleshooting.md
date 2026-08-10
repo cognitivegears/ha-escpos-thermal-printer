@@ -28,6 +28,24 @@ DHCP lease churn or sleep mode. Assign a static IP, disable sleep, optionally en
 
 Another app is using the printer, or it's in an error state (paper out, cover open). Power-cycle.
 
+### Printer not auto-discovered
+
+Discovery only matches DHCP hostnames starting with `tm-` (Epson TM-series)
+or `rongta_` (Rongta). Other brands and clones aren't matched: add them
+manually by IP address instead. `tm-*` hostnames also have to answer an
+ESC/POS `GS I` identity query before the discovery card appears, so an
+Epson printer with that query disabled won't show up either. Disabled
+hostname broadcast on the printer, or the printer sitting on a separate
+VLAN/subnet from Home Assistant, also prevents discovery: DHCP snooping is
+LAN-local and can't cross those boundaries.
+
+### Device page shows "ESC/POS / Network Printer" instead of my model
+
+The printer didn't answer the `GS I` identity query at setup (or
+reconfigure) time. Most non-Epson clones don't implement it. This is
+harmless: identification is cosmetic and every printing feature still
+works. Epson owners can retry via **Reconfigure**.
+
 ## USB issues
 
 ### "Permission denied" / "Access denied"

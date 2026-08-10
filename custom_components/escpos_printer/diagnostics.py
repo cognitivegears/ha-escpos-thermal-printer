@@ -11,6 +11,8 @@ from .const import (
     CONF_BT_MAC,
     CONF_CODEPAGE,
     CONF_CONNECTION_TYPE,
+    CONF_DETECTED_MANUFACTURER,
+    CONF_DETECTED_MODEL,
     CONF_IMPL,
     CONF_IN_EP,
     CONF_LINE_WIDTH,
@@ -159,6 +161,8 @@ async def async_get_config_entry_diagnostics(
             CONF_LINE_WIDTH: data.get(CONF_LINE_WIDTH),
             CONF_WIDTH_PIXELS: data.get(CONF_WIDTH_PIXELS),
             CONF_IMPL: data.get(CONF_IMPL),
+            CONF_DETECTED_MANUFACTURER: data.get(CONF_DETECTED_MANUFACTURER),
+            CONF_DETECTED_MODEL: data.get(CONF_DETECTED_MODEL),
         }
 
     payload = {

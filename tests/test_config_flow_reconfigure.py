@@ -13,6 +13,8 @@ from custom_components.escpos_printer.const import (
     CONF_CONNECTION_TYPE,
     CONF_DEFAULT_ALIGN,
     CONF_DEFAULT_CUT,
+    CONF_DETECTED_MANUFACTURER,
+    CONF_DETECTED_MODEL,
     CONF_IN_EP,
     CONF_LINE_WIDTH,
     CONF_OUT_EP,
@@ -111,6 +113,10 @@ async def test_reconfigure_network_happy_path(hass):  # type: ignore[no-untyped-
             "custom_components.escpos_printer._config_flow.network_steps._can_connect",
             return_value=True,
         ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
         patch("custom_components.escpos_printer.async_setup_entry", return_value=True),
     ):
         result = await entry.start_reconfigure_flow(hass)
@@ -156,6 +162,10 @@ async def test_reconfigure_network_preserves_manual_rename(hass):  # type: ignor
             "custom_components.escpos_printer._config_flow.network_steps._can_connect",
             return_value=True,
         ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
         patch("custom_components.escpos_printer.async_setup_entry", return_value=True),
     ):
         result = await entry.start_reconfigure_flow(hass)
@@ -174,6 +184,131 @@ async def test_reconfigure_network_preserves_manual_rename(hass):  # type: ignor
     assert updated.title == "Front Counter Printer"  # untouched
 
 
+async def test_reconfigure_network_detected_fields_replace_on_requery(hass):  # type: ignore[no-untyped-def]
+    """A fresh GS I result on reconfigure REPLACES prior detected state.
+
+    Reconfigure may point the entry at a different printer, so a detected
+    manufacturer/model must overwrite when present and be removed (not just
+    left stale) when the fresh query comes back empty.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="1.2.3.4:9100",
+        data={
+            CONF_HOST: "1.2.3.4",
+            CONF_PORT: 9100,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK,
+        },
+        unique_id="1.2.3.4:9100",
+    )
+    entry.add_to_hass(hass)
+    entry_id = entry.entry_id
+
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=True,
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value={"manufacturer": "EPSON", "model": "TM-T20II"},
+        ),
+        patch("custom_components.escpos_printer.async_setup_entry", return_value=True),
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_HOST: "5.6.7.8", CONF_PORT: 9100},
+        )
+        await hass.async_block_till_done()
+
+    assert result2["type"] == "abort"
+    assert result2["reason"] == "reconfigure_successful"
+
+    updated = hass.config_entries.async_get_entry(entry_id)
+    assert updated is not None
+    assert updated.data[CONF_DETECTED_MANUFACTURER] == "EPSON"
+    assert updated.data[CONF_DETECTED_MODEL] == "TM-T20II"
+
+    # Reconfigure again onto a printer that doesn't answer GS I -- the
+    # previous printer's detected fields must be removed, not kept stale.
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=True,
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
+        patch("custom_components.escpos_printer.async_setup_entry", return_value=True),
+    ):
+        result3 = await entry.start_reconfigure_flow(hass)
+        result4 = await hass.config_entries.flow.async_configure(
+            result3["flow_id"],
+            {CONF_HOST: "9.9.9.9", CONF_PORT: 9100},
+        )
+        await hass.async_block_till_done()
+
+    assert result4["type"] == "abort"
+    assert result4["reason"] == "reconfigure_successful"
+
+    updated2 = hass.config_entries.async_get_entry(entry_id)
+    assert updated2 is not None
+    assert CONF_DETECTED_MANUFACTURER not in updated2.data
+    assert CONF_DETECTED_MODEL not in updated2.data
+
+
+async def test_reconfigure_network_detected_fields_survive_transient_requery_failure(
+    hass,
+):  # type: ignore[no-untyped-def]
+    """Reconfiguring only the timeout (same host/port) while the printer is
+    busy (query returns None) must not destroy a good prior detection."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="1.2.3.4:9100",
+        data={
+            CONF_HOST: "1.2.3.4",
+            CONF_PORT: 9100,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK,
+            CONF_DETECTED_MANUFACTURER: "EPSON",
+            CONF_DETECTED_MODEL: "TM-T20II",
+        },
+        unique_id="1.2.3.4:9100",
+    )
+    entry.add_to_hass(hass)
+    entry_id = entry.entry_id
+
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=True,
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
+        patch("custom_components.escpos_printer.async_setup_entry", return_value=True),
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_HOST: "1.2.3.4", CONF_PORT: 9100, CONF_TIMEOUT: 8.0},
+        )
+        await hass.async_block_till_done()
+
+    assert result2["type"] == "abort"
+    assert result2["reason"] == "reconfigure_successful"
+
+    updated = hass.config_entries.async_get_entry(entry_id)
+    assert updated is not None
+    assert updated.data[CONF_TIMEOUT] == 8.0
+    assert updated.data[CONF_DETECTED_MANUFACTURER] == "EPSON"
+    assert updated.data[CONF_DETECTED_MODEL] == "TM-T20II"
+
+
 async def test_reconfigure_network_cannot_connect(hass):  # type: ignore[no-untyped-def]
     """A failed connection probe re-renders the form with cannot_connect and leaves the entry alone."""
     entry = MockConfigEntry(
@@ -189,9 +324,15 @@ async def test_reconfigure_network_cannot_connect(hass):  # type: ignore[no-unty
     )
     entry.add_to_hass(hass)
 
-    with patch(
-        "custom_components.escpos_printer._config_flow.network_steps._can_connect",
-        return_value=False,
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=False,
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
     ):
         result = await entry.start_reconfigure_flow(hass)
         result2 = await hass.config_entries.flow.async_configure(
@@ -608,10 +749,16 @@ async def test_reconfigure_network_case_insensitive_collision_aborts(hass):  # t
     entry.add_to_hass(hass)
     entry_id = entry.entry_id
 
-    with patch(
-        "custom_components.escpos_printer._config_flow.network_steps._can_connect",
-        return_value=True,
-    ) as mock_connect:
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=True,
+        ) as mock_connect,
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
+    ):
         result = await entry.start_reconfigure_flow(hass)
         assert result["step_id"] == "reconfigure_network"
 

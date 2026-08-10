@@ -5,6 +5,10 @@
     "@cognitivegears"
   ],
   "config_flow": true,
+  "dhcp": [
+    { "hostname": "tm-*" },
+    { "hostname": "rongta_*" }
+  ],
   "documentation": "https://github.com/cognitivegears/ha-escpos-thermal-printer#readme",
   "integration_type": "service",
   "iot_class": "local_polling",

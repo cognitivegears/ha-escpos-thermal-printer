@@ -19,6 +19,7 @@ from ..const import (
     DOMAIN,
 )
 from .bluetooth_steps import BluetoothFlowMixin
+from .discovery_steps import DiscoveryFlowMixin
 from .import_steps import ImportFlowMixin
 from .network_steps import NetworkFlowMixin
 from .serial_steps import SerialFlowMixin
@@ -30,6 +31,7 @@ _LOGGER = logging.getLogger(__name__)
 
 class EscposConfigFlow(
     NetworkFlowMixin,
+    DiscoveryFlowMixin,
     UsbFlowMixin,
     BluetoothFlowMixin,
     SerialFlowMixin,
@@ -46,6 +48,9 @@ class EscposConfigFlow(
     def __init__(self) -> None:
         """Initialize config flow."""
         self._user_data: dict[str, Any] = {}
+        self._detected: dict[str, str] = {}
+        self._discovery_host: str | None = None
+        self._discovery_port: int | None = None
         self._discovered_printers: list[dict[str, Any]] = []
         self._all_usb_devices: list[dict[str, Any]] = []
         self._paired_bt_devices: list[dict[str, Any]] = []

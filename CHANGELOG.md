@@ -12,6 +12,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Adding a printer without a real profile ("Generic (no profile)" or the
   generic `default` profile) now shows a tip on the success screen
   pointing at the calibration wizard (Configure → Calibrate printer).
+- Network printers are identified at setup via ESC/POS `GS I` queries: the
+  device page shows the real manufacturer/model (e.g. EPSON TM-T20II), the
+  calibration share link prefills the model name, and the detected
+  manufacturer/model are included in diagnostics downloads. Printers that
+  don't answer (most clones) behave exactly as before. Existing network
+  printer entries pick up the detected model the next time they are
+  reconfigured.
+- DHCP discovery for network thermal printers: Home Assistant now offers to
+  set up Epson TM-series (`tm-*`) and Rongta (`rongta_*`) printers it sees
+  join the network. Candidates are probed on port 9100 first, so matches
+  that aren't printers are ignored silently; `tm-*` hostnames additionally
+  require a real `GS I` answer, since port 9100 is also Prometheus
+  node_exporter's default. Discovered setups preselect
+  the matching printer profile when one is known.
 
 ### Changed
 
@@ -19,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   with my model" action is gone. Enter the model (optional), Save or
   Discard — the personalized GitHub share link now appears on the
   final confirmation screen after saving (and still in a notification).
+- Calibration test pages feed two extra blank lines after each test, so
+  the results clear the tear bar without a manual feed.
 
 ### Fixed
 

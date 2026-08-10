@@ -1,6 +1,7 @@
 {
   "title": "ESC/POS Thermal Printer",
   "config": {
+    "flow_title": "{name}",
     "step": {
       "user": {
         "title": "Connection Type",
@@ -316,6 +317,7 @@
     "abort": {
       "already_configured": "This printer is already configured.",
       "already_in_progress": "Configuration flow is already in progress.",
+      "cannot_connect": "The discovered device is not accepting printer connections.",
       "invalid_discovery_info": "Invalid USB discovery information.",
       "invalid_usb_device": "Invalid USB device configuration. Vendor ID and Product ID are required.",
       "unique_id_mismatch": "This connection detail belongs to a different printer than the one being reconfigured. Remove and re-add the integration if you want to switch to a different physical printer.",
