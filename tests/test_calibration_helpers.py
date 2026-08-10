@@ -38,19 +38,22 @@ def test_width_candidates_include_832() -> None:
 def test_width_bar_outline_exact_width_and_label_at_left() -> None:
     for width in WIDTH_CANDIDATES:
         img = _decode_data_uri(width_bar_data_uri(width)).convert("L")
-        assert img.size == (width, 28)
+        assert img.size == (width, 44)
         # The border is still black at the far right edge -- clipping
         # there is what a too-narrow printer's bars still detect.
-        assert img.getpixel((width - 1, 14)) < 64
+        assert img.getpixel((width - 1, 22)) < 64
         # Interior (away from the border and the label) is mostly white
         # now -- a fraction of the ink (and print-head heat) a solid
         # filled bar would use.
-        assert img.getpixel((width // 2, 14)) > 192
-        # The label (dark text on white) is still visible in the left 80px.
-        # Cropped from x=4 (inside the 3px border) so this actually
-        # requires label pixels, not just the border's own left edge.
-        left = img.crop((4, 4, 80, 24))
-        assert left.getextrema()[0] < 64
+        assert img.getpixel((width // 2, 22)) > 192
+        # The label must be READABLE on paper, not just present: the old
+        # ~11px bitmap default font printed at ~1.4mm and regressing to it
+        # leaves only ~50 dark pixels in this crop. A 30px scalable font
+        # leaves several hundred. Cropped from x=4 (inside the 3px border)
+        # so the border's own edge can't satisfy the assertion.
+        label = img.crop((4, 4, 110, 40))
+        dark = sum(count for value, count in enumerate(label.histogram()) if value < 64)
+        assert dark > 150, f"label too small/faint for {width}px bar ({dark} dark px)"
 
 
 def test_ruler_layout() -> None:

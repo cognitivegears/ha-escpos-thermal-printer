@@ -58,6 +58,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   (kinder to the print head on battery-powered Bluetooth printers).
 
 ### Fixed
+- Calibration width bars: the size label inside each bar was printed with an
+  ~11px bitmap font (about 1.4mm on paper — unreadable); bars are now taller
+  with a 30px label.
 - Calibration wizard test labels ("TEST 1/2/3") and codepage sample lines now
   end with a newline — without it, ESC/POS printers never flushed the text
   buffer, so raster printers dropped the label and column printers merged it
