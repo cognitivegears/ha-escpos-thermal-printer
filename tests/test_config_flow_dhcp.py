@@ -252,10 +252,56 @@ async def test_dhcp_discovery_edited_host_does_not_persist_mac(hass):
 
 
 async def test_dhcp_discovery_known_mac_new_ip_updates_existing_entry(hass):
-    """A DHCP lease change (same MAC, new IP) updates the existing entry in place."""
+    """A DHCP lease change (same MAC, new IP) updates the existing entry in place.
+
+    The entry's auto-generated title (matching its old "host:port") follows
+    the relocation, and the reload actually fires.
+    """
     mac = format_mac(DISCOVERY.macaddress)
     entry = MockConfigEntry(
         domain=DOMAIN,
+        title="192.168.10.157:9100",
+        unique_id="192.168.10.157:9100",
+        data={
+            "connection_type": "network",
+            "host": "192.168.10.157",
+            "port": 9100,
+            CONF_MAC_ADDRESS: mac,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.escpos_printer.async_setup_entry", return_value=True
+    ) as mock_setup:
+        result = await _start_dhcp_flow(
+            hass,
+            discovery=DhcpServiceInfo(
+                ip="192.168.10.200",
+                hostname="TM-T20II-628E52",
+                macaddress=DISCOVERY.macaddress,
+            ),
+        )
+        await hass.async_block_till_done()
+
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    assert len(hass.config_entries.async_entries(DOMAIN)) == 1
+    mock_setup.assert_called_once()  # reload actually fired
+
+    updated = hass.config_entries.async_get_entry(entry.entry_id)
+    assert updated is not None
+    assert updated.data["host"] == "192.168.10.200"
+    assert updated.unique_id == "192.168.10.200:9100"
+    assert updated.title == "192.168.10.200:9100"  # auto-generated title follows
+
+
+async def test_dhcp_discovery_known_mac_new_ip_preserves_manual_rename(hass):
+    """A relocation must never clobber a user-renamed title."""
+    mac = format_mac(DISCOVERY.macaddress)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Front Counter Printer",  # manually renamed, not "host:port"
         unique_id="192.168.10.157:9100",
         data={
             "connection_type": "network",
@@ -278,13 +324,41 @@ async def test_dhcp_discovery_known_mac_new_ip_updates_existing_entry(hass):
         await hass.async_block_till_done()
 
     assert result["type"] == FlowResultType.ABORT
-    assert result["reason"] == "already_configured"
-    assert len(hass.config_entries.async_entries(DOMAIN)) == 1
-
     updated = hass.config_entries.async_get_entry(entry.entry_id)
     assert updated is not None
-    assert updated.data["host"] == "192.168.10.200"
-    assert updated.unique_id == "192.168.10.200:9100"
+    assert updated.title == "Front Counter Printer"  # untouched
+
+
+async def test_dhcp_discovery_known_mac_new_ip_keeps_entry_port(hass):
+    """Relocation uses the entry's STORED port, not DEFAULT_PORT."""
+    mac = format_mac(DISCOVERY.macaddress)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="192.168.10.157:9101",
+        data={
+            "connection_type": "network",
+            "host": "192.168.10.157",
+            "port": 9101,
+            CONF_MAC_ADDRESS: mac,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    with patch("custom_components.escpos_printer.async_setup_entry", return_value=True):
+        result = await _start_dhcp_flow(
+            hass,
+            discovery=DhcpServiceInfo(
+                ip="192.168.10.200",
+                hostname="TM-T20II-628E52",
+                macaddress=DISCOVERY.macaddress,
+            ),
+        )
+        await hass.async_block_till_done()
+
+    assert result["type"] == FlowResultType.ABORT
+    updated = hass.config_entries.async_get_entry(entry.entry_id)
+    assert updated is not None
+    assert updated.unique_id == "192.168.10.200:9101"
 
 
 async def test_dhcp_discovery_known_mac_new_ip_collision_skips_update(hass):
@@ -320,7 +394,9 @@ async def test_dhcp_discovery_known_mac_new_ip_collision_skips_update(hass):
 
     assert result["type"] == FlowResultType.ABORT
     assert result["reason"] == "already_configured"
-    assert hass.config_entries.async_get_entry(tracked.entry_id).data["host"] == "192.168.10.157"
+    tracked_updated = hass.config_entries.async_get_entry(tracked.entry_id)
+    assert tracked_updated.data["host"] == "192.168.10.157"
+    assert tracked_updated.unique_id == "192.168.10.157:9100"  # untouched
     assert len(hass.config_entries.async_entries(DOMAIN)) == 2
 
 
@@ -344,6 +420,26 @@ async def test_dhcp_discovery_known_mac_same_ip_normal_abort(hass):
 
     assert result["type"] == FlowResultType.ABORT
     assert result["reason"] == "already_configured"
+
+
+async def test_dhcp_discovery_matched_entry_without_mac_adopts_it(hass):
+    """An already-configured entry at the discovered IP that has no stored MAC
+    yet adopts it -- pre-existing and manually-created entries gain lease
+    tracking the first time discovery sees them."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="192.168.10.157:9100",
+        data={"connection_type": "network", "host": "192.168.10.157", "port": 9100},
+    )
+    entry.add_to_hass(hass)
+
+    result = await _start_dhcp_flow(hass)
+
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    updated = hass.config_entries.async_get_entry(entry.entry_id)
+    assert updated is not None
+    assert updated.data[CONF_MAC_ADDRESS] == format_mac(DISCOVERY.macaddress)
 
 
 async def test_dhcp_discovery_duplicate_in_progress_aborts(hass):

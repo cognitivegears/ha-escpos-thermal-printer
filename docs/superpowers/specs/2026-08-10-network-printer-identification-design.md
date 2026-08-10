@@ -158,6 +158,15 @@ Reconfigure that changes the address clears the stored MAC, mirroring the
 detected-identity clearing rule: an address edit may repoint the entry at
 different hardware the MAC no longer describes.
 
+Two review-driven extensions: (1) relocation follows the auto-generated
+`host:port` title (a user rename is never clobbered), so the reconfigure
+title heuristic keeps working afterwards; (2) when discovery matches an
+already-configured entry at its current IP, the entry adopts the discovered
+MAC (`_abort_if_unique_id_configured(updates=...)`) — pre-existing and
+manually-created entries gain lease tracking the first time discovery sees
+them. The stored MAC is also surfaced as a device-registry network
+connection.
+
 ## Strings & docs
 
 - `strings.json` + `translations/en.json`: discovery step title/description

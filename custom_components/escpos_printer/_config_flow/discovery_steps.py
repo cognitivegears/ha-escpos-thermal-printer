@@ -15,6 +15,7 @@ from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
+from homeassistant.helpers.typing import UNDEFINED, UndefinedType
 
 from ..const import CONF_MAC_ADDRESS, DEFAULT_PORT, DEFAULT_TIMEOUT, DOMAIN
 from .network_helpers import _can_connect, query_printer_id
@@ -64,14 +65,27 @@ class DiscoveryFlowMixin:
             )
             if colliding is not None and colliding.entry_id != entry.entry_id:
                 break  # unique_id already owned by a different entry
+            # Only follow the address to a new auto-generated title -- a
+            # user's manual rename must never be clobbered (same heuristic
+            # as network_steps.async_step_reconfigure_network).
+            title: str | UndefinedType = UNDEFINED
+            if entry.title == f"{entry.data.get(CONF_HOST)}:{entry_port}":
+                title = f"{host}:{entry_port}"
             self.hass.config_entries.async_update_entry(
-                entry, data={**entry.data, CONF_HOST: host}, unique_id=new_unique_id
+                entry, data={**entry.data, CONF_HOST: host}, unique_id=new_unique_id, title=title
             )
             self.hass.config_entries.async_schedule_reload(entry.entry_id)
             return self.async_abort(reason="already_configured")  # type: ignore[attr-defined,no-any-return]
 
         await self.async_set_unique_id(f"{host.lower()}:{DEFAULT_PORT}")  # type: ignore[attr-defined]
-        self._abort_if_unique_id_configured()  # type: ignore[attr-defined]
+        # When discovery matches an already-configured entry at its current
+        # IP, fold the (possibly new) MAC into it -- pre-existing and
+        # manually-created entries gain lease tracking the first time
+        # discovery sees them. Reload only fires on an actual data change.
+        if mac:
+            self._abort_if_unique_id_configured(updates={CONF_MAC_ADDRESS: mac})  # type: ignore[attr-defined]
+        else:
+            self._abort_if_unique_id_configured()  # type: ignore[attr-defined]
 
         if not await self.hass.async_add_executor_job(
             _can_connect, host, DEFAULT_PORT, DEFAULT_TIMEOUT
