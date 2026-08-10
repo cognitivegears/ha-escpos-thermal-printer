@@ -322,7 +322,7 @@
       "reconfigure_successful": "Printer connection updated successfully."
     },
     "create_entry": {
-      "generic_profile": "Printer added with generic defaults (no profile selected). If prints come out wrong — wrong width, garbled images, odd characters — open the printer's entry in Settings > Devices & services, select **Configure**, then **Calibrate printer** to measure the correct settings on paper."
+      "generic_profile": "Printer added with generic defaults (no profile selected). If prints come out wrong, such as wrong width, garbled images, or odd characters, open the printer's entry in Settings > Devices & services, select **Configure**, then **Calibrate printer** to measure the correct settings on paper."
     }
   },
   "options": {
