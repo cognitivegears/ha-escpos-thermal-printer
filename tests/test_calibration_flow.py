@@ -142,6 +142,10 @@ async def test_impl_continue_stores_choice_and_advances_to_width(hass):  # type:
     width_calls = adapter.print_image.await_args_list[3:]
     assert len(width_calls) == 4
     assert all(call.kwargs["impl"] == "bitImageColumn" for call in width_calls)
+    # Each bar must request its own pixel width -- otherwise process_image
+    # clamps every bar to the profile/opts width and they all print
+    # identical length, making the step unable to measure anything wider.
+    assert [call.kwargs["width"] for call in width_calls] == [384, 512, 576, 640]
 
 
 async def test_impl_partial_candidate_failure_is_tolerated(hass):  # type: ignore[no-untyped-def]

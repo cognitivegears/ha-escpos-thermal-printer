@@ -190,10 +190,15 @@ class CalibrationFlowMixin:
         adapter = self.config_entry.runtime_data.adapter
         impl = self._calib.get("impl", "bitImageRaster")
         for w in WIDTH_CANDIDATES:
+            # width=w beats a narrower profile/opts width in the image
+            # pipeline (process_image only ever downscales, never
+            # upscales), so each bar prints at its true pixel width
+            # instead of all four being clamped to the same width.
             await adapter.print_image(
                 self.hass,
                 image=width_bar_data_uri(w),
                 impl=impl,
+                width=w,
                 cut="none",
                 feed=1,
                 auto_resize=False,
@@ -309,9 +314,16 @@ class CalibrationFlowMixin:
         """Print a sample line per codepage candidate, then record which match."""
         errors: dict[str, str] = {}
         candidates = await self._get_codepage_candidates()
+        printed: dict[str, int] = {}
         if user_input is None or user_input.get("action") == "reprint":
-            printed = await self._print_codepage_candidates(candidates)
-            if not printed:
+            try:
+                printed = await self._print_codepage_candidates(candidates)
+                if not printed:
+                    errors["base"] = "calibration_print_failed"
+            except Exception as err:
+                _LOGGER.warning(
+                    "Calibration codepage step failed: %s", sanitize_log_message(str(err))
+                )
                 errors["base"] = "calibration_print_failed"
         else:
             action = user_input.get("action", "continue")
