@@ -26,6 +26,7 @@ import voluptuous as vol
 from ..capabilities import get_profile_codepages
 from ..const import (
     CONF_CODEPAGE,
+    CONF_DETECTED_MODEL,
     CONF_IMPL,
     CONF_LINE_WIDTH,
     CONF_PROFILE,
@@ -566,7 +567,10 @@ class CalibrationFlowMixin:
 
         schema = vol.Schema(
             {
-                vol.Optional("model", default=""): str,
+                vol.Optional(
+                    "model",
+                    default=self.config_entry.data.get(CONF_DETECTED_MODEL, ""),
+                ): str,
                 vol.Required("action", default="save"): vol.In(_SUMMARY_ACTION_CHOICES),
             }
         )
