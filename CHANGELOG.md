@@ -34,6 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   columns, and (optionally) codepage, then saves them for the entry — and
   offers a prefilled GitHub issue link with the full measured support matrix
   and a draft printer profile for contributing back.
+- Calibration wizard now shows a confirmation screen (paper cost,
+  ~15–20 cm; make sure paper is loaded) before printing anything, and
+  tests a fifth, wider paper-width bar (832px, for 100/112mm heads).
+- Diagnostics downloads now include `width_pixels` and `impl` per entry,
+  plus the runtime-resolved paper width, default image implementation,
+  and no-image-support flag, for triage.
 
 ### Changed
 
@@ -47,6 +53,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   logs a warning (the print is still attempted).
 - `calibration_print` service renamed in the UI to "Print dither test
   sheet" to avoid confusion with the calibration wizard.
+- Calibration wizard's paper-width bars are now drawn as an outline
+  instead of a solid fill — same measurement, a fraction of the ink
+  (kinder to the print head on battery-powered Bluetooth printers).
 
 ### Fixed
 
@@ -64,6 +73,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Saving a calibration now posts a Home Assistant notification with the
   printer-database share link, since the link was previously lost as
   soon as the wizard closed.
+- Calibration wizard no longer wipes a step's already-entered selections
+  (impl checkboxes, width bar, ruler marker, codepage checkboxes) when
+  reprinting that step's test page.
+- Calibration wizard now aborts cleanly instead of risking a crash if
+  the config entry unloads while the wizard is open (e.g. an HA restart,
+  or a reload triggered from another browser tab).
 
 ## [1.0.0] - 2026-08-02
 
