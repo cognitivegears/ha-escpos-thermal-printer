@@ -35,7 +35,6 @@ async def _start_dhcp_flow(hass, can_connect=True, query_result=None):
         )
 
 
-@pytest.mark.xfail(reason="host prefill lands in next task", strict=True)
 async def test_dhcp_discovery_shows_network_form(hass):
     result = await _start_dhcp_flow(
         hass, query_result={"manufacturer": "EPSON", "model": "TM-T20II"}
@@ -43,7 +42,27 @@ async def test_dhcp_discovery_shows_network_form(hass):
     assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "network"
     # Host is prefilled from discovery.
-    assert result["data_schema"]({})["host"] == "192.168.10.157"
+    host_marker = next(k for k in result["data_schema"].schema if k.schema == "host")
+    assert host_marker.description["suggested_value"] == "192.168.10.157"
+
+
+async def test_dhcp_discovery_preselects_suggested_profile(hass):
+    with patch(
+        "custom_components.escpos_printer._config_flow.network_steps.suggest_profile",
+        return_value="TM-T20II",
+    ):
+        result = await _start_dhcp_flow(hass, query_result={"model": "TM-T20II"})
+    assert result["step_id"] == "network"
+    defaults = result["data_schema"]({"host": "192.168.10.157"})
+    assert defaults["profile"] == "TM-T20II"
+
+
+async def test_dhcp_discovery_unknown_model_keeps_auto_profile(hass):
+    from custom_components.escpos_printer.capabilities import PROFILE_AUTO
+
+    result = await _start_dhcp_flow(hass, query_result={"model": "Mystery-9000"})
+    defaults = result["data_schema"]({"host": "192.168.10.157"})
+    assert defaults["profile"] == PROFILE_AUTO
 
 
 async def test_dhcp_discovery_title_uses_detected_model(hass):

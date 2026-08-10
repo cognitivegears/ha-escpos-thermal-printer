@@ -15,6 +15,7 @@ from ..capabilities import (
     PROFILE_CUSTOM,
     get_profile_choices_dict,
 )
+from ..capabilities.suggestions import suggest_profile
 from ..const import (
     CONF_CONNECTION_TYPE,
     CONF_DETECTED_MANUFACTURER,
@@ -48,6 +49,7 @@ class NetworkFlowMixin:
     hass: Any
     _user_data: dict[str, Any]
     _detected: dict[str, str]
+    _discovery_host: str | None
 
     async def async_step_network(
         self, user_input: dict[str, Any] | None = None
@@ -116,6 +118,18 @@ class NetworkFlowMixin:
         # Build profile choices dynamically
         profile_choices = await self.hass.async_add_executor_job(get_profile_choices_dict)
 
+        # Discovery flows ran the GS I query before this form is shown, so
+        # the detected model can preselect the profile dropdown (preselect
+        # only -- the user always confirms). Manual flows query on submit.
+        default_profile = PROFILE_AUTO
+        detected_model = self._detected.get("model") if self._discovery_host else None
+        if detected_model:
+            suggestion = await self.hass.async_add_executor_job(
+                suggest_profile, detected_model, None, None
+            )
+            if suggestion and suggestion in profile_choices:
+                default_profile = suggestion
+
         data_schema = vol.Schema(
             {
                 vol.Required(CONF_HOST): str,
@@ -123,9 +137,13 @@ class NetworkFlowMixin:
                     vol.Coerce(int), vol.Range(min=1, max=65535)
                 ),
                 vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
-                vol.Optional(CONF_PROFILE, default=PROFILE_AUTO): vol.In(profile_choices),
+                vol.Optional(CONF_PROFILE, default=default_profile): vol.In(profile_choices),
             }
         )
+        if self._discovery_host:
+            data_schema = self.add_suggested_values_to_schema(  # type: ignore[attr-defined]
+                data_schema, {CONF_HOST: self._discovery_host}
+            )
 
         return self.async_show_form(step_id="network", data_schema=data_schema, errors=errors)  # type: ignore[attr-defined,no-any-return]
 
