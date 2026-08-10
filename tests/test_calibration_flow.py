@@ -161,15 +161,15 @@ async def test_impl_continue_stores_choice_and_advances_to_width(hass):  # type:
     assert result2["type"] == "form"
     assert result2["step_id"] == "calibrate_width"
 
-    # 3 impl-step prints already happened; width step adds 4 more (one per bar).
-    assert adapter.print_image.await_count == 3 + 4
+    # 3 impl-step prints already happened; width step adds 5 more (one per bar).
+    assert adapter.print_image.await_count == 3 + 5
     width_calls = adapter.print_image.await_args_list[3:]
-    assert len(width_calls) == 4
+    assert len(width_calls) == 5
     assert all(call.kwargs["impl"] == "bitImageColumn" for call in width_calls)
     # Each bar must request its own pixel width -- otherwise process_image
     # clamps every bar to the profile/opts width and they all print
     # identical length, making the step unable to measure anything wider.
-    assert [call.kwargs["width"] for call in width_calls] == [384, 512, 576, 640]
+    assert [call.kwargs["width"] for call in width_calls] == [384, 512, 576, 640, 832]
 
 
 async def test_impl_partial_candidate_failure_is_tolerated(hass):  # type: ignore[no-untyped-def]
@@ -232,7 +232,7 @@ async def test_width_bars_prefer_calib_impl_then_adapter_default(hass):  # type:
     flow._calib["impl"] = "graphics"
     await flow._print_width_bars()
     assert all(
-        call.kwargs["impl"] == "graphics" for call in adapter.print_image.await_args_list[-4:]
+        call.kwargs["impl"] == "graphics" for call in adapter.print_image.await_args_list[-5:]
     )
 
     # No stored impl -- falls back to adapter.default_impl, not the
@@ -240,7 +240,7 @@ async def test_width_bars_prefer_calib_impl_then_adapter_default(hass):  # type:
     del flow._calib["impl"]
     await flow._print_width_bars()
     assert all(
-        call.kwargs["impl"] == "bitImageColumn" for call in adapter.print_image.await_args_list[-4:]
+        call.kwargs["impl"] == "bitImageColumn" for call in adapter.print_image.await_args_list[-5:]
     )
 
 

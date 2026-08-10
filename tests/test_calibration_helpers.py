@@ -30,15 +30,25 @@ def test_checkerboard_dimensions() -> None:
     assert img.size == (192, 48)
 
 
-def test_width_bar_exact_width_and_label_at_left() -> None:
+def test_width_candidates_include_832() -> None:
+    """The fifth bar (832px) covers wider 100mm/112mm heads."""
+    assert WIDTH_CANDIDATES == (384, 512, 576, 640, 832)
+
+
+def test_width_bar_outline_exact_width_and_label_at_left() -> None:
     for width in WIDTH_CANDIDATES:
         img = _decode_data_uri(width_bar_data_uri(width)).convert("L")
         assert img.size == (width, 28)
-        # Bar is black at the far right edge (clipping there is what we detect)
+        # The border is still black at the far right edge -- clipping
+        # there is what a too-narrow printer's bars still detect.
         assert img.getpixel((width - 1, 14)) < 64
-        # Label pixels (white on black) exist in the left 80 px
+        # Interior (away from the border and the label) is mostly white
+        # now -- a fraction of the ink (and print-head heat) a solid
+        # filled bar would use.
+        assert img.getpixel((width // 2, 14)) > 192
+        # The label (dark text on white) is still visible in the left 80px.
         left = img.crop((0, 0, 80, 28))
-        assert left.getextrema()[1] > 192
+        assert left.getextrema()[0] < 64
 
 
 def test_ruler_layout() -> None:

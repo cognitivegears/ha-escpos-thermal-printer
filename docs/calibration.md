@@ -50,10 +50,12 @@ characters-per-line step.
 
 ### 2. Paper width (skipped if no pattern printed cleanly in step 1)
 
-The printer prints four numbered bars at 384, 512, 576, and 640 pixels
-wide, each labeled at its left edge. Bars wider than your printer's true
-printable width get clipped to the same length as the widest bar that
-fits — so several bars at the bottom of the page will look identical.
+The printer prints five numbered bars at 384, 512, 576, 640, and 832
+pixels wide, each labeled at its left edge. Bars wider than your printer's
+true printable width get clipped to the same length as the widest bar
+that fits — so several bars at the bottom of the page will look
+identical. If the bars look like staircases rather than clean solid
+blocks, your printer wraps rather than clips — choose "Not sure" instead.
 
 Counting from the top, pick the **first bar that's the same length as the
 bottom bar**. That bar's labeled width is your printer's true printable

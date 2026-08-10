@@ -59,13 +59,11 @@ _IMPL_LABELS = {
     "graphics": "Pattern 3 (Graphics)",
 }
 _ACTION_CHOICES = {"continue": "Continue", "reprint": "Reprint the test page"}
-_WIDTH_CHOICES = {
-    "384": "Bar 1 (384)",
-    "512": "Bar 2 (512)",
-    "576": "Bar 3 (576)",
-    "640": "Bar 4 (640)",
-    "none": "Not sure / bars unclear",
-}
+# Derived from WIDTH_CANDIDATES so the bar numbers/labels can't drift out
+# of sync with what _print_width_bars actually prints.
+_WIDTH_CHOICES: dict[str, str] = {
+    str(w): f"Bar {i} ({w})" for i, w in enumerate(WIDTH_CANDIDATES, start=1)
+} | {"none": "Not sure / bars unclear"}
 _CODEPAGE_ACTION_CHOICES = {
     "continue": "Continue",
     "reprint": "Reprint the test lines",

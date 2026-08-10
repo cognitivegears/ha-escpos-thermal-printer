@@ -13,7 +13,7 @@ from urllib.parse import quote
 
 from PIL import Image, ImageDraw
 
-WIDTH_CANDIDATES: tuple[int, ...] = (384, 512, 576, 640)
+WIDTH_CANDIDATES: tuple[int, ...] = (384, 512, 576, 640, 832)
 IMPL_CANDIDATES: tuple[str, ...] = ("bitImageRaster", "bitImageColumn", "graphics")
 # Capability order, broadest encoding first: the wizard stores the first
 # checked candidate in this order, so ties resolve to the most capable.
@@ -41,14 +41,19 @@ def checkerboard_data_uri() -> str:
 
 
 def width_bar_data_uri(width_px: int) -> str:
-    """Solid bar exactly width_px wide, labeled at the LEFT edge.
+    """Outlined rectangle exactly width_px wide, labeled at the LEFT edge.
 
-    Bars at or beyond the true printable width clip to identical length;
-    the left-edge label survives the right-edge clipping.
+    An outline (3px border) rather than a solid fill draws a fraction of
+    the ink a filled bar would -- kinder to the print head, which matters
+    on battery-powered (Bluetooth) printers -- while keeping the same
+    length-comparison semantics: the right-edge border still clips at the
+    true printable width, so bars at or beyond that width still end up
+    identical length.
     """
-    img = Image.new("1", (width_px, 28), 0)
+    img = Image.new("1", (width_px, 28), 1)
     draw = ImageDraw.Draw(img)
-    draw.text((4, 7), str(width_px), fill=1)
+    draw.rectangle((0, 0, width_px - 1, 27), outline=0, width=3)
+    draw.text((6, 7), str(width_px), fill=0)
     return _png_data_uri(img)
 
 
