@@ -84,11 +84,20 @@ class NetworkFlowMixin:
                 _LOGGER.debug("Connection test succeeded for %s:%s", host, port)
 
                 # Best-effort GS I identification. Reuse a discovery-time
-                # result (e.g. DHCP discovery step) instead of querying
-                # again when one is already available.
-                detected = self._detected or (
-                    await self.hass.async_add_executor_job(query_printer_id, host, port, timeout)
-                    or {}
+                # result (e.g. DHCP discovery step) only when the submitted
+                # host still matches the discovered one -- the host field is
+                # just a suggested value, and if the user points it at a
+                # different printer the discovery-time result must not be
+                # attributed to it.
+                detected = (
+                    self._detected
+                    if self._detected and host == self._discovery_host
+                    else (
+                        await self.hass.async_add_executor_job(
+                            query_printer_id, host, port, timeout
+                        )
+                        or {}
+                    )
                 )
 
                 # Store data and determine next step
@@ -141,8 +150,12 @@ class NetworkFlowMixin:
             }
         )
         if self._discovery_host:
+            # Prefer the host the user just typed (on error redisplay) over
+            # the original discovery suggestion, so a typo fix isn't
+            # clobbered back to the discovered address.
+            suggested_host = (user_input or {}).get(CONF_HOST) or self._discovery_host
             data_schema = self.add_suggested_values_to_schema(  # type: ignore[attr-defined]
-                data_schema, {CONF_HOST: self._discovery_host}
+                data_schema, {CONF_HOST: suggested_host}
             )
 
         return self.async_show_form(step_id="network", data_schema=data_schema, errors=errors)  # type: ignore[attr-defined,no-any-return]

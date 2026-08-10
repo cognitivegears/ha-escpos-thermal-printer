@@ -832,10 +832,7 @@ async def test_save_abort_screen_carries_personalized_share_url(hass, monkeypatc
 
 async def test_calibrate_summary_prefills_detected_model(hass):  # type: ignore[no-untyped-def]
     """The share-link model field defaults to entry.data's detected model."""
-    entry, _adapter = _make_entry(
-        hass,
-        data_extra={CONF_DETECTED_MODEL: "TM-T20II"}
-    )
+    entry, _adapter = _make_entry(hass, data_extra={CONF_DETECTED_MODEL: "TM-T20II"})
     result = await _advance_to_summary(hass, entry)
 
     schema = result["data_schema"].schema
