@@ -58,6 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   (kinder to the print head on battery-powered Bluetooth printers).
 
 ### Fixed
+- Calibration codepage lines now print their codepage name (e.g. "1 CP858:")
+  so the paper matches the on-screen checkboxes directly.
 - Calibration ruler readability: full numbers (10, 20, 30...) embedded in the
   ruler instead of single tens digits and pipe marks, plus a printed
   instruction line — read the last complete number on the first line and add

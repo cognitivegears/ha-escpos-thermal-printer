@@ -524,7 +524,9 @@ async def test_codepage_step_prints_one_line_per_candidate_with_encoding(hass, m
         for call in adapter.print_text.await_args_list
         if call.kwargs.get("encoding") is not None
     ]
-    assert texts[0].startswith("1: ")
+    # Line number AND codepage name (ASCII, safe in every encoding) so the
+    # paper correlates with the checkbox labels without screen-hopping.
+    assert texts[0].startswith("1 CP858: ")
     # Every feed=0 sample line needs its own newline, or unflushed lines
     # merge/drop on real hardware (same class as the impl-label bug).
     assert all(text.endswith("\n") for text in texts)

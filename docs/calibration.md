@@ -80,11 +80,12 @@ unmeasured rather than guessing.
 
 ### 4. Codepage (skipped if your profile supports none of the candidates)
 
-The printer prints one numbered line per candidate codepage your selected
-printer profile can actually switch to, each attempting to render the
-same sample text. The checkbox label for each line shows the text that
-line is *supposed* to look like for that codepage (including any `?`
-substitutions for characters the codepage can't represent).
+The printer prints one line per candidate codepage your selected printer
+profile can actually switch to — each starts with its number and codepage
+name (for example `1 CP858:`) followed by the sample text rendered under
+that codepage. The checkbox label for each line shows the text that line
+is *supposed* to look like (including any `?` substitutions for
+characters the codepage can't represent).
 
 Check every line whose printout matches its own expected text shown in
 the label. If none match, or you'd rather leave the codepage unchanged,

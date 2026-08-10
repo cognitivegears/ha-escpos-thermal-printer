@@ -387,7 +387,11 @@ class CalibrationFlowMixin:
             try:
                 await adapter.print_text(
                     self.hass,
-                    text=f"{n}: {codepage_sample_line(cp)}\n",
+                    # The codepage name is plain ASCII, so it renders
+                    # correctly under every candidate encoding — the paper
+                    # then correlates directly with the checkbox labels
+                    # without hopping back to the screen.
+                    text=f"{n} {cp}: {codepage_sample_line(cp)}\n",
                     encoding=cp,
                     cut="none",
                     feed=0,
