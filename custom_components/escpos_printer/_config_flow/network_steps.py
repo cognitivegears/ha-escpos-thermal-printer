@@ -20,6 +20,7 @@ from ..const import (
     CONF_CONNECTION_TYPE,
     CONF_DETECTED_MANUFACTURER,
     CONF_DETECTED_MODEL,
+    CONF_MAC_ADDRESS,
     CONF_PROFILE,
     CONF_TIMEOUT,
     CONNECTION_TYPE_NETWORK,
@@ -51,6 +52,7 @@ class NetworkFlowMixin:
     _detected: dict[str, str]
     _discovery_host: str | None
     _discovery_port: int | None
+    _discovery_mac: str | None
 
     async def async_step_network(
         self, user_input: dict[str, Any] | None = None
@@ -84,19 +86,18 @@ class NetworkFlowMixin:
             if ok:
                 _LOGGER.debug("Connection test succeeded for %s:%s", host, port)
 
-                # Best-effort GS I identification. Reuse a discovery-time
-                # result (e.g. DHCP discovery step) only when the submitted
-                # host AND port still match the discovered ones -- the host
-                # field is just a suggested value, and if the user points it
-                # at a different printer (or a different port on the same
-                # host) the discovery-time result must not be attributed to
-                # it. DHCP always probes DEFAULT_PORT, so an edited port
-                # alone is enough to misattribute identity.
+                # Discovery-time state (GS I result, MAC) only describes the
+                # probed target -- the host field is just a suggested value,
+                # and if the user points it at a different printer (or a
+                # different port on the same host) that state must not be
+                # attributed to it. DHCP always probes DEFAULT_PORT, so an
+                # edited port alone is enough to misattribute identity.
+                matches_discovery_target = (
+                    host == self._discovery_host and port == self._discovery_port
+                )
                 detected = (
                     self._detected
-                    if self._detected
-                    and host == self._discovery_host
-                    and port == self._discovery_port
+                    if self._detected and matches_discovery_target
                     else (
                         await self.hass.async_add_executor_job(
                             query_printer_id, host, port, timeout
@@ -118,6 +119,8 @@ class NetworkFlowMixin:
                     self._user_data[CONF_DETECTED_MANUFACTURER] = detected["manufacturer"]
                 if detected.get("model"):
                     self._user_data[CONF_DETECTED_MODEL] = detected["model"]
+                if self._discovery_mac and matches_discovery_target:
+                    self._user_data[CONF_MAC_ADDRESS] = self._discovery_mac
 
                 # If custom profile selected, go to custom profile step
                 if profile == PROFILE_CUSTOM:
@@ -250,6 +253,12 @@ class NetworkFlowMixin:
                         new_data[CONF_DETECTED_MANUFACTURER] = detected["manufacturer"]
                     if detected.get("model"):
                         new_data[CONF_DETECTED_MODEL] = detected["model"]
+                # The stored MAC describes the address binding, not the GS I
+                # reply -- it clears only when the address itself changes
+                # (an edit may repoint the entry at different hardware the
+                # MAC no longer describes), never on a transient query miss.
+                if addr_changed:
+                    new_data.pop(CONF_MAC_ADDRESS, None)
 
                 return self.async_update_reload_and_abort(  # type: ignore[attr-defined,no-any-return]
                     reconfigure_entry,

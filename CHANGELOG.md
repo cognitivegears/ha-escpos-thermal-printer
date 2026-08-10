@@ -25,7 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   that aren't printers are ignored silently; `tm-*` hostnames additionally
   require a real `GS I` answer, since port 9100 is also Prometheus
   node_exporter's default. Discovered setups preselect
-  the matching printer profile when one is known.
+  the matching printer profile when one is known. Discovered entries are
+  additionally tracked by MAC address, so a DHCP lease change updates the
+  existing entry's host in place instead of offering a duplicate.
 
 ### Changed
 

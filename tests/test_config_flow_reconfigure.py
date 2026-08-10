@@ -17,6 +17,7 @@ from custom_components.escpos_printer.const import (
     CONF_DETECTED_MODEL,
     CONF_IN_EP,
     CONF_LINE_WIDTH,
+    CONF_MAC_ADDRESS,
     CONF_OUT_EP,
     CONF_PRODUCT_ID,
     CONF_RFCOMM_CHANNEL,
@@ -307,6 +308,95 @@ async def test_reconfigure_network_detected_fields_survive_transient_requery_fai
     assert updated.data[CONF_TIMEOUT] == 8.0
     assert updated.data[CONF_DETECTED_MANUFACTURER] == "EPSON"
     assert updated.data[CONF_DETECTED_MODEL] == "TM-T20II"
+
+
+async def test_reconfigure_network_address_change_clears_mac_address(hass):  # type: ignore[no-untyped-def]
+    """An address edit clears the stored discovery MAC -- it may repoint the
+    entry at different hardware the MAC no longer describes."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="1.2.3.4:9100",
+        data={
+            CONF_HOST: "1.2.3.4",
+            CONF_PORT: 9100,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK,
+            CONF_MAC_ADDRESS: "50:57:9c:62:8e:52",
+        },
+        unique_id="1.2.3.4:9100",
+    )
+    entry.add_to_hass(hass)
+    entry_id = entry.entry_id
+
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=True,
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
+        patch("custom_components.escpos_printer.async_setup_entry", return_value=True),
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_HOST: "5.6.7.8", CONF_PORT: 9100},
+        )
+        await hass.async_block_till_done()
+
+    assert result2["type"] == "abort"
+    assert result2["reason"] == "reconfigure_successful"
+
+    updated = hass.config_entries.async_get_entry(entry_id)
+    assert updated is not None
+    assert CONF_MAC_ADDRESS not in updated.data
+
+
+async def test_reconfigure_network_same_address_keeps_mac_on_query_miss(hass):  # type: ignore[no-untyped-def]
+    """Reconfiguring just the timeout (same host/port) while the printer is
+    transiently busy (query returns None) must not clear a good stored MAC --
+    the MAC describes the address binding, not the GS I reply."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="1.2.3.4:9100",
+        data={
+            CONF_HOST: "1.2.3.4",
+            CONF_PORT: 9100,
+            CONF_TIMEOUT: 4.0,
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK,
+            CONF_MAC_ADDRESS: "50:57:9c:62:8e:52",
+        },
+        unique_id="1.2.3.4:9100",
+    )
+    entry.add_to_hass(hass)
+    entry_id = entry.entry_id
+
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=True,
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
+        patch("custom_components.escpos_printer.async_setup_entry", return_value=True),
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_HOST: "1.2.3.4", CONF_PORT: 9100, CONF_TIMEOUT: 8.0},
+        )
+        await hass.async_block_till_done()
+
+    assert result2["type"] == "abort"
+    assert result2["reason"] == "reconfigure_successful"
+
+    updated = hass.config_entries.async_get_entry(entry_id)
+    assert updated is not None
+    assert updated.data[CONF_MAC_ADDRESS] == "50:57:9c:62:8e:52"
 
 
 async def test_reconfigure_network_cannot_connect(hass):  # type: ignore[no-untyped-def]

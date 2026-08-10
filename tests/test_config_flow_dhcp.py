@@ -6,10 +6,11 @@ from unittest.mock import ANY, patch
 
 from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.escpos_printer.const import DOMAIN
+from custom_components.escpos_printer.const import CONF_MAC_ADDRESS, DOMAIN
 
 DISCOVERY = DhcpServiceInfo(
     ip="192.168.10.157",
@@ -204,6 +205,145 @@ async def test_dhcp_discovery_end_to_end_creates_entry_with_detection(hass):
     assert result["data"]["detected_manufacturer"] == "EPSON"
     assert result["data"]["detected_model"] == "TM-T20II"
     assert result["data"]["profile"] == "TM-T20II"
+
+
+async def test_dhcp_discovery_persists_mac_address(hass):
+    """A discovery-created entry (unedited host/port) carries the DHCP MAC."""
+    with patch(
+        "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+        return_value=True,
+    ):
+        result = await _start_dhcp_flow(
+            hass, query_result={"manufacturer": "EPSON", "model": "TM-T20II"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"host": "192.168.10.157", "port": 9100}
+        )
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_MAC_ADDRESS] == format_mac(DISCOVERY.macaddress)
+    assert result["data"][CONF_MAC_ADDRESS] == "50:57:9c:62:8e:52"
+
+
+async def test_dhcp_discovery_edited_host_does_not_persist_mac(hass):
+    """Editing the suggested host must not attribute the discovery MAC to it."""
+    result = await _start_dhcp_flow(
+        hass, query_result={"manufacturer": "EPSON", "model": "TM-T20II"}
+    )
+
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=True,
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"host": "192.168.10.200", "port": 9100}
+        )
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert CONF_MAC_ADDRESS not in result["data"]
+
+
+async def test_dhcp_discovery_known_mac_new_ip_updates_existing_entry(hass):
+    """A DHCP lease change (same MAC, new IP) updates the existing entry in place."""
+    mac = format_mac(DISCOVERY.macaddress)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="192.168.10.157:9100",
+        data={
+            "connection_type": "network",
+            "host": "192.168.10.157",
+            "port": 9100,
+            CONF_MAC_ADDRESS: mac,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    with patch("custom_components.escpos_printer.async_setup_entry", return_value=True):
+        result = await _start_dhcp_flow(
+            hass,
+            discovery=DhcpServiceInfo(
+                ip="192.168.10.200",
+                hostname="TM-T20II-628E52",
+                macaddress=DISCOVERY.macaddress,
+            ),
+        )
+        await hass.async_block_till_done()
+
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    assert len(hass.config_entries.async_entries(DOMAIN)) == 1
+
+    updated = hass.config_entries.async_get_entry(entry.entry_id)
+    assert updated is not None
+    assert updated.data["host"] == "192.168.10.200"
+    assert updated.unique_id == "192.168.10.200:9100"
+
+
+async def test_dhcp_discovery_known_mac_new_ip_collision_skips_update(hass):
+    """If the new ip:port is already owned by a different entry, the MAC-tracked
+    entry is left untouched and normal dedupe applies."""
+    mac = format_mac(DISCOVERY.macaddress)
+    tracked = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="192.168.10.157:9100",
+        data={
+            "connection_type": "network",
+            "host": "192.168.10.157",
+            "port": 9100,
+            CONF_MAC_ADDRESS: mac,
+        },
+    )
+    tracked.add_to_hass(hass)
+    other = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="192.168.10.200:9100",
+        data={"connection_type": "network", "host": "192.168.10.200", "port": 9100},
+    )
+    other.add_to_hass(hass)
+
+    result = await _start_dhcp_flow(
+        hass,
+        discovery=DhcpServiceInfo(
+            ip="192.168.10.200",
+            hostname="TM-T20II-628E52",
+            macaddress=DISCOVERY.macaddress,
+        ),
+    )
+
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    assert hass.config_entries.async_get_entry(tracked.entry_id).data["host"] == "192.168.10.157"
+    assert len(hass.config_entries.async_entries(DOMAIN)) == 2
+
+
+async def test_dhcp_discovery_known_mac_same_ip_normal_abort(hass):
+    """A known MAC at the same IP falls through to the ordinary
+    already-configured unique_id dedupe (no update, no reload)."""
+    mac = format_mac(DISCOVERY.macaddress)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="192.168.10.157:9100",
+        data={
+            "connection_type": "network",
+            "host": "192.168.10.157",
+            "port": 9100,
+            CONF_MAC_ADDRESS: mac,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    result = await _start_dhcp_flow(hass)
+
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
 
 
 async def test_dhcp_discovery_duplicate_in_progress_aborts(hass):

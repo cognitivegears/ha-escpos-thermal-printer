@@ -91,7 +91,9 @@ Services → Discovered), with the host prefilled and the matching profile
 preselected. Manual setup still runs the `GS I` query, but the profile
 dropdown is already on the same form when you submit it, so there's no
 discovered result yet to preselect a profile from — you pick the profile
-yourself, same as before.
+yourself, same as before. Discovered printers are tracked by MAC address, so
+a DHCP lease change updates the existing entry instead of offering a
+duplicate.
 
 **Upgrading?** Printers configured before this feature pick up their
 detected model the next time you run **Reconfigure** on the entry.
