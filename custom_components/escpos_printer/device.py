@@ -12,6 +12,8 @@ from homeassistant.helpers.entity import DeviceInfo
 
 from .const import (
     CONF_CONNECTION_TYPE,
+    CONF_DETECTED_MANUFACTURER,
+    CONF_DETECTED_MODEL,
     CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
     CONNECTION_TYPE_SERIAL,
@@ -57,12 +59,15 @@ def _usb_serial_number(entry: ConfigEntry) -> str | None:
 def build_device_info(entry: ConfigEntry) -> DeviceInfo:
     """Build the DeviceInfo shared by every entity on a config entry."""
     connection_type = entry.data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK)
-    model = _MODEL_BY_CONNECTION_TYPE.get(connection_type, "Network Printer")
+    model = entry.data.get(CONF_DETECTED_MODEL) or _MODEL_BY_CONNECTION_TYPE.get(
+        connection_type, "Network Printer"
+    )
+    manufacturer = entry.data.get(CONF_DETECTED_MANUFACTURER) or "ESC/POS"
 
     info = DeviceInfo(
         identifiers={(DOMAIN, entry.entry_id)},
         name=f"ESC/POS Printer {entry.title}",
-        manufacturer="ESC/POS",
+        manufacturer=manufacturer,
         model=model,
     )
     if connection_type == CONNECTION_TYPE_USB:
