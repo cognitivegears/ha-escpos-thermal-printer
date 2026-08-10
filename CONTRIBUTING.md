@@ -235,6 +235,17 @@ Use clear, descriptive commit messages:
 - Keep functions focused and reasonably sized
 - Add docstrings for public functions
 
+## Contributing printer profiles
+
+You don't need to write code to help: the easiest way to contribute
+printer data is the [calibration wizard](docs/calibration.md)'s share
+link. Run the wizard against your printer (Settings → Devices & services
+→ your printer entry → Configure → "Calibrate printer (prints test
+pages)"), and its summary step builds a prefilled GitHub issue containing
+your measured results and a draft `escpos-printer-db` profile entry.
+Submitting it helps every future owner of that printer model get accurate
+defaults instead of falling back to generic settings.
+
 ## Testing Without a Physical Printer
 
 The test suite uses mocks for all printer operations. You don't need a physical printer to run tests or develop features.

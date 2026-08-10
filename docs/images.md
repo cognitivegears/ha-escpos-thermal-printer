@@ -236,31 +236,48 @@ Images wider than the target are downscaled to fit (never upscaled). The
 target is resolved in this order:
 
 1. **`image_width` on the service call**: always wins.
-2. **The selected printer profile's declared width** (`media.width.pixels`).
-3. **384 px fallback**: used when no profile is selected (the auto/default
-   profile) or the selected profile doesn't declare a pixel width.
+2. **The per-entry "Paper width in pixels" option** (options form or the
+   [calibration wizard](calibration.md)): overrides the profile when set.
+3. **The selected printer profile's declared width** (`media.width.pixels`).
+4. **384 px fallback**: used when no profile is selected (the auto/default
+   profile), the selected profile doesn't declare a pixel width, and no
+   per-entry width override is set.
 
 384 px is the full head width of a 58 mm printer at 203 dpi, chosen because
 it's the only value safe on every printer; the previous 512 px fallback
 overflowed 58 mm heads and corrupted output. The tradeoff: on an **80 mm
-printer (576-dot head) with no profile selected**, images print at about
-two-thirds of the paper width. If your prints look narrower than expected,
-either select your printer's profile in the integration options (best: it
-fixes text width and cut modes too) or set `image_width: 576` on the call.
+printer (576-dot head) with no profile selected and no width override**,
+images print at about two-thirds of the paper width. If your prints look
+narrower than expected, set "Paper width in pixels" in the integration
+options (the [calibration wizard](calibration.md) can measure it for you),
+select your printer's profile (best: it fixes text width and cut modes
+too), or set `image_width: 576` on the call.
 `calibration_print` prints a pixel ruler at the same resolved width, so the
 sheet you measure always matches what images will actually do.
 
 ### Reliability profile
 
-Pick one in the integration's **Options** flow. Each profile sets sensible defaults for `fragment_height`, `chunk_delay_ms`, and `impl`; service-call options always override.
+Pick one in the integration's **Options** flow. Each profile sets sensible defaults for `fragment_height` (chunk size) and `chunk_delay_ms` (inter-chunk pacing) only; service-call options always override.
 
-| Profile          | `fragment_height` | `chunk_delay_ms` | `impl`           | Use for                                  |
-|------------------|-------------------|------------------|------------------|------------------------------------------|
-| Auto             | (transport default) | (transport default) | `bitImageRaster` | Default: no preset                    |
-| Fast LAN         | 512               | 0                | `bitImageRaster` | Epson TM-T20/T88 on Ethernet             |
-| Balanced         | 256               | 20               | `bitImageRaster` | Most USB and Star TSP printers           |
-| Conservative     | 128               | 100              | `bitImageRaster` | Cheap POS-58 / POS-80 clones             |
-| Bluetooth-safe   | 128               | 150              | `bitImageRaster` | Slow SPP printers (default for BT entries) |
+| Profile          | `fragment_height` | `chunk_delay_ms` | Use for                                  |
+|------------------|-------------------|------------------|-------------------------------------------|
+| Auto             | (transport default) | (transport default) | Default: no preset                    |
+| Fast LAN         | 512               | 0                | Epson TM-T20/T88 on Ethernet             |
+| Balanced         | 256               | 20                | Most USB and Star TSP printers           |
+| Conservative     | 128               | 100               | Cheap POS-58 / POS-80 clones             |
+| Bluetooth-safe   | 128               | 150               | Slow SPP printers (default for BT entries) |
+
+Reliability profiles no longer set `impl` — since 1.1.0, image
+implementation is resolved independently, in this order:
+
+1. **`impl` on the service call**: always wins.
+2. **The per-entry "Image printing implementation" option** (options form,
+   default "Auto"; the [calibration wizard](calibration.md) can measure
+   which one works on your printer).
+3. **The selected printer profile's declared support**: raster preferred,
+   column-mode for printers whose profile declares column-only support.
+4. **`bitImageRaster`**: the hard-coded fallback when nothing above
+   resolves an implementation.
 
 ### Supported formats
 
@@ -507,8 +524,9 @@ data:
 | `Failed to fetch camera image`                         | The camera entity is unavailable or slow. Snapshot timeout is 10 s; check the camera state in Developer Tools.                                           |
 | `Expected entity_id in domain 'camera'`                | You passed something like `cam.front_door` or `camera.` (empty). Use the full `camera.<id>` form.                                                        |
 | `impl must be one of ['bitImageColumn', ...]`          | Typo in `impl` value. Allowed: `bitImageRaster`, `graphics`, `bitImageColumn`.                                                                           |
-| Printer freezes, then next print shows garbage chars   | Classic buffer overrun. Lower `fragment_height` (try 128) and raise `chunk_delay_ms` (try 100). See [Reliability & speed](#reliability--speed).          |
-| Image prints stretched or in stripes                   | Try `impl: graphics` or `impl: bitImageColumn`. If it's a USB Epson, leave `impl: bitImageRaster` and check the cable.                                   |
+| Printer freezes, then next print shows garbage chars   | Classic buffer overrun. Lower `fragment_height` (try 128) and raise `chunk_delay_ms` (try 100), or run the [calibration wizard](calibration.md). See [Reliability & speed](#reliability--speed). |
+| Image prints stretched or in stripes                   | Try `impl: graphics` or `impl: bitImageColumn`, or run the [calibration wizard](calibration.md) to find the working implementation. If it's a USB Epson, leave `impl: bitImageRaster` and check the cable. |
+| Image prints at half the expected width                | No profile/width selected, so images fall back to 384px on an 80mm head. Set "Paper width in pixels" in the options, or run the [calibration wizard](calibration.md). See [How the target width is chosen](#how-the-target-width-is-chosen). |
 | Logo looks muddy with dotted edges                     | Switch from `dither: floyd-steinberg` (default) to `dither: threshold` and tune `threshold` between 100–180.                                             |
 | Photo prints almost all black or all white             | Turn on `autocontrast: true`. If still extreme, try `dither: threshold` with a value near the image's average brightness.                                |
 | Image is sideways (phone photos)                       | EXIF orientation should auto-correct. If your image lacks EXIF, use `rotation: 90` / `180` / `270`.                                                      |

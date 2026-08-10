@@ -1,6 +1,6 @@
 # Configuration Reference
 
-Settings that apply to all connection types. For connection-specific options, see [network.md](network.md), [usb.md](usb.md), or [bluetooth.md](bluetooth.md).
+Settings that apply to all connection types. For connection-specific options, see [network.md](network.md), [usb.md](usb.md), or [bluetooth.md](bluetooth.md). Don't want to set these by hand? The [calibration wizard](calibration.md) measures several of them for you by printing guided test pages.
 
 After initial setup, click **Configure** on the integration entry to change these.
 
@@ -8,8 +8,23 @@ After initial setup, click **Configure** on the integration entry to change thes
 
 Selects your printer model from the bundled [escpos-printer-db](https://github.com/receipt-print-hq/escpos-printer-db) (~35 profiles). The profile determines available codepages, line width options, supported cut modes, and other capabilities.
 
-- **Auto-detect**: works with most printers; use if your model isn't listed.
+- **Generic (no profile)**: works with most printers; use if your model isn't listed.
 - **Custom**: type a profile name from escpos-printer-db manually.
+
+### Rebadged and compatible printers
+
+Many cheap thermal printers are rebadges of, or share a command set with,
+an already-bundled profile. 22 such clone/equivalent models appear
+directly in the profile dropdown as **"Model (compatible)"** entries — for
+example, **Epson TM-T20III (compatible)**, **Xprinter XP-80C
+(compatible)**, and **Citizen CT-S601II (compatible)** all route to an
+existing bundled profile instead of falling back to the generic default.
+Typing a model name into the **Custom** profile field also resolves known
+aliases, so a bare model number works there too.
+
+If your printer isn't listed at all, use "Generic (no profile)" and,
+optionally, run the [calibration wizard](calibration.md) to measure
+accurate settings for it directly — no profile required.
 
 ## Timeout
 
@@ -41,6 +56,27 @@ Characters per line:
 | 42 | 80mm paper, small font |
 | 48 | 80mm paper, normal font |
 | 64 | 80mm paper, condensed |
+
+## Paper Width in Pixels
+
+Optional override for the target width images are scaled to. Leave empty
+to use the selected printer profile's declared width; set it when your
+printer has no profile (or the profile doesn't declare a pixel width) and
+images print narrower than expected — common values are 384 (58 mm) and
+576 (80 mm). The [calibration wizard](calibration.md) can measure this
+for you by printing a set of width-test bars. See [How the target width
+is chosen](images.md#how-the-target-width-is-chosen) for the full
+resolution order.
+
+## Image Printing Implementation
+
+Which ESC/POS image command the integration sends: **Auto** (recommended;
+follows the printer profile), **Raster**, **Column**, or **Graphics**.
+Override this if images print garbled, stretched, or as stray text under
+the Auto setting. The [calibration wizard](calibration.md) test-prints all
+three and lets you pick the one that actually rendered cleanly on your
+printer. See [Reliability profile](images.md#reliability-profile) for how
+this fits into the full implementation-resolution order.
 
 ## Default Alignment
 

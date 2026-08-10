@@ -14,6 +14,14 @@ USB printers from known thermal-printer vendors are auto-discovered when plugged
 
 Recognized vendor IDs include Epson (0x04B8), Star Micronics (0x0519), Citizen (0x08BD/0x1D90/0x2730), Bixolon (0x1504), Zebra (0x0A5F), and ~15 others. The full list is in `custom_components/escpos_printer/manifest.json` under the `usb:` key.
 
+## Profile preselection
+
+When the config flow recognizes your printer's USB device descriptor (or
+a known vendor/product ID pairing), it preselects a matching profile in
+the **Printer Profile** dropdown. This is only a suggested starting
+point — it's always changeable before you finish setup, and picking a
+different profile never breaks anything.
+
 ## Manual configuration
 
 If your printer isn't auto-discovered:
@@ -34,7 +42,7 @@ If your printer isn't auto-discovered:
 | Input Endpoint | USB IN endpoint | 0x82 |
 | Output Endpoint | USB OUT endpoint | 0x01 |
 | Timeout | Connect timeout (seconds) | 4.0 |
-| Printer Profile | Your printer model | Auto-detect |
+| Printer Profile | Your printer model | Generic (no profile), or a suggested match from the USB device descriptor |
 
 ## Paper status sensor
 

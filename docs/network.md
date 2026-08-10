@@ -9,7 +9,7 @@ For printers with Ethernet or WiFi.
 | Host | IP address or hostname | Required |
 | Port | TCP port | 9100 |
 | Timeout | Connect timeout (seconds) | 4.0 |
-| Printer Profile | Your printer model | Auto-detect |
+| Printer Profile | Your printer model | Generic (no profile) |
 
 ## Finding your printer's IP
 

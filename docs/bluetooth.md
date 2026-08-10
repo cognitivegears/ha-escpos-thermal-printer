@@ -108,6 +108,15 @@ If the picker shows **No paired Bluetooth printers found**:
 
 Pair the printer first using the steps above, or, if you already know the MAC, submit the form to enter it manually. The data plane works without bluez D-Bus as long as `AF_BLUETOOTH` is reachable.
 
+## Profile preselection
+
+When the config flow recognizes the paired device's advertised Bluetooth
+name (portable printers often advertise their model, e.g. "PT-210" or
+"NT-1809DD"), it preselects a matching profile in the **Printer Profile**
+dropdown. This is only a suggested starting point — it's always
+changeable before you finish setup, and picking a different profile never
+breaks anything.
+
 ## Connection settings
 
 | Setting | Description | Default |
@@ -116,7 +125,7 @@ Pair the printer first using the steps above, or, if you already know the MAC, s
 | MAC address | `AA:BB:CC:DD:EE:FF` (manual entry only) | Required |
 | RFCOMM channel | Service channel: 1 for almost every ESC/POS printer | 1 |
 | Timeout | Connect timeout (seconds) | 4.0 |
-| Printer Profile | Your printer model | Auto-detect |
+| Printer Profile | Your printer model | Generic (no profile), or a suggested match from the paired device's advertised name |
 
 ## Confirming the RFCOMM channel
 

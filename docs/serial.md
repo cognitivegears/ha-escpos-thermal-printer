@@ -39,8 +39,8 @@ The integration supports four connection formats:
 | Serial port | Device path (e.g. `/dev/ttyUSB0`) or URL (e.g. `esphome://host:6053?port_name=Name`) | N/A |
 | Baud rate | Serial speed for the serial connection. | 9600 |
 | Timeout | Connection timeout in seconds | 4.0 |
-| Printer Profile | Your printer model (or Auto-detect) | Auto-detect |
-| Codepage | Character encoding (or Auto-detect) | Auto-detect |
+| Printer Profile | Your printer model, or Generic (no profile) | Generic (no profile) |
+| Codepage | Character encoding, or Generic (no profile) | Generic (no profile) |
 | Line width | Characters per line (32 for 58 mm, 42–48 for 80 mm) | 48 |
 
 ## ESPHome serial proxy

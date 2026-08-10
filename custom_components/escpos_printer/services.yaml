@@ -1442,11 +1442,12 @@ preview_image:
             text: {}
 
 calibration_print:
-  name: Calibration Print
+  name: Print dither test sheet
   description: >
     Print a calibration sheet — a pixel ruler plus a threshold sweep
-    strip — so you can visually pick the best dither/threshold for
-    your printer. Burns ~10 cm of paper.
+    strip — for tuning image dither/threshold settings (not the printer
+    calibration wizard — see the Calibration docs page). Burns ~10 cm
+    of paper.
   fields:
     device_id:
       name: Device

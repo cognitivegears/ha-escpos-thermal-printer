@@ -187,6 +187,8 @@ See [serial.md](serial.md) for the full setup guide, ESPHome YAML, and detailed 
 
 ## Print-quality problems
 
+The [calibration wizard](calibration.md) can usually diagnose and fix wrong or mangled accented text — see calibration.md.
+
 - **Garbled characters**: codepage mismatch. Try CP437, CP850, or use `print_text_utf8`.
 - **Special characters missing**: printer codepage doesn't support them. Use `print_text_utf8` for best-effort transliteration.
 - **Text wraps wrong**: line width setting wrong. 32 for 58mm paper, 42–48 for 80mm.
@@ -202,9 +204,12 @@ See [serial.md](serial.md) for the full setup guide, ESPHome YAML, and detailed 
 
 ## Image issues
 
+The [calibration wizard](calibration.md) can usually diagnose and fix garbled image output or wrong image width — see calibration.md.
+
 - **"Image too large"**: the source file exceeds the 10 MB cap (40 MB with `auto_resize: true`), or the decoded image exceeds 20 M pixels. Re-export at lower resolution/quality, or set `auto_resize: true`. Width is fitted to the printer automatically and is not the cause of this error.
 - **Image doesn't print**: use PNG or JPEG; for URLs verify reachable from HA host; for local files use absolute paths starting with `/config/`.
 - **Image prints solid black**: image is too dark or has alpha issues. Use white background, increase contrast, convert to 1-bit B&W.
+- **Image prints garbled, stretched, or half-width**: see [Images troubleshooting](images.md#troubleshooting) for the `impl` and paper-width remedies.
 
 ## Paper and cutting
 
@@ -235,7 +240,7 @@ docker logs homeassistant 2>&1 | grep escpos  # Docker
 
 - **Epson TM series**: verify ESC/POS mode (not Epson proprietary). Check DIP switches.
 - **Star Micronics**: verify ESC/POS emulation (not Star native mode). Check the printer's web interface.
-- **Generic / unbranded**: use **Auto-detect** profile. Try CP437 first. Some cheap printers don't support all ESC/POS commands (QR codes, beep, cut).
+- **Generic / unbranded**: use **Generic (no profile)**. Try CP437 first, or run the [calibration wizard](calibration.md) to measure working settings directly. Some cheap printers don't support all ESC/POS commands (QR codes, beep, cut).
 
 ## Getting more help
 

@@ -34,7 +34,8 @@ start printing in minutes.
 - Image-print diagnostics sensor: success/failure counts and last-print details for tuning image options ([guide](docs/images.md#diagnostics-sensor))
 - Buzzer/beeper support
 - UTF-8 text with automatic character conversion
-- 35+ printer profiles with automatic feature detection
+- 35+ printer profiles with automatic feature detection, plus 22 rebadged/clone models available directly as "(compatible)" dropdown entries
+- Guided calibration wizard: prints test pages to measure image implementation, paper width, columns, and codepage, then saves them for you ([guide](docs/calibration.md))
 - Full UI configuration, no YAML required
 
 ## Quick Start
@@ -70,7 +71,7 @@ This integration is in the HACS default store. No custom repository needed.
 3. Select your connection type:
    - **Network:** Enter your printer's IP address and port (default: 9100)
    - **USB:** Select from auto-discovered printers or enter VID:PID manually
-4. Select your printer model or use "Auto-detect"
+4. Select your printer model, or "Generic (no profile)" if it isn't listed
 5. Done! Your printer is ready to use
 
 **Note:** USB printers may be auto-discovered when connected. Check your Home
@@ -234,6 +235,7 @@ See [`blueprints/README.md`](blueprints/README.md) for import instructions, per-
 |----------|-------------|
 | [Installation](docs/installation.md) | HACS / manual install, removal |
 | [Configuration](docs/configuration.md) | Common settings reference (codepage, line width, defaults) |
+| [Calibration](docs/calibration.md) | Calibration — guided printer setup wizard |
 | [Network printers](docs/network.md) | TCP/IP setup |
 | [USB printers](docs/usb.md) | USB setup, permissions, container pass-through |
 | [Bluetooth printers](docs/bluetooth.md) | Pairing, RFCOMM, container caveats |

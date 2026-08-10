@@ -45,6 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   profile)" — it never detected anything.
 - Printing an image on a profile that declares no image support now
   logs a warning (the print is still attempted).
+- `calibration_print` service renamed in the UI to "Print dither test
+  sheet" to avoid confusion with the calibration wizard.
 
 ### Fixed
 

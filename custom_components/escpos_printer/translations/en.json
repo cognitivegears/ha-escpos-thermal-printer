@@ -25,7 +25,7 @@
           "host": "IP address or hostname of the printer.",
           "port": "Network port (usually 9100).",
           "timeout": "Connection timeout in seconds.",
-          "profile": "Select your printer model or Auto-detect. Choose 'Custom' to enter a profile name manually."
+          "profile": "Select your printer model — or Generic (no profile) if it isn't listed; rebadged models appear as \"(compatible)\" entries. Choose 'Custom' to enter a profile name manually."
         }
       },
       "usb_select": {
@@ -39,7 +39,7 @@
         "data_description": {
           "usb_device": "Select your printer from the detected USB devices.",
           "timeout": "Connection timeout in seconds.",
-          "profile": "Select your printer model or Auto-detect."
+          "profile": "Select your printer model — or Generic (no profile) if it isn't listed; rebadged models appear as \"(compatible)\" entries."
         }
       },
       "usb_all_devices": {
@@ -57,7 +57,7 @@
           "in_ep": "Leave at default (130) unless your printer doesn't work. This is the USB address for receiving status from the printer.",
           "out_ep": "Leave at default (1) unless your printer doesn't work. This is the USB address for sending data to the printer.",
           "timeout": "Connection timeout in seconds.",
-          "profile": "Select your printer model or Auto-detect."
+          "profile": "Select your printer model — or Generic (no profile) if it isn't listed; rebadged models appear as \"(compatible)\" entries."
         }
       },
       "usb_manual": {
@@ -77,7 +77,7 @@
           "in_ep": "Leave at default (130) unless your printer doesn't work. This is the USB address for receiving status from the printer.",
           "out_ep": "Leave at default (1) unless your printer doesn't work. This is the USB address for sending data to the printer.",
           "timeout": "Connection timeout in seconds.",
-          "profile": "Select your printer model or Auto-detect."
+          "profile": "Select your printer model — or Generic (no profile) if it isn't listed; rebadged models appear as \"(compatible)\" entries."
         }
       },
       "usb_confirm": {
@@ -87,7 +87,7 @@
           "profile": "Printer profile"
         },
         "data_description": {
-          "profile": "Select your printer model or Auto-detect."
+          "profile": "Select your printer model — or Generic (no profile) if it isn't listed; rebadged models appear as \"(compatible)\" entries."
         }
       },
       "bluetooth_select": {
@@ -101,7 +101,7 @@
         "data_description": {
           "bt_device": "Select your printer from the list of paired Bluetooth devices.",
           "timeout": "Connection timeout in seconds.",
-          "profile": "Select your printer model or Auto-detect."
+          "profile": "Select your printer model — or Generic (no profile) if it isn't listed; rebadged models appear as \"(compatible)\" entries."
         },
         "sections": {
           "advanced_options": {
@@ -128,7 +128,7 @@
           "bt_mac": "Bluetooth MAC address in AA:BB:CC:DD:EE:FF format.",
           "rfcomm_channel": "RFCOMM channel (almost always 1 for ESC/POS printers).",
           "timeout": "Connection timeout in seconds.",
-          "profile": "Select your printer model or Auto-detect."
+          "profile": "Select your printer model — or Generic (no profile) if it isn't listed; rebadged models appear as \"(compatible)\" entries."
         }
       },
       "bluetooth_no_devices": {
@@ -210,7 +210,7 @@
           "serial_port": "Serial port path (e.g. /dev/ttyUSB0, /dev/ttyACM0, COM3) or URL (e.g. esphome://host:6053?port_name=Name, rfc2217://host:2217, socket://host:9100).",
           "baudrate": "Baud rate for the serial connection.",
           "timeout": "Connection timeout in seconds.",
-          "profile": "Select your printer model or Auto-detect. Choose 'Custom' to enter a profile name manually."
+          "profile": "Select your printer model — or Generic (no profile) if it isn't listed; rebadged models appear as \"(compatible)\" entries. Choose 'Custom' to enter a profile name manually."
         }
       },
       "reconfigure_network": {
@@ -619,7 +619,7 @@
       "name": "Beep"
     },
     "calibration_print": {
-      "description": "Print a calibration sheet — a pixel ruler plus a threshold sweep strip — so you can visually pick the best dither/threshold for your printer. Burns ~10 cm of paper.",
+      "description": "Print a calibration sheet — a pixel ruler plus a threshold sweep strip — for tuning image dither/threshold settings (not the printer calibration wizard — see the Calibration docs page). Burns ~10 cm of paper.",
       "fields": {
         "broadcast": {
           "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
@@ -638,7 +638,7 @@
           "name": "Feed Lines"
         }
       },
-      "name": "Calibration Print"
+      "name": "Print dither test sheet"
     },
     "cut": {
       "description": "Cut the paper. Select one or more printer devices as the target.",
