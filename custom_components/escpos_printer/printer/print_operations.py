@@ -42,8 +42,16 @@ class PrintOperationsMixin:
         encoding: str | None = None,
         cut: str | None = DEFAULT_CUT,
         feed: int | None = 0,
+        wrap: bool = True,
     ) -> None:
-        """Print text to the printer."""
+        """Print text to the printer.
+
+        ``wrap`` controls whether ``text`` is wrapped to the configured
+        ``line_width`` before printing (the default, matching every
+        existing caller). The calibration wizard's ruler step passes
+        ``wrap=False`` so it can measure the *actual* printable width
+        instead of always breaking at the width it's trying to measure.
+        """
         async with self._lock:
             printer, owned = await self._acquire_printer_or_offline(hass)
             failed = True
@@ -59,6 +67,7 @@ class PrintOperationsMixin:
                     width=width,
                     height=height,
                     encoding=encoding,
+                    wrap=wrap,
                 )
                 await self._apply_cut_and_feed(hass, printer, cut, feed)
                 failed = False
@@ -136,6 +145,7 @@ async def _print_text_under_lock(
     width: str | int | None,
     height: str | int | None,
     encoding: str | None,
+    wrap: bool = True,
 ) -> None:
     """Execute the text-print body. ``host._lock`` must already be held."""
     text = validate_text_input(text)
@@ -143,7 +153,7 @@ async def _print_text_under_lock(
     ul = map_underline(underline)
     wmult = map_multiplier(width)
     hmult = map_multiplier(height)
-    text_to_print = host._wrap_text(text)
+    text_to_print = host._wrap_text(text) if wrap else text
     codepage = host._config.codepage
 
     def _do_print(p: Any) -> None:

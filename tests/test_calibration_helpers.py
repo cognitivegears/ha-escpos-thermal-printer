@@ -49,6 +49,14 @@ def test_ruler_layout() -> None:
         assert ruler[tens * 10 - 1] == str(tens)
 
 
+def test_ruler_layout_at_96_cols() -> None:
+    """The wizard prints the ruler at 96 cols (its widest supported line_width)."""
+    ruler = build_ruler(96)
+    assert len(ruler) == 96
+    for tens in range(7, 10):
+        assert ruler[tens * 10 - 1] == str(tens)
+
+
 def test_codepage_sample_replaces_unencodable() -> None:
     # CP437 has no €; the sample must show ? instead, never drop the char
     line = codepage_sample_line("CP437")

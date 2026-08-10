@@ -18,11 +18,12 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from homeassistant.components.persistent_notification import async_create as pn_create
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.helpers import config_validation as cv
 import voluptuous as vol
 
-from ..capabilities import get_profile_codepages
+from ..capabilities import get_profile_codepages, is_valid_codepage_for_profile
 from ..const import CONF_CODEPAGE, CONF_IMPL, CONF_LINE_WIDTH, CONF_PROFILE, CONF_WIDTH_PIXELS
 from ..security import sanitize_log_message
 from .calibration import (
@@ -171,8 +172,13 @@ class CalibrationFlowMixin:
         else:
             selection = user_input.get("impls_clean", [])
             self._calib_extra["impls_clean"] = selection
-            if selection:
-                self._calib["impl"] = next(c for c in IMPL_CANDIDATES if c in selection)
+            if not selection:
+                # None of the patterns printed cleanly -- there's no
+                # working image mode to measure width bars with, so skip
+                # straight to the ruler step instead of clamping
+                # width_pixels to a fallback impl's raster output.
+                return await self.async_step_calibrate_ruler()
+            self._calib["impl"] = next(c for c in IMPL_CANDIDATES if c in selection)
             return await self.async_step_calibrate_width()
 
         schema = vol.Schema(
@@ -188,7 +194,7 @@ class CalibrationFlowMixin:
     async def _print_width_bars(self) -> None:
         """Print one bar per candidate width, using the impl chosen so far."""
         adapter = self.config_entry.runtime_data.adapter
-        impl = self._calib.get("impl", "bitImageRaster")
+        impl = self._calib.get("impl") or getattr(adapter, "default_impl", None) or "bitImageRaster"
         for w in WIDTH_CANDIDATES:
             # width=w beats a narrower profile/opts width in the image
             # pipeline (process_image only ever downscales, never
@@ -239,14 +245,16 @@ class CalibrationFlowMixin:
         if user_input is None or user_input.get("action") == "reprint":
             try:
                 adapter = self.config_entry.runtime_data.adapter
-                await adapter.print_text(self.hass, text=build_ruler(64), cut="none", feed=1)
+                await adapter.print_text(
+                    self.hass, text=build_ruler(96), cut="none", feed=1, wrap=False
+                )
             except Exception as err:
                 _LOGGER.warning("Calibration ruler step failed: %s", sanitize_log_message(str(err)))
                 errors["base"] = "calibration_print_failed"
         else:
             marker = user_input.get("last_marker", 0)
             if 1 <= marker <= 15:
-                errors["base"] = "invalid_line_width"
+                errors["base"] = "line_width_out_of_range"
             else:
                 if marker:
                     self._calib["line_width"] = marker
@@ -271,7 +279,18 @@ class CalibrationFlowMixin:
         )
         profile_codepages = await self.hass.async_add_executor_job(get_profile_codepages, profile)
         narrowed = tuple(cp for cp in CODEPAGE_CANDIDATES if cp in profile_codepages)
-        return narrowed or CODEPAGE_CANDIDATES
+        candidates = narrowed or CODEPAGE_CANDIDATES
+        # Drop any candidate the profile can't actually switch to *before*
+        # printing -- profile-listed candidates already pass by
+        # construction, this protects the Generic/odd-profile path where a
+        # candidate could otherwise print under the printer's previous
+        # (still-active) codepage while carrying the new label.
+        valid = [
+            cp
+            for cp in candidates
+            if await self.hass.async_add_executor_job(is_valid_codepage_for_profile, cp, profile)
+        ]
+        return tuple(valid)
 
     async def _print_codepage_candidates(self, candidates: tuple[str, ...]) -> dict[str, int]:
         """Print a labeled sample line per codepage candidate.
@@ -334,7 +353,7 @@ class CalibrationFlowMixin:
                     self._calib["codepage"] = next(cp for cp in candidates if cp in selection)
             return await self.async_step_calibrate_summary()
 
-        choices = {cp: f"Line {n}: {cp}" for cp, n in printed.items()}
+        choices = {cp: f"Line {n}: {cp} — {codepage_sample_line(cp)}" for cp, n in printed.items()}
         schema = vol.Schema(
             {
                 vol.Optional("codepages_match", default=[]): cv.multi_select(choices),
@@ -348,16 +367,45 @@ class CalibrationFlowMixin:
             description_placeholders={"sample": CODEPAGE_SAMPLE},
         )
 
-    def _save_calibration(self) -> ConfigFlowResult:
+    async def _calib_results(self) -> dict[str, Any]:
+        """Measured-value dict for ``build_share_url`` (profile + versions included)."""
+        profile = self.config_entry.options.get(
+            CONF_PROFILE, self.config_entry.data.get(CONF_PROFILE)
+        )
+        integration_version, escpos_version = await self.hass.async_add_executor_job(_read_versions)
+        return {
+            **self._calib,
+            **self._calib_extra,
+            "profile": profile,
+            "integration_version": integration_version,
+            "escpos_version": escpos_version,
+        }
+
+    async def _save_calibration(self, user_input: dict[str, Any]) -> ConfigFlowResult:
         """Merge measured values into the existing options and create the entry.
 
         Only keys actually present in ``self._calib`` are applied, so a
         setting the user never measured (or skipped) is left untouched.
+        Save also closes the flow, which takes the on-screen share link
+        with it -- post a persistent notification carrying the same link
+        (built from the submitted model field) so it's still reachable
+        afterwards.
         """
         merged: dict[str, Any] = {**dict(self.config_entry.options)}
         for calib_key, conf_key in _CALIB_TO_CONF.items():
             if calib_key in self._calib:
                 merged[conf_key] = self._calib[calib_key]
+
+        model = user_input.get("model", "").strip() or _SHARE_LINK_MODEL_PLACEHOLDER
+        share_url = build_share_url(model, await self._calib_results())
+        pn_create(
+            self.hass,
+            f"[Open a prefilled GitHub issue]({share_url}) to contribute your printer's "
+            "calibration results.",
+            title="Printer calibration saved",
+            notification_id=f"escpos_calibration_{self.config_entry.entry_id}",
+        )
+
         return self.async_create_entry(  # type: ignore[attr-defined,no-any-return]
             title="", data=merged
         )
@@ -373,7 +421,7 @@ class CalibrationFlowMixin:
         if user_input is not None:
             action = user_input.get("action", "save")
             if action == "save":
-                return self._save_calibration()
+                return await self._save_calibration(user_input)
             if action == "discard":
                 return self.async_abort(  # type: ignore[attr-defined,no-any-return]
                     reason="calibration_discarded"
@@ -385,18 +433,7 @@ class CalibrationFlowMixin:
             model_field_default = user_input.get("model", "").strip()
             model = model_field_default or model
 
-        profile = self.config_entry.options.get(
-            CONF_PROFILE, self.config_entry.data.get(CONF_PROFILE)
-        )
-        integration_version, escpos_version = await self.hass.async_add_executor_job(_read_versions)
-        results: dict[str, Any] = {
-            **self._calib,
-            **self._calib_extra,
-            "profile": profile,
-            "integration_version": integration_version,
-            "escpos_version": escpos_version,
-        }
-        share_url = build_share_url(model, results)
+        share_url = build_share_url(model, await self._calib_results())
 
         schema = vol.Schema(
             {

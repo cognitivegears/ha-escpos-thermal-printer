@@ -327,6 +327,7 @@
       "invalid_profile": "Invalid printer profile name.",
       "invalid_codepage": "Invalid codepage/encoding.",
       "invalid_line_width": "Invalid line width. Must be a positive number.",
+      "line_width_out_of_range": "Enter the marker number you can read (16–96), or 0 to skip.",
       "bt_status_interval_too_low": "Status check interval must be 0 (disabled) or at least 60 seconds for Bluetooth printers.",
       "calibration_print_failed": "Printing the test page failed. Check the printer and try again."
     },
@@ -379,7 +380,7 @@
       },
       "calibrate_impl": {
         "title": "Calibrate: image implementation",
-        "description": "Your printer just printed three numbered test patterns. A working pattern is a crisp checkerboard; a failing one prints stray letters or nothing. Check every pattern that printed cleanly.",
+        "description": "Your printer just printed three numbered test patterns. A working pattern is a crisp checkerboard; a failing one prints stray letters or nothing. Check every pattern that printed cleanly. If none of the patterns printed cleanly, leave all boxes unchecked — the width test will be skipped since it needs a working image mode.",
         "data": {
           "impls_clean": "Patterns that printed cleanly",
           "action": "Action"
@@ -403,7 +404,7 @@
       },
       "calibrate_codepage": {
         "title": "Calibrate: character encoding",
-        "description": "Your printer just printed one numbered line per candidate encoding, each rendering this reference text: \"{sample}\". Compare each printed line to the reference above, character for character, and check every line that matches exactly. Lines with wrong or missing accented characters don't match. If none match, or you'd rather leave the character encoding unchanged, choose \"Skip this step\".",
+        "description": "Your printer just printed one numbered line per candidate encoding, each attempting to render \"{sample}\", the ideal text. Check every line whose printout matches its own expected text shown in the checkbox label — including any ? marks. A line that prints exactly what its label shows is a working codepage. If none match, or you'd rather leave the character encoding unchanged, choose \"Skip this step\".",
         "data": {
           "codepages_match": "Lines that matched the reference exactly",
           "action": "Action"
@@ -1499,7 +1500,7 @@
           "name": "Image High Density"
         },
         "image_impl": {
-          "description": "ESC/POS image command (see print_image). Leave unset to honor the printer's Reliability profile.",
+          "description": "ESC/POS image command (see print_image). Leave unset to follow the printer profile.",
           "name": "Image Implementation"
         },
         "image_invert": {

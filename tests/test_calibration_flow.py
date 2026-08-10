@@ -5,6 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
+from homeassistant.components import persistent_notification as pn
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_HOST, CONF_PORT
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -167,12 +168,65 @@ async def test_impl_partial_candidate_failure_is_tolerated(hass):  # type: ignor
     assert fallback_texts == ["TEST 3: FAILED TO SEND"]
 
 
+async def test_impl_empty_selection_skips_width_step(hass):  # type: ignore[no-untyped-def]
+    """Continuing with no pattern checked skips straight to the ruler step.
+
+    None of the image implementations printed cleanly, so the width-bar
+    test (which needs a working image mode) can't measure anything --
+    routing through it would just silently clamp width_pixels.
+    """
+    entry, adapter = _make_entry(hass)
+    result = await _open_calibrate(hass, entry)
+    prints_before = adapter.print_image.await_count
+
+    result2 = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"impls_clean": [], "action": "continue"}
+    )
+
+    assert result2["type"] == "form"
+    assert result2["step_id"] == "calibrate_ruler"
+    # No width-bar prints happened -- only the ruler step's own print (a
+    # print_text call, not print_image).
+    assert adapter.print_image.await_count == prints_before
+    flow = hass.config_entries.options._progress[result2["flow_id"]]
+    assert "width_pixels" not in flow._calib
+
+
+async def test_width_bars_prefer_calib_impl_then_adapter_default(hass):  # type: ignore[no-untyped-def]
+    """_print_width_bars: explicit user choice wins; adapter.default_impl is the fallback.
+
+    The flow itself never reaches this fallback anymore (an unset impl
+    now skips the width step entirely -- see
+    test_impl_empty_selection_skips_width_step), so it's exercised
+    directly against the helper.
+    """
+    entry, adapter = _make_entry(hass)
+    adapter.default_impl = "bitImageColumn"
+    result = await _open_calibrate(hass, entry)
+    flow = hass.config_entries.options._progress[result["flow_id"]]
+
+    # User choice wins over adapter.default_impl.
+    flow._calib["impl"] = "graphics"
+    await flow._print_width_bars()
+    assert all(
+        call.kwargs["impl"] == "graphics" for call in adapter.print_image.await_args_list[-4:]
+    )
+
+    # No stored impl -- falls back to adapter.default_impl, not the
+    # hardcoded "bitImageRaster".
+    del flow._calib["impl"]
+    await flow._print_width_bars()
+    assert all(
+        call.kwargs["impl"] == "bitImageColumn" for call in adapter.print_image.await_args_list[-4:]
+    )
+
+
 async def test_width_continue_with_bar_stores_pixels_then_advances_to_ruler(hass):  # type: ignore[no-untyped-def]
     """Picking a matching bar stores width_pixels and routes to the ruler step."""
     entry, _adapter = _make_entry(hass)
     result = await _open_calibrate(hass, entry)
     result2 = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"impls_clean": [], "action": "continue"}
+        result["flow_id"], {"impls_clean": ["bitImageRaster"], "action": "continue"}
     )
     flow = hass.config_entries.options._progress[result2["flow_id"]]
 
@@ -190,7 +244,7 @@ async def test_width_continue_with_none_stores_nothing_then_advances_to_ruler(ha
     entry, _adapter = _make_entry(hass)
     result = await _open_calibrate(hass, entry)
     result2 = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"impls_clean": [], "action": "continue"}
+        result["flow_id"], {"impls_clean": ["bitImageRaster"], "action": "continue"}
     )
     flow = hass.config_entries.options._progress[result2["flow_id"]]
 
@@ -207,7 +261,7 @@ async def _advance_to_ruler(hass, entry):  # type: ignore[no-untyped-def]
     """Hop through impl + width to land on the ruler step."""
     result = await _open_calibrate(hass, entry)
     result2 = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"impls_clean": [], "action": "continue"}
+        result["flow_id"], {"impls_clean": ["bitImageRaster"], "action": "continue"}
     )
     return await hass.config_entries.options.async_configure(
         result2["flow_id"], {"first_equal": "none", "action": "continue"}
@@ -236,6 +290,10 @@ async def test_ruler_step_prints_once_and_shows_form(hass):  # type: ignore[no-u
     ]
     assert len(ruler_calls) == 1
     assert ruler_calls[0].kwargs.get("encoding") is None
+    # wrap=False + 96 cols: the ruler measures the true printable width
+    # instead of always breaking at the previously configured line_width.
+    assert ruler_calls[0].kwargs.get("wrap") is False
+    assert len(ruler_calls[0].kwargs["text"]) == 96
 
 
 async def test_ruler_reprint_reprints_and_reshows_same_step(hass):  # type: ignore[no-untyped-def]
@@ -283,8 +341,12 @@ async def test_ruler_zero_skips_storing_and_advances(hass):  # type: ignore[no-u
     assert "line_width" not in flow._calib
 
 
-async def test_ruler_low_value_shows_invalid_line_width_error(hass):  # type: ignore[no-untyped-def]
-    """1-15 is rejected with invalid_line_width and re-shows the ruler form."""
+async def test_ruler_low_value_shows_line_width_out_of_range_error(hass):  # type: ignore[no-untyped-def]
+    """1-15 is a positive number the user DID enter -- reject it with its own error key.
+
+    ``invalid_line_width`` ("Must be a positive number") is wrong here:
+    8 IS a positive number, it's just below the wizard's usable range.
+    """
     entry, _adapter = _make_entry(hass)
     result = await _advance_to_ruler(hass, entry)
 
@@ -294,7 +356,7 @@ async def test_ruler_low_value_shows_invalid_line_width_error(hass):  # type: ig
 
     assert result2["type"] == "form"
     assert result2["step_id"] == "calibrate_ruler"
-    assert result2["errors"]["base"] == "invalid_line_width"
+    assert result2["errors"]["base"] == "line_width_out_of_range"
 
 
 async def test_codepage_step_prints_one_line_per_candidate_with_encoding(hass, monkeypatch):  # type: ignore[no-untyped-def]
@@ -384,6 +446,28 @@ async def test_codepage_skip_stores_nothing(hass, monkeypatch):  # type: ignore[
     assert "codepages_match" not in flow._calib_extra
 
 
+async def test_codepage_choice_labels_carry_own_expected_rendering(hass, monkeypatch):  # type: ignore[no-untyped-def]
+    """Each choice label shows what THAT candidate is expected to print.
+
+    A CP437-class printer can't render the sample's '€' -- its own label
+    must show the '?' substitution, or the accept criterion (exact match
+    against a single shared reference) is impossible to satisfy on a
+    correctly-working printer.
+    """
+    monkeypatch.setattr(
+        "custom_components.escpos_printer._config_flow.calibration_steps.get_profile_codepages",
+        lambda profile: [],
+    )
+    entry, _adapter = _make_entry(hass)
+
+    result = await _advance_to_codepage(hass, entry)
+
+    assert result["type"] == "form"
+    labels = result["data_schema"].schema["codepages_match"].options
+    assert labels["CP437"] == "Line 5: CP437 — café ñ ü é ß ° ?"
+    assert labels["CP858"] == "Line 1: CP858 — café ñ ü é ß ° €"
+
+
 async def test_codepage_all_candidates_failing_shows_print_error(hass, monkeypatch):  # type: ignore[no-untyped-def]
     """If every candidate fails to print, the form re-shows a print-failure error."""
     monkeypatch.setattr(
@@ -398,6 +482,37 @@ async def test_codepage_all_candidates_failing_shows_print_error(hass, monkeypat
     assert result["type"] == "form"
     assert result["step_id"] == "calibrate_codepage"
     assert result["errors"]["base"] == "calibration_print_failed"
+
+
+async def test_codepage_candidate_the_profile_cannot_switch_to_is_dropped(hass, monkeypatch):  # type: ignore[no-untyped-def]
+    """A candidate is_valid_codepage_for_profile rejects is never printed or offered.
+
+    Without this guard the candidate could print under the printer's
+    PREVIOUS (still-active) codepage while carrying the new label --
+    false verification for an odd/Generic profile.
+    """
+    monkeypatch.setattr(
+        "custom_components.escpos_printer._config_flow.calibration_steps.get_profile_codepages",
+        lambda profile: [],
+    )
+    monkeypatch.setattr(
+        "custom_components.escpos_printer._config_flow.calibration_steps.is_valid_codepage_for_profile",
+        lambda cp, profile: cp != "CP437",
+    )
+    entry, adapter = _make_entry(hass)
+
+    result = await _advance_to_codepage(hass, entry)
+
+    assert result["type"] == "form"
+    encodings = [
+        call.kwargs["encoding"]
+        for call in adapter.print_text.await_args_list
+        if call.kwargs.get("encoding") is not None
+    ]
+    assert "CP437" not in encodings
+    assert set(encodings) == set(CODEPAGE_CANDIDATES) - {"CP437"}
+    offered = result["data_schema"].schema["codepages_match"].options
+    assert "CP437" not in offered
 
 
 async def test_codepage_profile_aware_narrowing(hass, monkeypatch):  # type: ignore[no-untyped-def]
@@ -484,6 +599,47 @@ async def test_skip_codepage_then_save_omits_codepage_key(hass, monkeypatch):  #
     assert result2["type"] == "create_entry"
     assert CONF_CODEPAGE not in result2["data"]
     assert result2["data"][CONF_WIDTH_PIXELS] == 576
+
+
+async def test_save_creates_persistent_notification_with_share_link(hass, monkeypatch):  # type: ignore[no-untyped-def]
+    """Saving posts a persistent notification carrying the share link.
+
+    Save closes the flow, so the on-screen GitHub link disappears with
+    it; the notification is the only place to find it again afterwards.
+    """
+    monkeypatch.setattr(
+        "custom_components.escpos_printer._config_flow.calibration_steps.get_profile_codepages",
+        lambda profile: [],
+    )
+    entry, _adapter = _make_entry(hass)
+    result = await _advance_to_summary(hass, entry)
+
+    result2 = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"model": "Rongta RP850P", "action": "save"}
+    )
+
+    assert result2["type"] == "create_entry"
+    notifications = hass.data[pn.DOMAIN]
+    notification_id = f"escpos_calibration_{entry.entry_id}"
+    assert notification_id in notifications
+    assert "Rongta%20RP850P" in notifications[notification_id][pn.ATTR_MESSAGE]
+
+
+async def test_discard_creates_no_persistent_notification(hass, monkeypatch):  # type: ignore[no-untyped-def]
+    """Discard doesn't post a notification -- nothing was saved to share."""
+    monkeypatch.setattr(
+        "custom_components.escpos_printer._config_flow.calibration_steps.get_profile_codepages",
+        lambda profile: [],
+    )
+    entry, _adapter = _make_entry(hass)
+    result = await _advance_to_summary(hass, entry)
+
+    result2 = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"model": "", "action": "discard"}
+    )
+
+    assert result2["type"] == "abort"
+    assert not hass.data.get(pn.DOMAIN)
 
 
 async def test_discard_aborts_without_touching_options(hass, monkeypatch):  # type: ignore[no-untyped-def]

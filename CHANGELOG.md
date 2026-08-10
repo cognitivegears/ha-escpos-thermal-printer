@@ -46,6 +46,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Printing an image on a profile that declares no image support now
   logs a warning (the print is still attempted).
 
+### Fixed
+
+- Calibration wizard's columns-per-line ruler now measures the printer's
+  true printable width instead of always breaking at whatever width was
+  already configured, so it could never detect a wider setting on a rerun.
+- Calibration wizard skips the paper-width step (instead of silently
+  testing it in a fallback image mode) when none of the image patterns
+  printed cleanly.
+- Calibration wizard no longer offers or tests character-encoding
+  candidates the printer's profile can't actually switch to.
+- Calibration wizard's character-encoding checkboxes now show each
+  candidate's own expected result, so printers that substitute "?" for
+  unsupported characters (e.g. CP437) can pass calibration.
+- Saving a calibration now posts a Home Assistant notification with the
+  printer-database share link, since the link was previously lost as
+  soon as the wizard closed.
+
 ## [1.0.0] - 2026-08-02
 
 ### Added

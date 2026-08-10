@@ -8,7 +8,7 @@ Targets coverage for:
 - base_adapter status listener add/remove
 """
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from homeassistant.const import CONF_HOST, CONF_PORT
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -177,6 +177,36 @@ async def test_wrap_text_zero_width_no_wrap(hass):  # type: ignore[no-untyped-de
 
     text = "some long text that would normally be wrapped into multiple lines"
     assert adapter._wrap_text(text) == text  # type: ignore[attr-defined]
+
+
+async def test_print_text_wrap_false_skips_wrapping(hass):  # type: ignore[no-untyped-def]
+    """print_text(wrap=False) sends the text unwrapped even with a configured line_width."""
+    entry = await _setup_entry(hass)
+    adapter = entry.runtime_data.adapter
+    adapter._config.line_width = 10  # type: ignore[attr-defined]
+
+    long_line = "abcdefghij klmnopqrst uvwxyz"
+    fake = MagicMock()
+    with patch("escpos.printer.Network", return_value=fake):
+        await adapter.print_text(hass, text=long_line, wrap=False)
+    fake.text.assert_called_once_with(long_line)
+
+
+async def test_print_text_wrap_default_true_wraps(hass):  # type: ignore[no-untyped-def]
+    """print_text's default (wrap unset) keeps today's wrapping behavior."""
+    entry = await _setup_entry(hass)
+    adapter = entry.runtime_data.adapter
+    adapter._config.line_width = 10  # type: ignore[attr-defined]
+
+    long_line = "abcdefghij klmnopqrst uvwxyz"
+    fake = MagicMock()
+    with patch("escpos.printer.Network", return_value=fake):
+        await adapter.print_text(hass, text=long_line)
+    fake.text.assert_called_once()
+    printed = fake.text.call_args.args[0]
+    assert printed != long_line
+    for line in printed.splitlines():
+        assert len(line) <= 10
 
 
 async def test_get_profile_pixel_width_handles_broken_profile_data(hass):  # type: ignore[no-untyped-def]
