@@ -58,6 +58,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   (kinder to the print head on battery-powered Bluetooth printers).
 
 ### Fixed
+- Every calibration test page now prints a title ("= CALIBRATE 1/4: IMAGE
+  MODE ="), a one-line instruction, and trailing feed lines so the steps are
+  self-explanatory and visually separated on the roll.
 - Calibration codepage lines now print their codepage name (e.g. "1 CP858:")
   so the paper matches the on-screen checkboxes directly.
 - Calibration ruler readability: full numbers (10, 20, 30...) embedded in the

@@ -162,6 +162,24 @@ class CalibrationFlowMixin:
             return None
         return self.config_entry.runtime_data.adapter
 
+    async def _print_step_header(self, adapter: Any, title: str, instruction: str) -> None:
+        """Print a compact on-paper title + one-line instruction.
+
+        Both lines are kept under ~30 chars so they don't wrap even on
+        32-column printers. Header failures are non-fatal — the test page
+        still works without it, and the content prints have their own
+        error handling.
+        """
+        with contextlib.suppress(Exception):
+            await adapter.print_text(
+                self.hass, text=f"= {title} =\n{instruction}\n", cut="none", feed=0
+            )
+
+    async def _print_step_trailer(self, adapter: Any, feed: int = 3) -> None:
+        """Blank feed after a step's page so steps separate on the roll."""
+        with contextlib.suppress(Exception):
+            await adapter.print_text(self.hass, text="", cut="none", feed=feed)
+
     async def _print_impl_candidates(self, adapter: Any) -> bool:
         """Print a labeled test page per image-implementation candidate.
 
@@ -169,6 +187,9 @@ class CalibrationFlowMixin:
         transport-level command (e.g. "graphics") can't brick the rest
         of the wizard. Returns True if at least one candidate printed.
         """
+        await self._print_step_header(
+            adapter, "CALIBRATE 1/4: IMAGE MODE", "Check clean patterns in app"
+        )
         any_ok = False
         for n, candidate in enumerate(IMPL_CANDIDATES, start=1):
             try:
@@ -197,6 +218,8 @@ class CalibrationFlowMixin:
                     await adapter.print_text(
                         self.hass, text=f"TEST {n}: FAILED TO SEND\n", cut="none", feed=0
                     )
+        if any_ok:
+            await self._print_step_trailer(adapter)
         return any_ok
 
     async def async_step_calibrate_impl(
@@ -248,6 +271,9 @@ class CalibrationFlowMixin:
 
     async def _print_width_bars(self, adapter: Any) -> None:
         """Print one bar per candidate width, using the impl chosen so far."""
+        await self._print_step_header(
+            adapter, "CALIBRATE 2/4: WIDTH BARS", "First bar equal to bottom?"
+        )
         impl = self._calib.get("impl") or getattr(adapter, "default_impl", None) or DEFAULT_IMPL
         for w in WIDTH_CANDIDATES:
             # width=w beats a narrower profile/opts width in the image
@@ -263,6 +289,7 @@ class CalibrationFlowMixin:
                 feed=1,
                 auto_resize=False,
             )
+        await self._print_step_trailer(adapter, feed=2)
 
     async def async_step_calibrate_width(
         self, user_input: dict[str, Any] | None = None
@@ -318,12 +345,12 @@ class CalibrationFlowMixin:
                 # explicitly ignorable without consulting the screen.
                 await adapter.print_text(
                     self.hass,
-                    text="Read FIRST line: last number + dots after it\n",
+                    text="= CALIBRATE 3/4: COLUMNS =\n1st line: last number + dots\n",
                     cut="none",
                     feed=0,
                 )
                 await adapter.print_text(
-                    self.hass, text=build_ruler(96), cut="none", feed=1, wrap=False
+                    self.hass, text=build_ruler(96), cut="none", feed=3, wrap=False
                 )
             except Exception as err:
                 _LOGGER.warning("Calibration ruler step failed: %s", sanitize_log_message(str(err)))
@@ -382,6 +409,9 @@ class CalibrationFlowMixin:
         printer rejects can't brick the rest of the step. Returns the
         candidates that printed successfully, mapped to their line number.
         """
+        await self._print_step_header(
+            adapter, "CALIBRATE 4/4: ENCODING", "Check matching lines in app"
+        )
         printed: dict[str, int] = {}
         for n, cp in enumerate(candidates, start=1):
             try:
@@ -404,13 +434,7 @@ class CalibrationFlowMixin:
                     sanitize_log_message(str(err)),
                 )
         if printed:
-            try:
-                await adapter.print_text(self.hass, text="", cut="none", feed=2)
-            except Exception as err:
-                _LOGGER.debug(
-                    "Calibration codepage trailing feed failed to print: %s",
-                    sanitize_log_message(str(err)),
-                )
+            await self._print_step_trailer(adapter)
         return printed
 
     async def async_step_calibrate_codepage(

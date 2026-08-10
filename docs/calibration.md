@@ -30,6 +30,9 @@ choose **Save calibration**; running the wizard and closing it early, or
 choosing **Discard**, changes nothing.
 
 Budget roughly 15–20 cm of paper for a full run through all five steps.
+Each test page prints its own title (for example `= CALIBRATE 1/4: IMAGE
+MODE =`) and a one-line instruction, and ends with a few blank lines so
+the steps are easy to tell apart on the roll.
 
 Before printing anything, the wizard shows a confirmation screen
 restating that paper cost and asking you to make sure paper is loaded —

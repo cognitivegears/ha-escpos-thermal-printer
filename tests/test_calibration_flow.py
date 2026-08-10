@@ -152,7 +152,8 @@ async def test_calibrate_confirm_start_advances_to_impl_step(hass):  # type: ign
 
     assert result["type"] == "form"
     assert result["step_id"] == "calibrate_impl"
-    assert adapter.print_text.await_count == 3
+    # header + 3 labels + trailing feed
+    assert adapter.print_text.await_count == 5
 
 
 async def test_calibrate_prints_impl_candidates_and_shows_form(hass):  # type: ignore[no-untyped-def]
@@ -165,13 +166,16 @@ async def test_calibrate_prints_impl_candidates_and_shows_form(hass):  # type: i
     assert result["step_id"] == "calibrate_impl"
     assert result.get("errors") in (None, {})
 
-    assert adapter.print_text.await_count == 3
+    # header + 3 labels + trailing feed
+    assert adapter.print_text.await_count == 5
     texts = [call.kwargs["text"] for call in adapter.print_text.await_args_list]
+    # First print is the on-paper title + instruction header.
+    assert texts[0].startswith("= CALIBRATE 1/4")
     # Labels must carry their own newline: they print with feed=0, and
     # ESC/POS only flushes the text line buffer on a newline or feed —
     # without it, raster printers drop the buffered label entirely and
     # column printers merge it into the pattern line (seen on RP850P).
-    assert texts == ["TEST 1\n", "TEST 2\n", "TEST 3\n"]
+    assert [t for t in texts if t.startswith("TEST")] == ["TEST 1\n", "TEST 2\n", "TEST 3\n"]
 
     assert adapter.print_image.await_count == 3
     impls = [call.kwargs["impl"] for call in adapter.print_image.await_args_list]
@@ -189,7 +193,8 @@ async def test_impl_reprint_reprints_and_reshows_same_step(hass):  # type: ignor
 
     assert result2["type"] == "form"
     assert result2["step_id"] == "calibrate_impl"
-    assert adapter.print_text.await_count == 6
+    # Two full passes: (header + 3 labels + trailer) x 2
+    assert adapter.print_text.await_count == 10
     assert adapter.print_image.await_count == 6
 
 
@@ -544,7 +549,8 @@ async def test_codepage_reprint_reprints(hass, monkeypatch):  # type: ignore[no-
 
     assert result2["type"] == "form"
     assert result2["step_id"] == "calibrate_codepage"
-    assert adapter.print_text.await_count == before + len(CODEPAGE_CANDIDATES) + 1
+    # header + one line per candidate + trailing feed
+    assert adapter.print_text.await_count == before + len(CODEPAGE_CANDIDATES) + 2
 
 
 async def test_codepage_continue_stores_first_in_candidate_order(hass, monkeypatch):  # type: ignore[no-untyped-def]
