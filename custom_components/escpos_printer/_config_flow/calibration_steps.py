@@ -174,7 +174,7 @@ class CalibrationFlowMixin:
                 self.hass, text=f"= {title} =\n{instruction}\n", cut="none", feed=0
             )
 
-    async def _print_step_trailer(self, adapter: Any, feed: int = 3) -> None:
+    async def _print_step_trailer(self, adapter: Any, feed: int = 5) -> None:
         """Blank feed after a step's page so steps separate on the roll."""
         with contextlib.suppress(Exception):
             await adapter.print_text(self.hass, text="", cut="none", feed=feed)
@@ -288,7 +288,7 @@ class CalibrationFlowMixin:
                 feed=1,
                 auto_resize=False,
             )
-        await self._print_step_trailer(adapter, feed=2)
+        await self._print_step_trailer(adapter, feed=4)
 
     async def async_step_calibrate_width(
         self, user_input: dict[str, Any] | None = None
@@ -349,7 +349,7 @@ class CalibrationFlowMixin:
                     feed=0,
                 )
                 await adapter.print_text(
-                    self.hass, text=build_ruler(96), cut="none", feed=3, wrap=False
+                    self.hass, text=build_ruler(96), cut="none", feed=5, wrap=False
                 )
             except Exception as err:
                 _LOGGER.warning("Calibration ruler step failed: %s", sanitize_log_message(str(err)))
