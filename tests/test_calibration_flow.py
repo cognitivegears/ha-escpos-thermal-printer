@@ -85,11 +85,19 @@ def _make_entry(
 
 
 async def _open_calibrate(hass, entry):  # type: ignore[no-untyped-def]
-    """Hop through the init menu to the calibrate step."""
+    """Hop through the init menu and the confirm screen to land on the impl step.
+
+    If the entry isn't loaded, ``async_step_calibrate`` aborts before the
+    confirm screen ever shows -- return that abort result as-is rather
+    than submitting a second, now-nonexistent flow.
+    """
     result = await hass.config_entries.options.async_init(entry.entry_id)
-    return await hass.config_entries.options.async_configure(
+    result = await hass.config_entries.options.async_configure(
         result["flow_id"], {"next_step_id": "calibrate"}
     )
+    if result["type"] != "form" or result.get("step_id") != "calibrate_confirm":
+        return result
+    return await hass.config_entries.options.async_configure(result["flow_id"], {"action": "start"})
 
 
 async def test_calibrate_aborts_when_entry_not_loaded(hass):  # type: ignore[no-untyped-def]
@@ -100,6 +108,51 @@ async def test_calibrate_aborts_when_entry_not_loaded(hass):  # type: ignore[no-
 
     assert result["type"] == "abort"
     assert result["reason"] == "printer_not_ready"
+
+
+async def test_calibrate_shows_paper_cost_confirm_screen_first(hass):  # type: ignore[no-untyped-def]
+    """The wizard's very first screen is the paper-cost confirmation --
+    no test page is printed until the user starts it."""
+    entry, adapter = _make_entry(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "calibrate"}
+    )
+
+    assert result["type"] == "form"
+    assert result["step_id"] == "calibrate_confirm"
+    assert adapter.print_text.await_count == 0
+    assert adapter.print_image.await_count == 0
+
+
+async def test_calibrate_confirm_cancel_aborts_without_printing(hass):  # type: ignore[no-untyped-def]
+    """Cancelling the confirm screen aborts calibration_discarded, nothing printed."""
+    entry, adapter = _make_entry(hass)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "calibrate"}
+    )
+
+    result2 = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"action": "cancel"}
+    )
+
+    assert result2["type"] == "abort"
+    assert result2["reason"] == "calibration_discarded"
+    assert adapter.print_text.await_count == 0
+    assert adapter.print_image.await_count == 0
+
+
+async def test_calibrate_confirm_start_advances_to_impl_step(hass):  # type: ignore[no-untyped-def]
+    """Starting the confirm screen advances into the impl step (which prints)."""
+    entry, adapter = _make_entry(hass)
+
+    result = await _open_calibrate(hass, entry)
+
+    assert result["type"] == "form"
+    assert result["step_id"] == "calibrate_impl"
+    assert adapter.print_text.await_count == 3
 
 
 async def test_calibrate_prints_impl_candidates_and_shows_form(hass):  # type: ignore[no-untyped-def]
@@ -134,6 +187,22 @@ async def test_impl_reprint_reprints_and_reshows_same_step(hass):  # type: ignor
     assert result2["step_id"] == "calibrate_impl"
     assert adapter.print_text.await_count == 6
     assert adapter.print_image.await_count == 6
+
+
+async def test_impl_reprint_preserves_checked_selection(hass):  # type: ignore[no-untyped-def]
+    """Reprinting must not wipe the boxes the user already checked."""
+    entry, _adapter = _make_entry(hass)
+    result = await _open_calibrate(hass, entry)
+
+    result2 = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"impls_clean": ["bitImageColumn"], "action": "reprint"}
+    )
+
+    assert result2["type"] == "form"
+    assert result2["step_id"] == "calibrate_impl"
+    schema = result2["data_schema"].schema
+    impls_key = next(k for k in schema if k.schema == "impls_clean")
+    assert impls_key.description == {"suggested_value": ["bitImageColumn"]}
 
 
 async def test_impl_all_candidates_failing_shows_print_error(hass):  # type: ignore[no-untyped-def]
@@ -230,7 +299,7 @@ async def test_width_bars_prefer_calib_impl_then_adapter_default(hass):  # type:
 
     # User choice wins over adapter.default_impl.
     flow._calib["impl"] = "graphics"
-    await flow._print_width_bars()
+    await flow._print_width_bars(adapter)
     assert all(
         call.kwargs["impl"] == "graphics" for call in adapter.print_image.await_args_list[-5:]
     )
@@ -238,7 +307,7 @@ async def test_width_bars_prefer_calib_impl_then_adapter_default(hass):  # type:
     # No stored impl -- falls back to adapter.default_impl, not the
     # hardcoded "bitImageRaster".
     del flow._calib["impl"]
-    await flow._print_width_bars()
+    await flow._print_width_bars(adapter)
     assert all(
         call.kwargs["impl"] == "bitImageColumn" for call in adapter.print_image.await_args_list[-5:]
     )
@@ -278,6 +347,29 @@ async def test_width_continue_with_none_stores_nothing_then_advances_to_ruler(ha
     assert result3["type"] == "form"
     assert result3["step_id"] == "calibrate_ruler"
     assert "width_pixels" not in flow._calib
+
+
+async def test_width_step_aborts_if_entry_unloads_mid_wizard(hass):  # type: ignore[no-untyped-def]
+    """The entry can unload between showing a step's form and the user
+    submitting it (HA restart, a reload triggered from another browser
+    tab) -- the step must abort cleanly instead of crashing with
+    AttributeError on a stale ``runtime_data.adapter`` reference.
+    """
+    entry, _adapter = _make_entry(hass)
+    result = await _open_calibrate(hass, entry)
+    result2 = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"impls_clean": ["bitImageRaster"], "action": "continue"}
+    )
+    assert result2["step_id"] == "calibrate_width"
+
+    entry.mock_state(hass, ConfigEntryState.NOT_LOADED)
+
+    result3 = await hass.config_entries.options.async_configure(
+        result2["flow_id"], {"first_equal": "none", "action": "reprint"}
+    )
+
+    assert result3["type"] == "abort"
+    assert result3["reason"] == "printer_not_ready"
 
 
 async def _advance_to_ruler(hass, entry):  # type: ignore[no-untyped-def]
@@ -332,6 +424,22 @@ async def test_ruler_reprint_reprints_and_reshows_same_step(hass):  # type: igno
     assert result2["type"] == "form"
     assert result2["step_id"] == "calibrate_ruler"
     assert adapter.print_text.await_count == before + 1
+
+
+async def test_ruler_reprint_preserves_entered_marker(hass):  # type: ignore[no-untyped-def]
+    """Reprinting must not wipe the marker value the user already entered."""
+    entry, _adapter = _make_entry(hass)
+    result = await _advance_to_ruler(hass, entry)
+
+    result2 = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"last_marker": 48, "action": "reprint"}
+    )
+
+    assert result2["type"] == "form"
+    assert result2["step_id"] == "calibrate_ruler"
+    schema = result2["data_schema"].schema
+    marker_key = next(k for k in schema if k.schema == "last_marker")
+    assert marker_key.description == {"suggested_value": 48}
 
 
 async def test_ruler_marker_stores_line_width_and_advances_to_codepage(hass):  # type: ignore[no-untyped-def]

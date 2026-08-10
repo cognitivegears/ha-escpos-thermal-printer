@@ -59,6 +59,7 @@ _IMPL_LABELS = {
     "graphics": "Pattern 3 (Graphics)",
 }
 _ACTION_CHOICES = {"continue": "Continue", "reprint": "Reprint the test page"}
+_CONFIRM_ACTION_CHOICES = {"start": "Start calibration", "cancel": "Cancel"}
 # Derived from WIDTH_CANDIDATES so the bar numbers/labels can't drift out
 # of sync with what _print_width_bars actually prints.
 _WIDTH_CHOICES: dict[str, str] = {
@@ -119,23 +120,55 @@ class CalibrationFlowMixin:
     async def async_step_calibrate(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Calibration wizard entry: guard on a loaded entry, then start at impl."""
+        """Calibration wizard entry: guard on a loaded entry, then start at the confirm screen."""
         if self.config_entry.state is not ConfigEntryState.LOADED:
             return self.async_abort(  # type: ignore[attr-defined,no-any-return]
                 reason="printer_not_ready"
             )
         self._calib = {}
         self._calib_extra = {}
-        return await self.async_step_calibrate_impl()
+        return await self.async_step_calibrate_confirm()
 
-    async def _print_impl_candidates(self) -> bool:
+    async def async_step_calibrate_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Paper-cost confirmation shown before any test page is printed."""
+        if user_input is not None:
+            if user_input.get("action") == "cancel":
+                return self.async_abort(  # type: ignore[attr-defined,no-any-return]
+                    reason="calibration_discarded"
+                )
+            return await self.async_step_calibrate_impl()
+
+        schema = vol.Schema(
+            {
+                vol.Required("action", default="start"): vol.In(_CONFIRM_ACTION_CHOICES),
+            }
+        )
+        return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
+            step_id="calibrate_confirm", data_schema=schema
+        )
+
+    def _calibration_adapter(self) -> Any | None:
+        """Return the live printer adapter, or None if the entry is no longer loaded.
+
+        The config entry can unload while the wizard is open in a browser
+        tab (an HA restart, or a reload triggered from another tab) --
+        every step that prints must check this before dereferencing
+        ``runtime_data.adapter``, or a stale/missing ``runtime_data``
+        crashes with AttributeError instead of aborting cleanly.
+        """
+        if self.config_entry.state is not ConfigEntryState.LOADED:
+            return None
+        return self.config_entry.runtime_data.adapter
+
+    async def _print_impl_candidates(self, adapter: Any) -> bool:
         """Print a labeled test page per image-implementation candidate.
 
         Each candidate is attempted independently so one rejecting a
         transport-level command (e.g. "graphics") can't brick the rest
         of the wizard. Returns True if at least one candidate printed.
         """
-        adapter = self.config_entry.runtime_data.adapter
         any_ok = False
         for n, candidate in enumerate(IMPL_CANDIDATES, start=1):
             try:
@@ -168,8 +201,13 @@ class CalibrationFlowMixin:
         """Print the impl test pages, then let the user pick which printed cleanly."""
         errors: dict[str, str] = {}
         if user_input is None or user_input.get("action") == "reprint":
+            adapter = self._calibration_adapter()
+            if adapter is None:
+                return self.async_abort(  # type: ignore[attr-defined,no-any-return]
+                    reason="printer_not_ready"
+                )
             try:
-                if not await self._print_impl_candidates():
+                if not await self._print_impl_candidates(adapter):
                     errors["base"] = "calibration_print_failed"
             except Exception as err:
                 _LOGGER.warning("Calibration impl step failed: %s", sanitize_log_message(str(err)))
@@ -192,13 +230,16 @@ class CalibrationFlowMixin:
                 vol.Required("action", default="continue"): vol.In(_ACTION_CHOICES),
             }
         )
+        if user_input is not None:
+            # Reprint: keep the boxes the user already checked instead of
+            # wiping them back to the schema defaults.
+            schema = self.add_suggested_values_to_schema(schema, user_input)  # type: ignore[attr-defined]
         return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
             step_id="calibrate_impl", data_schema=schema, errors=errors
         )
 
-    async def _print_width_bars(self) -> None:
+    async def _print_width_bars(self, adapter: Any) -> None:
         """Print one bar per candidate width, using the impl chosen so far."""
-        adapter = self.config_entry.runtime_data.adapter
         impl = self._calib.get("impl") or getattr(adapter, "default_impl", None) or DEFAULT_IMPL
         for w in WIDTH_CANDIDATES:
             # width=w beats a narrower profile/opts width in the image
@@ -221,8 +262,13 @@ class CalibrationFlowMixin:
         """Print the width bars, then let the user pick where they stop matching."""
         errors: dict[str, str] = {}
         if user_input is None or user_input.get("action") == "reprint":
+            adapter = self._calibration_adapter()
+            if adapter is None:
+                return self.async_abort(  # type: ignore[attr-defined,no-any-return]
+                    reason="printer_not_ready"
+                )
             try:
-                await self._print_width_bars()
+                await self._print_width_bars(adapter)
             except Exception as err:
                 _LOGGER.warning("Calibration width step failed: %s", sanitize_log_message(str(err)))
                 errors["base"] = "calibration_print_failed"
@@ -238,6 +284,8 @@ class CalibrationFlowMixin:
                 vol.Required("action", default="continue"): vol.In(_ACTION_CHOICES),
             }
         )
+        if user_input is not None:
+            schema = self.add_suggested_values_to_schema(schema, user_input)  # type: ignore[attr-defined]
         return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
             step_id="calibrate_width", data_schema=schema, errors=errors
         )
@@ -248,8 +296,12 @@ class CalibrationFlowMixin:
         """Print a column ruler, then let the user report where it stops matching."""
         errors: dict[str, str] = {}
         if user_input is None or user_input.get("action") == "reprint":
+            adapter = self._calibration_adapter()
+            if adapter is None:
+                return self.async_abort(  # type: ignore[attr-defined,no-any-return]
+                    reason="printer_not_ready"
+                )
             try:
-                adapter = self.config_entry.runtime_data.adapter
                 await adapter.print_text(
                     self.hass, text=build_ruler(96), cut="none", feed=1, wrap=False
                 )
@@ -273,6 +325,8 @@ class CalibrationFlowMixin:
                 vol.Required("action", default="continue"): vol.In(_ACTION_CHOICES),
             }
         )
+        if user_input is not None:
+            schema = self.add_suggested_values_to_schema(schema, user_input)  # type: ignore[attr-defined]
         return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
             step_id="calibrate_ruler", data_schema=schema, errors=errors
         )
@@ -295,14 +349,15 @@ class CalibrationFlowMixin:
         profile_codepages = await self.hass.async_add_executor_job(get_profile_codepages, profile)
         return tuple(cp for cp in CODEPAGE_CANDIDATES if cp in profile_codepages)
 
-    async def _print_codepage_candidates(self, candidates: tuple[str, ...]) -> dict[str, int]:
+    async def _print_codepage_candidates(
+        self, adapter: Any, candidates: tuple[str, ...]
+    ) -> dict[str, int]:
         """Print a labeled sample line per codepage candidate.
 
         Each candidate is attempted independently -- one codepage the
         printer rejects can't brick the rest of the step. Returns the
         candidates that printed successfully, mapped to their line number.
         """
-        adapter = self.config_entry.runtime_data.adapter
         printed: dict[str, int] = {}
         for n, cp in enumerate(candidates, start=1):
             try:
@@ -343,8 +398,13 @@ class CalibrationFlowMixin:
             return await self.async_step_calibrate_summary()
         printed: dict[str, int] = {}
         if user_input is None or user_input.get("action") == "reprint":
+            adapter = self._calibration_adapter()
+            if adapter is None:
+                return self.async_abort(  # type: ignore[attr-defined,no-any-return]
+                    reason="printer_not_ready"
+                )
             try:
-                printed = await self._print_codepage_candidates(candidates)
+                printed = await self._print_codepage_candidates(adapter, candidates)
                 if not printed:
                     errors["base"] = "calibration_print_failed"
             except Exception as err:
@@ -368,6 +428,8 @@ class CalibrationFlowMixin:
                 vol.Required("action", default="continue"): vol.In(_CODEPAGE_ACTION_CHOICES),
             }
         )
+        if user_input is not None:
+            schema = self.add_suggested_values_to_schema(schema, user_input)  # type: ignore[attr-defined]
         return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
             step_id="calibrate_codepage",
             data_schema=schema,

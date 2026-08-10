@@ -378,6 +378,13 @@
           "serial_write_chunk_delay_ms": "Pause between consecutive chunks (milliseconds). Allows the receiving device time to drain its buffer. Only applies when chunk size is non-zero."
         }
       },
+      "calibrate_confirm": {
+        "title": "Calibrate printer",
+        "description": "This wizard prints a series of test pages to measure your printer's image implementation, paper width, characters per line, and character encoding — using roughly 15–20 cm of paper in total. Make sure paper is loaded before continuing.",
+        "data": {
+          "action": "Action"
+        }
+      },
       "calibrate_impl": {
         "title": "Calibrate: image implementation",
         "description": "Your printer just printed three numbered test patterns. A working pattern is a crisp checkerboard; a failing one prints stray letters or nothing. Check every pattern that printed cleanly. If none of the patterns printed cleanly, leave all boxes unchecked — the width test will be skipped since it needs a working image mode.",

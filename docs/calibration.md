@@ -31,6 +31,10 @@ choosing **Discard**, changes nothing.
 
 Budget roughly 15–20 cm of paper for a full run through all five steps.
 
+Before printing anything, the wizard shows a confirmation screen
+restating that paper cost and asking you to make sure paper is loaded —
+choose "Start calibration" to proceed or "Cancel" to back out untouched.
+
 ## The five steps
 
 ### 1. Image implementation
