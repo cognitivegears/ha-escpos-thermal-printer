@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import socket
 from unittest.mock import MagicMock, patch
 
 from custom_components.escpos_printer._config_flow.network_helpers import (
