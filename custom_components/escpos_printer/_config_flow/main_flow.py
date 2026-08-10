@@ -46,6 +46,7 @@ class EscposConfigFlow(
     def __init__(self) -> None:
         """Initialize config flow."""
         self._user_data: dict[str, Any] = {}
+        self._detected: dict[str, str] = {}
         self._discovered_printers: list[dict[str, Any]] = []
         self._all_usb_devices: list[dict[str, Any]] = []
         self._paired_bt_devices: list[dict[str, Any]] = []

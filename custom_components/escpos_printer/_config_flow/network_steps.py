@@ -17,13 +17,15 @@ from ..capabilities import (
 )
 from ..const import (
     CONF_CONNECTION_TYPE,
+    CONF_DETECTED_MANUFACTURER,
+    CONF_DETECTED_MODEL,
     CONF_PROFILE,
     CONF_TIMEOUT,
     CONNECTION_TYPE_NETWORK,
     DEFAULT_PORT,
     DEFAULT_TIMEOUT,
 )
-from .network_helpers import _can_connect
+from .network_helpers import _can_connect, query_printer_id
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,6 +47,7 @@ class NetworkFlowMixin:
     # These attributes are expected from the main flow class
     hass: Any
     _user_data: dict[str, Any]
+    _detected: dict[str, str]
 
     async def async_step_network(
         self, user_input: dict[str, Any] | None = None
@@ -78,6 +81,14 @@ class NetworkFlowMixin:
             if ok:
                 _LOGGER.debug("Connection test succeeded for %s:%s", host, port)
 
+                # Best-effort GS I identification. Reuse a discovery-time
+                # result (e.g. DHCP discovery step) instead of querying
+                # again when one is already available.
+                detected = self._detected or (
+                    await self.hass.async_add_executor_job(query_printer_id, host, port, timeout)
+                    or {}
+                )
+
                 # Store data and determine next step
                 profile = user_input.get(CONF_PROFILE, PROFILE_AUTO)
                 self._user_data = {
@@ -87,6 +98,10 @@ class NetworkFlowMixin:
                     CONF_TIMEOUT: timeout,
                     CONF_PROFILE: profile,
                 }
+                if detected.get("manufacturer"):
+                    self._user_data[CONF_DETECTED_MANUFACTURER] = detected["manufacturer"]
+                if detected.get("model"):
+                    self._user_data[CONF_DETECTED_MODEL] = detected["model"]
 
                 # If custom profile selected, go to custom profile step
                 if profile == PROFILE_CUSTOM:
@@ -152,6 +167,11 @@ class NetworkFlowMixin:
                 _can_connect, host, port, timeout
             )
             if ok:
+                detected = (
+                    await self.hass.async_add_executor_job(query_printer_id, host, port, timeout)
+                    or {}
+                )
+
                 # Only follow the address to a new auto-generated title
                 # when the entry still carries the original auto-generated
                 # one -- a user's manual rename must never be clobbered.
@@ -168,6 +188,16 @@ class NetworkFlowMixin:
                         CONF_HOST: host,
                         CONF_PORT: port,
                         CONF_TIMEOUT: timeout,
+                        **(
+                            {CONF_DETECTED_MANUFACTURER: detected["manufacturer"]}
+                            if detected.get("manufacturer")
+                            else {}
+                        ),
+                        **(
+                            {CONF_DETECTED_MODEL: detected["model"]}
+                            if detected.get("model")
+                            else {}
+                        ),
                     },
                 )
             errors["base"] = "cannot_connect"

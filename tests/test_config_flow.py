@@ -21,9 +21,15 @@ from custom_components.escpos_printer.const import (
 
 async def test_config_flow_success(hass):  # type: ignore[no-untyped-def]
     """Test successful three-step config flow for network printer."""
-    with patch(
-        "custom_components.escpos_printer._config_flow.network_steps._can_connect",
-        return_value=True,
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=True,
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
     ):
         # Step 1: Connection type selection
         result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
@@ -75,9 +81,15 @@ async def test_config_flow_success(hass):  # type: ignore[no-untyped-def]
 
 async def test_config_flow_connection_failure(hass):  # type: ignore[no-untyped-def]
     """Test config flow with connection failure."""
-    with patch(
-        "custom_components.escpos_printer._config_flow.network_steps._can_connect",
-        return_value=False,
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=False,
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
     ):
         # Step 1: Connection type selection
         result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
@@ -108,9 +120,15 @@ async def test_config_flow_connection_failure(hass):  # type: ignore[no-untyped-
 
 async def test_config_flow_with_profile_selection(hass):  # type: ignore[no-untyped-def]
     """Test config flow with profile selection."""
-    with patch(
-        "custom_components.escpos_printer._config_flow.network_steps._can_connect",
-        return_value=True,
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=True,
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
     ):
         # Step 1: Connection type selection
         result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
@@ -154,9 +172,15 @@ async def test_config_flow_with_profile_selection(hass):  # type: ignore[no-unty
 
 async def test_config_flow_custom_profile(hass):  # type: ignore[no-untyped-def]
     """Test config flow with custom profile entry."""
-    with patch(
-        "custom_components.escpos_printer._config_flow.network_steps._can_connect",
-        return_value=True,
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=True,
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
     ):
         # Step 1: Connection type selection
         result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
@@ -215,6 +239,10 @@ async def test_config_flow_custom_codepage(hass):  # type: ignore[no-untyped-def
             "custom_components.escpos_printer._config_flow.settings_steps.is_valid_codepage_for_profile",
             return_value=True,
         ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
     ):
         # Step 1: Connection type selection
         result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
@@ -259,9 +287,15 @@ async def test_config_flow_custom_codepage(hass):  # type: ignore[no-untyped-def
 
 async def test_config_flow_custom_line_width(hass):  # type: ignore[no-untyped-def]
     """Test config flow with custom line width entry."""
-    with patch(
-        "custom_components.escpos_printer._config_flow.network_steps._can_connect",
-        return_value=True,
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=True,
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
     ):
         # Step 1: Connection type selection
         result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
@@ -318,6 +352,10 @@ async def test_config_flow_custom_codepage_and_custom_line_width(hass):  # type:
             "custom_components.escpos_printer._config_flow.settings_steps.is_valid_codepage_for_profile",
             return_value=True,
         ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
     ):
         result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
         result2 = await hass.config_entries.flow.async_configure(
@@ -369,6 +407,10 @@ async def test_config_flow_custom_codepage_and_line_width_keep_impl_and_width_pi
             "custom_components.escpos_printer._config_flow.settings_steps.is_valid_codepage_for_profile",
             return_value=True,
         ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
     ):
         result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
         result2 = await hass.config_entries.flow.async_configure(
@@ -401,3 +443,62 @@ async def test_config_flow_custom_codepage_and_line_width_keep_impl_and_width_pi
         assert result6["type"] == "create_entry"
         assert result6["data"][CONF_IMPL] == "bitImageColumn"
         assert result6["data"][CONF_WIDTH_PIXELS] == 576
+
+
+async def test_network_flow_persists_detected_fields(hass):  # type: ignore[no-untyped-def]
+    """GS I result lands in entry.data as detected_manufacturer/model."""
+    from custom_components.escpos_printer.const import (
+        CONF_DETECTED_MANUFACTURER,
+        CONF_DETECTED_MODEL,
+    )
+
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=True,
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value={"manufacturer": "EPSON", "model": "TM-T20II"},
+        ),
+    ):
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_HOST: "192.168.10.157", CONF_PORT: 9100}
+        )
+        # Complete the codepage step with defaults to create the entry.
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+
+    assert result["type"] == "create_entry"
+    assert result["data"][CONF_DETECTED_MANUFACTURER] == "EPSON"
+    assert result["data"][CONF_DETECTED_MODEL] == "TM-T20II"
+
+
+async def test_network_flow_no_reply_omits_detected_fields(hass):  # type: ignore[no-untyped-def]
+    """query_printer_id -> None leaves entry.data without detected keys."""
+    from custom_components.escpos_printer.const import CONF_DETECTED_MODEL
+
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=True,
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
+    ):
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_HOST: "192.168.10.157", CONF_PORT: 9100}
+        )
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+
+    assert result["type"] == "create_entry"
+    assert CONF_DETECTED_MODEL not in result["data"]

@@ -111,6 +111,10 @@ async def test_reconfigure_network_happy_path(hass):  # type: ignore[no-untyped-
             "custom_components.escpos_printer._config_flow.network_steps._can_connect",
             return_value=True,
         ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
         patch("custom_components.escpos_printer.async_setup_entry", return_value=True),
     ):
         result = await entry.start_reconfigure_flow(hass)
@@ -156,6 +160,10 @@ async def test_reconfigure_network_preserves_manual_rename(hass):  # type: ignor
             "custom_components.escpos_printer._config_flow.network_steps._can_connect",
             return_value=True,
         ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
         patch("custom_components.escpos_printer.async_setup_entry", return_value=True),
     ):
         result = await entry.start_reconfigure_flow(hass)
@@ -189,9 +197,15 @@ async def test_reconfigure_network_cannot_connect(hass):  # type: ignore[no-unty
     )
     entry.add_to_hass(hass)
 
-    with patch(
-        "custom_components.escpos_printer._config_flow.network_steps._can_connect",
-        return_value=False,
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=False,
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
     ):
         result = await entry.start_reconfigure_flow(hass)
         result2 = await hass.config_entries.flow.async_configure(
@@ -608,10 +622,16 @@ async def test_reconfigure_network_case_insensitive_collision_aborts(hass):  # t
     entry.add_to_hass(hass)
     entry_id = entry.entry_id
 
-    with patch(
-        "custom_components.escpos_printer._config_flow.network_steps._can_connect",
-        return_value=True,
-    ) as mock_connect:
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=True,
+        ) as mock_connect,
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
+    ):
         result = await entry.start_reconfigure_flow(hass)
         assert result["step_id"] == "reconfigure_network"
 
