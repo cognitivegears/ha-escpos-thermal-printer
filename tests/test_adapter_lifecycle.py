@@ -169,6 +169,24 @@ async def test_wrap_text_respects_line_width(hass):  # type: ignore[no-untyped-d
         assert len(line) <= 10, f"line too long: {line!r}"
 
 
+async def test_wrap_text_preserves_trailing_newline(hass):  # type: ignore[no-untyped-def]
+    """Wrapping must not strip a trailing newline.
+
+    The calibration wizard's labels rely on the trailing ``\\n`` to
+    flush the printer's line buffer before an image command (with
+    ``feed=0`` nothing else terminates the line); ``splitlines()`` +
+    ``join`` silently ate it, so the label was dropped/merged into the
+    following image on real hardware (Ronga RP850P).
+    """
+    entry = await _setup_entry(hass)
+    adapter = entry.runtime_data.adapter
+    adapter._config.line_width = 42  # type: ignore[attr-defined]
+
+    assert adapter._wrap_text("TEST 1\n") == "TEST 1\n"  # type: ignore[attr-defined]
+    assert adapter._wrap_text("a\n\n") == "a\n\n"  # type: ignore[attr-defined]
+    assert adapter._wrap_text("no newline") == "no newline"  # type: ignore[attr-defined]
+
+
 async def test_wrap_text_zero_width_no_wrap(hass):  # type: ignore[no-untyped-def]
     """line_width=0 disables wrapping."""
     entry = await _setup_entry(hass)

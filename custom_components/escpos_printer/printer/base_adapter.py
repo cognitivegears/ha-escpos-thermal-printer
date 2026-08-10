@@ -432,7 +432,13 @@ class EscposPrinterAdapterBase(
             wrapped_lines.extend(
                 textwrap.wrap(line, width=cols, replace_whitespace=False, drop_whitespace=False)
             )
-        return "\n".join(wrapped_lines)
+        # splitlines() drops the final line terminator; restore it. A
+        # trailing \n is load-bearing for callers that print with feed=0
+        # (calibration labels) — without it the last line sits unflushed
+        # in the printer's line buffer and the next image/raw command
+        # drops or merges it (seen on Ronga RP850P).
+        suffix = "\n" if text.endswith("\n") else ""
+        return "\n".join(wrapped_lines) + suffix
 
     # Static methods delegated to mapping_utils for backward compatibility
     @staticmethod

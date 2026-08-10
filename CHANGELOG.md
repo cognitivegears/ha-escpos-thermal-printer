@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Text wrapping no longer strips a trailing newline, so calibration
+  test-page labels flush before each pattern instead of being dropped
+  into or merged with the following image (seen on Ronga RP850P).
+
 ## [1.1.0] - 2026-08-08
 
 ### Added
