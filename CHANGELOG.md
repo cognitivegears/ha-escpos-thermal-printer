@@ -58,6 +58,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   (kinder to the print head on battery-powered Bluetooth printers).
 
 ### Fixed
+- Calibration wizard test labels ("TEST 1/2/3") and codepage sample lines now
+  end with a newline — without it, ESC/POS printers never flushed the text
+  buffer, so raster printers dropped the label and column printers merged it
+  into the pattern (seen on a Rongta RP850P).
 
 - Calibration wizard's columns-per-line ruler now measures the printer's
   true printable width instead of always breaking at whatever width was

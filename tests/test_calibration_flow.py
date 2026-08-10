@@ -167,7 +167,11 @@ async def test_calibrate_prints_impl_candidates_and_shows_form(hass):  # type: i
 
     assert adapter.print_text.await_count == 3
     texts = [call.kwargs["text"] for call in adapter.print_text.await_args_list]
-    assert texts == ["TEST 1", "TEST 2", "TEST 3"]
+    # Labels must carry their own newline: they print with feed=0, and
+    # ESC/POS only flushes the text line buffer on a newline or feed —
+    # without it, raster printers drop the buffered label entirely and
+    # column printers merge it into the pattern line (seen on RP850P).
+    assert texts == ["TEST 1\n", "TEST 2\n", "TEST 3\n"]
 
     assert adapter.print_image.await_count == 3
     impls = [call.kwargs["impl"] for call in adapter.print_image.await_args_list]
@@ -265,7 +269,7 @@ async def test_impl_partial_candidate_failure_is_tolerated(hass):  # type: ignor
         for call in adapter.print_text.await_args_list
         if "FAILED" in call.kwargs["text"]
     ]
-    assert fallback_texts == ["TEST 3: FAILED TO SEND"]
+    assert fallback_texts == ["TEST 3: FAILED TO SEND\n"]
 
 
 async def test_impl_empty_selection_skips_width_step(hass):  # type: ignore[no-untyped-def]
@@ -520,6 +524,9 @@ async def test_codepage_step_prints_one_line_per_candidate_with_encoding(hass, m
         if call.kwargs.get("encoding") is not None
     ]
     assert texts[0].startswith("1: ")
+    # Every feed=0 sample line needs its own newline, or unflushed lines
+    # merge/drop on real hardware (same class as the impl-label bug).
+    assert all(text.endswith("\n") for text in texts)
 
 
 async def test_codepage_reprint_reprints(hass, monkeypatch):  # type: ignore[no-untyped-def]

@@ -172,7 +172,11 @@ class CalibrationFlowMixin:
         any_ok = False
         for n, candidate in enumerate(IMPL_CANDIDATES, start=1):
             try:
-                await adapter.print_text(self.hass, text=f"TEST {n}", cut="none", feed=0)
+                # Trailing \n is load-bearing: with feed=0, ESC/POS only
+                # flushes the text line buffer on a newline or feed. Without
+                # it, raster printers drop the buffered label and column
+                # printers merge it into the pattern line (seen on RP850P).
+                await adapter.print_text(self.hass, text=f"TEST {n}\n", cut="none", feed=0)
                 await adapter.print_image(
                     self.hass,
                     image=checkerboard_data_uri(),
@@ -191,7 +195,7 @@ class CalibrationFlowMixin:
                 )
                 with contextlib.suppress(Exception):
                     await adapter.print_text(
-                        self.hass, text=f"TEST {n}: FAILED TO SEND", cut="none", feed=0
+                        self.hass, text=f"TEST {n}: FAILED TO SEND\n", cut="none", feed=0
                     )
         return any_ok
 
@@ -375,7 +379,7 @@ class CalibrationFlowMixin:
             try:
                 await adapter.print_text(
                     self.hass,
-                    text=f"{n}: {codepage_sample_line(cp)}",
+                    text=f"{n}: {codepage_sample_line(cp)}\n",
                     encoding=cp,
                     cut="none",
                     feed=0,
