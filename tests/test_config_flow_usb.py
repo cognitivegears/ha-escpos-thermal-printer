@@ -238,6 +238,36 @@ class TestUsbStep:
         profile_key = next(k for k in schema if k.schema == CONF_PROFILE)
         assert profile_key.default() == "TM-T20II"
 
+    @pytest.mark.asyncio
+    async def test_usb_all_devices_preselects_suggested_profile(self, hass) -> None:
+        """The browse-all-devices step preselects a suggested profile too,
+        mirroring usb_select's preselection (test_usb_select_preselects_suggested_profile).
+        """
+        fake_devices = [
+            {
+                "vendor_id": 0x04B8,
+                "product_id": 0x0E15,
+                "manufacturer": "EPSON",
+                "product": "TM-T20II",
+                "serial_number": None,
+                "is_known_printer": True,
+                "label": "EPSON TM-T20II (04B8:0E15)",
+            }
+        ]
+        flow = EscposConfigFlow()
+        flow.hass = hass
+        flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB}
+
+        with patch(
+            "custom_components.escpos_printer._config_flow.usb_steps._discover_all_usb_devices",
+            return_value=fake_devices,
+        ):
+            result = await flow.async_step_usb_all_devices()
+
+        schema = result["data_schema"].schema
+        profile_key = next(k for k in schema if k.schema == CONF_PROFILE)
+        assert profile_key.default() == "TM-T20II"
+
 
 class TestUsbManualStep:
     """Tests for the manual USB configuration step."""

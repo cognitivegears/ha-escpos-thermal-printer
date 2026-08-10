@@ -71,6 +71,19 @@ def test_candidate_orders() -> None:
     assert CODEPAGE_CANDIDATES[0] == "CP858"  # broadest first
 
 
+def test_share_url_round_trips_non_ascii_model() -> None:
+    """A non-ASCII model name must not raise and must round-trip intact
+    through the URL-encoded title/body."""
+    url = build_share_url(
+        "Ünïcödé Prïnter",
+        {"profile": "", "integration_version": "1.1.0", "escpos_version": "3.1"},
+    )
+    parsed = urlparse(url)
+    qs = parse_qs(parsed.query)
+    assert qs["title"] == ["Printer calibration: Ünïcödé Prïnter"]
+    assert "Ünïcödé Prïnter" in qs["body"][0]
+
+
 def test_share_url_contains_everything() -> None:
     url = build_share_url(
         "Rongta RP850P",

@@ -395,6 +395,31 @@ async def test_async_remove_entry_deletes_repair_issue(hass):  # type: ignore[no
     assert registry.async_get_issue(DOMAIN, issue_id) is None
 
 
+async def test_width_pixels_override_clears_existing_repair_issue(hass):  # type: ignore[no-untyped-def]
+    """A user-set width_pixels override must beat a broken profile AND
+    delete the fallback repairs issue that broken profile filed.
+    """
+    from homeassistant.helpers import issue_registry as ir
+
+    from custom_components.escpos_printer.const import DOMAIN
+
+    class _BrokenProfile:
+        profile_data: dict = {}
+
+    entry = await _setup_entry(hass)
+    adapter = entry.runtime_data.adapter
+    adapter._get_profile_obj = _BrokenProfile  # type: ignore[attr-defined,method-assign]
+    adapter.get_profile_pixel_width(hass)
+
+    registry = ir.async_get(hass)
+    issue_id = f"profile_width_fallback_{entry.entry_id}"
+    assert registry.async_get_issue(DOMAIN, issue_id) is not None
+
+    adapter.config.width_pixels = 640
+    assert adapter.get_profile_pixel_width(hass) == 640
+    assert registry.async_get_issue(DOMAIN, issue_id) is None
+
+
 async def test_get_connection_info(hass):  # type: ignore[no-untyped-def]
     """Network adapter exposes a human-readable connection string."""
     entry = await _setup_entry(hass)

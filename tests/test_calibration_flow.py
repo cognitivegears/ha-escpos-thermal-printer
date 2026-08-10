@@ -25,6 +25,28 @@ from custom_components.escpos_printer.const import (
 )
 
 
+def test_read_versions_falls_back_to_manifest_json(monkeypatch):  # type: ignore[no-untyped-def]
+    """A missing installed-package record must not crash the summary step --
+    fall back to reading the version straight out of manifest.json."""
+    from importlib.metadata import PackageNotFoundError
+    import json
+    from pathlib import Path
+
+    from custom_components.escpos_printer._config_flow import calibration_steps
+
+    def _raise_not_found(name):  # type: ignore[no-untyped-def]
+        raise PackageNotFoundError(name)
+
+    monkeypatch.setattr(calibration_steps, "pkg_version", _raise_not_found)
+
+    integration_version, escpos_version = calibration_steps._read_versions()
+
+    manifest_path = Path(calibration_steps.__file__).resolve().parent.parent / "manifest.json"
+    expected_version = json.loads(manifest_path.read_text())["version"]
+    assert integration_version == expected_version
+    assert escpos_version == "?"
+
+
 def test_codepage_candidates_are_real_encodings():
     """Every CODEPAGE_CANDIDATES entry must be a real, correctly-spelled encoding.
 
