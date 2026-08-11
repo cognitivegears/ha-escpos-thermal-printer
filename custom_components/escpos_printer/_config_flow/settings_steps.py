@@ -23,10 +23,8 @@ from ..const import (
     CONF_CONNECTION_TYPE,
     CONF_DEFAULT_ALIGN,
     CONF_DEFAULT_CUT,
-    CONF_HOST,
     CONF_IMPL,
     CONF_LINE_WIDTH,
-    CONF_PORT,
     CONF_PRODUCT_ID,
     CONF_PROFILE,
     CONF_SERIAL_PORT,
@@ -42,6 +40,7 @@ from ..const import (
     IMPL_AUTO,
     IMPL_CHOICE_LABELS,
 )
+from .network_helpers import make_network_entry_title
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -70,7 +69,7 @@ def _make_entry_title(data: dict[str, Any], user_data: dict[str, Any]) -> str:
                 f"Serial Printer {data.get(CONF_SERIAL_PORT, '')}",
             )
         )
-    return f"{data[CONF_HOST]}:{data[CONF_PORT]}"
+    return make_network_entry_title(data)
 
 
 def _create_entry_description(data: dict[str, Any]) -> str | None:

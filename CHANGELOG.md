@@ -31,6 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - "Rongta RP820" is recognized as a compatible model (the network identity
   RP850P hardware announces), so discovered Rongta printers preselect the
   matching 80mm profile.
+- Network printer entries are now titled by their detected model (e.g.
+  "TM-T20II (192.168.1.50:9100)") instead of the bare address. Manual
+  renames are still never overwritten when a lease change or reconfigure
+  updates the address.
+- Discovery now retries the port-9100 probe for up to a minute, so a
+  printer whose network stack is still booting when its DHCP lease lands
+  no longer misses its discovery card until the next lease renewal.
 
 ### Changed
 

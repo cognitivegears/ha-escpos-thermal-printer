@@ -231,6 +231,8 @@ async def test_reconfigure_network_detected_fields_replace_on_requery(hass):  # 
     assert updated is not None
     assert updated.data[CONF_DETECTED_MANUFACTURER] == "EPSON"
     assert updated.data[CONF_DETECTED_MODEL] == "TM-T20II"
+    # The auto-generated title picks up the fresh detection.
+    assert updated.title == "TM-T20II (5.6.7.8:9100)"
 
     # Reconfigure again onto a printer that doesn't answer GS I -- the
     # previous printer's detected fields must be removed, not kept stale.
@@ -259,6 +261,9 @@ async def test_reconfigure_network_detected_fields_replace_on_requery(hass):  # 
     assert updated2 is not None
     assert CONF_DETECTED_MANUFACTURER not in updated2.data
     assert CONF_DETECTED_MODEL not in updated2.data
+    # The model-based title is still recognised as auto-generated, so it
+    # follows the address and drops the no-longer-detected model.
+    assert updated2.title == "9.9.9.9:9100"
 
 
 async def test_reconfigure_network_detected_fields_survive_transient_requery_failure(
