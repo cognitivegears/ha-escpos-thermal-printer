@@ -43,6 +43,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Text wrapping no longer strips a trailing newline, so calibration
   test-page labels flush before each pattern instead of being dropped
   into or merged with the following image (seen on Ronga RP850P).
+- Clone printers announcing a brand hostname (e.g. `rongta_*`) no longer
+  masquerade as their emulation target in discovery/device info, even
+  when their firmware's `GS I` reply claims to be a different brand.
+- Implausible font column counts from the profile database (an upstream
+  data bug encoding font dot widths as column counts) no longer surface
+  as characters-per-line choices.
 
 ## [1.1.0] - 2026-08-08
 

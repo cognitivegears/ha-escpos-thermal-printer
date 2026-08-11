@@ -442,6 +442,50 @@ async def test_dhcp_discovery_matched_entry_without_mac_adopts_it(hass):
     assert updated.data[CONF_MAC_ADDRESS] == format_mac(DISCOVERY.macaddress)
 
 
+async def test_dhcp_discovery_rongta_clone_overrides_epson_emulation(hass):
+    """A Rongta board answering GS I as "EPSON TM-T88III" (clone firmware
+    impersonating its emulation target) must not hijack the discovered
+    identity -- the brand hostname is authoritative."""
+    result = await _start_dhcp_flow(
+        hass,
+        query_result={"manufacturer": "EPSON", "model": "TM-T88III"},
+        discovery=DISCOVERY_RONGTA,
+    )
+    assert result["step_id"] == "network"
+    flow = hass.config_entries.flow.async_progress()[0]
+    assert flow["context"]["title_placeholders"] == {"name": "RP820 (192.168.10.158)"}
+
+    from custom_components.escpos_printer.capabilities import PROFILE_AUTO
+
+    defaults = result["data_schema"]({"host": "192.168.10.158"})
+    assert defaults["profile"] == PROFILE_AUTO
+
+    with patch(
+        "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+        return_value=True,
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"host": "192.168.10.158", "port": 9100}
+        )
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["data"]["detected_manufacturer"] == "Rongta"
+    assert result["data"]["detected_model"] == "RP820"
+
+
+async def test_dhcp_discovery_rongta_branded_gs_i_reply_kept(hass):
+    """A rongta_* hostname whose GS I reply IS Rongta-branded keeps that
+    identity untouched -- the override only fires on a brand mismatch."""
+    await _start_dhcp_flow(
+        hass,
+        query_result={"manufacturer": "Rongta", "model": "RP850P"},
+        discovery=DISCOVERY_RONGTA,
+    )
+    flow = hass.config_entries.flow.async_progress()[0]
+    assert flow["context"]["title_placeholders"] == {"name": "RP850P (192.168.10.158)"}
+
+
 async def test_dhcp_discovery_duplicate_in_progress_aborts(hass):
     """A second DHCP discovery for the same IP while the first flow is
     still open (unanswered form) aborts as already_in_progress."""

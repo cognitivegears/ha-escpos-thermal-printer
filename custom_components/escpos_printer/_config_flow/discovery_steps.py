@@ -22,6 +22,31 @@ from .network_helpers import _can_connect, query_printer_id
 
 _LOGGER = logging.getLogger(__name__)
 
+# Brand hostname prefixes (lowercase, matching the manifest's DHCP hostname
+# matchers) that GS I identity may not be trusted against -- see
+# _override_clone_identity.
+BRAND_HOSTNAME_PREFIXES = {"rongta": "Rongta"}
+
+
+def _override_clone_identity(hostname: str, detected: dict[str, str]) -> dict[str, str]:
+    """Replace a borrowed GS I identity with the DHCP hostname's brand.
+
+    Some clone firmware answers GS I with the manufacturer/model of the
+    printer it emulates (e.g. a Rongta board claiming "EPSON TM-T88III").
+    A brand-exclusive hostname prefix is stronger evidence than that reply,
+    so when the two disagree the hostname wins.
+    """
+    hostname_lower = hostname.lower()
+    for prefix, brand in BRAND_HOSTNAME_PREFIXES.items():
+        if not hostname_lower.startswith(prefix):
+            continue
+        manufacturer = detected.get("manufacturer", "")
+        if detected.get("model") and manufacturer.lower() != brand.lower():
+            model = hostname[len(prefix) :].lstrip("_-.") or hostname
+            return {"manufacturer": brand, "model": model}
+        break
+    return detected
+
 
 class DiscoveryFlowMixin:
     """Mixin providing the DHCP discovery entry point.
@@ -104,6 +129,7 @@ class DiscoveryFlowMixin:
             )
             or {}
         )
+        detected = _override_clone_identity(discovery_info.hostname, detected)
 
         # "tm-*" also matches Prometheus node_exporter's default port 9100,
         # so a port-probe alone is not brand-exclusive evidence for it -- a

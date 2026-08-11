@@ -260,6 +260,38 @@ class TestGetProfileLineWidths:
         assert len(result) > 0
         assert 42 in result  # escpos default profile: Font A = 42 columns
 
+    def test_healthy_profile_unaffected(self):
+        """TM-T88III's real column counts (42, 56) pass the plausibility filter."""
+        result = get_profile_line_widths("TM-T88III")
+        assert result == [42, 56]
+
+    def test_bogus_font_columns_fall_back_to_common(self):
+        """NT-80-V-UL's upstream data bug encodes font DOT widths (9, 12) as
+        column counts on a 576px printer -- both are implausibly small for
+        any receipt printer, so the result must fall back to common widths."""
+        result = get_profile_line_widths("NT-80-V-UL")
+        assert result == COMMON_LINE_WIDTHS
+
+    def test_mixed_bogus_and_plausible_keeps_only_plausible(self):
+        """A profile with one implausible and one plausible font column
+        count keeps only the plausible one."""
+        mock_data = {
+            "profiles": {
+                "mixed": {
+                    "fonts": {
+                        "0": {"columns": 9},
+                        "1": {"columns": 48},
+                    }
+                }
+            },
+        }
+        with patch(
+            "custom_components.escpos_printer.capabilities.line_widths._get_capabilities",
+            return_value=mock_data,
+        ):
+            result = get_profile_line_widths("mixed")
+        assert result == [48]
+
 
 class TestGetAllLineWidths:
     """Tests for get_all_line_widths function."""
