@@ -146,25 +146,35 @@ async def _list_paired_bluetooth_devices() -> list[dict[str, Any]]:
     return await list_paired_bluetooth_devices()
 
 
+def _is_printer_candidate(device: dict[str, Any]) -> bool:
+    """Likely a printer: imaging Class-of-Device OR a cached SPP SDP record.
+
+    Cheap ESC/POS printers frequently skip the imaging class but still
+    advertise Serial Port Profile — either signal keeps the device in the
+    filtered dropdown.
+    """
+    return bool(device.get("is_imaging") or device.get("has_spp"))
+
+
 def _build_bt_device_choices(
-    devices: list[dict[str, Any]], *, imaging_only: bool = True
+    devices: list[dict[str, Any]], *, printers_only: bool = True
 ) -> dict[str, str]:
     """Build the dropdown for the bluetooth_select step.
 
-    Filters to imaging-class devices by default so users see only their
-    printer rather than every paired phone/headset on the host. Some cheap
-    printers don't advertise the class — when no imaging devices are found
-    the caller falls back to ``imaging_only=False`` to show everything.
+    Filters to printer-like devices (see :func:`_is_printer_candidate`) by
+    default so users see only their printer rather than every paired
+    phone/headset on the host. When no candidates are found the caller
+    falls back to ``printers_only=False`` to show everything.
 
     Always offers a manual-entry fallback so users without bluez D-Bus
     access can still configure paired devices.
     """
-    candidates = [d for d in devices if d.get("is_imaging")] if imaging_only else list(devices)
+    candidates = [d for d in devices if _is_printer_candidate(d)] if printers_only else list(devices)
     choices: dict[str, str] = {d["_choice_key"]: d["label"] for d in candidates}
-    # Surface "Show all" only when filtering imaging-only AND there's something
-    # the user can't currently see (avoids redundant choice when no filter is in
-    # effect or when nothing is hidden).
-    if imaging_only and len(candidates) < len(devices):
+    # Surface "Show all" only when the printer filter is on AND there's
+    # something the user can't currently see (avoids redundant choice when no
+    # filter is in effect or when nothing is hidden).
+    if printers_only and len(candidates) < len(devices):
         choices[BT_SHOW_ALL_KEY] = "Show all paired Bluetooth devices..."
     choices[BT_MANUAL_ENTRY_KEY] = "Manual MAC entry..."
     return choices

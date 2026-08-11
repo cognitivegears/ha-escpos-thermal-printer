@@ -13,6 +13,7 @@ from custom_components.escpos_printer._config_flow.bluetooth_helpers import (
 from custom_components.escpos_printer._config_flow.bluetooth_steps import (
     SECTION_BT_ADVANCED,
 )
+from custom_components.escpos_printer.bluez import has_spp_uuid
 from custom_components.escpos_printer.capabilities import PROFILE_AUTO
 from custom_components.escpos_printer.config_flow import EscposConfigFlow
 from custom_components.escpos_printer.const import (
@@ -438,6 +439,65 @@ class TestBluetoothImagingFilter:
         ]
         choices = bt_device.container
         assert "AA:BB:CC:DD:EE:FF" in choices  # surfaced despite non-imaging
+
+    @pytest.mark.asyncio
+    async def test_spp_only_device_survives_filter(self, hass):
+        """A printer with no imaging class but a cached SPP UUID stays in the
+        filtered dropdown; a device with neither signal is hidden."""
+        flow = EscposConfigFlow()
+        flow.hass = hass
+        flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH}
+
+        devices = [
+            {
+                "mac": "AA:BB:CC:DD:EE:FF",
+                "name": "Cheap Printer",
+                "alias": "Cheap Printer",
+                "label": "Cheap Printer (AA:BB:CC:DD:EE:FF)",
+                "class": 0x000000,  # no imaging class advertised
+                "is_imaging": False,
+                "has_spp": True,
+                "_choice_key": "AA:BB:CC:DD:EE:FF",
+            },
+            {
+                "mac": "11:22:33:44:55:66",
+                "name": "Pixel 8",
+                "alias": "Pixel 8",
+                "label": "Pixel 8 (11:22:33:44:55:66)",
+                "class": 0x5A020C,
+                "is_imaging": False,
+                "has_spp": False,
+                "_choice_key": "11:22:33:44:55:66",
+            },
+        ]
+        with patch(
+            "custom_components.escpos_printer._config_flow.bluetooth_steps."
+            "_list_paired_bluetooth_devices",
+            return_value=devices,
+        ):
+            result = await flow.async_step_bluetooth_select()
+
+        bt_device = result["data_schema"].schema[
+            next(k for k in result["data_schema"].schema if k == "bt_device")
+        ]
+        choices = bt_device.container
+        assert "AA:BB:CC:DD:EE:FF" in choices  # SPP kept it in the filter
+        assert "11:22:33:44:55:66" not in choices  # phone still hidden
+        assert "__show_all__" in choices
+
+
+class TestSppUuidDetection:
+    """bluez.has_spp_uuid recognizes the Serial Port Profile SDP UUID."""
+
+    def test_spp_uuid_matches_case_insensitively(self):
+        assert has_spp_uuid(["00001101-0000-1000-8000-00805F9B34FB"])
+        assert has_spp_uuid(["0000110b-0000-1000-8000-00805f9b34fb",
+                             "00001101-0000-1000-8000-00805f9b34fb"])
+
+    def test_non_spp_or_empty_lists_rejected(self):
+        assert not has_spp_uuid(["0000110b-0000-1000-8000-00805f9b34fb"])  # A2DP sink
+        assert not has_spp_uuid([])
+        assert not has_spp_uuid(None)
 
 
 class TestBluetoothChannelHidden:

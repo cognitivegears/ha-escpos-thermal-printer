@@ -33,12 +33,25 @@ _LOGGER = logging.getLogger(__name__)
 # and most ESC/POS receipt printers.
 _BT_MAJOR_CLASS_IMAGING = 0x06
 
+# Serial Port Profile — the RFCOMM service ESC/POS printers actually speak.
+# Cheap printers often skip setting the imaging Class-of-Device but still
+# advertise SPP in their SDP record, which bluez caches at pairing time —
+# reading it here is radio-silent.
+_SPP_UUID = "00001101-0000-1000-8000-00805f9b34fb"
+
 
 def is_imaging_device(class_value: int | None) -> bool:
     """Return True if the bluez Class-of-Device value is the Imaging major class."""
     if class_value is None:
         return False
     return ((class_value >> 8) & 0x1F) == _BT_MAJOR_CLASS_IMAGING
+
+
+def has_spp_uuid(uuids: list[str] | None) -> bool:
+    """Return True if the cached SDP UUID list advertises Serial Port Profile."""
+    if not uuids:
+        return False
+    return any(str(u).lower() == _SPP_UUID for u in uuids)
 
 
 def _normalize_mac(mac: Any) -> str | None:
@@ -91,8 +104,8 @@ async def list_paired_bluetooth_devices() -> list[dict[str, Any]]:
     """Enumerate Bluetooth devices paired on the host.
 
     Returns a list of ``{mac, name, alias, label, class, is_imaging,
-    _choice_key}`` dicts. Returns an empty list when bluez isn't reachable
-    so callers can degrade to manual MAC entry.
+    has_spp, _choice_key}`` dicts. Returns an empty list when bluez isn't
+    reachable so callers can degrade to manual MAC entry.
     """
     bus = await _connect_system_bus()
     if bus is None:
@@ -126,6 +139,11 @@ async def list_paired_bluetooth_devices() -> list[dict[str, Any]]:
         class_value: int | None = (
             int(getattr(class_var, "value", 0)) if class_var is not None else None
         )
+        uuids_var = device_props.get("UUIDs")
+        uuids_value = getattr(uuids_var, "value", None) if uuids_var is not None else None
+        uuids = (
+            [str(u) for u in uuids_value] if isinstance(uuids_value, (list, tuple)) else []
+        )
         devices.append(
             {
                 "mac": mac,
@@ -134,6 +152,7 @@ async def list_paired_bluetooth_devices() -> list[dict[str, Any]]:
                 "label": label,
                 "class": class_value,
                 "is_imaging": is_imaging_device(class_value),
+                "has_spp": has_spp_uuid(uuids),
                 "_choice_key": mac,
             }
         )
