@@ -8,12 +8,14 @@ binary_sensor.py, sensor.py, and notify.py each used to build independently
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
 from homeassistant.helpers.entity import DeviceInfo
 
 from .const import (
     CONF_CONNECTION_TYPE,
     CONF_DETECTED_MANUFACTURER,
     CONF_DETECTED_MODEL,
+    CONF_MAC_ADDRESS,
     CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
     CONNECTION_TYPE_SERIAL,
@@ -74,4 +76,7 @@ def build_device_info(entry: ConfigEntry) -> DeviceInfo:
         serial = _usb_serial_number(entry)
         if serial:
             info["serial_number"] = serial
+    mac = entry.data.get(CONF_MAC_ADDRESS)
+    if mac:
+        info["connections"] = {(CONNECTION_NETWORK_MAC, mac)}
     return info

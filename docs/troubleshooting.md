@@ -44,7 +44,9 @@ LAN-local and can't cross those boundaries.
 The printer didn't answer the `GS I` identity query at setup (or
 reconfigure) time. Most non-Epson clones don't implement it. This is
 harmless: identification is cosmetic and every printing feature still
-works. Epson owners can retry via **Reconfigure**.
+works. Epson owners can retry via **Reconfigure**. Brand-hostname clones
+(e.g. Rongta) are identified by their announced DHCP hostname even
+though their firmware's `GS I` reply claims to be an Epson.
 
 ## USB issues
 

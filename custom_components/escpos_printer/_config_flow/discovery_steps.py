@@ -12,12 +12,40 @@ import logging
 from typing import Any
 
 from homeassistant.config_entries import ConfigFlowResult
+from homeassistant.const import CONF_HOST, CONF_PORT
+from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
+from homeassistant.helpers.typing import UNDEFINED, UndefinedType
 
-from ..const import DEFAULT_PORT, DEFAULT_TIMEOUT
+from ..const import CONF_MAC_ADDRESS, DEFAULT_PORT, DEFAULT_TIMEOUT, DOMAIN
 from .network_helpers import _can_connect, query_printer_id
 
 _LOGGER = logging.getLogger(__name__)
+
+# Brand hostname prefixes (lowercase, matching the manifest's DHCP hostname
+# matchers) that GS I identity may not be trusted against -- see
+# _override_clone_identity.
+BRAND_HOSTNAME_PREFIXES = {"rongta": "Rongta"}
+
+
+def _override_clone_identity(hostname: str, detected: dict[str, str]) -> dict[str, str]:
+    """Replace a borrowed GS I identity with the DHCP hostname's brand.
+
+    Some clone firmware answers GS I with the manufacturer/model of the
+    printer it emulates (e.g. a Rongta board claiming "EPSON TM-T88III").
+    A brand-exclusive hostname prefix is stronger evidence than that reply,
+    so when the two disagree the hostname wins.
+    """
+    hostname_lower = hostname.lower()
+    for prefix, brand in BRAND_HOSTNAME_PREFIXES.items():
+        if not hostname_lower.startswith(prefix):
+            continue
+        manufacturer = detected.get("manufacturer", "")
+        if detected.get("model") and manufacturer.lower() != brand.lower():
+            model = hostname[len(prefix) :].lstrip("_-.") or hostname
+            return {"manufacturer": brand, "model": model}
+        break
+    return detected
 
 
 class DiscoveryFlowMixin:
@@ -29,18 +57,60 @@ class DiscoveryFlowMixin:
     - _detected: dict[str, str] (main_flow.__init__)
     - _discovery_host: str | None (main_flow.__init__)
     - _discovery_port: int | None (main_flow.__init__)
+    - _discovery_mac: str | None (main_flow.__init__)
     """
 
     hass: Any
     _detected: dict[str, str]
     _discovery_host: str | None
     _discovery_port: int | None
+    _discovery_mac: str | None
 
     async def async_step_dhcp(self, discovery_info: DhcpServiceInfo) -> ConfigFlowResult:
         """Handle a DHCP-discovered printer candidate."""
         host = discovery_info.ip
+        mac = format_mac(discovery_info.macaddress)
+        self._discovery_mac = mac
+
+        # A known MAC at a new IP (DHCP lease change) updates the existing
+        # entry in place instead of offering a duplicate -- see "Follow-up:
+        # MAC-tracked discovery identity" in the design doc. Only one
+        # network entry can plausibly carry a given MAC, so the first match
+        # wins; a same-IP match just falls through to the normal
+        # already-configured abort below.
+        for entry in self.hass.config_entries.async_entries(DOMAIN):
+            if entry.data.get(CONF_MAC_ADDRESS) != mac:
+                continue
+            if str(entry.data.get(CONF_HOST, "")).lower() == host.lower():
+                break
+            entry_port = entry.data.get(CONF_PORT, DEFAULT_PORT)
+            new_unique_id = f"{host.lower()}:{entry_port}"
+            colliding = self.hass.config_entries.async_entry_for_domain_unique_id(
+                DOMAIN, new_unique_id
+            )
+            if colliding is not None and colliding.entry_id != entry.entry_id:
+                break  # unique_id already owned by a different entry
+            # Only follow the address to a new auto-generated title -- a
+            # user's manual rename must never be clobbered (same heuristic
+            # as network_steps.async_step_reconfigure_network).
+            title: str | UndefinedType = UNDEFINED
+            if entry.title == f"{entry.data.get(CONF_HOST)}:{entry_port}":
+                title = f"{host}:{entry_port}"
+            self.hass.config_entries.async_update_entry(
+                entry, data={**entry.data, CONF_HOST: host}, unique_id=new_unique_id, title=title
+            )
+            self.hass.config_entries.async_schedule_reload(entry.entry_id)
+            return self.async_abort(reason="already_configured")  # type: ignore[attr-defined,no-any-return]
+
         await self.async_set_unique_id(f"{host.lower()}:{DEFAULT_PORT}")  # type: ignore[attr-defined]
-        self._abort_if_unique_id_configured()  # type: ignore[attr-defined]
+        # When discovery matches an already-configured entry at its current
+        # IP, fold the (possibly new) MAC into it -- pre-existing and
+        # manually-created entries gain lease tracking the first time
+        # discovery sees them. Reload only fires on an actual data change.
+        if mac:
+            self._abort_if_unique_id_configured(updates={CONF_MAC_ADDRESS: mac})  # type: ignore[attr-defined]
+        else:
+            self._abort_if_unique_id_configured()  # type: ignore[attr-defined]
 
         if not await self.hass.async_add_executor_job(
             _can_connect, host, DEFAULT_PORT, DEFAULT_TIMEOUT
@@ -59,6 +129,7 @@ class DiscoveryFlowMixin:
             )
             or {}
         )
+        detected = _override_clone_identity(discovery_info.hostname, detected)
 
         # "tm-*" also matches Prometheus node_exporter's default port 9100,
         # so a port-probe alone is not brand-exclusive evidence for it -- a

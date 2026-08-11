@@ -9,6 +9,12 @@ from .loader import _get_capabilities
 
 _LOGGER = logging.getLogger(__name__)
 
+# A receipt printer never has fewer than 16 characters per line. Guards
+# against upstream escpos-printer-db data bugs like NT-80-V-UL, whose
+# fonts.columns values (9, 12) are actually font DOT widths mistakenly
+# encoded as column counts (correct values: 48 and 64 on that profile).
+_MIN_PLAUSIBLE_COLUMNS = 16
+
 
 def get_profile_line_widths(profile_key: str | None) -> list[int]:
     """Get list of line widths (column counts) supported by a profile.
@@ -43,7 +49,7 @@ def get_profile_line_widths(profile_key: str | None) -> list[int]:
     for font_data in fonts.values():
         if isinstance(font_data, dict):
             columns = font_data.get("columns")
-            if isinstance(columns, int) and columns > 0:
+            if isinstance(columns, int) and columns >= _MIN_PLAUSIBLE_COLUMNS:
                 widths.add(columns)
 
     if not widths:

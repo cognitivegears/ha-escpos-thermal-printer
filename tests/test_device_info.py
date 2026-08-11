@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
+from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
+
 from custom_components.escpos_printer.const import (
     CONF_CONNECTION_TYPE,
     CONF_DETECTED_MANUFACTURER,
     CONF_DETECTED_MODEL,
+    CONF_MAC_ADDRESS,
     CONNECTION_TYPE_BLUETOOTH,
     CONNECTION_TYPE_NETWORK,
     CONNECTION_TYPE_SERIAL,
@@ -115,3 +118,20 @@ def test_device_info_falls_back_without_detected_fields() -> None:
     info = build_device_info(entry)  # type: ignore[arg-type]
     assert info["manufacturer"] == "ESC/POS"
     assert info["model"] == "Network Printer"
+
+
+def test_device_info_includes_mac_connection_when_tracked() -> None:
+    entry = _FakeEntry(
+        data={
+            CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK,
+            CONF_MAC_ADDRESS: "50:57:9c:62:8e:52",
+        }
+    )
+    info = build_device_info(entry)  # type: ignore[arg-type]
+    assert info["connections"] == {(CONNECTION_NETWORK_MAC, "50:57:9c:62:8e:52")}
+
+
+def test_device_info_no_connections_without_mac() -> None:
+    entry = _FakeEntry(data={CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK})
+    info = build_device_info(entry)  # type: ignore[arg-type]
+    assert "connections" not in info

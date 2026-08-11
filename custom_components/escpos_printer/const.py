@@ -26,6 +26,11 @@ CONF_ALLOW_LOCAL_IMAGE_URLS = "allow_local_image_urls"
 CONF_DETECTED_MANUFACTURER = "detected_manufacturer"
 CONF_DETECTED_MODEL = "detected_model"
 
+# DHCP-discovery MAC address (normalized via format_mac), captured only when
+# a discovery-created entry's host/port still match the probed target.
+# Network printers only; manual entries never carry this key.
+CONF_MAC_ADDRESS = "mac_address"
+
 # Connection type configuration
 CONF_CONNECTION_TYPE = "connection_type"
 CONNECTION_TYPE_NETWORK = "network"

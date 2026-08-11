@@ -36,7 +36,8 @@ setup screen.
 
 A discovered printer shows up under **Settings → Devices & Services →
 Discovered**; accepting it prefills the host and preselects the matching
-printer profile.
+printer profile. Discovered printers are tracked by MAC address, so a DHCP
+lease change updates the existing entry instead of offering a duplicate.
 
 Separately from discovery, every network setup and reconfigure queries the
 printer directly with `GS I`. Printers that answer (mostly genuine Epson
