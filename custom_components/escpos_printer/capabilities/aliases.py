@@ -62,6 +62,11 @@ ALIAS_MODELS: dict[str, str] = {
     # WRAPS onto extra lines rather than clipping on this firmware. NOT
     # aliased to RP326 because that bundled profile declares no pixel width.
     "Rongta RP850P": "NT-80-V-UL",
+    # "RP820" is the DHCP hostname (Rongta_RP820) that RP850P hardware
+    # announces on the network — observed on the hardware-verified unit
+    # above, so it inherits the same alias target. Covers DHCP-discovery
+    # identity, and any actual RP820 units sharing that network firmware.
+    "Rongta RP820": "NT-80-V-UL",
     # Misc verified 58mm/384dot ESC/POS clones.
     "HOIN HOP-E58": "POS-5890",
     "Goojprt PT-210": "POS-5890",

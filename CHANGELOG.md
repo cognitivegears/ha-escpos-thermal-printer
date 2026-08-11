@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   the matching printer profile when one is known. Discovered entries are
   additionally tracked by MAC address, so a DHCP lease change updates the
   existing entry's host in place instead of offering a duplicate.
+- "Rongta RP820" is recognized as a compatible model (the network identity
+  RP850P hardware announces), so discovered Rongta printers preselect the
+  matching 80mm profile.
 
 ### Changed
 
