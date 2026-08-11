@@ -46,7 +46,32 @@ Needs a new `_last_print` field set only in the print paths: the existing
 `_last_ok` is also updated by status probes, so it means "last successful
 operation", not "last print".
 
-### 6. Smaller items
+### 6. Print confirmation for network printers
+
+Today a TCP send to port 9100 proves bytes left the NIC, not that paper moved —
+a link that drops mid-stream (e.g. a flaky WiFi bridge) looks like success.
+Neither variant exists in python-escpos (it only implements the DLE EOT
+real-time queries, which answer from the receive buffer and don't confirm
+printing), so both need raw command + response parsing in the adapter:
+
+- **Epson (`GS ( H` process ID response)**: queue a 4-byte ID after the job;
+  the printer echoes it back only once everything before it has been
+  processed. Supported by TM-series printers (incl. TM-T20II). Reuses the
+  send-then-read round trip the paper sensor already does.
+- **Star (ETB counter in the ASB status block)**: append an ETB byte (0x17)
+  after the job, read the ASB ETB counter before and poll after; it only
+  advances when the printer physically feeds past the marker. Counter
+  position/step varies by model (mC-Print3: byte 7, +2 per ETB), so keep the
+  parsing per-profile. Only relevant if Star ASB support lands.
+
+**Retry policy (applies to any confirmation work)**: delivered-but-unconfirmed
+is not failed. If the job was sent but the confirmation read dies, report
+"unconfirmed" and do **not** retry — the print likely succeeded and a blind
+retry double-prints. Retry only on positive evidence the job did not go
+through, and keep everything after the committed send exception-safe so it
+cannot re-fire.
+
+### 7. Smaller items
 
 - **`hw("INIT")` reset service**: cheap recovery path for a wedged printer.
 - **Native QR rendering** (`qr(native=True)`): faster and sharper than the
