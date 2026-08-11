@@ -455,10 +455,10 @@ async def test_dhcp_discovery_rongta_clone_overrides_epson_emulation(hass):
     flow = hass.config_entries.flow.async_progress()[0]
     assert flow["context"]["title_placeholders"] == {"name": "RP820 (192.168.10.158)"}
 
-    from custom_components.escpos_printer.capabilities import PROFILE_AUTO
-
+    # The overridden identity ("RP820") resolves through the alias table
+    # to the 80mm clone profile -- not to the emulated TM-T88III.
     defaults = result["data_schema"]({"host": "192.168.10.158"})
-    assert defaults["profile"] == PROFILE_AUTO
+    assert defaults["profile"] == "NT-80-V-UL"
 
     with patch(
         "custom_components.escpos_printer._config_flow.network_steps._can_connect",
