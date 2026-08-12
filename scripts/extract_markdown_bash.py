@@ -35,7 +35,10 @@ from collections.abc import Iterator
 from pathlib import Path
 import re
 import shutil
-import subprocess
+
+# Running shellcheck/bash on repo-owned markdown is this tool's entire
+# purpose; it never sees input from outside the repository.
+import subprocess  # nosec B404
 import sys
 import tempfile
 from typing import NamedTuple
@@ -80,7 +83,8 @@ def iter_bash_blocks(md_path: Path) -> Iterator[Block]:
 
 def shellcheck_block(block: Block) -> list[str]:
     """Return a list of ``shellcheck`` finding lines for *block*."""
-    if shutil.which("shellcheck") is None:
+    shellcheck = shutil.which("shellcheck")
+    if shellcheck is None:
         return [
             f"{block.path}:{block.line}: WARN — shellcheck not installed; "
             "install via `apk add shellcheck` (HA OS / Alpine) or your "
@@ -95,9 +99,12 @@ def shellcheck_block(block: Block) -> list[str]:
         fh.write(block.body)
         tmp = Path(fh.name)
     try:
-        proc = subprocess.run(
+        # Fixed argv over a repo-owned tempfile; nothing here is
+        # attacker-controlled (and shellcheck is an absolute path via
+        # shutil.which above).
+        proc = subprocess.run(  # nosec B603
             [
-                "shellcheck",
+                shellcheck,
                 # SC1091: source file paths we can't resolve at lint time.
                 # SC2155: declare/assign separation — opinionated, OK as-is.
                 "--exclude=SC1091,SC2155",
@@ -132,7 +139,10 @@ def smoke_exec_block(block: Block, iterations: int = 10) -> list[str]:
 
     failures: list[str] = []
     for i in range(1, iterations + 1):
-        proc = subprocess.run(
+        # Smoke-executing the repo's own fenced blocks is the feature —
+        # the SIGPIPE bug this catches only reproduces by running them.
+        # bash stays a PATH lookup on purpose (Alpine/macOS/CI differ).
+        proc = subprocess.run(  # nosec B603 B607
             ["bash", "-c", body],
             capture_output=True,
             text=True,
