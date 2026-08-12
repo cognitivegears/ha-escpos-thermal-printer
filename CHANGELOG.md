@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   before draining the previous one could print the fragments out of
   order (seen on TM-T20II: TEST 1/3/2 labels shuffled, garbled pattern
   rows, and the trailing feed landing mid-page).
+- The "Characters per line" field in setup and options is now a combobox:
+  pick a preset or type a custom number directly. Previously a
+  "Custom (enter columns)..." choice promised an entry box that only
+  appeared on a follow-up screen after submitting, which read as "no box
+  to enter a value". The legacy two-step path still works.
 
 ### Added
 

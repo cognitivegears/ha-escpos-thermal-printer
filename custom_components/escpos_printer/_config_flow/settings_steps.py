@@ -6,6 +6,12 @@ import logging
 from typing import Any
 
 from homeassistant.config_entries import ConfigFlowResult
+from homeassistant.helpers.selector import (
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+)
 import voluptuous as vol
 
 from ..capabilities import (
@@ -40,7 +46,7 @@ from ..const import (
     IMPL_AUTO,
     IMPL_CHOICE_LABELS,
 )
-from .network_helpers import make_network_entry_title
+from .network_helpers import make_network_entry_title, validate_custom_line_width
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -137,7 +143,7 @@ class SettingsFlowMixin:
             errors=errors,
         )
 
-    async def async_step_codepage(
+    async def async_step_codepage(  # noqa: PLR0912
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Handle step 2: Codepage and settings selection.
@@ -148,14 +154,26 @@ class SettingsFlowMixin:
         Returns:
             FlowResult with entry creation or custom step
         """
+        errors: dict[str, str] = {}
         if user_input is not None:
             _LOGGER.debug("Config flow codepage step input: %s", user_input)
 
             codepage = user_input.get(CONF_CODEPAGE, "")
             line_width = user_input.get(CONF_LINE_WIDTH)
 
-            # Handle custom codepage
-            if codepage == OPTION_CUSTOM:
+            # The width field is a combobox (custom_value=True), so the
+            # submitted value may be a typed number, not just a preset.
+            # OPTION_CUSTOM is kept as a routed fallback for the legacy
+            # two-step entry path.
+            line_width_int = DEFAULT_LINE_WIDTH
+            if line_width not in (None, "", OPTION_CUSTOM):
+                width_int, width_err = validate_custom_line_width(line_width)
+                if width_err:
+                    errors["base"] = width_err
+                else:
+                    line_width_int = width_int  # type: ignore[assignment]
+
+            if not errors and codepage == OPTION_CUSTOM:
                 # Store current selections and go to custom codepage step
                 self._user_data[CONF_DEFAULT_ALIGN] = user_input.get(
                     CONF_DEFAULT_ALIGN, DEFAULT_ALIGN
@@ -171,13 +189,11 @@ class SettingsFlowMixin:
                 if line_width == OPTION_CUSTOM:
                     self._user_data[CONF_LINE_WIDTH] = OPTION_CUSTOM
                 else:
-                    self._user_data[CONF_LINE_WIDTH] = (
-                        int(line_width) if line_width else DEFAULT_LINE_WIDTH
-                    )
+                    self._user_data[CONF_LINE_WIDTH] = line_width_int
                 return await self.async_step_custom_codepage()
 
-            # Handle custom line width
-            if line_width == OPTION_CUSTOM:
+            # Handle custom line width (legacy sentinel path)
+            if not errors and line_width == OPTION_CUSTOM:
                 # Store current selections and go to custom line width step
                 self._user_data[CONF_CODEPAGE] = codepage or ""
                 self._user_data[CONF_DEFAULT_ALIGN] = user_input.get(
@@ -189,35 +205,36 @@ class SettingsFlowMixin:
                     self._user_data[CONF_WIDTH_PIXELS] = int(user_input[CONF_WIDTH_PIXELS])
                 return await self.async_step_custom_line_width()
 
-            # Merge with data from previous steps and create entry
-            data = {
-                **self._user_data,
-                CONF_CODEPAGE: codepage or "",
-                CONF_LINE_WIDTH: int(line_width) if line_width else DEFAULT_LINE_WIDTH,
-                CONF_DEFAULT_ALIGN: user_input.get(CONF_DEFAULT_ALIGN, DEFAULT_ALIGN),
-                CONF_DEFAULT_CUT: user_input.get(CONF_DEFAULT_CUT, DEFAULT_CUT),
-            }
+            if not errors:
+                # Merge with data from previous steps and create entry
+                data = {
+                    **self._user_data,
+                    CONF_CODEPAGE: codepage or "",
+                    CONF_LINE_WIDTH: line_width_int,
+                    CONF_DEFAULT_ALIGN: user_input.get(CONF_DEFAULT_ALIGN, DEFAULT_ALIGN),
+                    CONF_DEFAULT_CUT: user_input.get(CONF_DEFAULT_CUT, DEFAULT_CUT),
+                }
 
-            if user_input.get(CONF_WIDTH_PIXELS):
-                data[CONF_WIDTH_PIXELS] = int(user_input[CONF_WIDTH_PIXELS])
+                if user_input.get(CONF_WIDTH_PIXELS):
+                    data[CONF_WIDTH_PIXELS] = int(user_input[CONF_WIDTH_PIXELS])
 
-            data[CONF_IMPL] = user_input.get(CONF_IMPL, IMPL_AUTO)
+                data[CONF_IMPL] = user_input.get(CONF_IMPL, IMPL_AUTO)
 
-            # Remove internal keys
-            data.pop("_printer_name", None)
+                # Remove internal keys
+                data.pop("_printer_name", None)
 
-            title = _make_entry_title(data, self._user_data)
+                title = _make_entry_title(data, self._user_data)
 
-            _LOGGER.debug(
-                "Creating config entry for %s with profile=%s codepage=%s",
-                title,
-                data.get(CONF_PROFILE),
-                data.get(CONF_CODEPAGE),
-            )
+                _LOGGER.debug(
+                    "Creating config entry for %s with profile=%s codepage=%s",
+                    title,
+                    data.get(CONF_PROFILE),
+                    data.get(CONF_CODEPAGE),
+                )
 
-            return self.async_create_entry(  # type: ignore[attr-defined,no-any-return]
-                title=title, data=data, description=_create_entry_description(data)
-            )
+                return self.async_create_entry(  # type: ignore[attr-defined,no-any-return]
+                    title=title, data=data, description=_create_entry_description(data)
+                )
 
         # Get profile-specific options
         profile = self._user_data.get(CONF_PROFILE, PROFILE_AUTO)
@@ -234,7 +251,6 @@ class SettingsFlowMixin:
         width_choices: dict[str, str] = {}
         for w in width_list:
             width_choices[str(w)] = f"{w} columns"
-        width_choices[OPTION_CUSTOM] = "Custom (enter columns)..."
 
         # Get cut modes for selected profile
         cut_modes = await self.hass.async_add_executor_job(get_profile_cut_modes, profile)
@@ -243,8 +259,18 @@ class SettingsFlowMixin:
         data_schema = vol.Schema(
             {
                 vol.Optional(CONF_CODEPAGE, default=""): vol.In(codepage_choices),
-                vol.Optional(CONF_LINE_WIDTH, default=str(DEFAULT_LINE_WIDTH)): vol.In(
-                    width_choices
+                # Combobox rather than vol.In: custom_value lets the user
+                # type a width directly instead of hunting for a
+                # "Custom..." choice that only opens a box on the next screen.
+                vol.Optional(CONF_LINE_WIDTH, default=str(DEFAULT_LINE_WIDTH)): SelectSelector(
+                    SelectSelectorConfig(
+                        options=[
+                            SelectOptionDict(value=v, label=label)
+                            for v, label in width_choices.items()
+                        ],
+                        custom_value=True,
+                        mode=SelectSelectorMode.DROPDOWN,
+                    )
                 ),
                 vol.Optional(CONF_DEFAULT_ALIGN, default=DEFAULT_ALIGN): vol.In(
                     ["left", "center", "right"]
@@ -257,7 +283,9 @@ class SettingsFlowMixin:
             }
         )
 
-        return self.async_show_form(step_id="codepage", data_schema=data_schema)  # type: ignore[attr-defined,no-any-return]
+        return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
+            step_id="codepage", data_schema=data_schema, errors=errors
+        )
 
     async def async_step_custom_codepage(
         self, user_input: dict[str, Any] | None = None
@@ -334,8 +362,6 @@ class SettingsFlowMixin:
         if user_input is not None:
             custom_width = user_input.get("custom_line_width")
             _LOGGER.debug("Custom line width entered: %s", custom_width)
-
-            from .network_helpers import validate_custom_line_width  # noqa: PLC0415
 
             width_int, err_code = validate_custom_line_width(custom_width)
             if err_code:

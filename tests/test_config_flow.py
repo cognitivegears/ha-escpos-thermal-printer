@@ -539,3 +539,76 @@ async def test_network_flow_reuses_preset_detected_result(hass):  # type: ignore
 
     assert result["type"] == "create_entry"
     assert result["data"][CONF_DETECTED_MODEL] == "TM-T20II"
+
+
+async def test_config_flow_typed_line_width_creates_entry_directly(hass):  # type: ignore[no-untyped-def]
+    """The width combobox accepts a typed value at setup — no second step."""
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=True,
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
+    ):
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK},
+        )
+        result3 = await hass.config_entries.flow.async_configure(
+            result2["flow_id"],
+            {CONF_HOST: "1.2.3.4", CONF_PORT: 9100},
+        )
+
+        result4 = await hass.config_entries.flow.async_configure(
+            result3["flow_id"],
+            {
+                CONF_CODEPAGE: "",
+                CONF_LINE_WIDTH: "42",
+                CONF_DEFAULT_ALIGN: "left",
+                CONF_DEFAULT_CUT: "none",
+            },
+        )
+
+        assert result4["type"] == "create_entry"
+        assert result4["data"][CONF_LINE_WIDTH] == 42
+
+
+async def test_config_flow_typed_line_width_invalid_shows_error(hass):  # type: ignore[no-untyped-def]
+    """A non-numeric typed width re-shows the codepage form with an error."""
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=True,
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.network_steps.query_printer_id",
+            return_value=None,
+        ),
+    ):
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK},
+        )
+        result3 = await hass.config_entries.flow.async_configure(
+            result2["flow_id"],
+            {CONF_HOST: "1.2.3.4", CONF_PORT: 9100},
+        )
+
+        result4 = await hass.config_entries.flow.async_configure(
+            result3["flow_id"],
+            {
+                CONF_CODEPAGE: "",
+                CONF_LINE_WIDTH: "wide",
+                CONF_DEFAULT_ALIGN: "left",
+                CONF_DEFAULT_CUT: "none",
+            },
+        )
+
+        assert result4["type"] == "form"
+        assert result4["step_id"] == "codepage"
+        assert result4["errors"] == {"base": "invalid_line_width"}

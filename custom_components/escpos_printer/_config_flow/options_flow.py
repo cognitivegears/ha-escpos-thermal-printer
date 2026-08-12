@@ -7,6 +7,12 @@ from typing import Any
 
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
+from homeassistant.helpers.selector import (
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+)
 import voluptuous as vol
 
 from ..capabilities import (
@@ -57,6 +63,7 @@ from ..const import (
     RELIABILITY_PROFILE_FAST_LAN,
 )
 from .calibration_steps import CalibrationFlowMixin
+from .network_helpers import validate_custom_line_width
 
 _RELIABILITY_LABELS: dict[str, str] = {
     RELIABILITY_PROFILE_AUTO: "Auto (recommended)",
@@ -151,11 +158,22 @@ class EscposOptionsFlowHandler(CalibrationFlowMixin, config_entries.OptionsFlowW
             ):
                 errors["base"] = "bt_status_interval_too_low"
 
+            # The width field is a combobox (custom_value=True), so the
+            # submitted value may be a typed number, not just a preset.
+            # OPTION_CUSTOM is kept as a routed fallback for the legacy
+            # two-step entry path.
+            line_width = user_input.get(CONF_LINE_WIDTH)
+            if not errors and line_width not in (None, OPTION_CUSTOM):
+                width_int, width_err = validate_custom_line_width(line_width)
+                if width_err:
+                    errors["base"] = width_err
+                else:
+                    user_input[CONF_LINE_WIDTH] = width_int
+
             if not errors:
                 # Check for custom options
                 profile = user_input.get(CONF_PROFILE)
                 codepage = user_input.get(CONF_CODEPAGE)
-                line_width = user_input.get(CONF_LINE_WIDTH)
 
                 # Handle profile change - reset dependent options
                 old_profile = self.config_entry.options.get(
@@ -228,7 +246,6 @@ class EscposOptionsFlowHandler(CalibrationFlowMixin, config_entries.OptionsFlowW
         width_choices: dict[str, str] = {}
         for w in width_list:
             width_choices[str(w)] = f"{w} columns"
-        width_choices[OPTION_CUSTOM] = "Custom (enter columns)..."
 
         # Ensure current line width is in choices (backward compatibility).
         # Normalise to str so the lookup works regardless of stored type.
@@ -311,7 +328,19 @@ class EscposOptionsFlowHandler(CalibrationFlowMixin, config_entries.OptionsFlowW
             ): vol.Coerce(float),
             vol.Optional(CONF_PROFILE, default=current_profile): vol.In(profile_choices),
             vol.Optional(CONF_CODEPAGE, default=current_codepage): vol.In(codepage_choices),
-            vol.Optional(CONF_LINE_WIDTH, default=current_line_width_str): vol.In(width_choices),
+            # Combobox rather than vol.In: custom_value lets the user type
+            # a width directly instead of hunting for a "Custom..." choice
+            # that only opens an entry box on the next screen.
+            vol.Optional(CONF_LINE_WIDTH, default=current_line_width_str): SelectSelector(
+                SelectSelectorConfig(
+                    options=[
+                        SelectOptionDict(value=v, label=label)
+                        for v, label in width_choices.items()
+                    ],
+                    custom_value=True,
+                    mode=SelectSelectorMode.DROPDOWN,
+                )
+            ),
             vol.Optional(
                 CONF_WIDTH_PIXELS,
                 description={
@@ -474,8 +503,6 @@ class EscposOptionsFlowHandler(CalibrationFlowMixin, config_entries.OptionsFlowW
         if user_input is not None:
             custom_width = user_input.get("custom_line_width")
             _LOGGER.debug("Options: Custom line width entered: %s", custom_width)
-
-            from .network_helpers import validate_custom_line_width  # noqa: PLC0415
 
             width_int, err_code = validate_custom_line_width(custom_width)
             if err_code:
