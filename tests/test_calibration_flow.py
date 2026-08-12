@@ -9,7 +9,9 @@ from unittest.mock import AsyncMock, MagicMock
 from homeassistant.components import persistent_notification as pn
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_HOST, CONF_PORT
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+import voluptuous as vol
 
 from custom_components.escpos_printer._config_flow.calibration import CODEPAGE_CANDIDATES
 from custom_components.escpos_printer.capabilities.loader import _get_capabilities
@@ -470,12 +472,15 @@ async def _advance_to_ruler(hass, entry):  # type: ignore[no-untyped-def]
     )
 
 
-async def _advance_to_codepage(hass, entry, *, last_marker: int = 0):  # type: ignore[no-untyped-def]
+async def _advance_to_codepage(hass, entry, *, last_marker: int | None = None):  # type: ignore[no-untyped-def]
     """Hop through impl + width + ruler to land on the codepage step."""
     result = await _advance_to_ruler(hass, entry)
-    return await hass.config_entries.options.async_configure(
-        result["flow_id"], {"last_marker": last_marker, "action": "continue"}
+    payload = (
+        {"action": "skip"}
+        if last_marker is None
+        else {"last_marker": last_marker, "action": "continue"}
     )
+    return await hass.config_entries.options.async_configure(result["flow_id"], payload)
 
 
 async def test_ruler_step_prints_once_and_shows_form(hass):  # type: ignore[no-untyped-def]
@@ -505,7 +510,7 @@ async def test_ruler_reprint_reprints_and_reshows_same_step(hass):  # type: igno
     before = adapter.print_text.await_count
 
     result2 = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"last_marker": 0, "action": "reprint"}
+        result["flow_id"], {"action": "reprint"}
     )
 
     assert result2["type"] == "form"
@@ -545,14 +550,14 @@ async def test_ruler_marker_stores_line_width_and_advances_to_codepage(hass):  #
     assert flow._calib["line_width"] == 48
 
 
-async def test_ruler_zero_skips_storing_and_advances(hass):  # type: ignore[no-untyped-def]
-    """0 (don't know / skip) leaves line_width unset but still advances."""
+async def test_ruler_skip_action_skips_storing_and_advances(hass):  # type: ignore[no-untyped-def]
+    """The explicit skip action leaves line_width unset but still advances."""
     entry, _adapter = _make_entry(hass)
     result = await _advance_to_ruler(hass, entry)
     flow = hass.config_entries.options._progress[result["flow_id"]]
 
     result2 = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"last_marker": 0, "action": "continue"}
+        result["flow_id"], {"action": "skip"}
     )
 
     assert result2["type"] == "form"
@@ -560,22 +565,30 @@ async def test_ruler_zero_skips_storing_and_advances(hass):  # type: ignore[no-u
     assert "line_width" not in flow._calib
 
 
-async def test_ruler_low_value_shows_line_width_out_of_range_error(hass):  # type: ignore[no-untyped-def]
-    """1-15 is a positive number the user DID enter -- reject it with its own error key.
-
-    ``invalid_line_width`` ("Must be a positive number") is wrong here:
-    8 IS a positive number, it's just below the wizard's usable range.
-    """
+async def test_ruler_continue_without_marker_shows_missing_error(hass):  # type: ignore[no-untyped-def]
+    """Continue with an empty count is ambiguous -- demand a value or an explicit skip."""
     entry, _adapter = _make_entry(hass)
     result = await _advance_to_ruler(hass, entry)
 
     result2 = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"last_marker": 8, "action": "continue"}
+        result["flow_id"], {"action": "continue"}
     )
 
     assert result2["type"] == "form"
     assert result2["step_id"] == "calibrate_ruler"
-    assert result2["errors"]["base"] == "line_width_out_of_range"
+    assert result2["errors"]["base"] == "line_width_missing"
+
+
+async def test_ruler_low_value_rejected_by_schema(hass):  # type: ignore[no-untyped-def]
+    """1-15 is below the narrowest plausible printer width -- the
+    NumberSelector's min=16 rejects it at schema level."""
+    entry, _adapter = _make_entry(hass)
+    result = await _advance_to_ruler(hass, entry)
+
+    with pytest.raises(vol.Invalid):
+        await hass.config_entries.options.async_configure(
+            result["flow_id"], {"last_marker": 8, "action": "continue"}
+        )
 
 
 async def test_codepage_step_prints_one_line_per_candidate_with_encoding(hass, monkeypatch):  # type: ignore[no-untyped-def]
@@ -719,7 +732,7 @@ async def test_codepage_step_skipped_when_profile_supports_none_of_the_candidate
     prints_before = adapter.print_text.await_count
 
     result2 = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"last_marker": 0, "action": "continue"}
+        result["flow_id"], {"action": "skip"}
     )
 
     assert result2["type"] == "form"
@@ -836,7 +849,7 @@ async def test_save_with_nothing_measured_creates_no_notification(hass):  # type
         result["flow_id"], {"impls_clean": [], "action": "continue"}
     )
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"last_marker": 0, "action": "continue"}
+        result["flow_id"], {"action": "skip"}
     )
     assert result["step_id"] == "calibrate_codepage"
     result = await hass.config_entries.options.async_configure(

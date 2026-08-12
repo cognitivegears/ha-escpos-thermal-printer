@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The calibration wizard's "characters per line" step now uses a typed
+  number box (16–96) instead of a 0–96 slider, and skipping is an
+  explicit "Skip this step" action instead of the magic value 0. The
+  user is transcribing a count they just read off the paper, so a
+  slider was the wrong control, and its 0 default made the skip
+  convention easy to trigger by accident. Continuing with the count
+  left empty now asks for a value or an explicit skip.
+
 ### Fixed
 
 - The width-bars calibration step no longer reports "Printing the test
