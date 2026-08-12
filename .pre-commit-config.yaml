@@ -37,8 +37,11 @@ repos:
         files: ^blueprints/.*\.md$
         pass_filenames: false
 
+  # Keep this rev in lockstep with the ruff pin in pyproject.toml — the
+  # CI format gate runs the pyproject-pinned ruff, so a version skew here
+  # can locally format code in a way CI then rejects.
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.13
+    rev: v0.16.2
     hooks:
       - id: ruff-check
         args: [--fix]

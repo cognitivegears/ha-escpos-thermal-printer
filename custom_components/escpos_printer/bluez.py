@@ -141,9 +141,7 @@ async def list_paired_bluetooth_devices() -> list[dict[str, Any]]:
         )
         uuids_var = device_props.get("UUIDs")
         uuids_value = getattr(uuids_var, "value", None) if uuids_var is not None else None
-        uuids = (
-            [str(u) for u in uuids_value] if isinstance(uuids_value, (list, tuple)) else []
-        )
+        uuids = [str(u) for u in uuids_value] if isinstance(uuids_value, (list, tuple)) else []
         devices.append(
             {
                 "mac": mac,

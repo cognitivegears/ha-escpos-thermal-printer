@@ -493,8 +493,9 @@ class TestSppUuidDetection:
 
     def test_spp_uuid_matches_case_insensitively(self):
         assert has_spp_uuid(["00001101-0000-1000-8000-00805F9B34FB"])
-        assert has_spp_uuid(["0000110b-0000-1000-8000-00805f9b34fb",
-                             "00001101-0000-1000-8000-00805f9b34fb"])
+        assert has_spp_uuid(
+            ["0000110b-0000-1000-8000-00805f9b34fb", "00001101-0000-1000-8000-00805f9b34fb"]
+        )
 
     def test_non_spp_or_empty_lists_rejected(self):
         assert not has_spp_uuid(["0000110b-0000-1000-8000-00805f9b34fb"])  # A2DP sink
@@ -528,12 +529,8 @@ class TestSppUuidDetection:
             },
         }
         with (
-            patch.object(
-                bluez, "_connect_system_bus", AsyncMock(return_value=MagicMock())
-            ),
-            patch.object(
-                bluez, "_get_managed_objects", AsyncMock(return_value=managed)
-            ),
+            patch.object(bluez, "_connect_system_bus", AsyncMock(return_value=MagicMock())),
+            patch.object(bluez, "_get_managed_objects", AsyncMock(return_value=managed)),
         ):
             devices = await bluez.list_paired_bluetooth_devices()
 

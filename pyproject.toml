@@ -103,6 +103,13 @@ exclude_dirs = ["tests"]
 line-length = 100
 target-version = "py314"
 
+[tool.ruff.format]
+# ruff 0.16 formats Python code blocks inside Markdown by default. Our
+# .md files (plan docs, test designs, SECURITY.md) carry abridged and
+# pseudo-code snippets that shouldn't be reformatted — keep the
+# formatter (and the CI format gate) scoped to real code.
+exclude = ["*.md"]
+
 [tool.ruff.lint]
 select = [
     "E",      # pycodestyle errors
