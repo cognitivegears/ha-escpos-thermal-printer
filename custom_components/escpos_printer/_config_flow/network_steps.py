@@ -27,7 +27,12 @@ from ..const import (
     DEFAULT_PORT,
     DEFAULT_TIMEOUT,
 )
-from .network_helpers import _can_connect, query_printer_id
+from .network_helpers import (
+    _can_connect,
+    is_auto_network_title,
+    make_network_entry_title,
+    query_printer_id,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -218,14 +223,6 @@ class NetworkFlowMixin:
                     or {}
                 )
 
-                # Only follow the address to a new auto-generated title
-                # when the entry still carries the original auto-generated
-                # one -- a user's manual rename must never be clobbered.
-                title: str | UndefinedType = UNDEFINED
-                old_host = reconfigure_entry.data.get(CONF_HOST, "")
-                old_port = reconfigure_entry.data.get(CONF_PORT, DEFAULT_PORT)
-                if reconfigure_entry.title == f"{old_host}:{old_port}":
-                    title = f"{host}:{port}"
                 # A fresh GS I query result REPLACES prior detected state
                 # (present -> overwrite, absent -> key removed) since
                 # reconfigure may point the entry at a different printer.
@@ -259,6 +256,14 @@ class NetworkFlowMixin:
                 # MAC no longer describes), never on a transient query miss.
                 if addr_changed:
                     new_data.pop(CONF_MAC_ADDRESS, None)
+
+                # Only regenerate the title when the entry still carries an
+                # auto-generated one -- a user's manual rename must never be
+                # clobbered. Built from new_data so a fresh detection (or a
+                # cleared one) is reflected in the new title.
+                title: str | UndefinedType = UNDEFINED
+                if is_auto_network_title(reconfigure_entry.title, reconfigure_entry.data):
+                    title = make_network_entry_title(new_data)
 
                 return self.async_update_reload_and_abort(  # type: ignore[attr-defined,no-any-return]
                     reconfigure_entry,

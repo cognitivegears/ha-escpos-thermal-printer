@@ -8,6 +8,7 @@ network form is the confirmation UI — discovery just prefills it.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -18,9 +19,21 @@ from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 from homeassistant.helpers.typing import UNDEFINED, UndefinedType
 
 from ..const import CONF_MAC_ADDRESS, DEFAULT_PORT, DEFAULT_TIMEOUT, DOMAIN
-from .network_helpers import _can_connect, query_printer_id
+from .network_helpers import (
+    _can_connect,
+    is_auto_network_title,
+    make_network_entry_title,
+    query_printer_id,
+)
 
 _LOGGER = logging.getLogger(__name__)
+
+# A printer's DHCP lease often lands tens of seconds before port 9100 starts
+# listening (the network stack boots first), so a single probe at discovery
+# time misses freshly powered-on printers -- and HA won't re-fire discovery
+# until the next DHCP packet, typically a lease renewal hours later. Probe
+# again after these sleeps before giving up on the card.
+_PROBE_RETRY_DELAYS: tuple[float, ...] = (0, 5, 10, 15, 30)
 
 # Brand hostname prefixes (lowercase, matching the manifest's DHCP hostname
 # matchers) that GS I identity may not be trusted against -- see
@@ -93,11 +106,12 @@ class DiscoveryFlowMixin:
             # Only follow the address to a new auto-generated title -- a
             # user's manual rename must never be clobbered (same heuristic
             # as network_steps.async_step_reconfigure_network).
+            new_data = {**entry.data, CONF_HOST: host}
             title: str | UndefinedType = UNDEFINED
-            if entry.title == f"{entry.data.get(CONF_HOST)}:{entry_port}":
-                title = f"{host}:{entry_port}"
+            if is_auto_network_title(entry.title, entry.data):
+                title = make_network_entry_title(new_data)
             self.hass.config_entries.async_update_entry(
-                entry, data={**entry.data, CONF_HOST: host}, unique_id=new_unique_id, title=title
+                entry, data=new_data, unique_id=new_unique_id, title=title
             )
             self.hass.config_entries.async_schedule_reload(entry.entry_id)
             return self.async_abort(reason="already_configured")  # type: ignore[attr-defined,no-any-return]
@@ -112,14 +126,20 @@ class DiscoveryFlowMixin:
         else:
             self._abort_if_unique_id_configured()  # type: ignore[attr-defined]
 
-        if not await self.hass.async_add_executor_job(
-            _can_connect, host, DEFAULT_PORT, DEFAULT_TIMEOUT
-        ):
+        for delay in _PROBE_RETRY_DELAYS:
+            if delay:
+                await asyncio.sleep(delay)
+            if await self.hass.async_add_executor_job(
+                _can_connect, host, DEFAULT_PORT, DEFAULT_TIMEOUT
+            ):
+                break
+        else:
             _LOGGER.debug(
-                "DHCP match %s (%s) not listening on %s; ignoring",
+                "DHCP match %s (%s) not listening on %s after %d probes; ignoring",
                 discovery_info.hostname,
                 host,
                 DEFAULT_PORT,
+                len(_PROBE_RETRY_DELAYS),
             )
             return self.async_abort(reason="cannot_connect")  # type: ignore[attr-defined,no-any-return]
 

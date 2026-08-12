@@ -35,6 +35,12 @@ async def _start_dhcp_flow(hass, can_connect=True, query_result=None, discovery=
             "custom_components.escpos_printer._config_flow.discovery_steps._can_connect",
             return_value=can_connect,
         ),
+        # Collapse the boot-race retry schedule so a closed port aborts
+        # immediately instead of sleeping through the real delays.
+        patch(
+            "custom_components.escpos_printer._config_flow.discovery_steps._PROBE_RETRY_DELAYS",
+            (0,),
+        ),
         patch(
             "custom_components.escpos_printer._config_flow.discovery_steps.query_printer_id",
             return_value=query_result,
@@ -101,6 +107,32 @@ async def test_dhcp_discovery_aborts_when_port_closed(hass):
     result = await _start_dhcp_flow(hass, can_connect=False)
     assert result["type"] == FlowResultType.ABORT
     assert result["reason"] == "cannot_connect"
+
+
+async def test_dhcp_discovery_retries_probe_for_booting_printer(hass):
+    """The DHCP lease lands before port 9100 is up on a booting printer --
+    the probe must retry instead of aborting on the first refusal."""
+    with (
+        patch(
+            "custom_components.escpos_printer._config_flow.discovery_steps._can_connect",
+            side_effect=[False, False, True],
+        ) as mock_connect,
+        patch(
+            "custom_components.escpos_printer._config_flow.discovery_steps._PROBE_RETRY_DELAYS",
+            (0, 0, 0),
+        ),
+        patch(
+            "custom_components.escpos_printer._config_flow.discovery_steps.query_printer_id",
+            return_value={"manufacturer": "EPSON", "model": "TM-T20II"},
+        ),
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_DHCP}, data=DISCOVERY
+        )
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "network"
+    assert mock_connect.call_count == 3
 
 
 async def test_dhcp_discovery_edited_host_requeries_instead_of_reusing_detection(hass):
@@ -205,6 +237,8 @@ async def test_dhcp_discovery_end_to_end_creates_entry_with_detection(hass):
     assert result["data"]["detected_manufacturer"] == "EPSON"
     assert result["data"]["detected_model"] == "TM-T20II"
     assert result["data"]["profile"] == "TM-T20II"
+    # Entry title is model-based when a model was detected.
+    assert result["title"] == "TM-T20II (192.168.10.157:9100)"
 
 
 async def test_dhcp_discovery_persists_mac_address(hass):
@@ -294,6 +328,43 @@ async def test_dhcp_discovery_known_mac_new_ip_updates_existing_entry(hass):
     assert updated.data["host"] == "192.168.10.200"
     assert updated.unique_id == "192.168.10.200:9100"
     assert updated.title == "192.168.10.200:9100"  # auto-generated title follows
+
+
+async def test_dhcp_discovery_known_mac_new_ip_model_title_follows(hass):
+    """A model-based auto title ("TM-T20II (host:port)") counts as
+    auto-generated too and follows the relocation."""
+    mac = format_mac(DISCOVERY.macaddress)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="TM-T20II (192.168.10.157:9100)",
+        unique_id="192.168.10.157:9100",
+        data={
+            "connection_type": "network",
+            "host": "192.168.10.157",
+            "port": 9100,
+            "detected_manufacturer": "EPSON",
+            "detected_model": "TM-T20II",
+            CONF_MAC_ADDRESS: mac,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    with patch("custom_components.escpos_printer.async_setup_entry", return_value=True):
+        result = await _start_dhcp_flow(
+            hass,
+            discovery=DhcpServiceInfo(
+                ip="192.168.10.200",
+                hostname="TM-T20II-628E52",
+                macaddress=DISCOVERY.macaddress,
+            ),
+        )
+        await hass.async_block_till_done()
+
+    assert result["type"] == FlowResultType.ABORT
+    updated = hass.config_entries.async_get_entry(entry.entry_id)
+    assert updated is not None
+    assert updated.data["host"] == "192.168.10.200"
+    assert updated.title == "TM-T20II (192.168.10.200:9100)"
 
 
 async def test_dhcp_discovery_known_mac_new_ip_preserves_manual_rename(hass):

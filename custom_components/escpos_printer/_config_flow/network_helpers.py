@@ -2,11 +2,37 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 import logging
 import socket
 from typing import Any
 
+from homeassistant.const import CONF_HOST, CONF_PORT
+
+from ..const import CONF_DETECTED_MODEL, DEFAULT_PORT
+
 _LOGGER = logging.getLogger(__name__)
+
+
+def make_network_entry_title(data: Mapping[str, Any]) -> str:
+    """Auto-generated title for a network entry: model-based when detected."""
+    host = data.get(CONF_HOST, "")
+    port = data.get(CONF_PORT, DEFAULT_PORT)
+    model = data.get(CONF_DETECTED_MODEL)
+    return f"{model} ({host}:{port})" if model else f"{host}:{port}"
+
+
+def is_auto_network_title(title: str, data: Mapping[str, Any]) -> bool:
+    """True when ``title`` is one this integration generated from ``data``.
+
+    The auto title is a pure function of stored entry data, so "has the
+    user renamed this entry?" is answered by recomputing it -- no stored
+    original-title field to keep in sync. The bare "host:port" form is
+    always included: entries created before model-based titles carry it
+    even when a detected model is stored alongside.
+    """
+    legacy = f"{data.get(CONF_HOST, '')}:{data.get(CONF_PORT, DEFAULT_PORT)}"
+    return title in {legacy, make_network_entry_title(data)}
 
 
 def validate_custom_line_width(value: Any) -> tuple[int | None, str | None]:
