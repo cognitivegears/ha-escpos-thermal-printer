@@ -99,8 +99,13 @@ jobs:
 
       - name: Per-patch coverage gate (CI-H1)
         if: github.event_name == 'pull_request'
+        # No --depth on the fetch: a shallow (depth=1) fetch grafts the
+        # base branch's tip with its parents cut off, so as soon as the
+        # base advances past this PR's fork point, `origin/<base>...HEAD`
+        # has no merge base and diff-cover dies. The clone above is full
+        # (fetch-depth: 0), so a plain fetch keeps real history.
         run: |
-          git fetch origin ${{ github.base_ref }} --depth=1
+          git fetch origin ${{ github.base_ref }}
           diff-cover coverage.xml \
             --compare-branch=origin/${{ github.base_ref }} \
             --fail-under=90

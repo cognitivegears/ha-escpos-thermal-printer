@@ -347,3 +347,50 @@ async def test_options_flow_non_bt_entry_status_interval_below_60_accepted(hass)
         await hass.async_block_till_done()
     assert result["type"] == "create_entry"
     assert result["data"][CONF_STATUS_INTERVAL] == 30
+
+
+async def test_options_flow_typed_line_width_saves_directly(hass):  # type: ignore[no-untyped-def]
+    """The width combobox accepts a typed value — no second step needed."""
+    entry = await _setup_entry(hass)
+
+    result = await _open_settings(hass, entry)
+    with patch("custom_components.escpos_printer.async_setup_entry", return_value=True):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            user_input={
+                CONF_PROFILE: "TM-T20",
+                CONF_CODEPAGE: "",
+                CONF_LINE_WIDTH: "42",
+                "default_align": "left",
+                "default_cut": "none",
+                "timeout": 4.0,
+                "keepalive": False,
+                "status_interval": 0,
+            },
+        )
+        await hass.async_block_till_done()
+    assert result["type"] == "create_entry"
+    assert result["data"][CONF_LINE_WIDTH] == 42
+
+
+async def test_options_flow_typed_line_width_invalid_shows_error(hass):  # type: ignore[no-untyped-def]
+    """A non-numeric typed width re-shows the settings form with an error."""
+    entry = await _setup_entry(hass)
+
+    result = await _open_settings(hass, entry)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            CONF_PROFILE: "TM-T20",
+            CONF_CODEPAGE: "",
+            CONF_LINE_WIDTH: "lots",
+            "default_align": "left",
+            "default_cut": "none",
+            "timeout": 4.0,
+            "keepalive": False,
+            "status_interval": 0,
+        },
+    )
+    assert result["type"] == "form"
+    assert result["step_id"] == "settings"
+    assert result["errors"] == {"base": "invalid_line_width"}

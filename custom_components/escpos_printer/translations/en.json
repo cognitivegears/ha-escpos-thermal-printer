@@ -161,7 +161,7 @@
         },
         "data_description": {
           "codepage": "Character encoding/codepage for text. Choose 'Custom' to enter a codepage manually.",
-          "line_width": "Number of characters per line (columns). Choose 'Custom' to enter a value manually.",
+          "line_width": "Number of characters per line (columns). Pick a preset or type a custom number.",
           "width_pixels": "Overrides the profile's printable width for images. Leave empty to use the profile. Common values: 384 (58 mm), 576 (80 mm).",
           "impl": "ESC/POS command set used to print images. Auto follows the printer profile; override if images print garbled or fail.",
           "default_align": "Default text alignment for printing.",
@@ -372,7 +372,7 @@
           "timeout": "Connection timeout in seconds.",
           "profile": "Select your printer model. Changing this will reset encoding options.",
           "codepage": "Character encoding/codepage for text.",
-          "line_width": "Number of characters per line (columns).",
+          "line_width": "Number of characters per line (columns). Pick a preset or type a custom number.",
           "width_pixels": "Overrides the profile's printable width for images. Leave empty to use the profile. Common values: 384 (58 mm), 576 (80 mm).",
           "default_align": "Default text alignment for printing.",
           "default_cut": "Default paper cut mode after printing.",
