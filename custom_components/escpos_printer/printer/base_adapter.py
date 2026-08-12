@@ -27,6 +27,7 @@ from .image_operations import (
     ImageStats,
     _print_prepared_under_lock,
     prepare_image_for_print,
+    profile_width_bypass,
 )
 from .image_processor import FALLBACK_PROFILE_WIDTH
 from .mapping_utils import cleanup_cut, map_align, map_cut, map_multiplier, map_underline
@@ -795,12 +796,18 @@ class _BatchPage:
         dither: str = "floyd-steinberg",
         auto_resize: bool = False,
         feed: int | None = 0,
+        ignore_profile_width: bool = False,
     ) -> None:
         """Print an image on the held connection (mirrors ``adapter.print_image``).
 
         Image prep runs while the lock is held — callers pass small
         generated data URIs (calibration patterns), not slow camera or
         URL sources.
+
+        ``ignore_profile_width`` swaps in a width-unlocked profile for
+        the send so python-escpos doesn't refuse images wider than the
+        profile's declared width — calibration's width bars are wider
+        on purpose (hardware clipping is the measurement).
         """
         prepared = await prepare_image_for_print(
             self._adapter,
@@ -811,7 +818,11 @@ class _BatchPage:
             dither=dither,
             auto_resize=auto_resize,
         )
-        await _print_prepared_under_lock(self._hass, self._printer, prepared)
+        if ignore_profile_width:
+            with profile_width_bypass(self._printer):
+                await _print_prepared_under_lock(self._hass, self._printer, prepared)
+        else:
+            await _print_prepared_under_lock(self._hass, self._printer, prepared)
         await self._adapter._apply_cut_and_feed(self._hass, self._printer, "none", feed)
 
     async def feed(self, lines: int) -> None:

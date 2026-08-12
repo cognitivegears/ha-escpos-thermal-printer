@@ -276,6 +276,9 @@ async def test_impl_continue_stores_choice_and_advances_to_width(hass):  # type:
     # clamps every bar to the profile/opts width and they all print
     # identical length, making the step unable to measure anything wider.
     assert [call.kwargs["width"] for call in width_calls] == [384, 512, 576, 640, 832]
+    # ...and bypass python-escpos's profile-width refusal, or bars wider
+    # than the declared profile width can never reach the printer.
+    assert all(call.kwargs["ignore_profile_width"] for call in width_calls)
 
 
 async def test_impl_partial_candidate_failure_is_tolerated(hass):  # type: ignore[no-untyped-def]
@@ -348,6 +351,53 @@ async def test_width_bars_prefer_calib_impl_then_adapter_default(hass):  # type:
     assert all(
         call.kwargs["impl"] == "bitImageColumn" for call in adapter.print_image.await_args_list[-5:]
     )
+
+
+async def test_width_partial_bar_failure_is_tolerated(hass):  # type: ignore[no-untyped-def]
+    """Bars wider than the profile's declared width failing doesn't fail the step.
+
+    python-escpos raises ImageWidthError for any image wider than the
+    profile's media.width.pixels, so on a printer with a declared width
+    (e.g. TM-T20II @ 576) the 640/832 bars can never be sent. The bars
+    that did print are still a valid measurement (seen on TM-T20II:
+    3 bars on paper + a spurious "print failed" banner).
+    """
+    entry, adapter = _make_entry(hass)
+    # 3 impl-step prints succeed; width bars 384/512/576 succeed, 640/832
+    # exceed the profile width and raise.
+    adapter.print_image.side_effect = [None] * 3 + [
+        None,
+        None,
+        None,
+        RuntimeError("640 > 576"),
+        RuntimeError("832 > 576"),
+    ]
+    result = await _open_calibrate(hass, entry)
+
+    result2 = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"impls_clean": ["bitImageRaster"], "action": "continue"}
+    )
+
+    assert result2["type"] == "form"
+    assert result2["step_id"] == "calibrate_width"
+    assert result2.get("errors") in (None, {})
+    # All five bars were attempted -- a failing bar must not abort the rest.
+    assert adapter.print_image.await_count == 3 + 5
+
+
+async def test_width_all_bars_failing_shows_print_error(hass):  # type: ignore[no-untyped-def]
+    """If every bar fails to print, the form re-shows a print-failure error."""
+    entry, adapter = _make_entry(hass)
+    adapter.print_image.side_effect = [None] * 3 + [RuntimeError("boom")] * 5
+    result = await _open_calibrate(hass, entry)
+
+    result2 = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"impls_clean": ["bitImageRaster"], "action": "continue"}
+    )
+
+    assert result2["type"] == "form"
+    assert result2["step_id"] == "calibrate_width"
+    assert result2["errors"]["base"] == "calibration_print_failed"
 
 
 async def test_width_continue_with_bar_stores_pixels_then_advances_to_ruler(hass):  # type: ignore[no-untyped-def]

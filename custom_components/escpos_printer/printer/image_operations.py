@@ -41,6 +41,8 @@ from .image_processor import (
 from .mapping_utils import cleanup_cut, map_align
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from homeassistant.core import Context, HomeAssistant
     from PIL import Image
 
@@ -430,6 +432,48 @@ async def _process_bytes(
             raise HomeAssistantError(_describe_undecodable(raw, content_type)) from exc
 
     return await hass.async_add_executor_job(_go)
+
+
+class _WidthUnlockedProfile:
+    """Proxy of a python-escpos profile with ``media.width`` removed.
+
+    ``Escpos.image()`` raises ``ImageWidthError`` for images wider than
+    ``profile_data["media"]["width"]["pixels"]`` — and deliberately
+    prints anyway on ``KeyError`` (the "unknown width" path generic
+    profiles take). Dropping just that key opts out of the refusal while
+    delegating every other attribute (``get_font``, ``supports``, …) to
+    the real profile, so ``set()`` and text encoding keep working.
+    """
+
+    def __init__(self, profile: Any) -> None:
+        self._profile = profile
+        data = dict(getattr(profile, "profile_data", {}) or {})
+        media = dict(data.get("media", {}))
+        media.pop("width", None)
+        data["media"] = media
+        self.profile_data = data
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._profile, name)
+
+
+@contextlib.contextmanager
+def profile_width_bypass(printer: Any) -> Iterator[None]:
+    """Temporarily hide the profile's pixel width from ``printer``.
+
+    Calibration sends bars *deliberately* wider than the profile width
+    so the hardware's own clipping can be measured — including when the
+    configured profile under-declares the true width, which is exactly
+    the misconfiguration the width step exists to catch. Callers hold
+    the adapter lock, so no other operation can observe the swapped
+    profile.
+    """
+    original = printer.profile
+    printer.profile = _WidthUnlockedProfile(original)
+    try:
+        yield
+    finally:
+        printer.profile = original
 
 
 # Cache of ``printer.image`` supported kwarg names, keyed by printer class.
