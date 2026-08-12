@@ -21,6 +21,11 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.components.persistent_notification import async_create as pn_create
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.selector import (
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
+)
 import voluptuous as vol
 
 from ..capabilities import get_profile_codepages
@@ -60,6 +65,7 @@ _IMPL_LABELS = {
     "graphics": "Pattern 3 (Graphics)",
 }
 _ACTION_CHOICES = {"continue": "Continue", "reprint": "Reprint the test page"}
+_RULER_ACTION_CHOICES = _ACTION_CHOICES | {"skip": "Skip this step"}
 _CONFIRM_ACTION_CHOICES = {"start": "Start calibration", "cancel": "Cancel"}
 # Derived from WIDTH_CANDIDATES so the bar numbers/labels can't drift out
 # of sync with what _print_width_bars actually prints.
@@ -378,20 +384,30 @@ class CalibrationFlowMixin:
                 _LOGGER.warning("Calibration ruler step failed: %s", sanitize_log_message(str(err)))
                 errors["base"] = "calibration_print_failed"
         else:
-            marker = user_input.get("last_marker", 0)
-            if 1 <= marker <= 15:
-                errors["base"] = "line_width_out_of_range"
+            if user_input.get("action") == "skip":
+                return await self.async_step_calibrate_codepage()
+            marker = user_input.get("last_marker")
+            if marker is None:
+                # "Continue" with an empty count is ambiguous -- make the
+                # user either type what they measured or skip explicitly.
+                errors["base"] = "line_width_missing"
             else:
-                if marker:
-                    self._calib["line_width"] = marker
+                self._calib["line_width"] = marker
                 return await self.async_step_calibrate_codepage()
 
         schema = vol.Schema(
             {
-                vol.Required("last_marker", default=0): vol.All(
-                    vol.Coerce(int), vol.Range(min=0, max=96)
+                # BOX mode: the user transcribes a count they just read off
+                # the paper -- a typed number field, not a slider. 16 is the
+                # narrowest plausible printer width; "don't know" is the
+                # explicit skip action, not a magic 0.
+                vol.Optional("last_marker"): vol.All(
+                    NumberSelector(
+                        NumberSelectorConfig(min=16, max=96, step=1, mode=NumberSelectorMode.BOX)
+                    ),
+                    vol.Coerce(int),
                 ),
-                vol.Required("action", default="continue"): vol.In(_ACTION_CHOICES),
+                vol.Required("action", default="continue"): vol.In(_RULER_ACTION_CHOICES),
             }
         )
         if user_input is not None:

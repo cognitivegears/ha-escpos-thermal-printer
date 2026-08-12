@@ -332,7 +332,7 @@
       "invalid_profile": "Invalid printer profile name.",
       "invalid_codepage": "Invalid codepage/encoding.",
       "invalid_line_width": "Invalid line width. Must be a positive number.",
-      "line_width_out_of_range": "Enter the marker number you can read (16–96), or 0 to skip.",
+      "line_width_missing": "Enter the character count from the first line (16–96), or choose \"Skip this step\".",
       "bt_status_interval_too_low": "Status check interval must be 0 (disabled) or at least 60 seconds for Bluetooth printers.",
       "calibration_print_failed": "Printing the test page failed. Check the printer and try again."
     },
@@ -410,9 +410,9 @@
       },
       "calibrate_ruler": {
         "title": "Calibrate: characters per line",
-        "description": "Your printer just printed a ruler line of dots with the numbers 10, 20, 30... embedded in it, followed by one or two leftover lines you can ignore. Look at the FIRST printed line only: find the last complete number on it, then add 1 for every dot printed after that number. Example: if the line ends with \"40..\", enter 42. Enter 0 if you're not sure.",
+        "description": "Your printer just printed a ruler line of dots with the numbers 10, 20, 30... embedded in it, followed by one or two leftover lines you can ignore. Look at the FIRST printed line only: find the last complete number on it, then add 1 for every dot printed after that number. Example: if the line ends with \"40..\", enter 42. If you're not sure, choose \"Skip this step\".",
         "data": {
-          "last_marker": "Characters on the first line (0 = don't know / skip)",
+          "last_marker": "Characters on the first line",
           "action": "Action"
         }
       },
