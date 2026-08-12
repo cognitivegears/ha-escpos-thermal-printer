@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.components import persistent_notification as pn
 from homeassistant.config_entries import ConfigEntryState
@@ -785,15 +785,27 @@ async def _advance_to_summary(  # type: ignore[no-untyped-def]
     )
 
 
+async def _submit_save(hass, flow_id, user_input):  # type: ignore[no-untyped-def]
+    """Submit the summary step's save and drain the scheduled reload.
+
+    Saving schedules a real config-entry reload; without stubbing setup
+    and draining the loop, the reload task races test teardown and
+    intermittently errors ("task still running after final writes
+    shutdown stage"). Same pattern as test_options_flow_custom.py.
+    """
+    with patch("custom_components.escpos_printer.async_setup_entry", return_value=True):
+        result = await hass.config_entries.options.async_configure(flow_id, user_input)
+        await hass.async_block_till_done()
+    return result
+
+
 async def test_full_wizard_save_merges_and_preserves_unrelated_option(hass, monkeypatch):  # type: ignore[no-untyped-def]
     """Save merges measured keys into options without dropping an unrelated one."""
     entry, _adapter = _make_entry(hass, options={CONF_TIMEOUT: 7.0})
     result = await _advance_to_summary(hass, entry)
     assert result["step_id"] == "calibrate_summary"
 
-    result2 = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"model": "", "action": "save"}
-    )
+    result2 = await _submit_save(hass, result["flow_id"], {"model": "", "action": "save"})
 
     assert result2["type"] == "abort"
     assert result2["reason"] == "calibration_saved"
@@ -810,9 +822,7 @@ async def test_skip_codepage_then_save_omits_codepage_key(hass, monkeypatch):  #
     entry, _adapter = _make_entry(hass)
     result = await _advance_to_summary(hass, entry, codepage_action="skip")
 
-    result2 = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"model": "", "action": "save"}
-    )
+    result2 = await _submit_save(hass, result["flow_id"], {"model": "", "action": "save"})
 
     assert result2["type"] == "abort"
     assert result2["reason"] == "calibration_saved"
@@ -829,8 +839,8 @@ async def test_save_creates_persistent_notification_with_share_link(hass, monkey
     entry, _adapter = _make_entry(hass)
     result = await _advance_to_summary(hass, entry)
 
-    result2 = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"model": "Rongta RP850P", "action": "save"}
+    result2 = await _submit_save(
+        hass, result["flow_id"], {"model": "Rongta RP850P", "action": "save"}
     )
 
     assert result2["type"] == "abort"
@@ -857,9 +867,7 @@ async def test_save_with_nothing_measured_creates_no_notification(hass):  # type
     )
     assert result["step_id"] == "calibrate_summary"
 
-    result2 = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"model": "", "action": "save"}
-    )
+    result2 = await _submit_save(hass, result["flow_id"], {"model": "", "action": "save"})
 
     assert result2["type"] == "abort"
     assert result2["reason"] == "calibration_saved_no_changes"
@@ -898,8 +906,8 @@ async def test_save_abort_screen_carries_personalized_share_url(hass, monkeypatc
     entry, _adapter = _make_entry(hass)
     result = await _advance_to_summary(hass, entry)
 
-    result2 = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"model": "Rongta RP850P", "action": "save"}
+    result2 = await _submit_save(
+        hass, result["flow_id"], {"model": "Rongta RP850P", "action": "save"}
     )
 
     assert result2["type"] == "abort"
