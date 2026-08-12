@@ -162,7 +162,7 @@ class CalibrationFlowMixin:
             return None
         return self.config_entry.runtime_data.adapter
 
-    async def _print_step_header(self, adapter: Any, title: str, instruction: str) -> None:
+    async def _print_step_header(self, page: Any, title: str, instruction: str) -> None:
         """Print a compact on-paper title + one-line instruction.
 
         Both lines are kept under ~30 chars so they don't wrap even on
@@ -171,55 +171,56 @@ class CalibrationFlowMixin:
         error handling.
         """
         with contextlib.suppress(Exception):
-            await adapter.print_text(
-                self.hass, text=f"= {title} =\n{instruction}\n", cut="none", feed=0
-            )
+            await page.print_text(text=f"= {title} =\n{instruction}\n", feed=0)
 
-    async def _print_step_trailer(self, adapter: Any, feed: int = 5) -> None:
+    async def _print_step_trailer(self, page: Any, feed: int = 5) -> None:
         """Blank feed after a step's page so steps separate on the roll."""
         with contextlib.suppress(Exception):
-            await adapter.print_text(self.hass, text="", cut="none", feed=feed)
+            await page.feed(feed)
 
     async def _print_impl_candidates(self, adapter: Any) -> bool:
         """Print a labeled test page per image-implementation candidate.
+
+        The whole page runs on one connection (``batch_connection``):
+        with reconnect-per-operation, each label/pattern went out on its
+        own short-lived TCP connection, and printers that accept the
+        next connection before draining the previous one printed the
+        fragments out of order (seen on TM-T20II: TEST 1/3/2).
 
         Each candidate is attempted independently so one rejecting a
         transport-level command (e.g. "graphics") can't brick the rest
         of the wizard. Returns True if at least one candidate printed.
         """
-        await self._print_step_header(
-            adapter, "CALIBRATE 1/4: IMAGE MODE", "Check clean patterns in app"
-        )
         any_ok = False
-        for n, candidate in enumerate(IMPL_CANDIDATES, start=1):
-            try:
-                # Trailing \n is load-bearing: with feed=0, ESC/POS only
-                # flushes the text line buffer on a newline or feed. Without
-                # it, raster printers drop the buffered label and column
-                # printers merge it into the pattern line (seen on RP850P).
-                await adapter.print_text(self.hass, text=f"TEST {n}\n", cut="none", feed=0)
-                await adapter.print_image(
-                    self.hass,
-                    image=checkerboard_data_uri(),
-                    impl=candidate,
-                    cut="none",
-                    feed=1,
-                    dither="threshold",
-                    auto_resize=False,
-                )
-                any_ok = True
-            except Exception as err:
-                _LOGGER.warning(
-                    "Calibration impl candidate %s failed to print: %s",
-                    candidate,
-                    sanitize_log_message(str(err)),
-                )
-                with contextlib.suppress(Exception):
-                    await adapter.print_text(
-                        self.hass, text=f"TEST {n}: FAILED TO SEND\n", cut="none", feed=0
+        async with adapter.batch_connection(self.hass) as page:
+            await self._print_step_header(
+                page, "CALIBRATE 1/4: IMAGE MODE", "Check clean patterns in app"
+            )
+            for n, candidate in enumerate(IMPL_CANDIDATES, start=1):
+                try:
+                    # Trailing \n is load-bearing: with feed=0, ESC/POS only
+                    # flushes the text line buffer on a newline or feed. Without
+                    # it, raster printers drop the buffered label and column
+                    # printers merge it into the pattern line (seen on RP850P).
+                    await page.print_text(text=f"TEST {n}\n", feed=0)
+                    await page.print_image(
+                        image=checkerboard_data_uri(),
+                        impl=candidate,
+                        feed=1,
+                        dither="threshold",
+                        auto_resize=False,
                     )
-        if any_ok:
-            await self._print_step_trailer(adapter)
+                    any_ok = True
+                except Exception as err:
+                    _LOGGER.warning(
+                        "Calibration impl candidate %s failed to print: %s",
+                        candidate,
+                        sanitize_log_message(str(err)),
+                    )
+                    with contextlib.suppress(Exception):
+                        await page.print_text(text=f"TEST {n}: FAILED TO SEND\n", feed=0)
+            if any_ok:
+                await self._print_step_trailer(page)
         return any_ok
 
     async def async_step_calibrate_impl(
@@ -271,25 +272,24 @@ class CalibrationFlowMixin:
 
     async def _print_width_bars(self, adapter: Any) -> None:
         """Print one bar per candidate width, using the impl chosen so far."""
-        await self._print_step_header(
-            adapter, "CALIBRATE 2/4: WIDTH BARS", "First bar equal to bottom?"
-        )
         impl = self._calib.get("impl") or getattr(adapter, "default_impl", None) or DEFAULT_IMPL
-        for w in WIDTH_CANDIDATES:
-            # width=w beats a narrower profile/opts width in the image
-            # pipeline (process_image only ever downscales, never
-            # upscales), so each bar prints at its true pixel width
-            # instead of all four being clamped to the same width.
-            await adapter.print_image(
-                self.hass,
-                image=width_bar_data_uri(w),
-                impl=impl,
-                width=w,
-                cut="none",
-                feed=1,
-                auto_resize=False,
+        async with adapter.batch_connection(self.hass) as page:
+            await self._print_step_header(
+                page, "CALIBRATE 2/4: WIDTH BARS", "First bar equal to bottom?"
             )
-        await self._print_step_trailer(adapter, feed=4)
+            for w in WIDTH_CANDIDATES:
+                # width=w beats a narrower profile/opts width in the image
+                # pipeline (process_image only ever downscales, never
+                # upscales), so each bar prints at its true pixel width
+                # instead of all four being clamped to the same width.
+                await page.print_image(
+                    image=width_bar_data_uri(w),
+                    impl=impl,
+                    width=w,
+                    feed=1,
+                    auto_resize=False,
+                )
+            await self._print_step_trailer(page, feed=4)
 
     async def async_step_calibrate_width(
         self, user_input: dict[str, Any] | None = None
@@ -341,17 +341,14 @@ class CalibrationFlowMixin:
                     reason="printer_not_ready"
                 )
             try:
-                # On-paper instruction so the wrapped remainder lines are
-                # explicitly ignorable without consulting the screen.
-                await adapter.print_text(
-                    self.hass,
-                    text="= CALIBRATE 3/4: COLUMNS =\n1st line: last number + dots\n",
-                    cut="none",
-                    feed=0,
-                )
-                await adapter.print_text(
-                    self.hass, text=build_ruler(96), cut="none", feed=5, wrap=False
-                )
+                async with adapter.batch_connection(self.hass) as page:
+                    # On-paper instruction so the wrapped remainder lines are
+                    # explicitly ignorable without consulting the screen.
+                    await page.print_text(
+                        text="= CALIBRATE 3/4: COLUMNS =\n1st line: last number + dots\n",
+                        feed=0,
+                    )
+                    await page.print_text(text=build_ruler(96), feed=5, wrap=False)
             except Exception as err:
                 _LOGGER.warning("Calibration ruler step failed: %s", sanitize_log_message(str(err)))
                 errors["base"] = "calibration_print_failed"
@@ -409,32 +406,31 @@ class CalibrationFlowMixin:
         printer rejects can't brick the rest of the step. Returns the
         candidates that printed successfully, mapped to their line number.
         """
-        await self._print_step_header(
-            adapter, "CALIBRATE 4/4: ENCODING", "Check matching lines in app"
-        )
         printed: dict[str, int] = {}
-        for n, cp in enumerate(candidates, start=1):
-            try:
-                await adapter.print_text(
-                    self.hass,
-                    # The codepage name is plain ASCII, so it renders
-                    # correctly under every candidate encoding — the paper
-                    # then correlates directly with the checkbox labels
-                    # without hopping back to the screen.
-                    text=f"{n} {cp}: {codepage_sample_line(cp)}\n",
-                    encoding=cp,
-                    cut="none",
-                    feed=0,
-                )
-                printed[cp] = n
-            except Exception as err:
-                _LOGGER.debug(
-                    "Calibration codepage candidate %s failed to print: %s",
-                    cp,
-                    sanitize_log_message(str(err)),
-                )
-        if printed:
-            await self._print_step_trailer(adapter)
+        async with adapter.batch_connection(self.hass) as page:
+            await self._print_step_header(
+                page, "CALIBRATE 4/4: ENCODING", "Check matching lines in app"
+            )
+            for n, cp in enumerate(candidates, start=1):
+                try:
+                    await page.print_text(
+                        # The codepage name is plain ASCII, so it renders
+                        # correctly under every candidate encoding — the paper
+                        # then correlates directly with the checkbox labels
+                        # without hopping back to the screen.
+                        text=f"{n} {cp}: {codepage_sample_line(cp)}\n",
+                        encoding=cp,
+                        feed=0,
+                    )
+                    printed[cp] = n
+                except Exception as err:
+                    _LOGGER.debug(
+                        "Calibration codepage candidate %s failed to print: %s",
+                        cp,
+                        sanitize_log_message(str(err)),
+                    )
+            if printed:
+                await self._print_step_trailer(page)
         return printed
 
     async def async_step_calibrate_codepage(
