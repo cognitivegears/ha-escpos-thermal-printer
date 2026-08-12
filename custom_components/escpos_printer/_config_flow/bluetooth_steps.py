@@ -163,9 +163,7 @@ class BluetoothFlowMixin:
         # would yield zero entries we transparently disable it — handles
         # printers that advertise neither signal.
         printers_only = not self._show_all_bt_devices
-        if printers_only and not any(
-            _is_printer_candidate(d) for d in self._paired_bt_devices
-        ):
+        if printers_only and not any(_is_printer_candidate(d) for d in self._paired_bt_devices):
             printers_only = False
         device_choices = _build_bt_device_choices(
             self._paired_bt_devices, printers_only=printers_only

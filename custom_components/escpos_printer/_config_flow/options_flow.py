@@ -334,8 +334,7 @@ class EscposOptionsFlowHandler(CalibrationFlowMixin, config_entries.OptionsFlowW
             vol.Optional(CONF_LINE_WIDTH, default=current_line_width_str): SelectSelector(
                 SelectSelectorConfig(
                     options=[
-                        SelectOptionDict(value=v, label=label)
-                        for v, label in width_choices.items()
+                        SelectOptionDict(value=v, label=label) for v, label in width_choices.items()
                     ],
                     custom_value=True,
                     mode=SelectSelectorMode.DROPDOWN,

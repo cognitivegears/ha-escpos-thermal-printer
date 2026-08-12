@@ -69,6 +69,12 @@ jobs:
       - name: Lint (ruff)
         run: ruff check .
 
+      # CI-L2: mirror the pre-commit ruff-format hook in CI. Without this
+      # gate, code merged without local hooks (GitHub web merges, cloud
+      # agents, forks) can land unformatted — as happened in #139.
+      - name: Format check (ruff)
+        run: ruff format --check .
+
       - name: Type check (mypy)
         run: mypy custom_components/
 
