@@ -469,3 +469,47 @@ async def test_network_status_check_skips_when_lock_held(hass):  # type: ignore[
 
     assert adapter._last_check is prior_check  # type: ignore[attr-defined]
     assert adapter.get_status() is prior_status
+
+
+async def test_batch_connection_uses_one_connection_for_the_whole_page(hass):  # type: ignore[no-untyped-def]
+    """batch_connection: all prints ride one connection, closed once at the end.
+
+    The reconnect-per-operation model sends each print on its own TCP
+    connection; printers that accept the next connection before the
+    previous buffer drains can reorder the fragments on paper (seen on
+    TM-T20II during calibration). One page = one connection is the fix.
+    """
+    entry = await _setup_entry(hass)
+    adapter = entry.runtime_data.adapter
+
+    fake_printer = MagicMock()
+    with patch.object(adapter, "_connect", return_value=fake_printer) as connect:
+        async with adapter.batch_connection(hass) as page:
+            await page.print_text(text="TEST 1\n")
+            await page.print_text(text="TEST 2\n")
+            await page.feed(5)
+
+    assert connect.call_count == 1
+    assert fake_printer.close.call_count == 1
+    assert [c.args[0] for c in fake_printer.text.call_args_list] == ["TEST 1\n", "TEST 2\n"]
+    fake_printer.ln.assert_called_once_with(5)
+    assert adapter.get_status() is True
+
+
+async def test_batch_connection_failure_closes_connection_and_marks_offline(hass):  # type: ignore[no-untyped-def]
+    """An exception escaping the batch releases the connection with failed=True."""
+    import pytest
+
+    entry = await _setup_entry(hass)
+    adapter = entry.runtime_data.adapter
+
+    fake_printer = MagicMock()
+    with (
+        patch.object(adapter, "_connect", return_value=fake_printer),
+        pytest.raises(RuntimeError),
+    ):
+        async with adapter.batch_connection(hass):
+            raise RuntimeError("boom")
+
+    assert fake_printer.close.call_count == 1
+    assert adapter.get_status() is False

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Calibration test pages now print each page over a single printer
+  connection instead of one connection per label/pattern. With the
+  reconnect-per-operation model, printers that accept a new connection
+  before draining the previous one could print the fragments out of
+  order (seen on TM-T20II: TEST 1/3/2 labels shuffled, garbled pattern
+  rows, and the trailing feed landing mid-page).
+
 ### Added
 
 - The Bluetooth device picker now also recognizes printers by their cached

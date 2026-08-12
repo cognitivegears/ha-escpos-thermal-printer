@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -82,8 +83,22 @@ def _make_entry(
     if loaded:
         entry.mock_state(hass, ConfigEntryState.LOADED)
     adapter = MagicMock()
-    adapter.print_image = AsyncMock()
-    adapter.print_text = AsyncMock()
+    # Calibration prints through a single-connection batch page
+    # (adapter.batch_connection). The page's mocks are aliased onto the
+    # adapter so assertions read naturally as adapter.print_text/_image.
+    page = MagicMock()
+    page.print_text = AsyncMock()
+    page.print_image = AsyncMock()
+    page.feed = AsyncMock()
+
+    @asynccontextmanager
+    async def _batch_connection(hass):  # type: ignore[no-untyped-def]
+        yield page
+
+    adapter.batch_connection = _batch_connection
+    adapter.print_text = page.print_text
+    adapter.print_image = page.print_image
+    adapter.page_feed = page.feed
     entry.runtime_data = SimpleNamespace(adapter=adapter)
     return entry, adapter
 
@@ -156,8 +171,9 @@ async def test_calibrate_confirm_start_advances_to_impl_step(hass):  # type: ign
 
     assert result["type"] == "form"
     assert result["step_id"] == "calibrate_impl"
-    # header + 3 labels + trailing feed
-    assert adapter.print_text.await_count == 5
+    # header + 3 labels (the trailing separator is a page feed, not text)
+    assert adapter.print_text.await_count == 4
+    assert adapter.page_feed.await_count == 1
 
 
 async def test_calibrate_prints_impl_candidates_and_shows_form(hass):  # type: ignore[no-untyped-def]
@@ -170,8 +186,8 @@ async def test_calibrate_prints_impl_candidates_and_shows_form(hass):  # type: i
     assert result["step_id"] == "calibrate_impl"
     assert result.get("errors") in (None, {})
 
-    # header + 3 labels + trailing feed
-    assert adapter.print_text.await_count == 5
+    # header + 3 labels (the trailing separator is a page feed, not text)
+    assert adapter.print_text.await_count == 4
     texts = [call.kwargs["text"] for call in adapter.print_text.await_args_list]
     # First print is the on-paper title + instruction header.
     assert texts[0].startswith("= CALIBRATE 1/4")
@@ -197,8 +213,8 @@ async def test_impl_reprint_reprints_and_reshows_same_step(hass):  # type: ignor
 
     assert result2["type"] == "form"
     assert result2["step_id"] == "calibrate_impl"
-    # Two full passes: (header + 3 labels + trailer) x 2
-    assert adapter.print_text.await_count == 10
+    # Two full passes: (header + 3 labels) x 2; trailers are page feeds
+    assert adapter.print_text.await_count == 8
     assert adapter.print_image.await_count == 6
 
 
@@ -553,8 +569,8 @@ async def test_codepage_reprint_reprints(hass, monkeypatch):  # type: ignore[no-
 
     assert result2["type"] == "form"
     assert result2["step_id"] == "calibrate_codepage"
-    # header + one line per candidate + trailing feed
-    assert adapter.print_text.await_count == before + len(CODEPAGE_CANDIDATES) + 2
+    # header + one line per candidate (the trailing separator is a page feed)
+    assert adapter.print_text.await_count == before + len(CODEPAGE_CANDIDATES) + 1
 
 
 async def test_codepage_continue_stores_first_in_candidate_order(hass, monkeypatch):  # type: ignore[no-untyped-def]

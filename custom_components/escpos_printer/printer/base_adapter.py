@@ -652,6 +652,33 @@ class EscposPrinterAdapterBase(
         self._last_error_errno = None
         self._notify_status_change(True)
 
+    @contextlib.asynccontextmanager
+    async def batch_connection(self, hass: HomeAssistant) -> AsyncIterator[_BatchPage]:
+        """Run several prints over one lock acquisition and one connection.
+
+        The reconnect-per-operation model sends each print on its own
+        short-lived connection. Printer interfaces that accept the next
+        connection before the previous one's buffer has drained can
+        reorder or interleave the fragments on paper (observed on a
+        TM-T20II ethernet interface during calibration: labels printed
+        out of order and one raster row garbled mid-stream). Any page
+        that must render in order belongs on a single connection.
+
+        Yields a :class:`_BatchPage` bound to the held connection. An
+        exception escaping the ``with`` body releases the connection
+        with ``failed=True`` (offline signal + keepalive invalidation),
+        matching the per-operation methods.
+        """
+        async with self._lock:
+            printer, owned = await self._acquire_printer_or_offline(hass)
+            failed = True
+            try:
+                yield _BatchPage(self, hass, printer)
+                failed = False
+            finally:
+                await self._release_printer(hass, printer, owned=owned, failed=failed)
+        await self._mark_success()
+
     async def print_text_with_image(
         self,
         hass: HomeAssistant,
@@ -719,3 +746,74 @@ class EscposPrinterAdapterBase(
             finally:
                 await self._release_printer(hass, printer, owned=owned, failed=failed)
         await self._mark_success()
+
+
+class _BatchPage:
+    """Print primitives bound to one held connection.
+
+    Created only by :meth:`EscposPrinterAdapterBase.batch_connection`;
+    valid only inside that ``with`` block. Never cuts — a batch page is
+    a fragment stream, the caller feeds/cuts via :meth:`feed` or a
+    follow-up operation.
+    """
+
+    def __init__(self, adapter: EscposPrinterAdapterBase, hass: HomeAssistant, printer: Any):
+        self._adapter = adapter
+        self._hass = hass
+        self._printer = printer
+
+    async def print_text(
+        self,
+        *,
+        text: str,
+        encoding: str | None = None,
+        wrap: bool = True,
+        feed: int | None = 0,
+    ) -> None:
+        """Print text on the held connection (mirrors ``adapter.print_text``)."""
+        await _print_text_under_lock(
+            self._adapter,
+            self._hass,
+            self._printer,
+            text=text,
+            align=None,
+            bold=None,
+            underline=None,
+            width=None,
+            height=None,
+            encoding=encoding,
+            wrap=wrap,
+        )
+        await self._adapter._apply_cut_and_feed(self._hass, self._printer, "none", feed)
+
+    async def print_image(
+        self,
+        *,
+        image: str,
+        impl: str | None = None,
+        width: int | None = None,
+        dither: str = "floyd-steinberg",
+        auto_resize: bool = False,
+        feed: int | None = 0,
+    ) -> None:
+        """Print an image on the held connection (mirrors ``adapter.print_image``).
+
+        Image prep runs while the lock is held — callers pass small
+        generated data URIs (calibration patterns), not slow camera or
+        URL sources.
+        """
+        prepared = await prepare_image_for_print(
+            self._adapter,
+            self._hass,
+            image,
+            impl=impl,
+            width=width,
+            dither=dither,
+            auto_resize=auto_resize,
+        )
+        await _print_prepared_under_lock(self._hass, self._printer, prepared)
+        await self._adapter._apply_cut_and_feed(self._hass, self._printer, "none", feed)
+
+    async def feed(self, lines: int) -> None:
+        """Feed blank lines on the held connection."""
+        await self._adapter._apply_cut_and_feed(self._hass, self._printer, "none", lines)
