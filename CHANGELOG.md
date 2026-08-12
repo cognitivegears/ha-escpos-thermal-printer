@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The Bluetooth device picker now also recognizes printers by their cached
+  Serial Port Profile (SPP) record, not just the imaging device class —
+  cheap printers that don't advertise the imaging class show up in the
+  filtered dropdown instead of hiding behind "Show all".
 - Adding a printer without a real profile ("Generic (no profile)" or the
   generic `default` profile) now shows a tip on the success screen
   pointing at the calibration wizard (Configure → Calibrate printer).

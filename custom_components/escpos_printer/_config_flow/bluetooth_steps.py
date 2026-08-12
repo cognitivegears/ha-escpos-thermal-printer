@@ -35,6 +35,7 @@ from .bluetooth_helpers import (
     _build_bt_device_choices,
     _can_connect_bluetooth,
     _generate_bt_unique_id,
+    _is_printer_candidate,
     _list_paired_bluetooth_devices,
     _normalize_bt_mac,
 )
@@ -157,15 +158,17 @@ class BluetoothFlowMixin:
         if not self._paired_bt_devices:
             return await self.async_step_bluetooth_no_devices()
 
-        # Filter to imaging-class devices unless the user explicitly opted to
-        # see everything. If the imaging filter would yield zero entries we
-        # transparently disable it — handles printers that don't advertise the
-        # class correctly (most cheap ESC/POS hardware doesn't).
-        imaging_only = not self._show_all_bt_devices
-        if imaging_only and not any(d.get("is_imaging") for d in self._paired_bt_devices):
-            imaging_only = False
+        # Filter to printer-like devices (imaging class or SPP SDP record)
+        # unless the user explicitly opted to see everything. If the filter
+        # would yield zero entries we transparently disable it — handles
+        # printers that advertise neither signal.
+        printers_only = not self._show_all_bt_devices
+        if printers_only and not any(
+            _is_printer_candidate(d) for d in self._paired_bt_devices
+        ):
+            printers_only = False
         device_choices = _build_bt_device_choices(
-            self._paired_bt_devices, imaging_only=imaging_only
+            self._paired_bt_devices, printers_only=printers_only
         )
         profile_choices = await self.hass.async_add_executor_job(get_profile_choices_dict)
         default_device = next(iter(device_choices.keys()))
