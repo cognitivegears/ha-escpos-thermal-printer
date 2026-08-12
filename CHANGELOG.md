@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The width-bars calibration step no longer reports "Printing the test
+  page failed" on printers whose profile declares a pixel width.
+  python-escpos refuses to send images wider than the profile's
+  `media.width.pixels`, so the bars beyond that width (640/832 on a
+  576-dot TM-T20II) raised an error that aborted the page. The width
+  bars now bypass that profile check for the duration of the send —
+  wider-than-true-width bars are the measurement (hardware clips them
+  to the same length), and the bypass also makes an under-declared
+  profile width detectable instead of silently "confirmed". Each bar
+  is additionally attempted independently, so a printer rejecting one
+  bar can't abort the rest; the step only errors if no bar prints.
 - Calibration test pages now print each page over a single printer
   connection instead of one connection per label/pattern. With the
   reconnect-per-operation model, printers that accept a new connection

@@ -270,26 +270,50 @@ class CalibrationFlowMixin:
             step_id="calibrate_impl", data_schema=schema, errors=errors
         )
 
-    async def _print_width_bars(self, adapter: Any) -> None:
-        """Print one bar per candidate width, using the impl chosen so far."""
+    async def _print_width_bars(self, adapter: Any) -> bool:
+        """Print one bar per candidate width, using the impl chosen so far.
+
+        Bars wider than the printer's true width are the measurement —
+        the hardware clips them to the same length. That requires
+        ``ignore_profile_width``: python-escpos otherwise refuses any
+        image wider than the profile's declared ``media.width.pixels``
+        (``ImageWidthError``), which both broke the step on printers
+        with a declared width (seen on TM-T20II @ 576: bars 640/832
+        aborted the page) and made an under-declared profile width
+        impossible to detect. Each bar is still attempted independently
+        so a printer rejecting one bar can't abort the rest. Returns
+        True if at least one bar printed.
+        """
         impl = self._calib.get("impl") or getattr(adapter, "default_impl", None) or DEFAULT_IMPL
+        any_ok = False
         async with adapter.batch_connection(self.hass) as page:
             await self._print_step_header(
                 page, "CALIBRATE 2/4: WIDTH BARS", "First bar equal to bottom?"
             )
             for w in WIDTH_CANDIDATES:
-                # width=w beats a narrower profile/opts width in the image
-                # pipeline (process_image only ever downscales, never
-                # upscales), so each bar prints at its true pixel width
-                # instead of all four being clamped to the same width.
-                await page.print_image(
-                    image=width_bar_data_uri(w),
-                    impl=impl,
-                    width=w,
-                    feed=1,
-                    auto_resize=False,
-                )
-            await self._print_step_trailer(page, feed=4)
+                try:
+                    # width=w beats a narrower profile/opts width in the image
+                    # pipeline (process_image only ever downscales, never
+                    # upscales), so each bar prints at its true pixel width
+                    # instead of all four being clamped to the same width.
+                    await page.print_image(
+                        image=width_bar_data_uri(w),
+                        impl=impl,
+                        width=w,
+                        feed=1,
+                        auto_resize=False,
+                        ignore_profile_width=True,
+                    )
+                    any_ok = True
+                except Exception as err:
+                    _LOGGER.warning(
+                        "Calibration width bar %d failed to print: %s",
+                        w,
+                        sanitize_log_message(str(err)),
+                    )
+            if any_ok:
+                await self._print_step_trailer(page, feed=4)
+        return any_ok
 
     async def async_step_calibrate_width(
         self, user_input: dict[str, Any] | None = None
@@ -303,7 +327,8 @@ class CalibrationFlowMixin:
                     reason="printer_not_ready"
                 )
             try:
-                await self._print_width_bars(adapter)
+                if not await self._print_width_bars(adapter):
+                    errors["base"] = "calibration_print_failed"
             except Exception as err:
                 _LOGGER.warning("Calibration width step failed: %s", sanitize_log_message(str(err)))
                 errors["base"] = "calibration_print_failed"
