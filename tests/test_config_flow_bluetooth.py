@@ -1,10 +1,12 @@
 """Tests for Bluetooth Classic / RFCOMM config flow."""
 
 import errno
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from custom_components.escpos_printer import bluez
 from custom_components.escpos_printer._config_flow.bluetooth_helpers import (
     _bt_error_to_key,
     _can_connect_bluetooth,
@@ -498,6 +500,46 @@ class TestSppUuidDetection:
         assert not has_spp_uuid(["0000110b-0000-1000-8000-00805f9b34fb"])  # A2DP sink
         assert not has_spp_uuid([])
         assert not has_spp_uuid(None)
+
+    @pytest.mark.asyncio
+    async def test_list_paired_devices_extracts_cached_uuids(self):
+        """list_paired_bluetooth_devices reads the cached SDP UUID list off the
+        Device1 props and sets has_spp; a device without UUIDs gets has_spp
+        False rather than blowing up."""
+        var = lambda v: SimpleNamespace(value=v)  # noqa: E731 — bluez Variant stand-in
+        managed = {
+            "/org/bluez/hci0/dev_AA_BB_CC_DD_EE_FF": {
+                "org.bluez.Device1": {
+                    "Paired": var(True),
+                    "Address": var("AA:BB:CC:DD:EE:FF"),
+                    "Alias": var("Cheap Printer"),
+                    "Class": var(0x000000),
+                    "UUIDs": var(["00001101-0000-1000-8000-00805F9B34FB"]),
+                }
+            },
+            "/org/bluez/hci0/dev_11_22_33_44_55_66": {
+                "org.bluez.Device1": {
+                    "Paired": var(True),
+                    "Address": var("11:22:33:44:55:66"),
+                    "Alias": var("Pixel 8"),
+                    "Class": var(0x5A020C),
+                    # no UUIDs key — bluez omits it for some devices
+                }
+            },
+        }
+        with (
+            patch.object(
+                bluez, "_connect_system_bus", AsyncMock(return_value=MagicMock())
+            ),
+            patch.object(
+                bluez, "_get_managed_objects", AsyncMock(return_value=managed)
+            ),
+        ):
+            devices = await bluez.list_paired_bluetooth_devices()
+
+        by_mac = {d["mac"]: d for d in devices}
+        assert by_mac["AA:BB:CC:DD:EE:FF"]["has_spp"] is True
+        assert by_mac["11:22:33:44:55:66"]["has_spp"] is False
 
 
 class TestBluetoothChannelHidden:
