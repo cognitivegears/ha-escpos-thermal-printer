@@ -28,9 +28,9 @@ escpos-php issues all searched):
 - Symcode/Bisofice: CLOSED as unmappable — storefront brands over
   mixed OEM hardware, no FCC identity of record; the generic profile
   is the right answer for these.
-- Epson TM-m10: geometry confirmed from Epson's TRG (420 dots/203dpi,
-  Font A/B/C = 35/42/46 — matches no existing profile); needs its own
-  registered profile, pending codepage-table transcription.
+(TM-m10 was resolved by this pass: TRG-confirmed geometry, registered
+as its own profile in custom_profiles.py with a borrowed-and-flagged
+codepage table.)
 """
 
 from __future__ import annotations

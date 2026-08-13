@@ -103,6 +103,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   dots, 48/64 columns) and the official RP80 command-set manual (same
   font table and Epson-standard codepage layout as the hardware-verified
   RP850P) both match the RP820 class.
+- Epson TM-m10 (58mm compact) is supported via a built-in profile with
+  geometry from Epson's own technical reference (420 dots at 203dpi,
+  35/42/46 columns — a class no bundled profile covers). Its codepage
+  table is borrowed from the TM-m30 family (Epson gates the per-model
+  table behind an NDA) — run the calibration wizard to verify encodings
+  on real hardware.
 - The Bluetooth device picker now also recognizes printers by their cached
   Serial Port Profile (SPP) record, not just the imaging device class —
   cheap printers that don't advertise the imaging class show up in the

@@ -239,6 +239,58 @@ def _register_tm_m30iii(profiles: dict[str, Any]) -> None:
     }
 
 
+def _register_tm_m10(profiles: dict[str, Any]) -> None:
+    """Register the Epson TM-m10 (58mm compact) profile.
+
+    Geometry is grade-A from Epson's own TRG
+    (files.support.epson.com/pdf/pos/bulk/tm-m10_trg_en_revg.pdf,
+    pp.98-99): 203dpi, 52.5mm printable width = 420 dots, Font A 12x24 ->
+    35 columns, Font B 10x24 -> 42, Font C 9x17 -> 46. No bundled profile
+    matches this class (420 dots and a 35-column Font A exist nowhere
+    else), which is why it needs its own profile.
+
+    The codePages table is ASSUMED, not confirmed: Epson gates the
+    per-model ESC t enumeration behind an NDA "Product Specifications"
+    document, and the public charcode reference site was shut down in
+    2024. The TRG does state "selectable from 43 pages including user
+    defined page" with PC437 as the power-on default -- the TM-m30III
+    table registered above has exactly 43 entries, so the m30-family
+    table is borrowed here as the closest same-generation sibling. The
+    calibration wizard verifies the pages that matter on real hardware.
+
+    Idempotent: a no-op once already registered, same reasoning as RP820.
+    """
+    if "TM-m10" in profiles:
+        return
+
+    m30iii = profiles.get("TM-m30III")
+    if m30iii is None:
+        _LOGGER.warning("TM-m30III profile not found, skipping TM-m10 registration")
+        return
+
+    profiles["TM-m10"] = {
+        "name": "TM-m10",
+        "vendor": "Epson",
+        "notes": (
+            "Epson TM-m10 58mm compact printer. Geometry from Epson's TRG "
+            "(Rev G, doc M00092306): 203dpi, 52.5mm printable = 420 dots, "
+            "fonts 35/42/46 columns. Codepage table borrowed from the "
+            "TM-m30III profile (the per-model table is NDA-gated; the TRG "
+            "confirms 43 selectable pages with PC437 default, matching "
+            "that table's shape) -- verify via the calibration wizard."
+        ),
+        "features": m30iii["features"],
+        "colors": m30iii["colors"],
+        "fonts": {
+            "0": {"name": "Font A", "columns": 35},
+            "1": {"name": "Font B", "columns": 42},
+            "2": {"name": "Font C", "columns": 46},
+        },
+        "media": {"dpi": 203, "width": {"mm": 52.5, "pixels": 420}},
+        "codePages": dict(m30iii["codePages"]),
+    }
+
+
 def register_custom_profiles() -> None:
     """Insert/patch our custom profiles in escpos's profile registry.
 
@@ -260,5 +312,6 @@ def register_custom_profiles() -> None:
         _patch_nt80vul_fonts(profiles)
         _register_rp820(profiles)
         _register_tm_m30iii(profiles)
+        _register_tm_m10(profiles)
     except Exception:  # mirror loader._get_capabilities's broad fallback
         _LOGGER.warning("Failed to register/patch custom printer profiles", exc_info=True)

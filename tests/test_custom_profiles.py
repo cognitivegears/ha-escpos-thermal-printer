@@ -163,6 +163,27 @@ def test_calibration_codepage_candidates_for_tm_m30iii() -> None:
     assert candidates == ("CP1252", "CP850", "CP437")
 
 
+def test_registers_tm_m10_in_escpos_capabilities() -> None:
+    """TRG-confirmed geometry; codepage table borrowed from TM-m30III."""
+    register_custom_profiles()
+    profile = escpos.capabilities.get_profile("TM-m10")
+    assert profile.profile_data["media"]["width"]["pixels"] == 420
+    assert profile.profile_data["fonts"]["0"]["columns"] == 35
+    assert profile.profile_data["fonts"]["1"]["columns"] == 42
+    assert profile.profile_data["fonts"]["2"]["columns"] == 46
+    m30iii = escpos.capabilities.CAPABILITIES["profiles"]["TM-m30III"]
+    assert profile.profile_data["codePages"] == m30iii["codePages"]
+    # ...but a distinct dict: patching one table must not mutate the other.
+    assert profile.profile_data["codePages"] is not m30iii["codePages"]
+
+
+def test_tm_m10_registration_is_idempotent() -> None:
+    register_custom_profiles()
+    register_custom_profiles()
+    profile = escpos.capabilities.get_profile("TM-m10")
+    assert profile.profile_data is escpos.capabilities.CAPABILITIES["profiles"]["TM-m10"]
+
+
 def test_epson_tm_t70_aliases_resolve_to_tm_t88v() -> None:
     assert resolve_alias("Epson TM-T70") == "TM-T88V"
     assert resolve_alias("Epson TM-T70II") == "TM-T88V"
