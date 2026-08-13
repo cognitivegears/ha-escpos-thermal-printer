@@ -28,7 +28,7 @@ from homeassistant.helpers.selector import (
 )
 import voluptuous as vol
 
-from ..capabilities import get_profile_codepages
+from ..capabilities import get_profile_codepages, resolve_profile_name
 from ..const import (
     CONF_CODEPAGE,
     CONF_DETECTED_MODEL,
@@ -427,21 +427,27 @@ class CalibrationFlowMixin:
         )
 
     async def _get_codepage_candidates(self) -> tuple[str, ...]:
-        """Codepage candidates the configured profile can actually switch to.
+        """Codepage candidates the *active* escpos profile can switch to.
 
-        ``get_profile_codepages`` already falls back to the common
-        codepage list (a superset of every candidate here) when no
-        profile is configured or the profile's own list is unknown, so
-        intersecting is enough -- no separate "no profile" branch needed.
+        With no profile configured (or an unresolvable name), the printer
+        object runs python-escpos's **default** profile, so candidates are
+        filtered against that -- NOT the static ``COMMON_CODEPAGES`` list
+        ``get_profile_codepages`` returns for those cases. That list
+        includes ISO_8859-1, which the default profile cannot switch to:
+        ``charcode()`` fails (silently, by design), the sample prints
+        under the *previous* line's codepage, looks correct on paper, and
+        the stored codepage then silently fails on every later print.
         Deliberately NO fallback to the full candidate tuple when the
-        intersection is empty: that fallback is exactly the
-        false-verification bug (a candidate printing under a codepage the
-        profile can't switch to) this narrowing exists to prevent.
+        intersection is empty either, for the same reason: every printed
+        line must be one the active profile can genuinely switch to.
         """
         profile = self.config_entry.options.get(
             CONF_PROFILE, self.config_entry.data.get(CONF_PROFILE)
         )
-        profile_codepages = await self.hass.async_add_executor_job(get_profile_codepages, profile)
+        resolved = await self.hass.async_add_executor_job(resolve_profile_name, profile)
+        profile_codepages = await self.hass.async_add_executor_job(
+            get_profile_codepages, resolved or "default"
+        )
         return tuple(cp for cp in CODEPAGE_CANDIDATES if cp in profile_codepages)
 
     async def _print_codepage_candidates(

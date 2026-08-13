@@ -598,6 +598,14 @@ async def test_ruler_low_value_rejected_by_schema(hass):  # type: ignore[no-unty
         )
 
 
+# With no profile configured (or an unresolvable name), the printer object
+# runs escpos's *default* profile, so calibration filters candidates against
+# it. ISO_8859-1 is in COMMON_CODEPAGES but NOT in the default profile: it
+# must not print, or it renders under the previous line's codepage and
+# verifies falsely (then silently fails on every later print once stored).
+DEFAULT_PROFILE_CANDIDATES = ("CP858", "CP1252", "CP850", "CP437")
+
+
 async def test_codepage_step_prints_one_line_per_candidate_with_encoding(hass, monkeypatch):  # type: ignore[no-untyped-def]
     """The codepage step prints one line per candidate, tagged with its encoding."""
     entry, adapter = _make_entry(hass)
@@ -613,7 +621,7 @@ async def test_codepage_step_prints_one_line_per_candidate_with_encoding(hass, m
         for call in adapter.print_text.await_args_list
         if call.kwargs.get("encoding") is not None
     ]
-    assert encodings == list(CODEPAGE_CANDIDATES)
+    assert encodings == list(DEFAULT_PROFILE_CANDIDATES)
     texts = [
         call.kwargs["text"]
         for call in adapter.print_text.await_args_list
@@ -625,6 +633,23 @@ async def test_codepage_step_prints_one_line_per_candidate_with_encoding(hass, m
     # Every feed=0 sample line needs its own newline, or unflushed lines
     # merge/drop on real hardware (same class as the impl-label bug).
     assert all(text.endswith("\n") for text in texts)
+
+
+async def test_codepage_unresolvable_profile_filters_against_default(hass, monkeypatch):  # type: ignore[no-untyped-def]
+    """An unknown profile name degrades to escpos's default profile at connect
+    time, so candidates must be filtered against the default profile too --
+    same false-verification hole as the no-profile case."""
+    entry, adapter = _make_entry(hass, data_extra={CONF_PROFILE: "NoSuchModel9000"})
+
+    result = await _advance_to_codepage(hass, entry)
+
+    assert result["step_id"] == "calibrate_codepage"
+    encodings = [
+        call.kwargs["encoding"]
+        for call in adapter.print_text.await_args_list
+        if call.kwargs.get("encoding") is not None
+    ]
+    assert encodings == list(DEFAULT_PROFILE_CANDIDATES)
 
 
 async def test_codepage_reprint_reprints(hass, monkeypatch):  # type: ignore[no-untyped-def]
@@ -640,7 +665,7 @@ async def test_codepage_reprint_reprints(hass, monkeypatch):  # type: ignore[no-
     assert result2["type"] == "form"
     assert result2["step_id"] == "calibrate_codepage"
     # header + one line per candidate (the trailing separator is a page feed)
-    assert adapter.print_text.await_count == before + len(CODEPAGE_CANDIDATES) + 1
+    assert adapter.print_text.await_count == before + len(DEFAULT_PROFILE_CANDIDATES) + 1
 
 
 async def test_codepage_continue_stores_first_in_candidate_order(hass, monkeypatch):  # type: ignore[no-untyped-def]
@@ -689,7 +714,7 @@ async def test_codepage_choice_labels_carry_own_expected_rendering(hass, monkeyp
 
     assert result["type"] == "form"
     labels = result["data_schema"].schema["codepages_match"].options
-    assert labels["CP437"] == "Line 5: CP437 — café ñ ü é ß ° ?"
+    assert labels["CP437"] == "Line 4: CP437 — café ñ ü é ß ° ?"
     assert labels["CP858"] == "Line 1: CP858 — café ñ ü é ß ° €"
 
 

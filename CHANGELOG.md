@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The encoding calibration step no longer offers ISO-8859-1 when no
+  printer profile is configured (or the configured name is unknown). In
+  those cases the printer runs python-escpos's default profile, which
+  cannot switch to ISO-8859-1: the sample line silently printed under the
+  previous line's codepage, looked correct on paper, and the stored
+  codepage then failed on every later print. Candidates are now filtered
+  against the profile the printer actually runs with.
 - The width-bars calibration step no longer reports "Printing the test
   page failed" on printers whose profile declares a pixel width.
   python-escpos refuses to send images wider than the profile's
