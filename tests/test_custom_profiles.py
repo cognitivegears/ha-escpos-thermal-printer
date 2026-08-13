@@ -8,6 +8,9 @@ from custom_components.escpos_printer._config_flow.calibration import CODEPAGE_C
 from custom_components.escpos_printer.capabilities.aliases import normalize_model, resolve_alias
 from custom_components.escpos_printer.capabilities.codepages import get_profile_codepages
 from custom_components.escpos_printer.capabilities.custom_profiles import (
+    _register_rp820,
+    _register_tm_m10,
+    _register_tm_m30iii,
     register_custom_profiles,
 )
 from custom_components.escpos_printer.capabilities.line_widths import get_profile_line_widths
@@ -175,6 +178,17 @@ def test_registers_tm_m10_in_escpos_capabilities() -> None:
     assert profile.profile_data["codePages"] == m30iii["codePages"]
     # ...but a distinct dict: patching one table must not mutate the other.
     assert profile.profile_data["codePages"] is not m30iii["codePages"]
+
+
+def test_registration_helpers_skip_when_template_profile_missing() -> None:
+    """A degraded escpos database (e.g. its BrokenDefault fallback, which
+    only carries "default") leaves each helper nothing to copy from --
+    they must warn and skip, never raise or register partial data."""
+    profiles: dict = {}
+    _register_rp820(profiles)
+    _register_tm_m30iii(profiles)
+    _register_tm_m10(profiles)
+    assert profiles == {}
 
 
 def test_tm_m10_registration_is_idempotent() -> None:
