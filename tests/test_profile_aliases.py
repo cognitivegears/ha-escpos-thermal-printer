@@ -27,11 +27,14 @@ def test_normalize_model() -> None:
     assert normalize_model("ZJ_5890-K") == "zj5890k"
 
 
-def test_every_alias_target_exists_in_bundled_db() -> None:
+def test_every_alias_target_exists_in_bundled_or_registered_profiles() -> None:
+    """Alias targets are almost always bundled escpos-printer-db profiles,
+    but may be an integration-registered custom profile (e.g. RP820) --
+    _get_capabilities() reflects both once custom_profiles has run."""
     profiles = _get_capabilities()["profiles"]
     for alias, target in PROFILE_ALIASES.items():
         assert alias == normalize_model(alias), f"alias key {alias!r} must be pre-normalized"
-        assert target in profiles, f"alias {alias!r} -> {target!r} not in bundled DB"
+        assert target in profiles, f"alias {alias!r} -> {target!r} not in a known profile"
 
 
 def test_every_alias_target_declares_a_pixel_width() -> None:
@@ -168,4 +171,25 @@ async def test_setup_entry_resolves_alias_to_target_profile(hass) -> None:  # ty
 
     adapter = entry.runtime_data.adapter
     assert adapter._config.profile == "NT-80-V-UL"
+    assert adapter.get_profile_pixel_width() == 576
+
+
+async def test_setup_entry_resolves_rp850p_alias_to_custom_rp820_profile(hass) -> None:  # type: ignore[no-untyped-def]
+    """The RP850P alias now targets the custom RP820 profile (not a bundled
+    escpos-printer-db profile) -- confirm it resolves the same way at
+    connect time as any other alias."""
+    alias_key = normalize_model("Rongta RP850P")  # -> RP820, 576px
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="1.2.3.4:9100",
+        data={CONF_HOST: "1.2.3.4", CONF_PORT: 9100, CONF_PROFILE: alias_key},
+        unique_id="1.2.3.4:9100",
+    )
+    entry.add_to_hass(hass)
+    with patch("escpos.printer.Network"):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    adapter = entry.runtime_data.adapter
+    assert adapter._config.profile == "RP820"
     assert adapter.get_profile_pixel_width() == 576

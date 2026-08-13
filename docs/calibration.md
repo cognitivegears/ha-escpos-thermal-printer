@@ -57,17 +57,18 @@ characters-per-line step.
 
 ### 2. Paper width (skipped if no pattern printed cleanly in step 1)
 
-The printer prints five numbered bars at 384, 512, 576, 640, and 832
-pixels wide, each labeled at its left edge. Bars wider than your printer's
-true printable width get clipped to the same length as the widest bar
-that fits — so several bars at the bottom of the page will look
-identical. If the bars look like staircases rather than clean solid
-blocks, your printer wraps rather than clips — choose "Not sure" instead.
+The printer prints six outlined boxes at 384, 512, 546, 576, 640, and
+832 pixels wide, each with its width printed as a text line above it. A
+box that fits your printer's true printable width prints complete,
+including its **right-side vertical border**. A box that's too wide
+loses that border — clipped off on some printers, shed onto the next
+line as stray fragments on printers that wrap instead of clipping.
+Either way the reading is the same: no intact right edge.
 
-Counting from the top, pick the **first bar that's the same length as the
-bottom bar**. That bar's labeled width is your printer's true printable
-width. If you can't tell, choose "Not sure / bars unclear" to leave the
-paper width unmeasured.
+Pick the **widest box whose right-side border printed**. That box's
+labeled width is your printer's true printable width. If none of the
+boxes show an intact right edge, choose "None had an intact right edge"
+to leave the paper width unmeasured.
 
 ### 3. Characters per line
 
@@ -155,7 +156,11 @@ must be connected and the config entry loaded):
   ```
 
   If both prints come out the same length, your printer's printable width
-  is 576px; if the 640px print is visibly longer, it's 640px.
+  is 576px; if the 640px print is visibly longer, it's 640px. Length
+  differences this small are easy to misjudge on faint thermal ink — if
+  in doubt, use a test image with a strong border on its right edge and
+  check whether that edge printed instead (the wizard's width step, which
+  you can re-run at any time, works exactly this way).
 
 See [Configuration reference](configuration.md) for setting these values
 by hand, and [Images guide](images.md) for the image-implementation

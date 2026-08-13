@@ -1,9 +1,13 @@
-"""Clone/equivalent-model aliases onto bundled escpos-printer-db profiles.
+"""Clone/equivalent-model aliases onto known printer profiles.
 
 Aliases route rebadged or near-equivalent hardware to an existing
-bundled profile. They only ever improve defaults (width, codepages) —
-they never gate behavior. Genuinely new hardware belongs upstream in
-escpos-printer-db, not here.
+profile — almost always a bundled escpos-printer-db one, but occasionally
+an integration-registered profile (see custom_profiles.py) when no bundled
+profile's codepage table matches the hardware. They only ever improve
+defaults (width, codepages) — they never gate behavior. Genuinely new
+hardware belongs upstream in escpos-printer-db first; a custom profile is
+the fallback only when upstream can't represent it (e.g. non-standard
+codepage numbering).
 
 Researched-but-held models (deliberately absent — conflicting or
 unverified specs, or a widthless alias target): TM-m10/m30, TM-T70/T70II,
@@ -55,18 +59,38 @@ ALIAS_MODELS: dict[str, str] = {
     "Xprinter XP-N160II": "NT-80-V-UL",
     "Xprinter XP-T80A": "NT-80-V-UL",
     # Rongta RP850P: hardware-verified on a real unit (self-test: 640-dot
-    # head, GD207_v1.16 firmware). Raster width follows the DIP column-mode
-    # switch (SW-5): 576 dots in 48-column mode (the default this alias
-    # assumes), 512 dots in 42-column/TM-T88-compat mode — recalibrate or
-    # set a width override after changing the switch. Over-width raster
-    # WRAPS onto extra lines rather than clipping on this firmware. NOT
-    # aliased to RP326 because that bundled profile declares no pixel width.
-    "Rongta RP850P": "NT-80-V-UL",
-    # "RP820" is the DHCP hostname (Rongta_RP820) that RP850P hardware
+    # head, GD207_v1.16 firmware). Raster width AND text columns follow
+    # the DIP column-mode switch (SW-5): 576 dots / 48 columns in the
+    # 48-column position, 512 dots / 42 columns in the 42-column position
+    # (both modes probed on hardware 2026-08-13) — recalibrate after
+    # flipping the switch. Over-width raster WRAPS onto extra lines rather
+    # than clipping on this firmware. NOT aliased to RP326 because that
+    # bundled profile declares no pixel width.
+    #
+    # Points at the custom "RP820" profile (registered in
+    # custom_profiles.py), not a bundled escpos-printer-db profile.
+    # It was previously aliased to NT-80-V-UL, but that profile's
+    # codePages table sent ESC t 52/71/53 for CP437/CP1252/CP858, values
+    # that don't exist in this firmware's 0-47 table, so every codepage
+    # but CP850 printed garbage on real hardware -- the firmware actually
+    # follows Epson's standard numbering (0/2/16/19 for the same four
+    # codepages, hardware-verified 2026-08-13 via the HA calibration
+    # wizard). custom_profiles.py now dedupes NT-80-V-UL's >=48 duplicate
+    # indices at runtime too, so it *also* sends 0/2/16/19 for these four.
+    # RP820 still earns its own profile: NT-80-V-UL's ~31 codepage names
+    # that only ever had a single index >= 48 (e.g. CP1250, CP775) remain
+    # unreachable on clone firmware, while RP820's full Epson table (copied
+    # from TM-T20II) covers them at their real low indices; RP820 also
+    # carries hardware-verified per-DIP-mode geometry (576px/48 cols in
+    # the 48-column SW-5 position, 512px/42 cols in the 42-column one)
+    # and graphics=False that NT-80-V-UL has no data for.
+    #
+    # "RP820" is also the DHCP hostname (Rongta_RP820) that RP850P hardware
     # announces on the network — observed on the hardware-verified unit
-    # above, so it inherits the same alias target. Covers DHCP-discovery
-    # identity, and any actual RP820 units sharing that network firmware.
-    "Rongta RP820": "NT-80-V-UL",
+    # above. No separate "Rongta RP820" alias entry is needed: RP820 is now
+    # a real profile key, so it already appears in the dropdown and
+    # resolves directly without going through the alias table.
+    "Rongta RP850P": "RP820",
     # Misc verified 58mm/384dot ESC/POS clones.
     "HOIN HOP-E58": "POS-5890",
     "Goojprt PT-210": "POS-5890",

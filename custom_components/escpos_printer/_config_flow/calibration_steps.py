@@ -67,11 +67,11 @@ _IMPL_LABELS = {
 _ACTION_CHOICES = {"continue": "Continue", "reprint": "Reprint the test page"}
 _RULER_ACTION_CHOICES = _ACTION_CHOICES | {"skip": "Skip this step"}
 _CONFIRM_ACTION_CHOICES = {"start": "Start calibration", "cancel": "Cancel"}
-# Derived from WIDTH_CANDIDATES so the bar numbers/labels can't drift out
-# of sync with what _print_width_bars actually prints.
-_WIDTH_CHOICES: dict[str, str] = {
-    str(w): f"Bar {i} ({w})" for i, w in enumerate(WIDTH_CANDIDATES, start=1)
-} | {"none": "Not sure / bars unclear"}
+# Derived from WIDTH_CANDIDATES so the choices can't drift out of sync
+# with what _print_width_bars actually prints.
+_WIDTH_CHOICES: dict[str, str] = {str(w): f"{w} px" for w in WIDTH_CANDIDATES} | {
+    "none": "None had an intact right edge"
+}
 _CODEPAGE_ACTION_CHOICES = {
     "continue": "Continue",
     "reprint": "Reprint the test lines",
@@ -277,43 +277,49 @@ class CalibrationFlowMixin:
         )
 
     async def _print_width_bars(self, adapter: Any) -> bool:
-        """Print one bar per candidate width, using the impl chosen so far.
+        """Print a labeled box per candidate width, using the impl chosen so far.
 
-        Bars wider than the printer's true width are the measurement —
-        the hardware clips them to the same length. That requires
-        ``ignore_profile_width``: python-escpos otherwise refuses any
-        image wider than the profile's declared ``media.width.pixels``
-        (``ImageWidthError``), which both broke the step on printers
-        with a declared width (seen on TM-T20II @ 576: bars 640/832
-        aborted the page) and made an under-declared profile width
-        impossible to detect. Each bar is still attempted independently
-        so a printer rejecting one bar can't abort the rest. Returns
-        True if at least one bar printed.
+        Boxes wider than the printer's true width are the measurement —
+        the hardware either clips or wraps them, losing the right-side
+        border either way. That requires ``ignore_profile_width``:
+        python-escpos otherwise refuses any image wider than the
+        profile's declared ``media.width.pixels`` (``ImageWidthError``),
+        which both broke the step on printers with a declared width
+        (seen on TM-T20II @ 576: bars 640/832 aborted the page) and made
+        an under-declared profile width impossible to detect. The width
+        number is a separate text line above each box (not baked into
+        the image) so the reader's only job is spotting an intact border,
+        not reading two things at once. Each candidate is still attempted
+        independently so a printer rejecting one can't abort the rest.
+        Returns True if at least one candidate printed.
         """
         impl = self._calib.get("impl") or getattr(adapter, "default_impl", None) or DEFAULT_IMPL
         any_ok = False
         async with adapter.batch_connection(self.hass) as page:
             await self._print_step_header(
-                page, "CALIBRATE 2/4: WIDTH BARS", "First bar equal to bottom?"
+                page, "CALIBRATE 2/4: WIDTH BOXES", "Widest box with right edge?"
             )
             for w in WIDTH_CANDIDATES:
                 try:
+                    await page.print_text(text=f"{w}:\n", feed=0)
                     # width=w beats a narrower profile/opts width in the image
                     # pipeline (process_image only ever downscales, never
-                    # upscales), so each bar prints at its true pixel width
-                    # instead of all four being clamped to the same width.
+                    # upscales), so each box prints at its true pixel width
+                    # instead of all of them being clamped to the same width.
+                    # feed=2 (vs. the usual 1) keeps each label+box grouped
+                    # and visibly separated from the next one.
                     await page.print_image(
                         image=width_bar_data_uri(w),
                         impl=impl,
                         width=w,
-                        feed=1,
+                        feed=2,
                         auto_resize=False,
                         ignore_profile_width=True,
                     )
                     any_ok = True
                 except Exception as err:
                     _LOGGER.warning(
-                        "Calibration width bar %d failed to print: %s",
+                        "Calibration width box %d failed to print: %s",
                         w,
                         sanitize_log_message(str(err)),
                     )
