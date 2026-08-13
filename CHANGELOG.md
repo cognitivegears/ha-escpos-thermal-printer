@@ -92,10 +92,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Epson TM-T70 and TM-T70II are recognized as compatible models (aliased
   to the bundled TM-T88V profile, whose 512px/180dpi/42-56-column class
-  and codepage table match both). Epson TM-m30 and TM-m30III are now
-  supported via a built-in `TM-m30III` profile carried from the upstream
-  escpos-printer-db printer database — newer than the one python-escpos
-  3.1 ships, so it isn't available there yet.
+  and codepage table match both). Epson TM-m30, TM-m30II, and TM-m30III
+  are now supported via a built-in `TM-m30III` profile carried from the
+  upstream escpos-printer-db printer database — newer than the one
+  python-escpos 3.1 ships, so it isn't available there yet. (The TM-m30II
+  TRG confirms an exact geometry and font match: 576 dots, 48/57/64
+  columns.)
+- Rongta RP80 and RP328 are recognized as compatible models, mapped to
+  the built-in `RP820` profile: RP328's vendor spec (72mm/203dpi = 576
+  dots, 48/64 columns) and the official RP80 command-set manual (same
+  font table and Epson-standard codepage layout as the hardware-verified
+  RP850P) both match the RP820 class.
 - The Bluetooth device picker now also recognizes printers by their cached
   Serial Port Profile (SPP) record, not just the imaging device class —
   cheap printers that don't advertise the imaging class show up in the

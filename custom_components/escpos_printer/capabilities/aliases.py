@@ -10,16 +10,27 @@ the fallback only when upstream can't represent it (e.g. non-standard
 codepage numbering).
 
 Researched-but-held models (deliberately absent — conflicting or
-unverified specs, or a widthless alias target): TM-m10, TM-m30II (Epson
-spec not yet checked), Rongta RP80/RP328, Zjiang ZJ-8220, Bixolon
-SRP-350III, PeriPage/MTP-3, Citizen CT-S801/851, generic Symcode/Bisofice.
-See the 2026-08-08 research in the PR discussion. GitHub-tracker evidence
-exhausted 2026-08-13 (escpos-printer-db, python-escpos, and escpos-php
-issue trackers all searched — zero new data surfaced for SRP-350III,
-RP80/RP328, CT-S801/851, ZJ-8220, or PeriPage/MTP-3); the next evidence
-source for these should be vendor manuals or FCC filings, not these
-trackers. RP328's community-suggested profile (escpos-php #1055 →
-RP326) is widthless, which confirms rather than resolves that hold.
+unverified specs, or a widthless alias target), status as of the
+2026-08-13 vendor-manual/FCC research pass (GitHub trackers were
+exhausted earlier the same day — escpos-printer-db, python-escpos, and
+escpos-php issues all searched):
+- Bixolon SRP-350III and Citizen CT-S801/851: still unresolved
+  (vendor-doc pass pending/incomplete).
+- Zjiang ZJ-8220: a real SKU (zjiang.com product id 34), likely generic
+  80mm/203dpi class, but no primary spec sheet or FCC filing found —
+  zjiang.com is unreachable to fetchers (TLS cert points at sister
+  domain cnfujun.com). Held at low confidence.
+- PeriPage A6-class: PERMANENTLY OUT OF SCOPE — not ESC/POS at all
+  (proprietary Bluetooth protocol; python-escpos #386 plus multiple
+  reverse-engineering projects, e.g. eliasweingaertner/peripage-A6-
+  bluetooth). Note "MTP-3" is a GOOJPRT model, not PeriPage — a
+  different, unverified device; don't conflate the two.
+- Symcode/Bisofice: CLOSED as unmappable — storefront brands over
+  mixed OEM hardware, no FCC identity of record; the generic profile
+  is the right answer for these.
+- Epson TM-m10: geometry confirmed from Epson's TRG (420 dots/203dpi,
+  Font A/B/C = 35/42/46 — matches no existing profile); needs its own
+  registered profile, pending codepage-table transcription.
 """
 
 from __future__ import annotations
@@ -67,14 +78,17 @@ ALIAS_MODELS: dict[str, str] = {
     # different 576px/203dpi class and are NOT covered by this alias.
     "Epson TM-T70": "TM-T88V",
     "Epson TM-T70II": "TM-T88V",
-    # Epson TM-m30: points at the custom "TM-m30III" profile (registered
-    # in custom_profiles.py, carried from an upstream escpos-printer-db
-    # merge) rather than a bundled profile. Epson's own TM-m30 spec
+    # Epson TM-m30/TM-m30II: point at the custom "TM-m30III" profile
+    # (registered in custom_profiles.py, carried from an upstream
+    # escpos-printer-db merge) rather than a bundled profile. Epson's own
+    # TM-m30 spec
     # (https://download4.epson.biz/sec_pubs/bs/html/m000943/en/chap10_1.html)
-    # confirms the same 80mm/72mm-printable/203dpi/576-dot class as the
-    # hardware-tested TM-m30III data. TM-m30II deliberately not aliased
-    # here -- its spec hasn't been checked yet.
+    # confirms the same 80mm/72mm-printable/203dpi/576-dot class, and the
+    # TM-m30II TRG (files.support.epson.com/pdf/pos/bulk/
+    # tm-m30ii_trg_en_reva.pdf pp.96-97) confirms an exact match on the
+    # full font triple too: 576 dots, Font A/B/C = 48/57/64 columns.
     "Epson TM-m30": "TM-m30III",
+    "Epson TM-m30II": "TM-m30III",
     # Xprinter: XP-58IIH 58mm/384dots (manuals.plus manual); XP-80C 80mm/576
     # (xprintertech.com); XP-N160II/XP-T80A 80mm/203dpi (vendor listings).
     "Xprinter XP-58IIH": "POS-5890",
@@ -114,6 +128,16 @@ ALIAS_MODELS: dict[str, str] = {
     # a real profile key, so it already appears in the dropdown and
     # resolves directly without going through the alias table.
     "Rongta RP850P": "RP820",
+    # Rongta RP80 and RP328: same class as the hardware-verified
+    # RP850P/RP820. RP328's vendor page states 72mm effective width @
+    # 203dpi (= 576 dots), Font A 12x24/48 cols, Font B 9x17/64 cols,
+    # ESC/POS emulation (rongtatech.com/rp328-bluetooth-thermal-receipt-
+    # printer_p20.html). The official Rongta "RP80 Command Set" manual is
+    # a command-set fingerprint match for RP820/RP850P: identical ESC ! n
+    # font table (12x24 / 9x17) and the same Epson-standard ESC t 0-47
+    # codepage table with the same reserved slots 11-14.
+    "Rongta RP80": "RP820",
+    "Rongta RP328": "RP820",
     # Misc verified 58mm/384dot ESC/POS clones.
     "HOIN HOP-E58": "POS-5890",
     "Goojprt PT-210": "POS-5890",
