@@ -90,6 +90,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Epson TM-T70 and TM-T70II are recognized as compatible models (aliased
+  to the bundled TM-T88V profile, whose 512px/180dpi/42-56-column class
+  and codepage table match both). Epson TM-m30 and TM-m30III are now
+  supported via a built-in `TM-m30III` profile carried from the upstream
+  escpos-printer-db printer database — newer than the one python-escpos
+  3.1 ships, so it isn't available there yet.
 - The Bluetooth device picker now also recognizes printers by their cached
   Serial Port Profile (SPP) record, not just the imaging device class —
   cheap printers that don't advertise the imaging class show up in the

@@ -1,4 +1,4 @@
-"""Tests for the RP820 custom profile (custom_profiles.py)."""
+"""Tests for the RP820/TM-m30III custom profiles (custom_profiles.py)."""
 
 from __future__ import annotations
 
@@ -125,3 +125,48 @@ def test_aliased_model_through_nt80vul_gets_corrected_line_widths() -> None:
     register_custom_profiles()
     alias_key = normalize_model("Xprinter XP-80C")
     assert get_profile_line_widths(alias_key) == [48, 64]
+
+
+# =============================================================================
+# Epson TM-T70/TM-T70II/TM-m30 support (upstream escpos-printer-db merges
+# newer than python-escpos 3.1's bundled database)
+# =============================================================================
+
+
+def test_registers_tm_m30iii_in_escpos_capabilities() -> None:
+    register_custom_profiles()
+    profile = escpos.capabilities.get_profile("TM-m30III")
+    assert profile.profile_data["media"]["width"]["pixels"] == 576
+    assert profile.profile_data["fonts"]["0"]["columns"] == 48
+    assert profile.profile_data["fonts"]["1"]["columns"] == 57
+    assert profile.profile_data["fonts"]["2"]["columns"] == 64
+    assert profile.profile_data["codePages"]["0"] == "CP437"
+    assert profile.profile_data["codePages"]["2"] == "CP850"
+    assert profile.profile_data["codePages"]["16"] == "CP1252"
+    # The honesty property that makes this a standalone profile rather
+    # than an alias to another 80mm/576px bundled profile: index 19 is
+    # NOT CP858 here, unlike TM-T20II/NT-80-V-UL/POS-5890/etc.
+    assert profile.profile_data["codePages"].get("19") != "CP858"
+
+
+def test_tm_m30iii_registration_is_idempotent() -> None:
+    register_custom_profiles()
+    register_custom_profiles()
+    profile = escpos.capabilities.get_profile("TM-m30III")
+    assert profile.profile_data is escpos.capabilities.CAPABILITIES["profiles"]["TM-m30III"]
+
+
+def test_calibration_codepage_candidates_for_tm_m30iii() -> None:
+    """No CP858 candidate -- TM-m30III's index 19 is Unknown, not CP858."""
+    profile_codepages = get_profile_codepages("TM-m30III")
+    candidates = tuple(cp for cp in CODEPAGE_CANDIDATES if cp in profile_codepages)
+    assert candidates == ("CP1252", "CP850", "CP437")
+
+
+def test_epson_tm_t70_aliases_resolve_to_tm_t88v() -> None:
+    assert resolve_alias("Epson TM-T70") == "TM-T88V"
+    assert resolve_alias("Epson TM-T70II") == "TM-T88V"
+
+
+def test_epson_tm_m30_alias_resolves_to_tm_m30iii() -> None:
+    assert resolve_alias("Epson TM-m30") == "TM-m30III"

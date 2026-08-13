@@ -10,10 +10,16 @@ the fallback only when upstream can't represent it (e.g. non-standard
 codepage numbering).
 
 Researched-but-held models (deliberately absent — conflicting or
-unverified specs, or a widthless alias target): TM-m10/m30, TM-T70/T70II,
-Rongta RP80/RP328, ZJ-8220, Bixolon SRP-350III, PeriPage/MTP-3, Citizen
-CT-S801/851, generic Symcode/Bisofice. See the 2026-08-08 research in the
-PR discussion.
+unverified specs, or a widthless alias target): TM-m10, TM-m30II (Epson
+spec not yet checked), Rongta RP80/RP328, Zjiang ZJ-8220, Bixolon
+SRP-350III, PeriPage/MTP-3, Citizen CT-S801/851, generic Symcode/Bisofice.
+See the 2026-08-08 research in the PR discussion. GitHub-tracker evidence
+exhausted 2026-08-13 (escpos-printer-db, python-escpos, and escpos-php
+issue trackers all searched — zero new data surfaced for SRP-350III,
+RP80/RP328, CT-S801/851, ZJ-8220, or PeriPage/MTP-3); the next evidence
+source for these should be vendor manuals or FCC filings, not these
+trackers. RP328's community-suggested profile (escpos-php #1055 →
+RP326) is widthless, which confirms rather than resolves that hold.
 """
 
 from __future__ import annotations
@@ -52,6 +58,23 @@ ALIAS_MODELS: dict[str, str] = {
     # Epson TM-T88 successors: same 80mm/512dots/180dpi lineage as TM-T88V.
     "Epson TM-T88VI": "TM-T88V",
     "Epson TM-T88VII": "TM-T88V",
+    # Epson TM-T70/TM-T70II ANK (alphanumeric) models: upstream
+    # escpos-printer-db profiles for both match TM-T88V's class exactly
+    # (512px/180dpi, Font A/B 42/56 columns, codepage indices agree at
+    # every index both tables define -- T70's table is a subset of
+    # TM-T88V's, T70II's is nearly identical). ANK only -- the
+    # TM-T70-SA/TM-T70II-SA/TM-T70II-CH regional variants are a
+    # different 576px/203dpi class and are NOT covered by this alias.
+    "Epson TM-T70": "TM-T88V",
+    "Epson TM-T70II": "TM-T88V",
+    # Epson TM-m30: points at the custom "TM-m30III" profile (registered
+    # in custom_profiles.py, carried from an upstream escpos-printer-db
+    # merge) rather than a bundled profile. Epson's own TM-m30 spec
+    # (https://download4.epson.biz/sec_pubs/bs/html/m000943/en/chap10_1.html)
+    # confirms the same 80mm/72mm-printable/203dpi/576-dot class as the
+    # hardware-tested TM-m30III data. TM-m30II deliberately not aliased
+    # here -- its spec hasn't been checked yet.
+    "Epson TM-m30": "TM-m30III",
     # Xprinter: XP-58IIH 58mm/384dots (manuals.plus manual); XP-80C 80mm/576
     # (xprintertech.com); XP-N160II/XP-T80A 80mm/203dpi (vendor listings).
     "Xprinter XP-58IIH": "POS-5890",
