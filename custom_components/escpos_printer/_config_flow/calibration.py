@@ -11,13 +11,17 @@ import base64
 import io
 from urllib.parse import quote
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
-WIDTH_CANDIDATES: tuple[int, ...] = (384, 512, 576, 640, 832)
+WIDTH_CANDIDATES: tuple[int, ...] = (384, 512, 546, 576, 640, 832)
 IMPL_CANDIDATES: tuple[str, ...] = ("bitImageRaster", "bitImageColumn", "graphics")
 # Capability order, broadest encoding first: the wizard stores the first
 # checked candidate in this order, so ties resolve to the most capable.
-CODEPAGE_CANDIDATES: tuple[str, ...] = ("CP858", "CP1252", "CP850", "ISO_8859-1", "CP437")
+# These are the four most-supported Western codepages across the real
+# printer profiles in escpos-printer-db (CP437 97%, CP1252 82%, CP858
+# 80%, CP850 77% of bundled profiles). ISO_8859-1 was dropped: no
+# bundled profile exposes it, so the profile filter removed it anyway.
+CODEPAGE_CANDIDATES: tuple[str, ...] = ("CP858", "CP1252", "CP850", "CP437")
 CODEPAGE_SAMPLE = "café ñ ü é ß ° €"
 
 _ISSUES_URL = "https://github.com/cognitivegears/ha-escpos-thermal-printer/issues/new"
@@ -41,22 +45,23 @@ def checkerboard_data_uri() -> str:
 
 
 def width_bar_data_uri(width_px: int) -> str:
-    """Outlined rectangle exactly width_px wide, labeled at the LEFT edge.
+    """Outlined rectangle exactly width_px wide, for right-border detection.
 
     An outline (3px border) rather than a solid fill draws a fraction of
     the ink a filled bar would -- kinder to the print head, which matters
-    on battery-powered (Bluetooth) printers -- while keeping the same
-    length-comparison semantics: the right-edge border still clips at the
-    true printable width, so bars at or beyond that width still end up
-    identical length.
+    on battery-powered (Bluetooth) printers. No label inside the box (the
+    candidate width is printed as a text line above it, see
+    ``_print_width_bars``): the judgment this box exists for is "does the
+    right-side border print intact?", not a length comparison between two
+    near-equal bars -- comparing 512 vs 576 (an 11% difference) by eye on
+    faint thermal ink proved unreliable on real hardware. A too-wide box
+    loses its
+    border on both clip firmware (truncated) and wrap firmware (shed into
+    garbled fragments on the next line) -- either way, no intact border.
     """
-    img = Image.new("1", (width_px, 44), 1)
+    img = Image.new("1", (width_px, 24), 1)
     draw = ImageDraw.Draw(img)
-    draw.rectangle((0, 0, width_px - 1, 43), outline=0, width=3)
-    # PIL's bitmap default font is ~11px (~1.4mm at 203dpi) — unreadable
-    # on paper. Pillow >=10.1 ships a scalable default; 30px is ~3.8mm.
-    font = ImageFont.load_default(size=30)
-    draw.text((8, 6), str(width_px), fill=0, font=font)
+    draw.rectangle((0, 0, width_px - 1, 23), outline=0, width=3)
     return _png_data_uri(img)
 
 

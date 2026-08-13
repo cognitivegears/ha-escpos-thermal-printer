@@ -21,6 +21,7 @@ from .constants import (
     PROFILE_AUTO,
     PROFILE_CUSTOM,
 )
+from .custom_profiles import register_custom_profiles
 from .features import (
     get_profile_cut_modes,
     get_profile_features,
@@ -38,6 +39,16 @@ from .profiles import (
     resolve_profile_name,
 )
 from .suggestions import suggest_profile
+
+# Register hardware-verified profiles that aren't in escpos-printer-db yet.
+# Runs at import time (rather than lazily on first capabilities lookup) so
+# it's guaranteed to happen before *every* consumer: this package is always
+# imported by the integration's top-level ``__init__.py`` before
+# ``async_setup_entry`` runs, and before ``printer/base_adapter.py`` (which
+# calls ``escpos.capabilities.get_profile()`` directly, bypassing our own
+# loader) can be reached -- Python always finishes initializing a parent
+# package before any of its submodules execute.
+register_custom_profiles()
 
 __all__ = [
     "COMMON_CODEPAGES",
@@ -64,6 +75,7 @@ __all__ = [
     "pick_impl",
     "profile_declares_no_images",
     "profile_supports_feature",
+    "register_custom_profiles",
     "resolve_alias",
     "resolve_profile_name",
     "suggest_profile",

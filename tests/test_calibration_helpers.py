@@ -30,30 +30,28 @@ def test_checkerboard_dimensions() -> None:
     assert img.size == (192, 48)
 
 
-def test_width_candidates_include_832() -> None:
-    """The fifth bar (832px) covers wider 100mm/112mm heads."""
-    assert WIDTH_CANDIDATES == (384, 512, 576, 640, 832)
+def test_width_candidates_include_832_and_546() -> None:
+    """832px covers wider 100mm/112mm heads; 546px is the Epson 42-column
+    mode class (e.g. TM-T20II in 42-col mode)."""
+    assert WIDTH_CANDIDATES == (384, 512, 546, 576, 640, 832)
 
 
-def test_width_bar_outline_exact_width_and_label_at_left() -> None:
+def test_width_bar_outline_exact_width_with_intact_right_border() -> None:
     for width in WIDTH_CANDIDATES:
         img = _decode_data_uri(width_bar_data_uri(width)).convert("L")
-        assert img.size == (width, 44)
-        # The border is still black at the far right edge -- clipping
-        # there is what a too-narrow printer's bars still detect.
-        assert img.getpixel((width - 1, 22)) < 64
-        # Interior (away from the border and the label) is mostly white
-        # now -- a fraction of the ink (and print-head heat) a solid
-        # filled bar would use.
-        assert img.getpixel((width // 2, 22)) > 192
-        # The label must be READABLE on paper, not just present: the old
-        # ~11px bitmap default font printed at ~1.4mm and regressing to it
-        # leaves only ~50 dark pixels in this crop. A 30px scalable font
-        # leaves several hundred. Cropped from x=4 (inside the 3px border)
-        # so the border's own edge can't satisfy the assertion.
-        label = img.crop((4, 4, 110, 40))
-        dark = sum(count for value, count in enumerate(label.histogram()) if value < 64)
-        assert dark > 150, f"label too small/faint for {width}px bar ({dark} dark px)"
+        assert img.size == (width, 24)
+        # The whole point of the box: an intact right-side border at
+        # x=width-1 is the signal the calibration step asks the user to
+        # look for, so if the printer reproduced the box at full width,
+        # this column must be black top to bottom (not just one pixel).
+        right_edge = [img.getpixel((width - 1, y)) for y in range(24)]
+        assert all(v < 64 for v in right_edge), f"right border not intact at {width}px"
+        # Interior (away from the border) is mostly white -- a fraction of
+        # the ink (and print-head heat) a solid filled bar would use.
+        assert img.getpixel((width // 2, 12)) > 192
+        # No baked-in label -- the width number now prints as a separate
+        # text line above the box (see _print_width_bars).
+        assert img.getpixel((8, 8)) > 192
 
 
 def test_ruler_layout() -> None:

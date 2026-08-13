@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The encoding calibration step no longer offers ISO-8859-1 when no
+  printer profile is configured (or the configured name is unknown). In
+  those cases the printer runs python-escpos's default profile, which
+  cannot switch to ISO-8859-1: the sample line silently printed under the
+  previous line's codepage, looked correct on paper, and the stored
+  codepage then failed on every later print. Candidates are now filtered
+  against the profile the printer actually runs with.
 - The width-bars calibration step no longer reports "Printing the test
   page failed" on printers whose profile declares a pixel width.
   python-escpos refuses to send images wider than the profile's
@@ -36,11 +43,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   before draining the previous one could print the fragments out of
   order (seen on TM-T20II: TEST 1/3/2 labels shuffled, garbled pattern
   rows, and the trailing feed landing mid-page).
+- The width calibration step now asks the user to spot an intact
+  right-side border on the widest of several labeled boxes, instead of
+  comparing two bars' lengths by eye. The old length-comparison judgment
+  misread a real printer (512px vs. its true 576px, an 11% difference) on
+  faint thermal ink, storing a too-narrow width. Labels now print as a
+  separate text line above each box rather than baked into the image, and
+  the candidate widths gained a finer step (384, 512, 546, 576, 640, 832
+  — 546 covers the Epson 42-column-mode width class).
 - The "Characters per line" field in setup and options is now a combobox:
   pick a preset or type a custom number directly. Previously a
   "Custom (enter columns)..." choice promised an entry box that only
   appeared on a follow-up screen after submitting, which read as "no box
   to enter a value". The legacy two-step path still works.
+- Rongta RP850P/RP820 printers (the network identity RP850P hardware
+  announces) now use a built-in `RP820` profile with the firmware's
+  real Epson-style codepage numbering, and are recognized as a
+  compatible model so discovered Rongta printers preselect it. They
+  were previously aliased to the bundled `NT-80-V-UL` profile, whose
+  codepage table used non-standard ESC t values that don't exist in
+  this firmware, garbling every calibration codepage except CP850.
+  The new profile declares the hardware-probed 48-column DIP (SW-5)
+  geometry — 576px raster width, 48/64 text columns — and documents
+  that the 42-column position switches the whole geometry to
+  512px/42/56; recalibrate after flipping the switch.
+- Every bundled profile's codepage table is now deduped at runtime: some
+  profiles map a codepage name to both a low index and a duplicate index
+  >= 48, and since python-escpos always emits the last-registered index,
+  affected printers got the >= 48 one — unreachable on clone firmware's
+  0-47 ESC t table, garbling that codepage. Only the >= 48 duplicate is
+  dropped (never the low one), so this only ever affects codepage names
+  that had a working low-index duplicate to fall back to; the surviving
+  index isn't guaranteed to be Epson's own standard number for that
+  codepage (e.g. `NT-80-V-UL`'s CP864 dedupes to 28, in-range but not
+  Epson's 37) — only that it now falls inside the range clone firmware
+  actually implements. Codepage names that only ever had a single index
+  >= 48 are unaffected and remain unverified on clone hardware. This
+  fixes garbled non-CP850 codepages on every model aliased to `NT-80-V-UL`
+  (Xprinter XP-80C/XP-N160II/XP-T80A, Sunmi T2) and `POS-5890`/`NT-5890K`
+  (Zjiang ZJ-5890/ZJ-5890K/POS-5890K/ZJ-5802, Xprinter XP-58IIH, HOIN
+  HOP-E58, Goojprt PT-210, Netum NT-1809DD). `NT-80-V-UL`'s Font A/B
+  column counts (previously 12/9, actually glyph dot widths mistakenly
+  entered as columns) are also corrected to 48/64, fixing implausible
+  line-width options on the same models. All three fixes mirror
+  corrections already reported upstream to escpos-printer-db.
 
 ### Added
 
@@ -67,9 +113,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   the matching printer profile when one is known. Discovered entries are
   additionally tracked by MAC address, so a DHCP lease change updates the
   existing entry's host in place instead of offering a duplicate.
-- "Rongta RP820" is recognized as a compatible model (the network identity
-  RP850P hardware announces), so discovered Rongta printers preselect the
-  matching 80mm profile.
 - Network printer entries are now titled by their detected model (e.g.
   "TM-T20II (192.168.1.50:9100)") instead of the bare address. Manual
   renames are still never overwritten when a lease change or reconfigure

@@ -266,10 +266,26 @@ class TestGetProfileLineWidths:
         assert result == [42, 56]
 
     def test_bogus_font_columns_fall_back_to_common(self):
-        """NT-80-V-UL's upstream data bug encodes font DOT widths (9, 12) as
-        column counts on a 576px printer -- both are implausibly small for
-        any receipt printer, so the result must fall back to common widths."""
-        result = get_profile_line_widths("NT-80-V-UL")
+        """A profile whose fonts.columns holds font DOT widths instead of
+        column counts (both implausibly small for any receipt printer)
+        falls back to common widths. (Real-world instance of this bug,
+        NT-80-V-UL, is now corrected at runtime -- see
+        test_custom_profiles.py -- so this uses synthetic data instead.)"""
+        mock_data = {
+            "profiles": {
+                "bogus": {
+                    "fonts": {
+                        "0": {"columns": 9},
+                        "1": {"columns": 12},
+                    }
+                }
+            },
+        }
+        with patch(
+            "custom_components.escpos_printer.capabilities.line_widths._get_capabilities",
+            return_value=mock_data,
+        ):
+            result = get_profile_line_widths("bogus")
         assert result == COMMON_LINE_WIDTHS
 
     def test_mixed_bogus_and_plausible_keeps_only_plausible(self):

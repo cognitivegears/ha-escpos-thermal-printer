@@ -269,18 +269,24 @@ async def test_impl_continue_stores_choice_and_advances_to_width(hass):  # type:
     assert result2["type"] == "form"
     assert result2["step_id"] == "calibrate_width"
 
-    # 3 impl-step prints already happened; width step adds 5 more (one per bar).
-    assert adapter.print_image.await_count == 3 + 5
+    # 3 impl-step prints already happened; width step adds 6 more (one per box).
+    assert adapter.print_image.await_count == 3 + 6
     width_calls = adapter.print_image.await_args_list[3:]
-    assert len(width_calls) == 5
+    assert len(width_calls) == 6
     assert all(call.kwargs["impl"] == "bitImageColumn" for call in width_calls)
-    # Each bar must request its own pixel width -- otherwise process_image
-    # clamps every bar to the profile/opts width and they all print
+    # Each box must request its own pixel width -- otherwise process_image
+    # clamps every box to the profile/opts width and they all print
     # identical length, making the step unable to measure anything wider.
-    assert [call.kwargs["width"] for call in width_calls] == [384, 512, 576, 640, 832]
+    assert [call.kwargs["width"] for call in width_calls] == [384, 512, 546, 576, 640, 832]
     # ...and bypass python-escpos's profile-width refusal, or bars wider
     # than the declared profile width can never reach the printer.
     assert all(call.kwargs["ignore_profile_width"] for call in width_calls)
+    # The label moved out of the box raster into a text line above it --
+    # without these, the user gets six unlabeled boxes and no way to map
+    # "the widest intact one" back to a pixel width.
+    label_texts = [call.kwargs["text"] for call in adapter.print_text.await_args_list]
+    for w in (384, 512, 546, 576, 640, 832):
+        assert f"{w}:\n" in label_texts
 
 
 async def test_impl_partial_candidate_failure_is_tolerated(hass):  # type: ignore[no-untyped-def]
@@ -343,7 +349,7 @@ async def test_width_bars_prefer_calib_impl_then_adapter_default(hass):  # type:
     flow._calib["impl"] = "graphics"
     await flow._print_width_bars(adapter)
     assert all(
-        call.kwargs["impl"] == "graphics" for call in adapter.print_image.await_args_list[-5:]
+        call.kwargs["impl"] == "graphics" for call in adapter.print_image.await_args_list[-6:]
     )
 
     # No stored impl -- falls back to adapter.default_impl, not the
@@ -351,23 +357,24 @@ async def test_width_bars_prefer_calib_impl_then_adapter_default(hass):  # type:
     del flow._calib["impl"]
     await flow._print_width_bars(adapter)
     assert all(
-        call.kwargs["impl"] == "bitImageColumn" for call in adapter.print_image.await_args_list[-5:]
+        call.kwargs["impl"] == "bitImageColumn" for call in adapter.print_image.await_args_list[-6:]
     )
 
 
-async def test_width_partial_bar_failure_is_tolerated(hass):  # type: ignore[no-untyped-def]
-    """Bars wider than the profile's declared width failing doesn't fail the step.
+async def test_width_partial_box_failure_is_tolerated(hass):  # type: ignore[no-untyped-def]
+    """Boxes wider than the profile's declared width failing doesn't fail the step.
 
     python-escpos raises ImageWidthError for any image wider than the
     profile's media.width.pixels, so on a printer with a declared width
-    (e.g. TM-T20II @ 576) the 640/832 bars can never be sent. The bars
+    (e.g. TM-T20II @ 576) the 640/832 boxes can never be sent. The boxes
     that did print are still a valid measurement (seen on TM-T20II:
-    3 bars on paper + a spurious "print failed" banner).
+    4 boxes on paper + a spurious "print failed" banner).
     """
     entry, adapter = _make_entry(hass)
-    # 3 impl-step prints succeed; width bars 384/512/576 succeed, 640/832
-    # exceed the profile width and raise.
+    # 3 impl-step prints succeed; width boxes 384/512/546/576 succeed,
+    # 640/832 exceed the profile width and raise.
     adapter.print_image.side_effect = [None] * 3 + [
+        None,
         None,
         None,
         None,
@@ -383,14 +390,14 @@ async def test_width_partial_bar_failure_is_tolerated(hass):  # type: ignore[no-
     assert result2["type"] == "form"
     assert result2["step_id"] == "calibrate_width"
     assert result2.get("errors") in (None, {})
-    # All five bars were attempted -- a failing bar must not abort the rest.
-    assert adapter.print_image.await_count == 3 + 5
+    # All six candidates were attempted -- a failing one must not abort the rest.
+    assert adapter.print_image.await_count == 3 + 6
 
 
-async def test_width_all_bars_failing_shows_print_error(hass):  # type: ignore[no-untyped-def]
-    """If every bar fails to print, the form re-shows a print-failure error."""
+async def test_width_all_boxes_failing_shows_print_error(hass):  # type: ignore[no-untyped-def]
+    """If every box fails to print, the form re-shows a print-failure error."""
     entry, adapter = _make_entry(hass)
-    adapter.print_image.side_effect = [None] * 3 + [RuntimeError("boom")] * 5
+    adapter.print_image.side_effect = [None] * 3 + [RuntimeError("boom")] * 6
     result = await _open_calibrate(hass, entry)
 
     result2 = await hass.config_entries.options.async_configure(
@@ -591,6 +598,14 @@ async def test_ruler_low_value_rejected_by_schema(hass):  # type: ignore[no-unty
         )
 
 
+# With no profile configured (or an unresolvable name), the printer object
+# runs escpos's *default* profile, so calibration filters candidates against
+# it. ISO_8859-1 is in COMMON_CODEPAGES but NOT in the default profile: it
+# must not print, or it renders under the previous line's codepage and
+# verifies falsely (then silently fails on every later print once stored).
+DEFAULT_PROFILE_CANDIDATES = ("CP858", "CP1252", "CP850", "CP437")
+
+
 async def test_codepage_step_prints_one_line_per_candidate_with_encoding(hass, monkeypatch):  # type: ignore[no-untyped-def]
     """The codepage step prints one line per candidate, tagged with its encoding."""
     entry, adapter = _make_entry(hass)
@@ -606,7 +621,7 @@ async def test_codepage_step_prints_one_line_per_candidate_with_encoding(hass, m
         for call in adapter.print_text.await_args_list
         if call.kwargs.get("encoding") is not None
     ]
-    assert encodings == list(CODEPAGE_CANDIDATES)
+    assert encodings == list(DEFAULT_PROFILE_CANDIDATES)
     texts = [
         call.kwargs["text"]
         for call in adapter.print_text.await_args_list
@@ -618,6 +633,23 @@ async def test_codepage_step_prints_one_line_per_candidate_with_encoding(hass, m
     # Every feed=0 sample line needs its own newline, or unflushed lines
     # merge/drop on real hardware (same class as the impl-label bug).
     assert all(text.endswith("\n") for text in texts)
+
+
+async def test_codepage_unresolvable_profile_filters_against_default(hass, monkeypatch):  # type: ignore[no-untyped-def]
+    """An unknown profile name degrades to escpos's default profile at connect
+    time, so candidates must be filtered against the default profile too --
+    same false-verification hole as the no-profile case."""
+    entry, adapter = _make_entry(hass, data_extra={CONF_PROFILE: "NoSuchModel9000"})
+
+    result = await _advance_to_codepage(hass, entry)
+
+    assert result["step_id"] == "calibrate_codepage"
+    encodings = [
+        call.kwargs["encoding"]
+        for call in adapter.print_text.await_args_list
+        if call.kwargs.get("encoding") is not None
+    ]
+    assert encodings == list(DEFAULT_PROFILE_CANDIDATES)
 
 
 async def test_codepage_reprint_reprints(hass, monkeypatch):  # type: ignore[no-untyped-def]
@@ -633,7 +665,7 @@ async def test_codepage_reprint_reprints(hass, monkeypatch):  # type: ignore[no-
     assert result2["type"] == "form"
     assert result2["step_id"] == "calibrate_codepage"
     # header + one line per candidate (the trailing separator is a page feed)
-    assert adapter.print_text.await_count == before + len(CODEPAGE_CANDIDATES) + 1
+    assert adapter.print_text.await_count == before + len(DEFAULT_PROFILE_CANDIDATES) + 1
 
 
 async def test_codepage_continue_stores_first_in_candidate_order(hass, monkeypatch):  # type: ignore[no-untyped-def]
@@ -682,7 +714,7 @@ async def test_codepage_choice_labels_carry_own_expected_rendering(hass, monkeyp
 
     assert result["type"] == "form"
     labels = result["data_schema"].schema["codepages_match"].options
-    assert labels["CP437"] == "Line 5: CP437 — café ñ ü é ß ° ?"
+    assert labels["CP437"] == "Line 4: CP437 — café ñ ü é ß ° ?"
     assert labels["CP858"] == "Line 1: CP858 — café ñ ü é ß ° €"
 
 
@@ -720,7 +752,7 @@ async def test_codepage_candidates_narrowed_to_profile_using_real_capabilities_d
 
 
 async def test_codepage_step_skipped_when_profile_supports_none_of_the_candidates(hass):  # type: ignore[no-untyped-def]
-    """AF-240's real codepage list (OXHOO-EUROPEAN) excludes all five candidates.
+    """AF-240's real codepage list (OXHOO-EUROPEAN) excludes every candidate.
 
     No fallback to the full candidate list here -- that fallback IS the
     false-verification bug (printing a line under a codepage the printer

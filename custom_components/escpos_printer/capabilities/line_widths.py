@@ -9,10 +9,13 @@ from .loader import _get_capabilities
 
 _LOGGER = logging.getLogger(__name__)
 
-# A receipt printer never has fewer than 16 characters per line. Guards
-# against upstream escpos-printer-db data bugs like NT-80-V-UL, whose
-# fonts.columns values (9, 12) are actually font DOT widths mistakenly
-# encoded as column counts (correct values: 48 and 64 on that profile).
+# A receipt printer never has fewer than 16 characters per line. General
+# defensive floor against upstream escpos-printer-db data bugs where
+# fonts.columns holds a font's glyph DOT width instead of a column count
+# (implausibly small for any receipt printer) -- e.g. NT-80-V-UL shipped
+# 9/12 instead of 48/64 this way; that specific case is now corrected at
+# runtime (see custom_profiles.py), but this floor stays as a safety net
+# for any other profile with the same class of bug.
 _MIN_PLAUSIBLE_COLUMNS = 16
 
 
