@@ -103,6 +103,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   dots, 48/64 columns) and the official RP80 command-set manual (same
   font table and Epson-standard codepage layout as the hardware-verified
   RP850P) both match the RP820 class.
+- Bixolon SRP-350III (180dpi/512-dot class, aliased to TM-T88V) and its
+  203dpi sibling SRP-352III (576-dot class, aliased to TM-T20II) are
+  recognized as compatible models, per Bixolon's official user's manual.
+- Citizen CT-S801/CT-S851 and their II revisions are recognized as
+  compatible models (aliased to TM-T20II): Citizen's manuals confirm the
+  203dpi/576-dot default on 80mm paper, and its command reference
+  accepts the Epson-standard codepage numbers. Units memory-switched to
+  83mm/640-dot stock should recalibrate width.
 - Epson TM-m10 (58mm compact) is supported via a built-in profile with
   geometry from Epson's own technical reference (420 dots at 203dpi,
   35/42/46 columns — a class no bundled profile covers). Its codepage

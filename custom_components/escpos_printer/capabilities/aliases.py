@@ -14,8 +14,6 @@ unverified specs, or a widthless alias target), status as of the
 2026-08-13 vendor-manual/FCC research pass (GitHub trackers were
 exhausted earlier the same day — escpos-printer-db, python-escpos, and
 escpos-php issues all searched):
-- Bixolon SRP-350III and Citizen CT-S801/851: still unresolved
-  (vendor-doc pass pending/incomplete).
 - Zjiang ZJ-8220: a real SKU (zjiang.com product id 34), likely generic
   80mm/203dpi class, but no primary spec sheet or FCC filing found —
   zjiang.com is unreachable to fetchers (TLS cert points at sister
@@ -28,9 +26,10 @@ escpos-php issues all searched):
 - Symcode/Bisofice: CLOSED as unmappable — storefront brands over
   mixed OEM hardware, no FCC identity of record; the generic profile
   is the right answer for these.
-(TM-m10 was resolved by this pass: TRG-confirmed geometry, registered
-as its own profile in custom_profiles.py with a borrowed-and-flagged
-codepage table.)
+(Resolved by this pass: TM-m10 — TRG-confirmed geometry, registered as
+its own profile in custom_profiles.py with a borrowed-and-flagged
+codepage table; Bixolon SRP-350III/352III and Citizen CT-S801/851 —
+vendor-manual-confirmed geometry, aliased below.)
 """
 
 from __future__ import annotations
@@ -138,6 +137,28 @@ ALIAS_MODELS: dict[str, str] = {
     # codepage table with the same reserved slots 11-14.
     "Rongta RP80": "RP820",
     "Rongta RP328": "RP820",
+    # Bixolon SRP-350III: official user's manual v2.00 section 8-1 states
+    # 180dpi / 72mm printing width (= 512-dot class) with Font A/B
+    # defaults 42/56 -- exactly TM-T88V's geometry. Its 203dpi sibling
+    # SRP-352III (same manual) is the 576-dot class with Font A 48 --
+    # TM-T20II geometry. Bixolon documents Epson-standard ESC t numbering
+    # (0=437, 2=850, 16=1252) in its unified command manual; verify
+    # codepages via the calibration wizard on real hardware.
+    "Bixolon SRP-350III": "TM-T88V",
+    "Bixolon SRP-352III": "TM-T20II",
+    # Citizen CT-S801/CT-S851 (and II revisions): official user's manuals
+    # section 1.4 confirm 203dpi with the 80mm default = 576 dots (Font
+    # A/B/C 48/64/72). The 640-dot figure in the same table is the 83mm
+    # memory-switch paper option, not the default -- users running 83mm
+    # stock should recalibrate width. Citizen's shared command reference
+    # dual-maps WPC1252 at both 9 and 16, and accepts the Epson-standard
+    # 0/2/16/19 -- so TM-T20II's table works for the common codepages;
+    # exotic pages (e.g. CP857 at Citizen's 8 vs Epson's 13) may need a
+    # manual codepage override.
+    "Citizen CT-S801": "TM-T20II",
+    "Citizen CT-S801II": "TM-T20II",
+    "Citizen CT-S851": "TM-T20II",
+    "Citizen CT-S851II": "TM-T20II",
     # Misc verified 58mm/384dot ESC/POS clones.
     "HOIN HOP-E58": "POS-5890",
     "Goojprt PT-210": "POS-5890",
