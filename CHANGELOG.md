@@ -90,6 +90,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Epson TM-T70 and TM-T70II are recognized as compatible models (aliased
+  to the bundled TM-T88V profile, whose 512px/180dpi/42-56-column class
+  and codepage table match both). Epson TM-m30, TM-m30II, and TM-m30III
+  are now supported via a built-in `TM-m30III` profile carried from the
+  upstream escpos-printer-db printer database — newer than the one
+  python-escpos 3.1 ships, so it isn't available there yet. (The TM-m30II
+  TRG confirms an exact geometry and font match: 576 dots, 48/57/64
+  columns.)
+- Rongta RP80 and RP328 are recognized as compatible models, mapped to
+  the built-in `RP820` profile: RP328's vendor spec (72mm/203dpi = 576
+  dots, 48/64 columns) and the official RP80 command-set manual (same
+  font table and Epson-standard codepage layout as the hardware-verified
+  RP850P) both match the RP820 class.
+- Bixolon SRP-350III (180dpi/512-dot class, aliased to TM-T88V) and its
+  203dpi sibling SRP-352III (576-dot class, aliased to TM-T20II) are
+  recognized as compatible models, per Bixolon's official user's manual.
+- Citizen CT-S801/CT-S851 and their II revisions are recognized as
+  compatible models (aliased to TM-T20II): Citizen's manuals confirm the
+  203dpi/576-dot default on 80mm paper, and its command reference
+  accepts the Epson-standard codepage numbers. Units memory-switched to
+  83mm/640-dot stock should recalibrate width.
+- Epson TM-m10 (58mm compact) is supported via a built-in profile with
+  geometry from Epson's own technical reference (420 dots at 203dpi,
+  35/42/46 columns — a class no bundled profile covers). Its codepage
+  table is borrowed from the TM-m30 family (Epson gates the per-model
+  table behind an NDA) — run the calibration wizard to verify encodings
+  on real hardware.
 - The Bluetooth device picker now also recognizes printers by their cached
   Serial Port Profile (SPP) record, not just the imaging device class —
   cheap printers that don't advertise the imaging class show up in the
