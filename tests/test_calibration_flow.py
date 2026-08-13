@@ -752,7 +752,7 @@ async def test_codepage_candidates_narrowed_to_profile_using_real_capabilities_d
 
 
 async def test_codepage_step_skipped_when_profile_supports_none_of_the_candidates(hass):  # type: ignore[no-untyped-def]
-    """AF-240's real codepage list (OXHOO-EUROPEAN) excludes all five candidates.
+    """AF-240's real codepage list (OXHOO-EUROPEAN) excludes every candidate.
 
     No fallback to the full candidate list here -- that fallback IS the
     false-verification bug (printing a line under a codepage the printer
