@@ -7,6 +7,98 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-14
+
+### Added
+
+- Epson TM-T70 and TM-T70II are recognized as compatible models (aliased
+  to the bundled TM-T88V profile, whose 512px/180dpi/42-56-column class
+  and codepage table match both). Epson TM-m30, TM-m30II, and TM-m30III
+  are now supported via a built-in `TM-m30III` profile carried from the
+  upstream escpos-printer-db printer database — newer than the one
+  python-escpos 3.1 ships, so it isn't available there yet. (The TM-m30II
+  TRG confirms an exact geometry and font match: 576 dots, 48/57/64
+  columns.)
+- Rongta RP80 and RP328 are recognized as compatible models, mapped to
+  the built-in `RP820` profile: RP328's vendor spec (72mm/203dpi = 576
+  dots, 48/64 columns) and the official RP80 command-set manual (same
+  font table and Epson-standard codepage layout as the hardware-verified
+  RP850P) both match the RP820 class.
+- Bixolon SRP-350III (180dpi/512-dot class, aliased to TM-T88V) and its
+  203dpi sibling SRP-352III (576-dot class, aliased to TM-T20II) are
+  recognized as compatible models, per Bixolon's official user's manual.
+- Citizen CT-S801/CT-S851 and their II revisions are recognized as
+  compatible models (aliased to TM-T20II): Citizen's manuals confirm the
+  203dpi/576-dot default on 80mm paper, and its command reference
+  accepts the Epson-standard codepage numbers. Units memory-switched to
+  83mm/640-dot stock should recalibrate width.
+- Epson TM-m10 (58mm compact) is supported via a built-in profile with
+  geometry from Epson's own technical reference (420 dots at 203dpi,
+  35/42/46 columns — a class no bundled profile covers). Its codepage
+  table is borrowed from the TM-m30 family (Epson gates the per-model
+  table behind an NDA) — run the calibration wizard to verify encodings
+  on real hardware.
+- The Bluetooth device picker now also recognizes printers by their cached
+  Serial Port Profile (SPP) record, not just the imaging device class —
+  cheap printers that don't advertise the imaging class show up in the
+  filtered dropdown instead of hiding behind "Show all".
+- Adding a printer without a real profile ("Generic (no profile)" or the
+  generic `default` profile) now shows a tip on the success screen
+  pointing at the calibration wizard (Configure → Calibrate printer).
+- Network printers are identified at setup via ESC/POS `GS I` queries: the
+  device page shows the real manufacturer/model (e.g. EPSON TM-T20II), the
+  calibration share link prefills the model name, and the detected
+  manufacturer/model are included in diagnostics downloads. Printers that
+  don't answer (most clones) behave exactly as before. Existing network
+  printer entries pick up the detected model the next time they are
+  reconfigured.
+- DHCP discovery for network thermal printers: Home Assistant now offers to
+  set up Epson TM-series (`tm-*`) and Rongta (`rongta_*`) printers it sees
+  join the network. Candidates are probed on port 9100 first, so matches
+  that aren't printers are ignored silently; `tm-*` hostnames additionally
+  require a real `GS I` answer, since port 9100 is also Prometheus
+  node_exporter's default. Discovered setups preselect
+  the matching printer profile when one is known. Discovered entries are
+  additionally tracked by MAC address, so a DHCP lease change updates the
+  existing entry's host in place instead of offering a duplicate.
+- Network printer entries are now titled by their detected model (e.g.
+  "TM-T20II (192.168.1.50:9100)") instead of the bare address. Manual
+  renames are still never overwritten when a lease change or reconfigure
+  updates the address.
+- Discovery now retries the port-9100 probe for up to a minute, so a
+  printer whose network stack is still booting when its DHCP lease lands
+  no longer misses its discovery card until the next lease renewal.
+
+- Per-entry "Paper width in pixels" override — fixes image sizing for
+  printers whose profile lacks a width (previously a Repairs issue with
+  no user-side fix).
+- USB config flow now preselects a suggested profile from the device's
+  USB descriptor or a curated VID:PID list.
+- Bluetooth config flow now preselects a suggested profile from the
+  paired device's advertised name (same preselect-only matching as USB).
+- Clone/equivalent model aliases (e.g. Citizen CT-S601II → CT-S651,
+  ZJ-5890 → POS-5890) accepted in the custom profile field.
+- 16 more researched clone/equivalent model aliases: Epson TM-T20III/
+  TM-T20X/TM-T82II/TM-T82III/TM-T88VI/TM-T88VII, Xprinter XP-58IIH/
+  XP-80C/XP-N160II/XP-T80A, Zjiang ZJ-5802, HOIN HOP-E58, Goojprt
+  PT-210, Netum NT-1809DD, Sunmi V1/T2, Rongta RP850P (hardware-verified).
+- Aliased models now appear directly in the profile dropdown as
+  "Model (compatible)" entries, so users can find a rebadged printer
+  without knowing the custom-profile field exists.
+- Per-entry "Image printing implementation" option (Auto/Raster/Column/
+  Graphics) with plain-language guidance.
+- Printer calibration wizard (Settings → Configure → "Calibrate printer"):
+  prints guided test pages to dial in image implementation, paper width,
+  columns, and (optionally) codepage, then saves them for the entry — and
+  offers a prefilled GitHub issue link with the full measured support matrix
+  and a draft printer profile for contributing back.
+- Calibration wizard now shows a confirmation screen (paper cost,
+  ~15–20 cm; make sure paper is loaded) before printing anything, and
+  tests a fifth, wider paper-width bar (832px, for 100/112mm heads).
+- Diagnostics downloads now include `width_pixels` and `impl` per entry,
+  plus the runtime-resolved paper width, default image implementation,
+  and no-image-support flag, for triage.
+
 ### Changed
 
 - The calibration wizard's "characters per line" step now uses a typed
@@ -16,6 +108,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   slider was the wrong control, and its 0 default made the skip
   convention easy to trigger by accident. Continuing with the count
   left empty now asks for a value or an explicit skip.
+
+- Calibration summary step simplified: the confusing "Update share link
+  with my model" action is gone. Enter the model (optional), Save or
+  Discard — the personalized GitHub share link now appears on the
+  final confirmation screen after saving (and still in a notification).
+- Calibration test pages feed two extra blank lines after each test, so
+  the results clear the tear bar without a manual feed.
+
+- **Behavioral:** image implementation now defaults from the printer
+  profile (raster, or column for column-only printers) instead of
+  always raster; reliability presets no longer force `bitImageRaster`.
+  Explicit `impl` in service calls is unaffected.
+- Profile dropdown's "Auto-detect (Default)" renamed to "Generic (no
+  profile)" — it never detected anything.
+- Printing an image on a profile that declares no image support now
+  logs a warning (the print is still attempted).
+- `calibration_print` service renamed in the UI to "Print dither test
+  sheet" to avoid confusion with the calibration wizard.
+- Calibration wizard's paper-width bars are now drawn as an outline
+  instead of a solid fill — same measurement, a fraction of the ink
+  (kinder to the print head on battery-powered Bluetooth printers).
 
 ### Fixed
 
@@ -88,77 +201,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   line-width options on the same models. All three fixes mirror
   corrections already reported upstream to escpos-printer-db.
 
-### Added
-
-- Epson TM-T70 and TM-T70II are recognized as compatible models (aliased
-  to the bundled TM-T88V profile, whose 512px/180dpi/42-56-column class
-  and codepage table match both). Epson TM-m30, TM-m30II, and TM-m30III
-  are now supported via a built-in `TM-m30III` profile carried from the
-  upstream escpos-printer-db printer database — newer than the one
-  python-escpos 3.1 ships, so it isn't available there yet. (The TM-m30II
-  TRG confirms an exact geometry and font match: 576 dots, 48/57/64
-  columns.)
-- Rongta RP80 and RP328 are recognized as compatible models, mapped to
-  the built-in `RP820` profile: RP328's vendor spec (72mm/203dpi = 576
-  dots, 48/64 columns) and the official RP80 command-set manual (same
-  font table and Epson-standard codepage layout as the hardware-verified
-  RP850P) both match the RP820 class.
-- Bixolon SRP-350III (180dpi/512-dot class, aliased to TM-T88V) and its
-  203dpi sibling SRP-352III (576-dot class, aliased to TM-T20II) are
-  recognized as compatible models, per Bixolon's official user's manual.
-- Citizen CT-S801/CT-S851 and their II revisions are recognized as
-  compatible models (aliased to TM-T20II): Citizen's manuals confirm the
-  203dpi/576-dot default on 80mm paper, and its command reference
-  accepts the Epson-standard codepage numbers. Units memory-switched to
-  83mm/640-dot stock should recalibrate width.
-- Epson TM-m10 (58mm compact) is supported via a built-in profile with
-  geometry from Epson's own technical reference (420 dots at 203dpi,
-  35/42/46 columns — a class no bundled profile covers). Its codepage
-  table is borrowed from the TM-m30 family (Epson gates the per-model
-  table behind an NDA) — run the calibration wizard to verify encodings
-  on real hardware.
-- The Bluetooth device picker now also recognizes printers by their cached
-  Serial Port Profile (SPP) record, not just the imaging device class —
-  cheap printers that don't advertise the imaging class show up in the
-  filtered dropdown instead of hiding behind "Show all".
-- Adding a printer without a real profile ("Generic (no profile)" or the
-  generic `default` profile) now shows a tip on the success screen
-  pointing at the calibration wizard (Configure → Calibrate printer).
-- Network printers are identified at setup via ESC/POS `GS I` queries: the
-  device page shows the real manufacturer/model (e.g. EPSON TM-T20II), the
-  calibration share link prefills the model name, and the detected
-  manufacturer/model are included in diagnostics downloads. Printers that
-  don't answer (most clones) behave exactly as before. Existing network
-  printer entries pick up the detected model the next time they are
-  reconfigured.
-- DHCP discovery for network thermal printers: Home Assistant now offers to
-  set up Epson TM-series (`tm-*`) and Rongta (`rongta_*`) printers it sees
-  join the network. Candidates are probed on port 9100 first, so matches
-  that aren't printers are ignored silently; `tm-*` hostnames additionally
-  require a real `GS I` answer, since port 9100 is also Prometheus
-  node_exporter's default. Discovered setups preselect
-  the matching printer profile when one is known. Discovered entries are
-  additionally tracked by MAC address, so a DHCP lease change updates the
-  existing entry's host in place instead of offering a duplicate.
-- Network printer entries are now titled by their detected model (e.g.
-  "TM-T20II (192.168.1.50:9100)") instead of the bare address. Manual
-  renames are still never overwritten when a lease change or reconfigure
-  updates the address.
-- Discovery now retries the port-9100 probe for up to a minute, so a
-  printer whose network stack is still booting when its DHCP lease lands
-  no longer misses its discovery card until the next lease renewal.
-
-### Changed
-
-- Calibration summary step simplified: the confusing "Update share link
-  with my model" action is gone. Enter the model (optional), Save or
-  Discard — the personalized GitHub share link now appears on the
-  final confirmation screen after saving (and still in a notification).
-- Calibration test pages feed two extra blank lines after each test, so
-  the results clear the tear bar without a manual feed.
-
-### Fixed
-
 - Text wrapping no longer strips a trailing newline, so calibration
   test-page labels flush before each pattern instead of being dropped
   into or merged with the following image (seen on Ronga RP850P).
@@ -169,57 +211,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   data bug encoding font dot widths as column counts) no longer surface
   as characters-per-line choices.
 
-## [1.1.0] - 2026-08-08
-
-### Added
-
-- Per-entry "Paper width in pixels" override — fixes image sizing for
-  printers whose profile lacks a width (previously a Repairs issue with
-  no user-side fix).
-- USB config flow now preselects a suggested profile from the device's
-  USB descriptor or a curated VID:PID list.
-- Bluetooth config flow now preselects a suggested profile from the
-  paired device's advertised name (same preselect-only matching as USB).
-- Clone/equivalent model aliases (e.g. Citizen CT-S601II → CT-S651,
-  ZJ-5890 → POS-5890) accepted in the custom profile field.
-- 16 more researched clone/equivalent model aliases: Epson TM-T20III/
-  TM-T20X/TM-T82II/TM-T82III/TM-T88VI/TM-T88VII, Xprinter XP-58IIH/
-  XP-80C/XP-N160II/XP-T80A, Zjiang ZJ-5802, HOIN HOP-E58, Goojprt
-  PT-210, Netum NT-1809DD, Sunmi V1/T2, Rongta RP850P (hardware-verified).
-- Aliased models now appear directly in the profile dropdown as
-  "Model (compatible)" entries, so users can find a rebadged printer
-  without knowing the custom-profile field exists.
-- Per-entry "Image printing implementation" option (Auto/Raster/Column/
-  Graphics) with plain-language guidance.
-- Printer calibration wizard (Settings → Configure → "Calibrate printer"):
-  prints guided test pages to dial in image implementation, paper width,
-  columns, and (optionally) codepage, then saves them for the entry — and
-  offers a prefilled GitHub issue link with the full measured support matrix
-  and a draft printer profile for contributing back.
-- Calibration wizard now shows a confirmation screen (paper cost,
-  ~15–20 cm; make sure paper is loaded) before printing anything, and
-  tests a fifth, wider paper-width bar (832px, for 100/112mm heads).
-- Diagnostics downloads now include `width_pixels` and `impl` per entry,
-  plus the runtime-resolved paper width, default image implementation,
-  and no-image-support flag, for triage.
-
-### Changed
-
-- **Behavioral:** image implementation now defaults from the printer
-  profile (raster, or column for column-only printers) instead of
-  always raster; reliability presets no longer force `bitImageRaster`.
-  Explicit `impl` in service calls is unaffected.
-- Profile dropdown's "Auto-detect (Default)" renamed to "Generic (no
-  profile)" — it never detected anything.
-- Printing an image on a profile that declares no image support now
-  logs a warning (the print is still attempted).
-- `calibration_print` service renamed in the UI to "Print dither test
-  sheet" to avoid confusion with the calibration wizard.
-- Calibration wizard's paper-width bars are now drawn as an outline
-  instead of a solid fill — same measurement, a fraction of the ink
-  (kinder to the print head on battery-powered Bluetooth printers).
-
-### Fixed
 - Every calibration test page now prints a title ("= CALIBRATE 1/4: IMAGE
   MODE ="), a one-line instruction, and trailing feed lines so the steps are
   self-explanatory and visually separated on the roll.
