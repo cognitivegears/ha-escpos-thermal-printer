@@ -99,14 +99,6 @@ class PrintOperationsMixin:
         await self._mark_success()
 
 
-# ---------------------------------------------------------------------------
-# Module-level helper: runs the text-print body assuming the lock is held
-# and ``printer`` is already acquired. Used by both ``print_text`` and the
-# ``print_text_with_image`` adapter method (which needs to keep the lock
-# across two operations for atomicity).
-# ---------------------------------------------------------------------------
-
-
 async def _qr_under_lock(
     hass: HomeAssistant,
     printer: Any,
@@ -144,6 +136,14 @@ async def _qr_under_lock(
         printer_obj.qr(data, size=qsize, ec=_map_qr_ec(qec))
 
     await hass.async_add_executor_job(_do_print, printer)
+
+
+# ---------------------------------------------------------------------------
+# Module-level helper: runs the text-print body assuming the lock is held
+# and ``printer`` is already acquired. Used by both ``print_text`` and the
+# ``print_text_with_image`` adapter method (which needs to keep the lock
+# across two operations for atomicity).
+# ---------------------------------------------------------------------------
 
 
 async def _print_text_under_lock(
