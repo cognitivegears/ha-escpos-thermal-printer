@@ -1,5 +1,7 @@
 """Tests for the printer-not-calibrated repairs issue and fix flow."""
 
+import json
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from homeassistant.const import CONF_HOST, CONF_PORT
@@ -7,6 +9,15 @@ from homeassistant.helpers import issue_registry as ir
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.escpos_printer.const import CONF_LINE_WIDTH, DOMAIN
+
+_STRINGS_PATH = (
+    Path(__file__).resolve().parent.parent / "custom_components" / "escpos_printer" / "strings.json"
+)
+_APPROVED_PREFIX = (
+    "The optional calibration tool prints test pages to tune print width and "
+    "character set for this printer and paper. Run it now, or ignore this — "
+    "printing works without it.\n\n"
+)
 
 
 async def _setup_entry(hass, host="1.2.3.4", options=None):  # type: ignore[no-untyped-def]
@@ -65,3 +76,23 @@ async def test_fix_flow_opens_wizard_confirm_step(hass):  # type: ignore[no-unty
     result = await flow.async_step_init()
     assert result["type"] == "form"
     assert result["step_id"] == "calibrate_confirm"
+
+
+def test_fix_flow_strings_match_options_counterparts() -> None:
+    """fix_flow.step/error/abort must mirror options.step/error/abort (drift guard)."""
+    strings = json.loads(_STRINGS_PATH.read_text())
+    options = strings["options"]
+    fix_flow = strings["issues"]["printer_not_calibrated"]["fix_flow"]
+
+    for key, step in fix_flow["step"].items():
+        counterpart = options["step"][key]
+        if key == "calibrate_confirm":
+            assert step["title"] == counterpart["title"]
+            assert step["data"] == counterpart["data"]
+            assert step["description"] == _APPROVED_PREFIX + counterpart["description"]
+        else:
+            assert step == counterpart
+
+    for key, message in fix_flow["error"].items():
+        assert message == options["error"][key]
+    assert fix_flow["abort"] == options["abort"]

@@ -26,7 +26,7 @@ menu. See [Calibration wizard](docs/calibration.md).
 
 **Core functionality**: `open_cash_drawer` (python-escpos `cashdraw`, pin 2/5)
 plus a matching device action, and optionally a button entity alongside the
-planned Feed/Cut/Calibration buttons (item 1). The one classic POS capability
+shipped Feed/Cut/Beep/Sample buttons (item 1). The one classic POS capability
 entirely absent from the integration.
 
 **Investigation: general-purpose I/O.** The drawer-kick connector (RJ11/RJ12)

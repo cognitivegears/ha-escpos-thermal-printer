@@ -570,6 +570,10 @@
             }
           }
         },
+        "error": {
+          "line_width_missing": "Enter the character count from the first line (16–96), or choose \"Skip this step\".",
+          "calibration_print_failed": "Printing the test page failed. Check the printer and try again."
+        },
         "abort": {
           "calibration_discarded": "Calibration discarded — no options were changed.",
           "printer_not_ready": "The printer is not connected — load the integration before calibrating.",
