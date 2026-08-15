@@ -497,6 +497,20 @@
           "out": "Out"
         }
       }
+    },
+    "button": {
+      "feed": {
+        "name": "Feed paper"
+      },
+      "cut": {
+        "name": "Cut paper"
+      },
+      "beep": {
+        "name": "Beep"
+      },
+      "sample_print": {
+        "name": "Sample test print"
+      }
     }
   },
   "issues": {

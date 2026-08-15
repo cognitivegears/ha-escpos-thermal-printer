@@ -80,7 +80,7 @@ _LOGGER = logging.getLogger(__name__)
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
-PLATFORMS: list[str] = ["notify", "binary_sensor", "sensor"]
+PLATFORMS: list[str] = ["notify", "binary_sensor", "sensor", "button"]
 
 # Domain-level singleton flag for one-time service registration.
 # Per-entry state lives on entry.runtime_data (see EscposRuntimeData).
