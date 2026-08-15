@@ -15,10 +15,32 @@ Everything needed already exists: `adapter.feed()` / `adapter.cut()`
 three `ButtonEntity` subclasses reusing `build_device_info()`, plus `"button"`
 in `PLATFORMS`, icons, and strings. Beep as a fourth button is optional.
 
-### 2. Cash drawer service
+### 2. Cash drawer service — and the drawer-kick port as a "geek port"
 
-`open_cash_drawer` (python-escpos `cashdraw`, pin 2/5) plus a matching device
-action. The one classic POS capability entirely absent from the integration.
+**Core functionality**: `open_cash_drawer` (python-escpos `cashdraw`, pin 2/5)
+plus a matching device action, and optionally a button entity alongside the
+planned Feed/Cut/Calibration buttons (item 1). The one classic POS capability
+entirely absent from the integration.
+
+**Investigation: general-purpose I/O.** The drawer-kick connector (RJ11/RJ12)
+is electrically more than a cash-drawer plug, which makes it interesting as a
+cheap "geek port" for HA users without a drawer:
+
+- *Output*: `ESC p m t1 t2` fires a timed 24 V pulse on pin 2 or pin 5 with
+  configurable on/off duration — enough to drive a relay module, door strike,
+  or buzzer. Pulse-only, not level-hold, so it maps to an HA momentary
+  switch/button rather than a real GPIO line.
+- *Input*: the real-time status query `DLE EOT n=1` reports the drawer
+  kick-out connector pin 3 level, giving one readable sense line — a
+  binary_sensor for a door contact or any dry-contact switch, piggybacking on
+  the same poll loop as the existing paper sensor.
+
+Open questions for the investigation: which transports support the status
+read (network + USB likely, Bluetooth/serial to verify), per-model behavior of
+pulse timing limits, how to present this in the UI without confusing
+cash-drawer users (probably an "advanced" config option that renames the
+entities), and safety copy warning that pin voltage is 12/24 V solenoid drive,
+not logic-level.
 
 ### 3. Text styling: `invert`, `density`, `font` on `print_text` / `print_message`
 
