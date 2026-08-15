@@ -3,6 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.const import CONF_HOST, CONF_PORT
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -88,3 +89,33 @@ async def test_buttons_attached_to_printer_device(hass):  # type: ignore[no-unty
     reg_entry = registry.async_get(entity_id)
     assert reg_entry is not None
     assert reg_entry.device_id is not None
+
+
+async def test_button_press_error_is_logged_and_sanitised(hass, caplog):  # type: ignore[no-untyped-def]
+    """A failed press must log via _LOGGER.exception and sanitise the message.
+
+    Mirrors test_control_handler_sanitises_path_in_error in
+    test_services_targeting.py: the pre-fix button.py swallowed the
+    exception into a bare class-name message with no log output at
+    all, so an offline printer produced zero diagnostics. Reusing
+    ``_wrap_unexpected`` restores both the log line and the
+    sanitize_log_message redaction contract shared by every other
+    service handler.
+    """
+    entry = await _setup_entry(hass)
+
+    async def _leak(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        raise OSError("usb open failed at /config/secret/db.sqlite")
+
+    entry.runtime_data.adapter.feed = AsyncMock(side_effect=_leak)
+
+    with caplog.at_level("ERROR"):
+        with pytest.raises(HomeAssistantError) as exc_info:
+            await _press(hass, _button_entity_id(hass, entry, "feed"))
+
+    msg = str(exc_info.value)
+    assert "secret/db.sqlite" not in msg, f"path leaked through sanitiser: {msg}"
+    assert "[REDACTED]" in msg, f"sanitiser was bypassed: {msg}"
+    assert any("feed" in rec.message and rec.levelname == "ERROR" for rec in caplog.records), (
+        "no exception log emitted for the failed press"
+    )
