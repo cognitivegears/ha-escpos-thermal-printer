@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ESC/POS Thermal Printer for Home Assistant</title>
+<meta name="description" content="Print receipts, labels, QR codes, and images from Home Assistant automations on any ESC/POS thermal printer — network, USB, Bluetooth, or serial. Local only, no cloud.">
+<meta property="og:title" content="ESC/POS Thermal Printer for Home Assistant">
+<meta property="og:description" content="Print receipts, labels, QR codes, and images from Home Assistant automations. Local only, no cloud.">
+<meta property="og:image" content="https://cognitivegears.github.io/ha-escpos-thermal-printer/assets/weather-dither.png">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧾</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #f6f4ee;
+    --paper-dim: #edeae1;
+    --ink: #1c1b18;
+    --ink-dim: #55534d;
+    --rule: #a9a69c;
+    --bg: #26262b;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    background-image: radial-gradient(ellipse at 50% 0%, #34343b 0%, var(--bg) 60%);
+    font-family: "Courier Prime", "Courier New", Courier, monospace;
+    color: var(--ink);
+    line-height: 1.55;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* ---- the printer the page comes out of ---- */
+  .printer {
+    max-width: 840px;
+    margin: 36px auto 0;
+    padding: 18px 22px 16px;
+    background: linear-gradient(#45454d, #29292e 70%, #1c1c20);
+    border-radius: 16px 16px 10px 10px;
+    box-shadow: 0 14px 34px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.12);
+    position: relative;
+    z-index: 2;
+  }
+  .printer-face {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #b7b7bd;
+    font-size: .78rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .led {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: #3fd35c;
+    box-shadow: 0 0 7px #3fd35c;
+    flex: none;
+  }
+  .printer-face .model { margin-left: auto; }
+  .slot {
+    height: 11px;
+    border-radius: 6px;
+    background: #060607;
+    box-shadow: inset 0 3px 5px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.08);
+  }
+
+  /* ---- the receipt ---- */
+  .receipt {
+    width: min(720px, calc(100% - 20px));
+    margin: -6px auto 0;
+    position: relative;
+    z-index: 1;
+    background: var(--paper);
+    background-image: repeating-linear-gradient(0deg, rgba(0,0,0,.015) 0 2px, transparent 2px 5px);
+    padding: 44px clamp(16px, 5vw, 48px) 40px;
+    box-shadow: 0 16px 48px rgba(0,0,0,.5);
+  }
+  .tear {
+    display: block;
+    width: min(720px, calc(100% - 20px));
+    margin: 0 auto 64px;
+    filter: drop-shadow(0 10px 14px rgba(0,0,0,.35));
+  }
+  .tear path { fill: var(--paper); }
+
+  a { color: var(--ink); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+  a:hover { background: var(--ink); color: var(--paper); text-decoration: none; }
+
+  h1, .display { font-family: "VT323", "Courier Prime", monospace; font-weight: 400; }
+  h1 {
+    font-size: clamp(2.6rem, 9vw, 4.2rem);
+    line-height: .95;
+    text-align: center;
+    margin: .2em 0 .1em;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+  }
+  .tagline {
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: .28em;
+    font-size: clamp(.72rem, 2.6vw, .95rem);
+    margin: 0 0 4px;
+  }
+  .stars { text-align: center; letter-spacing: .4em; color: var(--ink-dim); margin: 10px 0; }
+
+  hr {
+    border: none;
+    border-top: 2px dashed var(--rule);
+    margin: 34px 0 26px;
+  }
+  .meta-row {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    font-size: .78rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--ink-dim);
+    margin: 14px 0;
+  }
+
+  nav.toc {
+    text-align: center;
+    font-size: .85rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin: 18px 0 6px;
+  }
+  nav.toc a { margin: 0 6px; white-space: nowrap; }
+
+  h2 {
+    font-size: 1.05rem;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: .3em;
+    margin: 0 0 20px;
+    scroll-margin-top: 20px;
+  }
+  h2::before, h2::after { content: " ▪ "; color: var(--ink-dim); }
+  section { scroll-margin-top: 16px; }
+  h3 {
+    font-size: .9rem;
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    border-bottom: 2px dotted var(--rule);
+    padding-bottom: 4px;
+    margin: 28px 0 12px;
+  }
+
+  p, li { font-size: .95rem; }
+  ul.ticks { list-style: none; padding-left: 0; }
+  ul.ticks li { padding-left: 1.9em; text-indent: -1.9em; margin: 8px 0; }
+  ul.ticks li::before { content: "[✓] "; font-weight: 700; letter-spacing: .05em; }
+  ol { padding-left: 1.4em; }
+  ol li { margin: 8px 0; }
+  code {
+    font-family: inherit;
+    background: var(--paper-dim);
+    padding: 1px 5px;
+    font-size: .9em;
+  }
+
+  .btn-row { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin: 26px 0; }
+  a.btn {
+    display: inline-block;
+    border: 2px solid var(--ink);
+    padding: 11px 20px;
+    font-weight: 700;
+    font-size: .85rem;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    text-decoration: none;
+  }
+  a.btn.primary { background: var(--ink); color: var(--paper); }
+  a.btn:hover { background: var(--paper); color: var(--ink); }
+  a.btn.primary:hover { background: var(--paper); color: var(--ink); }
+
+  .logo {
+    display: block;
+    width: 220px;
+    height: auto;
+    margin: 0 auto 14px;
+    image-rendering: pixelated;
+  }
+  figure { margin: 26px 0; text-align: center; }
+  figure img {
+    max-width: 100%;
+    height: auto;
+    image-rendering: pixelated;
+    border: 2px solid var(--ink);
+  }
+  figcaption { font-size: .78rem; color: var(--ink-dim); text-transform: uppercase; letter-spacing: .1em; margin-top: 8px; }
+
+  pre {
+    background: var(--paper-dim);
+    border: 2px dashed var(--rule);
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-family: inherit;
+    font-size: .84rem;
+    line-height: 1.45;
+    margin: 14px 0 22px;
+  }
+  pre.output {
+    border-style: solid;
+    border-color: var(--ink);
+    background: var(--paper);
+    /* Courier Prime lacks box-drawing glyphs; system monospace keeps ┌─┐ aligned */
+    font-family: Menlo, Consolas, "DejaVu Sans Mono", monospace;
+    line-height: 1.25;
+  }
+  pre code { background: none; padding: 0; font-size: 1em; }
+  .out-label {
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    color: var(--ink-dim);
+    margin: -14px 0 4px;
+  }
+
+  .svc { border-bottom: 1px dotted var(--rule); padding: 9px 0; }
+  .svc:last-child { border-bottom: none; }
+  .svc code { font-weight: 700; background: none; padding: 0; }
+  .svc span { display: block; color: var(--ink-dim); font-size: .87rem; }
+
+  .doc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 28px;
+  }
+  .doc-grid a { display: block; padding: 6px 0; font-size: .92rem; border-bottom: 1px dotted var(--rule); }
+  @media (max-width: 560px) { .doc-grid { grid-template-columns: 1fr; } }
+
+  table.bp { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  table.bp td { padding: 7px 8px 7px 0; border-bottom: 1px dotted var(--rule); vertical-align: top; }
+  table.bp td:first-child { white-space: nowrap; font-weight: 700; }
+
+  .totals { max-width: 340px; margin: 0 auto; font-size: .95rem; }
+  .totals div { display: flex; }
+  .totals .dots { flex: 1; border-bottom: 2px dotted var(--rule); margin: 0 6px 5px; }
+  .totals .grand { font-weight: 700; }
+
+  .barcode {
+    height: 52px;
+    max-width: 340px;
+    margin: 30px auto 6px;
+    background: repeating-linear-gradient(90deg,
+      var(--ink) 0 2px, transparent 2px 5px,
+      var(--ink) 5px 6px, transparent 6px 8px,
+      var(--ink) 8px 12px, transparent 12px 15px,
+      var(--ink) 15px 16px, transparent 16px 21px,
+      var(--ink) 21px 24px, transparent 24px 26px);
+  }
+  .barcode-label { text-align: center; letter-spacing: .5em; font-size: .8rem; margin-bottom: 26px; }
+  footer p { text-align: center; }
+  .fineprint { font-size: .78rem; color: var(--ink-dim); }
+</style>
+</head>
+<body>
+
+<div class="printer" aria-hidden="true">
+  <div class="printer-face">
+    <span class="led"></span> online
+    <span class="model">HA-80 thermal</span>
+  </div>
+  <div class="slot"></div>
+</div>
+
+<main class="receipt">
+  <header>
+    <img class="logo" src="assets/logo-dither.png" width="220" height="220"
+         alt="ESC/POS Thermal Printer logo: a receipt emerging from a printer inside a house silhouette">
+    <p class="tagline">★ Home Assistant Integration ★</p>
+    <h1>ESC/POS<br>Thermal&nbsp;Printer</h1>
+    <p class="stars">* * * * * * * * * * * * * * *</p>
+    <p style="text-align:center; max-width: 34em; margin: 0 auto;">
+      Print receipts, labels, QR&nbsp;codes, and images from Home&nbsp;Assistant
+      automations. Works with any ESC/POS-capable thermal printer over
+      network, USB, Bluetooth, or serial.
+    </p>
+    <div class="meta-row">
+      <span>Order #0001</span>
+      <span>Local only</span>
+      <span>No cloud</span>
+      <span>Total: $0.00</span>
+    </div>
+    <div class="btn-row">
+      <a class="btn primary" href="https://my.home-assistant.io/redirect/hacs_repository/?owner=cognitivegears&amp;repository=ha-escpos-thermal-printer&amp;category=integration">Open in HACS</a>
+      <a class="btn" href="https://github.com/cognitivegears/ha-escpos-thermal-printer">View on GitHub</a>
+    </div>
+    <nav class="toc" aria-label="Sections">
+      <a href="#why">Why</a> ·
+      <a href="#install">Install</a> ·
+      <a href="#examples">Examples</a> ·
+      <a href="#services">Services</a> ·
+      <a href="#blueprints">Blueprints</a> ·
+      <a href="#docs">Docs</a>
+    </nav>
+  </header>
+
+  <figure>
+    <img src="assets/weather-dither.png" width="720" height="540"
+         alt="Two printed receipts on a keyboard: a clothing briefing with a jacket and boots, and a weather forecast showing cloudy, 13.6°C, with an hourly table.">
+    <figcaption>Morning briefing, printed by automations · dithered like your printer would</figcaption>
+  </figure>
+
+  <hr>
+
+  <section id="why">
+    <h2>Why use this</h2>
+    <ul class="ticks">
+      <li>Print door access logs, temperature alerts, todo lists, daily reports, or shopping lists automatically</li>
+      <li>Works with any $30+ thermal printer that speaks ESC/POS (most receipt printers do)</li>
+      <li>Connects via TCP/IP, USB, Bluetooth, or a serial cable / ESPHome serial proxy</li>
+      <li>Set up as many printers as you need — target them individually or broadcast to all</li>
+      <li>Direct connection to your printers. No cloud, everything stays local</li>
+    </ul>
+
+    <h3>Feature roll</h3>
+    <ul class="ticks">
+      <li>Formatted text: bold, underline, alignment, font sizes, UTF-8 with automatic character conversion</li>
+      <li>QR codes, barcodes, and images from URLs, files, camera/image entities, or base64</li>
+      <li>Text effects: boxes, multi-column tables, custom-font and rotated text</li>
+      <li>Paper feed, cut, and buzzer control</li>
+      <li>Paper status sensor — automate on paper low / paper out</li>
+      <li>35+ printer profiles with automatic feature detection, plus 23 rebadged/clone models as "(compatible)" entries</li>
+      <li>Guided calibration wizard that measures and saves your printer's settings</li>
+      <li>Device page buttons: Feed / Cut / Beep / Sample print</li>
+      <li>Full UI configuration — no YAML required</li>
+    </ul>
+  </section>
+
+  <hr>
+
+  <section id="install">
+    <h2>Quick start</h2>
+    <h3>You will need</h3>
+    <ul class="ticks">
+      <li>Home Assistant 2026.5 or later (0.4.x of this integration still works on HA 2024.8+)</li>
+      <li>A thermal printer with ESC/POS support — Epson TM series, Star Micronics, Citizen, and most generic 58mm/80mm receipt printers</li>
+      <li>Network: reachable on your LAN (usually port 9100) · USB: plugged into the HA host · Bluetooth: paired on the host · Serial: device path or ESPHome proxy</li>
+    </ul>
+
+    <h3>Install</h3>
+    <ol>
+      <li>Open <strong>HACS</strong> in Home Assistant — this integration is in the default store, no custom repository needed</li>
+      <li>Search for "ESC/POS Thermal Printer" and install it</li>
+      <li>Restart Home Assistant</li>
+    </ol>
+
+    <h3>Configure</h3>
+    <ol>
+      <li>Go to <strong>Settings → Devices &amp; services → Add Integration</strong></li>
+      <li>Search for "ESC/POS Thermal Printer" and pick your connection type</li>
+      <li>Select your printer model, or "Generic (no profile)" if it isn't listed</li>
+      <li>Done — start printing</li>
+    </ol>
+    <p class="fineprint" style="text-align:center;">
+      Epson and Rongta network printers are auto-discovered via DHCP and offered
+      in Settings → Devices &amp; Services. USB printers may be auto-discovered when connected.
+    </p>
+  </section>
+
+  <hr>
+
+  <section id="examples">
+    <h2>Examples</h2>
+
+    <h3>Print a message</h3>
+<pre><code>service: escpos_printer.print_text
+data:
+  text: "Hello from Home Assistant!"
+  align: center
+  cut: partial</code></pre>
+
+    <h3>Print a QR code</h3>
+<pre><code>service: escpos_printer.print_qr
+data:
+  data: "https://www.home-assistant.io"
+  size: 8
+  align: center
+  cut: partial</code></pre>
+
+    <h3>Print a bordered header</h3>
+<pre><code>service: escpos_printer.print_box
+data:
+  text: DAILY REPORT
+  style: auto
+  padding: 1
+  align: center</code></pre>
+    <p class="out-label">Prints:</p>
+<pre class="output"><code>   ┌──────────────────────┐
+   │     DAILY REPORT     │
+   └──────────────────────┘</code></pre>
+
+    <h3>Print a receipt-style table</h3>
+<pre><code>service: escpos_printer.print_table
+data:
+  rows:
+    - ["Item", "Qty", "Price"]
+    - ["Coffee", "2", "$6.00"]
+    - ["Bagel",  "1", "$3.50"]
+  style: single
+  header: true
+  column_aligns: ["left", "center", "right"]</code></pre>
+    <p class="out-label">Prints:</p>
+<pre class="output"><code>┌──────────┬─────┬───────┐
+│ Item     │ Qty │ Price │
+├──────────┼─────┼───────┤
+│ Coffee   │  2  │ $6.00 │
+│ Bagel    │  1  │ $3.50 │
+└──────────┴─────┴───────┘</code></pre>
+
+    <h3>Print a camera snapshot</h3>
+<pre><code>service: escpos_printer.print_camera_snapshot
+data:
+  source: camera.front_door
+  cut: partial</code></pre>
+
+    <h3>Target a specific printer</h3>
+<pre><code>service: escpos_printer.print_text
+target:
+  device_id: your_printer_device_id
+data:
+  text: "Sent to a specific printer"
+  cut: partial</code></pre>
+    <p>
+      The services use Home Assistant's standard target picker, so you can target
+      devices, entities, areas, floors, or labels — or set <code>broadcast: true</code>
+      to print to every configured printer at once.
+    </p>
+  </section>
+
+  <hr>
+
+  <section id="services">
+    <h2>Services</h2>
+
+    <h3>Text</h3>
+    <div class="svc"><code>print_text</code><span>Formatted text in the device encoding</span></div>
+    <div class="svc"><code>print_text_utf8</code><span>UTF-8 text with automatic character conversion</span></div>
+    <div class="svc"><code>print_message</code><span>Formatted message via notify entity</span></div>
+    <div class="svc"><code>print_text_image</code><span>Render text with a TTF/OTF font, optional 90/180/270° rotation</span></div>
+
+    <h3>Codes &amp; images</h3>
+    <div class="svc"><code>print_qr</code><span>QR codes</span></div>
+    <div class="svc"><code>print_barcode</code><span>Barcodes (EAN13, CODE128, …)</span></div>
+    <div class="svc"><code>print_image</code><span>Images from URL, file, camera/image entity, or base64</span></div>
+    <div class="svc"><code>print_image_url</code> / <code>print_image_path</code><span>Focused URL / local-file variants</span></div>
+    <div class="svc"><code>print_camera_snapshot</code> / <code>print_image_entity</code><span>Live frame from a camera or image entity</span></div>
+
+    <h3>Layout</h3>
+    <div class="svc"><code>print_box</code><span>Wrap text in a printable border</span></div>
+    <div class="svc"><code>print_table</code><span>Multi-column rows for receipts and logs</span></div>
+    <div class="svc"><code>print_kvtable</code><span>Two-column label/value pairs (totals, sensor readings)</span></div>
+    <div class="svc"><code>print_separator</code><span>A single decorative rule</span></div>
+
+    <h3>Preview &amp; calibration</h3>
+    <div class="svc"><code>preview_image</code> / <code>preview_box</code> / <code>preview_table</code><span>Render to a file on disk — no paper used</span></div>
+    <div class="svc"><code>calibration_print</code><span>Ruler + threshold sweep strip for dialing in image settings</span></div>
+
+    <h3>Control</h3>
+    <div class="svc"><code>feed</code> · <code>cut</code> · <code>beep</code><span>Paper feed, cutter, and buzzer</span></div>
+  </section>
+
+  <hr>
+
+  <section id="blueprints">
+    <h2>Blueprints</h2>
+    <p style="text-align:center;">13 ready-to-import scripts and automations — no YAML from scratch.</p>
+    <table class="bp">
+      <tr><td>Shopping List</td><td>Print a todo entity as a bordered grocery list</td></tr>
+      <tr><td>Daily Agenda</td><td>Today's calendar events at a fixed time each day</td></tr>
+      <tr><td>Morning Briefing</td><td>Combined weather + agenda printout each morning</td></tr>
+      <tr><td>Guest Wi-Fi QR</td><td>Scannable Wi-Fi join code for guests</td></tr>
+      <tr><td>Doorbell Snapshot</td><td>Camera snapshot when the doorbell is pressed</td></tr>
+      <tr><td>Sensor Alert</td><td>Bordered alert when a sensor hits a target state</td></tr>
+      <tr><td>TODO Ticket</td><td>A ticket (with QR) per item added to a todo list</td></tr>
+      <tr><td>Trash Reminder</td><td>Bin / recycling reminder on collection eve</td></tr>
+    </table>
+    <p style="text-align:center; margin-top:16px;">
+      <a href="https://github.com/cognitivegears/ha-escpos-thermal-printer/tree/main/blueprints">Browse all 13 blueprints →</a>
+    </p>
+  </section>
+
+  <hr>
+
+  <section id="docs">
+    <h2>Documentation</h2>
+    <div class="doc-grid">
+      <a href="https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/docs/installation.md">Installation</a>
+      <a href="https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/docs/configuration.md">Configuration</a>
+      <a href="https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/docs/calibration.md">Calibration wizard</a>
+      <a href="https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/docs/services.md">Service reference</a>
+      <a href="https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/docs/images.md">Image printing</a>
+      <a href="https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/docs/text-effects.md">Text effects</a>
+      <a href="https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/docs/network.md">Network printers</a>
+      <a href="https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/docs/usb.md">USB printers</a>
+      <a href="https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/docs/bluetooth.md">Bluetooth printers</a>
+      <a href="https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/docs/serial.md">Serial / ESPHome printers</a>
+      <a href="https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/docs/automations.md">Automation examples</a>
+      <a href="https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/docs/notifications.md">Notifications</a>
+      <a href="https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/docs/multi-printer.md">Multi-printer targeting</a>
+      <a href="https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/docs/troubleshooting.md">Troubleshooting</a>
+      <a href="https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/docs/limitations.md">Known limitations</a>
+      <a href="https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/CONTRIBUTING.md">Contributing</a>
+    </div>
+  </section>
+
+  <hr>
+
+  <footer>
+    <div class="totals" aria-hidden="true">
+      <div><span>Subtotal</span><span class="dots"></span><span>$0.00</span></div>
+      <div><span>Cloud fees</span><span class="dots"></span><span>$0.00</span></div>
+      <div class="grand"><span>Total</span><span class="dots"></span><span>$0.00</span></div>
+    </div>
+    <p class="stars">* * * MIT LICENSE * * *</p>
+    <p>
+      <a href="https://github.com/cognitivegears/ha-escpos-thermal-printer">GitHub</a> ·
+      <a href="https://github.com/cognitivegears/ha-escpos-thermal-printer/issues">Issues</a> ·
+      <a href="https://github.com/cognitivegears/ha-escpos-thermal-printer/discussions">Discussions</a> ·
+      <a href="https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/CHANGELOG.md">Changelog</a>
+    </p>
+    <div class="barcode" role="presentation"></div>
+    <p class="barcode-label" aria-hidden="true">ESC/POS</p>
+    <p class="fineprint">Thank you for printing locally · Please come again</p>
+  </footer>
+</main>
+
+<svg class="tear" viewBox="0 0 720 14" preserveAspectRatio="none" aria-hidden="true" height="14">
+  <path d="M0 0 L12 14 L24 0 L36 14 L48 0 L60 14 L72 0 L84 14 L96 0 L108 14 L120 0 L132 14 L144 0 L156 14 L168 0 L180 14 L192 0 L204 14 L216 0 L228 14 L240 0 L252 14 L264 0 L276 14 L288 0 L300 14 L312 0 L324 14 L336 0 L348 14 L360 0 L372 14 L384 0 L396 14 L408 0 L420 14 L432 0 L444 14 L456 0 L468 14 L480 0 L492 14 L504 0 L516 14 L528 0 L540 14 L552 0 L564 14 L576 0 L588 14 L600 0 L612 14 L624 0 L636 14 L648 0 L660 14 L672 0 L684 14 L696 0 L708 14 L720 0 Z"/>
+</svg>
+
+</body>
+</html>

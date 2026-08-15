@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Uncalibrated printers now get a dismissible suggestion in Settings →
   Repairs that launches the calibration wizard directly — no more hunting
   for it under the integration's Configure menu.
+- Project website (`docs/index.html`) for GitHub Pages: thermal-receipt
+  themed landing page with examples, service overview, blueprint list, and
+  documentation links.
 
 ## [1.2.0] - 2026-08-15
 
