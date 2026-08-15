@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Device page buttons: Feed paper, Cut paper, Beep, and Sample test print
+  (a one-tap demo receipt with the integration logo, styled text, a table,
+  and a QR code).
+- Uncalibrated printers now get a dismissible suggestion in Settings →
+  Repairs that launches the calibration wizard directly — no more hunting
+  for it under the integration's Configure menu.
+
 ## [1.2.0] - 2026-08-15
 
 ### Added
