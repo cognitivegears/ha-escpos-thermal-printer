@@ -738,9 +738,11 @@ _TARGETED_SERVICES = frozenset(
 
 _UNTARGETED_WITH_DEVICE_ID = frozenset({"preview_image", "preview_box", "preview_table"})
 
+# Entity-only filter: hassfest rejects device filters on a service target
+# ("use a device selector instead"); devices are still pickable in the UI
+# via their notify entity, matching print_message's long-standing block.
 _EXPECTED_TARGET_BLOCK = {
     "entity": {"domain": "notify", "integration": "escpos_printer"},
-    "device": {"integration": "escpos_printer"},
 }
 
 

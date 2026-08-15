@@ -5,8 +5,6 @@ print_text_utf8:
     entity:
       domain: notify
       integration: escpos_printer
-    device:
-      integration: escpos_printer
   fields:
     broadcast:
       name: Broadcast
@@ -114,8 +112,6 @@ print_text:
   target:
     entity:
       domain: notify
-      integration: escpos_printer
-    device:
       integration: escpos_printer
   fields:
     broadcast:
@@ -234,8 +230,6 @@ print_qr:
     entity:
       domain: notify
       integration: escpos_printer
-    device:
-      integration: escpos_printer
   fields:
     broadcast:
       name: Broadcast
@@ -317,8 +311,6 @@ print_image:
   target:
     entity:
       domain: notify
-      integration: escpos_printer
-    device:
       integration: escpos_printer
   fields:
     broadcast:
@@ -517,8 +509,6 @@ print_image_url:
     entity:
       domain: notify
       integration: escpos_printer
-    device:
-      integration: escpos_printer
   fields:
     broadcast:
       name: Broadcast
@@ -715,8 +705,6 @@ print_image_path:
     entity:
       domain: notify
       integration: escpos_printer
-    device:
-      integration: escpos_printer
   fields:
     broadcast:
       name: Broadcast
@@ -910,8 +898,6 @@ print_camera_snapshot:
   target:
     entity:
       domain: notify
-      integration: escpos_printer
-    device:
       integration: escpos_printer
   fields:
     broadcast:
@@ -1107,8 +1093,6 @@ print_image_entity:
   target:
     entity:
       domain: notify
-      integration: escpos_printer
-    device:
       integration: escpos_printer
   fields:
     broadcast:
@@ -1445,8 +1429,6 @@ calibration_print:
     entity:
       domain: notify
       integration: escpos_printer
-    device:
-      integration: escpos_printer
   fields:
     broadcast:
       name: Broadcast
@@ -1485,8 +1467,6 @@ print_barcode:
   target:
     entity:
       domain: notify
-      integration: escpos_printer
-    device:
       integration: escpos_printer
   fields:
     broadcast:
@@ -1644,8 +1624,6 @@ feed:
     entity:
       domain: notify
       integration: escpos_printer
-    device:
-      integration: escpos_printer
   fields:
     broadcast:
       name: Broadcast
@@ -1675,8 +1653,6 @@ cut:
   target:
     entity:
       domain: notify
-      integration: escpos_printer
-    device:
       integration: escpos_printer
   fields:
     broadcast:
@@ -1715,8 +1691,6 @@ beep:
   target:
     entity:
       domain: notify
-      integration: escpos_printer
-    device:
       integration: escpos_printer
   fields:
     broadcast:
@@ -2016,8 +1990,6 @@ print_box:
     entity:
       domain: notify
       integration: escpos_printer
-    device:
-      integration: escpos_printer
   fields:
     broadcast:
       name: Broadcast
@@ -2116,8 +2088,6 @@ print_table:
   target:
     entity:
       domain: notify
-      integration: escpos_printer
-    device:
       integration: escpos_printer
   fields:
     broadcast:
@@ -2225,8 +2195,6 @@ print_text_image:
   target:
     entity:
       domain: notify
-      integration: escpos_printer
-    device:
       integration: escpos_printer
   fields:
     broadcast:
@@ -2430,8 +2398,6 @@ print_separator:
     entity:
       domain: notify
       integration: escpos_printer
-    device:
-      integration: escpos_printer
   fields:
     broadcast:
       name: Broadcast
@@ -2498,8 +2464,6 @@ print_kvtable:
   target:
     entity:
       domain: notify
-      integration: escpos_printer
-    device:
       integration: escpos_printer
   fields:
     broadcast:
