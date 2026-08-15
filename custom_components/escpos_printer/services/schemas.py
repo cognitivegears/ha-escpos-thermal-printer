@@ -87,6 +87,7 @@ from ..const import (
     DITHER_MODES,
     IMPL_MODES,
     ROTATION_VALUES,
+    TARGET_PICKER_KEYS,
 )
 from ..security import (
     IMAGE_CHUNK_DELAY_MAX,
@@ -120,33 +121,51 @@ from ..security import (
 # `selector: device:` and `selector: device: multiple: true` UI shapes.
 _DEVICE_ID = vol.Any(cv.string, [cv.string])
 
-# Explicit opt-in to broadcast to every loaded printer. Omitting both
-# `device_id` and `broadcast` still broadcasts (backward compatible —
-# see `target_resolution._async_get_target_entries`), but that implicit
-# form logs a warning; `broadcast: true` is the silent, explicit way to
-# say the same thing.
+# `entity_id`/`area_id`/`floor_id`/`label_id` accept str or [str] to match
+# the shapes HA's target picker sends. These are never in services.yaml as
+# explicit `fields:` entries — they come from the `target:` block declared
+# on each service, which HA core merges into `call.data` before schema
+# validation runs (the frontend's device/entity/area/floor/label picker
+# resolves to one or more of these keys under the hood). Without accepting
+# them here, the PREVENT_EXTRA schemas below would reject any call made
+# through the "create as a new action" target picker.
+_ANY_ID = vol.Any(cv.string, [cv.string])
+
+# Explicit opt-in to broadcast to every loaded printer. Omitting
+# `device_id`/the target-picker keys and `broadcast` still broadcasts
+# (backward compatible — see `target_resolution._async_get_target_entries`),
+# but that implicit form logs a warning; `broadcast: true` is the silent,
+# explicit way to say the same thing.
 _TARGET_FIELDS: dict[Any, Any] = {
     vol.Optional("device_id"): _DEVICE_ID,
+    **{vol.Optional(key): _ANY_ID for key in TARGET_PICKER_KEYS},
     vol.Optional("broadcast", default=False): cv.boolean,
 }
 
+_TARGET_KEYS = ("device_id", *TARGET_PICKER_KEYS)
 
-def _reject_broadcast_with_device_id(value: dict[Any, Any]) -> dict[Any, Any]:
-    """Reject `broadcast: true` combined with an explicit `device_id`.
+
+def _reject_broadcast_with_target(value: dict[Any, Any]) -> dict[Any, Any]:
+    """Reject `broadcast: true` combined with an explicit target.
 
     Voluptuous validates each key independently, so this cross-field rule
     can't live inside ``_TARGET_FIELDS`` itself — every schema below runs
     it as a second pass (via :func:`_with_target_validation`) over the
-    already-coerced dict.
+    already-coerced dict. ``device_id`` and the target-picker keys
+    (``entity_id``/``area_id``/``floor_id``/``label_id``) are all mutually
+    exclusive with ``broadcast`` for the same reason: they all pick a
+    non-broadcast target.
     """
-    if value.get("broadcast") and value.get("device_id"):
-        raise vol.Invalid("'broadcast' and 'device_id' are mutually exclusive")
+    if value.get("broadcast") and any(value.get(k) for k in _TARGET_KEYS):
+        raise vol.Invalid(
+            "'broadcast' and a target (device/entity/area/floor/label) are mutually exclusive"
+        )
     return value
 
 
 def _with_target_validation(schema_dict: dict[Any, Any]) -> vol.All:
-    """Wrap a global-service schema dict with the broadcast/device_id mutex check."""
-    return vol.All(vol.Schema(schema_dict), _reject_broadcast_with_device_id)
+    """Wrap a global-service schema dict with the broadcast/target mutex check."""
+    return vol.All(vol.Schema(schema_dict), _reject_broadcast_with_target)
 
 
 # Alignment / underline / cut / size enums shared across services.

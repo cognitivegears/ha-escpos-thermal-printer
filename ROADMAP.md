@@ -84,6 +84,13 @@ cannot re-fire.
 - **`_last_error_errno` in the Online sensor's attributes**: already tracked
   by the adapters and exposed in diagnostics, just not on the entity.
 
+## Planned for 2.0.0 (breaking)
+
+- **Remove the implicit broadcast-when-no-target fallback**: service calls
+  will require an explicit target (`device_id` or an entity/area/floor/label
+  target) or `broadcast: true`. Deprecated since 1.2.0; a warning has been
+  logged for this case since multi-printer support was added.
+
 ## Considered and rejected
 
 | Idea | Why not |

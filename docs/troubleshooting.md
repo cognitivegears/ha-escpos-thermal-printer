@@ -218,7 +218,7 @@ The [calibration wizard](calibration.md) can usually diagnose and fix wrong or m
 
 - **"Service not found"**: restart HA; verify the integration loaded.
 - **"No valid ESC/POS printer targets found"**: wrong device ID, or entry not loaded. Use `broadcast: true` to send to all printers.
-- **"no device_id specified: printing to all N configured printers" warning**: a service call with multiple printers configured named no target. Add a `device_id` to target one printer, or set `broadcast: true` if printing everywhere is intended.
+- **"no target specified — printing to all N configured printers" warning**: a service call with multiple printers configured named no target. This implicit broadcast fallback is deprecated and will be removed in 2.0.0 — select a target (device, entity, area, floor, or label) to print to one printer, or set `broadcast: true` if printing everywhere is intended.
 - **"Printer configuration not found"**: entry was removed. Restart HA or re-add.
 - **Timeout errors during printing**: increase timeout, reduce image size, check network.
 

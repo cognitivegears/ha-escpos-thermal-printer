@@ -4,6 +4,13 @@ from typing import Any
 
 DOMAIN = "escpos_printer"
 
+# HA target-picker keys (populated by a service's `target:` block in
+# services.yaml, merged into call.data by HA core before the schema/handler
+# runs). Shared by services/schemas.py (accept + broadcast-mutex) and
+# services/target_resolution.py (dispatch to async_extract_config_entry_ids)
+# so the four keys are defined in exactly one place.
+TARGET_PICKER_KEYS = ("entity_id", "area_id", "floor_id", "label_id")
+
 # Configuration keys
 CONF_HOST = "host"
 CONF_PORT = "port"

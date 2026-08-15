@@ -59,8 +59,9 @@ async def _for_each_target(
     (with any ``translation_key`` / ``status`` context) propagates
     untouched; other exceptions are sanitised via :func:`_wrap_unexpected`.
 
-    Multiple targets (an explicit ``device_id`` list, or a broadcast to
-    every configured printer): each target is attempted even if an
+    Multiple targets (an explicit ``device_id`` list, a target-picker
+    selection of entities/areas/floors/labels, or a broadcast to every
+    configured printer): each target is attempted even if an
     earlier one fails, so one offline printer doesn't silently skip the
     rest. Failures are collected and reported together afterwards, named
     by printer, with a count of how many succeeded — partial success is

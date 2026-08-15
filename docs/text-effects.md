@@ -73,8 +73,8 @@ Wrap a block of text in a border.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `device_id` | device / [device] | *(all printers)* | Optional target. Omitting it prints to all printers (warns when several are configured). |
-| `broadcast` | bool | `false` | Explicitly print to all printers, without the warning. Mutually exclusive with `device_id`. |
+| `device_id` | device / [device] | *(all printers)* | Legacy target field; the standard target picker (device/entity/area/floor/label) also works. Omitting both prints to all printers (deprecated fallback, warns when several are configured). |
+| `broadcast` | bool | `false` | Explicitly print to all printers, without the warning. Mutually exclusive with any target (device/entity/area/floor/label). |
 | `text` | string | *(required)* | Text to wrap. Supports newlines. Up to 10 000 chars. |
 | `style` | enum | `auto` | One of `auto`, `single`, `double`, `ascii`, `asterisk`, `hash`, `none`. |
 | `padding` | int | `0` | Blank rows added above and below the content (0-4). |
@@ -160,8 +160,8 @@ The same applies to `print_kvtable`'s `items` field.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `device_id` | device / [device] | *(all printers)* | Optional target. Omitting it prints to all printers (warns when several are configured). |
-| `broadcast` | bool | `false` | Explicitly print to all printers, without the warning. Mutually exclusive with `device_id`. |
+| `device_id` | device / [device] | *(all printers)* | Legacy target field; the standard target picker (device/entity/area/floor/label) also works. Omitting both prints to all printers (deprecated fallback, warns when several are configured). |
+| `broadcast` | bool | `false` | Explicitly print to all printers, without the warning. Mutually exclusive with any target (device/entity/area/floor/label). |
 | `rows` | list of lists of strings | *(required)* | The grid. First row is the header when `header: true`. Up to 200 rows × 12 cols. |
 | `style` | enum | `auto` | Same options as `print_box`. `none` gives a borderless aligned grid. |
 | `column_widths` | list of ints | even split | Per-column character widths. Sum + (cols+1) separators must fit `total_width`. |
@@ -300,8 +300,8 @@ and size is capped at 16 MB.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `device_id` | device / [device] | *(all printers)* | Optional target. Omitting it prints to all printers (warns when several are configured). |
-| `broadcast` | bool | `false` | Explicitly print to all printers, without the warning. Mutually exclusive with `device_id`. |
+| `device_id` | device / [device] | *(all printers)* | Legacy target field; the standard target picker (device/entity/area/floor/label) also works. Omitting both prints to all printers (deprecated fallback, warns when several are configured). |
+| `broadcast` | bool | `false` | Explicitly print to all printers, without the warning. Mutually exclusive with any target (device/entity/area/floor/label). |
 | `text` | string | *(required)* | Text to render. Supports newlines (each newline starts a new line on the bitmap). Up to 10 000 chars. |
 | `font` | enum | `dejavu_mono` | Bundled font: `dejavu_mono`, `dejavu_sans`, or `dejavu_serif`. Ignored when `font_path` is set. |
 | `font_path` | string | *(unset)* | Optional path to a `.ttf` / `.otf` file inside `allowlist_external_dirs`. |

@@ -611,15 +611,11 @@
   },
   "services": {
     "beep": {
-      "description": "Trigger the printer buzzer (if supported). Select one or more printer devices as the target.",
+      "description": "Trigger the printer buzzer (if supported). Select a target — printer device, entity, area, floor, or label. If no target is selected, prints to every configured printer (deprecated fallback).",
       "fields": {
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with any target (device, entity, area, floor, or label). Omitting both a target and broadcast also prints to all printers, but that implicit fallback is deprecated and will be removed in 2.0.0 — select a target or set broadcast: true.",
           "name": "Broadcast"
-        },
-        "device_id": {
-          "description": "Select one or more printer devices (if omitted, broadcasts to all printers)",
-          "name": "Device"
         },
         "duration": {
           "description": "Duration of each beep (in the printer's buzzer time units, ~100 ms each)",
@@ -633,19 +629,15 @@
       "name": "Beep"
     },
     "calibration_print": {
-      "description": "Print a calibration sheet — a pixel ruler plus a threshold sweep strip — for tuning image dither/threshold settings (not the printer calibration wizard — see the Calibration docs page). Burns ~10 cm of paper.",
+      "description": "Print a calibration sheet — a pixel ruler plus a threshold sweep strip — for tuning image dither/threshold settings (not the printer calibration wizard — see the Calibration docs page). Burns ~10 cm of paper. If no target is selected, prints to every configured printer (deprecated fallback).",
       "fields": {
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with any target (device, entity, area, floor, or label). Omitting both a target and broadcast also prints to all printers, but that implicit fallback is deprecated and will be removed in 2.0.0 — select a target or set broadcast: true.",
           "name": "Broadcast"
         },
         "cut": {
           "description": "Paper cutting mode after printing (defaults to the printer's configured cut mode).",
           "name": "Cut"
-        },
-        "device_id": {
-          "description": "Printer device.",
-          "name": "Device"
         },
         "feed": {
           "description": "Number of lines to feed after printing.",
@@ -655,15 +647,11 @@
       "name": "Print dither test sheet"
     },
     "cut": {
-      "description": "Cut the paper. Select one or more printer devices as the target.",
+      "description": "Cut the paper. Select a target — printer device, entity, area, floor, or label. If no target is selected, prints to every configured printer (deprecated fallback).",
       "fields": {
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with any target (device, entity, area, floor, or label). Omitting both a target and broadcast also prints to all printers, but that implicit fallback is deprecated and will be removed in 2.0.0 — select a target or set broadcast: true.",
           "name": "Broadcast"
-        },
-        "device_id": {
-          "description": "Select one or more printer devices (if omitted, broadcasts to all printers)",
-          "name": "Device"
         },
         "feed_before_cut": {
           "description": "Force-feed a few lines before cutting (the printer's own behavior). Disable if you've already fed enough paper and want the cut right where the paper currently sits.",
@@ -677,15 +665,11 @@
       "name": "Cut Paper"
     },
     "feed": {
-      "description": "Feed the paper a number of lines. Select one or more printer devices as the target.",
+      "description": "Feed the paper a number of lines. Select a target — printer device, entity, area, floor, or label. If no target is selected, prints to every configured printer (deprecated fallback).",
       "fields": {
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with any target (device, entity, area, floor, or label). Omitting both a target and broadcast also prints to all printers, but that implicit fallback is deprecated and will be removed in 2.0.0 — select a target or set broadcast: true.",
           "name": "Broadcast"
-        },
-        "device_id": {
-          "description": "Select one or more printer devices (if omitted, broadcasts to all printers)",
-          "name": "Device"
         },
         "lines": {
           "description": "Number of lines to feed",
@@ -839,7 +823,7 @@
       "name": "Preview Table (no paper)"
     },
     "print_barcode": {
-      "description": "Print a barcode. Select one or more printer devices as the target.",
+      "description": "Print a barcode. Select a target — printer device, entity, area, floor, or label. If no target is selected, prints to every configured printer (deprecated fallback).",
       "fields": {
         "align": {
           "description": "Barcode alignment",
@@ -850,7 +834,7 @@
           "name": "Barcode Type"
         },
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with any target (device, entity, area, floor, or label). Omitting both a target and broadcast also prints to all printers, but that implicit fallback is deprecated and will be removed in 2.0.0 — select a target or set broadcast: true.",
           "name": "Broadcast"
         },
         "check": {
@@ -864,10 +848,6 @@
         "cut": {
           "description": "Paper cutting mode after printing (defaults to the printer's configured cut mode)",
           "name": "Cut"
-        },
-        "device_id": {
-          "description": "Select one or more printer devices (if omitted, broadcasts to all printers)",
-          "name": "Device"
         },
         "feed": {
           "description": "Number of lines to feed after printing",
@@ -907,23 +887,19 @@
       }
     },
     "print_box": {
-      "description": "Print text wrapped in a printable border (single/double/ASCII glyphs).",
+      "description": "Print text wrapped in a printable border (single/double/ASCII glyphs). If no target is selected, prints to every configured printer (deprecated fallback).",
       "fields": {
         "align": {
           "description": "Text alignment inside the box.",
           "name": "Alignment"
         },
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with any target (device, entity, area, floor, or label). Omitting both a target and broadcast also prints to all printers, but that implicit fallback is deprecated and will be removed in 2.0.0 — select a target or set broadcast: true.",
           "name": "Broadcast"
         },
         "cut": {
           "description": "Paper cutting mode after printing (defaults to the printer's configured cut mode).",
           "name": "Cut"
-        },
-        "device_id": {
-          "description": "Select one or more printer devices (if omitted, broadcasts to all printers).",
-          "name": "Device"
         },
         "feed": {
           "description": "Number of lines to feed after printing.",
@@ -949,7 +925,7 @@
       "name": "Print Box"
     },
     "print_camera_snapshot": {
-      "description": "Print a live snapshot from a camera entity. Convenience wrapper around print_image with a camera-entity selector for a friendlier UI.",
+      "description": "Print a live snapshot from a camera entity. Convenience wrapper around print_image with a camera-entity selector for a friendlier UI. If no target is selected, prints to every configured printer (deprecated fallback).",
       "fields": {
         "align": {
           "description": "Image alignment on the paper.",
@@ -964,7 +940,7 @@
           "name": "Autocontrast"
         },
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with any target (device, entity, area, floor, or label). Omitting both a target and broadcast also prints to all printers, but that implicit fallback is deprecated and will be removed in 2.0.0 — select a target or set broadcast: true.",
           "name": "Broadcast"
         },
         "camera_entity": {
@@ -978,10 +954,6 @@
         "cut": {
           "description": "Paper cutting mode after printing (defaults to the printer's configured cut mode).",
           "name": "Cut"
-        },
-        "device_id": {
-          "description": "Select one or more printer devices (if omitted, broadcasts to all printers).",
-          "name": "Device"
         },
         "dither": {
           "description": "How to convert to 1-bit B&W. floyd-steinberg works well for photos; threshold gives crisp logos/text; none disables dithering.",
@@ -1041,7 +1013,7 @@
       }
     },
     "print_image": {
-      "description": "Print an image from a URL, file path, camera.[id], image.[id], or base64 data URI. Automations can still use a Jinja template for this field — HA renders it before the service call is dispatched — but the field itself is a plain string, not evaluated server-side. For a friendlier UI, prefer the focused services (Print Image from URL, from Path, Camera Snapshot, Image Entity) — see docs/images.md.",
+      "description": "Print an image from a URL, file path, camera.[id], image.[id], or base64 data URI. Automations can still use a Jinja template for this field — HA renders it before the service call is dispatched — but the field itself is a plain string, not evaluated server-side. For a friendlier UI, prefer the focused services (Print Image from URL, from Path, Camera Snapshot, Image Entity) — see docs/images.md. If no target is selected, prints to every configured printer (deprecated fallback).",
       "fields": {
         "align": {
           "description": "Image alignment on the paper.",
@@ -1056,7 +1028,7 @@
           "name": "Autocontrast"
         },
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with any target (device, entity, area, floor, or label). Omitting both a target and broadcast also prints to all printers, but that implicit fallback is deprecated and will be removed in 2.0.0 — select a target or set broadcast: true.",
           "name": "Broadcast"
         },
         "chunk_delay_ms": {
@@ -1066,10 +1038,6 @@
         "cut": {
           "description": "Paper cutting mode after printing (defaults to the printer's configured cut mode).",
           "name": "Cut"
-        },
-        "device_id": {
-          "description": "Select one or more printer devices (if omitted, broadcasts to all printers).",
-          "name": "Device"
         },
         "dither": {
           "description": "How to convert to 1-bit B&W. floyd-steinberg works well for photos; threshold gives crisp logos/text; none disables dithering.",
@@ -1133,7 +1101,7 @@
       }
     },
     "print_image_entity": {
-      "description": "Print the current frame from an HA image entity (weather radar, ML overlay, generated chart, etc).",
+      "description": "Print the current frame from an HA image entity (weather radar, ML overlay, generated chart, etc). If no target is selected, prints to every configured printer (deprecated fallback).",
       "fields": {
         "align": {
           "description": "Image alignment on the paper.",
@@ -1148,7 +1116,7 @@
           "name": "Autocontrast"
         },
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with any target (device, entity, area, floor, or label). Omitting both a target and broadcast also prints to all printers, but that implicit fallback is deprecated and will be removed in 2.0.0 — select a target or set broadcast: true.",
           "name": "Broadcast"
         },
         "chunk_delay_ms": {
@@ -1158,10 +1126,6 @@
         "cut": {
           "description": "Paper cutting mode after printing (defaults to the printer's configured cut mode).",
           "name": "Cut"
-        },
-        "device_id": {
-          "description": "Select one or more printer devices (if omitted, broadcasts to all printers).",
-          "name": "Device"
         },
         "dither": {
           "description": "How to convert to 1-bit B&W. floyd-steinberg works well for photos; threshold gives crisp logos/text; none disables dithering.",
@@ -1225,7 +1189,7 @@
       }
     },
     "print_image_path": {
-      "description": "Print an image from a local file path. The path must lie inside one of Home Assistant's allowlist_external_dirs (typically /config or /media — add directories under homeassistant -> allowlist_external_dirs in configuration.yaml if needed).",
+      "description": "Print an image from a local file path. The path must lie inside one of Home Assistant's allowlist_external_dirs (typically /config or /media — add directories under homeassistant -> allowlist_external_dirs in configuration.yaml if needed). If no target is selected, prints to every configured printer (deprecated fallback).",
       "fields": {
         "align": {
           "description": "Image alignment on the paper.",
@@ -1240,7 +1204,7 @@
           "name": "Autocontrast"
         },
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with any target (device, entity, area, floor, or label). Omitting both a target and broadcast also prints to all printers, but that implicit fallback is deprecated and will be removed in 2.0.0 — select a target or set broadcast: true.",
           "name": "Broadcast"
         },
         "chunk_delay_ms": {
@@ -1250,10 +1214,6 @@
         "cut": {
           "description": "Paper cutting mode after printing (defaults to the printer's configured cut mode).",
           "name": "Cut"
-        },
-        "device_id": {
-          "description": "Select one or more printer devices (if omitted, broadcasts to all printers).",
-          "name": "Device"
         },
         "dither": {
           "description": "How to convert to 1-bit B&W. floyd-steinberg works well for photos; threshold gives crisp logos/text; none disables dithering.",
@@ -1317,7 +1277,7 @@
       }
     },
     "print_image_url": {
-      "description": "Print an image fetched from an HTTP(S) URL. SSRF-aware — private, loopback, and link-local addresses are refused.",
+      "description": "Print an image fetched from an HTTP(S) URL. SSRF-aware — private, loopback, and link-local addresses are refused. If no target is selected, prints to every configured printer (deprecated fallback).",
       "fields": {
         "align": {
           "description": "Image alignment on the paper.",
@@ -1332,7 +1292,7 @@
           "name": "Autocontrast"
         },
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with any target (device, entity, area, floor, or label). Omitting both a target and broadcast also prints to all printers, but that implicit fallback is deprecated and will be removed in 2.0.0 — select a target or set broadcast: true.",
           "name": "Broadcast"
         },
         "chunk_delay_ms": {
@@ -1342,10 +1302,6 @@
         "cut": {
           "description": "Paper cutting mode after printing (defaults to the printer's configured cut mode).",
           "name": "Cut"
-        },
-        "device_id": {
-          "description": "Select one or more printer devices (if omitted, broadcasts to all printers).",
-          "name": "Device"
         },
         "dither": {
           "description": "How to convert to 1-bit B&W. floyd-steinberg works well for photos; threshold gives crisp logos/text; none disables dithering.",
@@ -1409,19 +1365,15 @@
       }
     },
     "print_kvtable": {
-      "description": "Print a two-column label/value table — receipt totals, sensor readings, ingredient lists. Labels left-aligned, values per \"value_align\" (default right).",
+      "description": "Print a two-column label/value table — receipt totals, sensor readings, ingredient lists. Labels left-aligned, values per \"value_align\" (default right). If no target is selected, prints to every configured printer (deprecated fallback).",
       "fields": {
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with any target (device, entity, area, floor, or label). Omitting both a target and broadcast also prints to all printers, but that implicit fallback is deprecated and will be removed in 2.0.0 — select a target or set broadcast: true.",
           "name": "Broadcast"
         },
         "cut": {
           "description": "Paper cutting mode after printing (defaults to the printer's configured cut mode).",
           "name": "Cut"
-        },
-        "device_id": {
-          "description": "Select one or more printer devices (if omitted, broadcasts to all printers).",
-          "name": "Device"
         },
         "feed": {
           "description": "Number of lines to feed after printing.",
@@ -1571,14 +1523,14 @@
       }
     },
     "print_qr": {
-      "description": "Print a QR code. Select one or more printer devices as the target.",
+      "description": "Print a QR code. Select a target — printer device, entity, area, floor, or label. If no target is selected, prints to every configured printer (deprecated fallback).",
       "fields": {
         "align": {
           "description": "QR code alignment",
           "name": "Alignment"
         },
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with any target (device, entity, area, floor, or label). Omitting both a target and broadcast also prints to all printers, but that implicit fallback is deprecated and will be removed in 2.0.0 — select a target or set broadcast: true.",
           "name": "Broadcast"
         },
         "cut": {
@@ -1588,10 +1540,6 @@
         "data": {
           "description": "Data to encode in the QR code",
           "name": "Data"
-        },
-        "device_id": {
-          "description": "Select one or more printer devices (if omitted, broadcasts to all printers)",
-          "name": "Device"
         },
         "ec": {
           "description": "Error correction level",
@@ -1609,10 +1557,10 @@
       "name": "Print QR Code"
     },
     "print_separator": {
-      "description": "Print a single decorative rule built by repeating one character to fill the printer's line width. Examples — \"-\" for a single rule, \"=\" for a heavy rule, \"*\" or \"_\" for decorative bars.",
+      "description": "Print a single decorative rule built by repeating one character to fill the printer's line width. Examples — \"-\" for a single rule, \"=\" for a heavy rule, \"*\" or \"_\" for decorative bars. If no target is selected, prints to every configured printer (deprecated fallback).",
       "fields": {
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with any target (device, entity, area, floor, or label). Omitting both a target and broadcast also prints to all printers, but that implicit fallback is deprecated and will be removed in 2.0.0 — select a target or set broadcast: true.",
           "name": "Broadcast"
         },
         "char": {
@@ -1622,10 +1570,6 @@
         "cut": {
           "description": "Paper cutting mode after printing (defaults to the printer's configured cut mode).",
           "name": "Cut"
-        },
-        "device_id": {
-          "description": "Select one or more printer devices (if omitted, broadcasts to all printers).",
-          "name": "Device"
         },
         "feed": {
           "description": "Number of lines to feed after printing.",
@@ -1643,10 +1587,10 @@
       "name": "Print Separator"
     },
     "print_table": {
-      "description": "Print a multi-column table (receipt-style) with optional borders and header.",
+      "description": "Print a multi-column table (receipt-style) with optional borders and header. If no target is selected, prints to every configured printer (deprecated fallback).",
       "fields": {
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with any target (device, entity, area, floor, or label). Omitting both a target and broadcast also prints to all printers, but that implicit fallback is deprecated and will be removed in 2.0.0 — select a target or set broadcast: true.",
           "name": "Broadcast"
         },
         "column_aligns": {
@@ -1660,10 +1604,6 @@
         "cut": {
           "description": "Paper cutting mode after printing (defaults to the printer's configured cut mode).",
           "name": "Cut"
-        },
-        "device_id": {
-          "description": "Select one or more printer devices (if omitted, broadcasts to all printers).",
-          "name": "Device"
         },
         "feed": {
           "description": "Number of lines to feed after printing.",
@@ -1693,7 +1633,7 @@
       "name": "Print Table"
     },
     "print_text": {
-      "description": "Print text to the ESC/POS printer using raw encoding. Select one or more printer devices as the target.",
+      "description": "Print text to the ESC/POS printer using raw encoding. Select a target — printer device, entity, area, floor, or label. If no target is selected, prints to every configured printer (deprecated fallback).",
       "fields": {
         "align": {
           "description": "Text alignment",
@@ -1704,16 +1644,12 @@
           "name": "Bold"
         },
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with any target (device, entity, area, floor, or label). Omitting both a target and broadcast also prints to all printers, but that implicit fallback is deprecated and will be removed in 2.0.0 — select a target or set broadcast: true.",
           "name": "Broadcast"
         },
         "cut": {
           "description": "Paper cutting mode after printing (defaults to the printer's configured cut mode)",
           "name": "Cut"
-        },
-        "device_id": {
-          "description": "Select one or more printer devices (if omitted, broadcasts to all printers)",
-          "name": "Device"
         },
         "encoding": {
           "description": "Codepage override for this print — a python-escpos codepage name such as CP437, CP850, or CP858 (not a Python codec name). Leave empty to use the printer's configured codepage.",
@@ -1743,23 +1679,19 @@
       "name": "Print Text (Raw Encoding)"
     },
     "print_text_image": {
-      "description": "Render text to a bitmap with a custom TTF/OTF font, optional rotation, and arbitrary point size. The rendered image is printed through the same dither/threshold pipeline as print_image. Use this when you need bigger or styled text than the printer's built-in 32-column font can produce.",
+      "description": "Render text to a bitmap with a custom TTF/OTF font, optional rotation, and arbitrary point size. The rendered image is printed through the same dither/threshold pipeline as print_image. Use this when you need bigger or styled text than the printer's built-in 32-column font can produce. If no target is selected, prints to every configured printer (deprecated fallback).",
       "fields": {
         "align": {
           "description": "Horizontal alignment of each rendered line within the canvas.",
           "name": "Alignment"
         },
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with any target (device, entity, area, floor, or label). Omitting both a target and broadcast also prints to all printers, but that implicit fallback is deprecated and will be removed in 2.0.0 — select a target or set broadcast: true.",
           "name": "Broadcast"
         },
         "cut": {
           "description": "Paper cutting mode after printing (defaults to the printer's configured cut mode).",
           "name": "Cut"
-        },
-        "device_id": {
-          "description": "Select one or more printer devices (if omitted, broadcasts to all printers).",
-          "name": "Device"
         },
         "feed": {
           "description": "Number of lines to feed after printing.",
@@ -1847,7 +1779,7 @@
       }
     },
     "print_text_utf8": {
-      "description": "Print UTF-8 text with automatic transcoding to printer codepage. Select one or more printer devices as the target.",
+      "description": "Print UTF-8 text with automatic transcoding to printer codepage. Select a target — printer device, entity, area, floor, or label. If no target is selected, prints to every configured printer (deprecated fallback).",
       "fields": {
         "align": {
           "description": "Text alignment",
@@ -1858,16 +1790,12 @@
           "name": "Bold"
         },
         "broadcast": {
-          "description": "Explicitly print to every configured printer. Mutually exclusive with device_id. Omitting both device_id and broadcast also targets all printers (kept for backward compatibility), but logs a warning when more than one printer is configured — set broadcast: true to make the intent explicit and silence it.",
+          "description": "Explicitly print to every configured printer. Mutually exclusive with any target (device, entity, area, floor, or label). Omitting both a target and broadcast also prints to all printers, but that implicit fallback is deprecated and will be removed in 2.0.0 — select a target or set broadcast: true.",
           "name": "Broadcast"
         },
         "cut": {
           "description": "Paper cutting mode after printing (defaults to the printer's configured cut mode)",
           "name": "Cut"
-        },
-        "device_id": {
-          "description": "Select one or more printer devices (if omitted, broadcasts to all printers)",
-          "name": "Device"
         },
         "feed": {
           "description": "Number of lines to feed after printing",
