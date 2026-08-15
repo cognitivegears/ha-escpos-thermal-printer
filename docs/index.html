@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ESC/POS Thermal Printer for Home Assistant</title>
-<meta name="description" content="Print receipts, labels, QR codes, and images from Home Assistant automations on any ESC/POS thermal printer — network, USB, Bluetooth, or serial. Local only, no cloud.">
+<meta name="description" content="Print receipts, labels, QR codes, and images from Home Assistant automations on any ESC/POS thermal printer: network, USB, Bluetooth, or serial. Local only, no cloud.">
 <meta property="og:title" content="ESC/POS Thermal Printer for Home Assistant">
 <meta property="og:description" content="Print receipts, labels, QR codes, and images from Home Assistant automations. Local only, no cloud.">
 <meta property="og:image" content="https://cognitivegears.github.io/ha-escpos-thermal-printer/assets/weather-dither.png">
@@ -319,7 +319,7 @@
       <li>Print door access logs, temperature alerts, todo lists, daily reports, or shopping lists automatically</li>
       <li>Works with any $30+ thermal printer that speaks ESC/POS (most receipt printers do)</li>
       <li>Connects via TCP/IP, USB, Bluetooth, or a serial cable / ESPHome serial proxy</li>
-      <li>Set up as many printers as you need — target them individually or broadcast to all</li>
+      <li>Set up as many printers as you need. Target them individually or broadcast to all</li>
       <li>Direct connection to your printers. No cloud, everything stays local</li>
     </ul>
 
@@ -329,11 +329,11 @@
       <li>QR codes, barcodes, and images from URLs, files, camera/image entities, or base64</li>
       <li>Text effects: boxes, multi-column tables, custom-font and rotated text</li>
       <li>Paper feed, cut, and buzzer control</li>
-      <li>Paper status sensor — automate on paper low / paper out</li>
+      <li>Paper status sensor: automate on paper low / paper out</li>
       <li>35+ printer profiles with automatic feature detection, plus 23 rebadged/clone models as "(compatible)" entries</li>
       <li>Guided calibration wizard that measures and saves your printer's settings</li>
       <li>Device page buttons: Feed / Cut / Beep / Sample print</li>
-      <li>Full UI configuration — no YAML required</li>
+      <li>Full UI configuration, no YAML required</li>
     </ul>
   </section>
 
@@ -344,13 +344,13 @@
     <h3>You will need</h3>
     <ul class="ticks">
       <li>Home Assistant 2026.5 or later (0.4.x of this integration still works on HA 2024.8+)</li>
-      <li>A thermal printer with ESC/POS support — Epson TM series, Star Micronics, Citizen, and most generic 58mm/80mm receipt printers</li>
+      <li>A thermal printer with ESC/POS support: Epson TM series, Star Micronics, Citizen, and most generic 58mm/80mm receipt printers</li>
       <li>Network: reachable on your LAN (usually port 9100) · USB: plugged into the HA host · Bluetooth: paired on the host · Serial: device path or ESPHome proxy</li>
     </ul>
 
     <h3>Install</h3>
     <ol>
-      <li>Open <strong>HACS</strong> in Home Assistant — this integration is in the default store, no custom repository needed</li>
+      <li>Open <strong>HACS</strong> in Home Assistant (this integration is in the default store, no custom repository needed)</li>
       <li>Search for "ESC/POS Thermal Printer" and install it</li>
       <li>Restart Home Assistant</li>
     </ol>
@@ -360,7 +360,7 @@
       <li>Go to <strong>Settings → Devices &amp; services → Add Integration</strong></li>
       <li>Search for "ESC/POS Thermal Printer" and pick your connection type</li>
       <li>Select your printer model, or "Generic (no profile)" if it isn't listed</li>
-      <li>Done — start printing</li>
+      <li>Done. Start printing</li>
     </ol>
     <p class="fineprint" style="text-align:center;">
       Epson and Rongta network printers are auto-discovered via DHCP and offered
@@ -433,7 +433,7 @@ data:
   cut: partial</code></pre>
     <p>
       The services use Home Assistant's standard target picker, so you can target
-      devices, entities, areas, floors, or labels — or set <code>broadcast: true</code>
+      devices, entities, areas, floors, or labels. Set <code>broadcast: true</code>
       to print to every configured printer at once.
     </p>
   </section>
@@ -463,7 +463,7 @@ data:
     <div class="svc"><code>print_separator</code><span>A single decorative rule</span></div>
 
     <h3>Preview &amp; calibration</h3>
-    <div class="svc"><code>preview_image</code> / <code>preview_box</code> / <code>preview_table</code><span>Render to a file on disk — no paper used</span></div>
+    <div class="svc"><code>preview_image</code> / <code>preview_box</code> / <code>preview_table</code><span>Render to a file on disk, no paper used</span></div>
     <div class="svc"><code>calibration_print</code><span>Ruler + threshold sweep strip for dialing in image settings</span></div>
 
     <h3>Control</h3>
@@ -474,7 +474,7 @@ data:
 
   <section id="blueprints">
     <h2>Blueprints</h2>
-    <p style="text-align:center;">13 ready-to-import scripts and automations — no YAML from scratch.</p>
+    <p style="text-align:center;">13 ready-to-import scripts and automations, no YAML from scratch.</p>
     <table class="bp">
       <tr><td>Shopping List</td><td>Print a todo entity as a bordered grocery list</td></tr>
       <tr><td>Daily Agenda</td><td>Today's calendar events at a fixed time each day</td></tr>
