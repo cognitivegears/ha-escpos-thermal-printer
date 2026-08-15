@@ -32,6 +32,7 @@ async def test_sample_print_composes_one_receipt(hass):  # type: ignore[no-untyp
     assert fake.image.called, "logo did not print"
     assert fake.qr.called, "QR did not print"
     assert fake.cut.called, "receipt was not cut"
+    assert fake.cut.call_args.kwargs.get("mode") == "FULL"
     # image (logo) must come before qr on the wire
     names = [c[0] for c in fake.method_calls]
     assert names.index("image") < names.index("qr")
@@ -50,3 +51,4 @@ async def test_sample_print_cut_mode_none_falls_back_to_full(hass):  # type: ign
     with patch("escpos.printer.Network", return_value=fake):
         await async_print_sample(hass, entry)
     assert fake.cut.called
+    assert fake.cut.call_args.kwargs.get("mode") == "FULL"
