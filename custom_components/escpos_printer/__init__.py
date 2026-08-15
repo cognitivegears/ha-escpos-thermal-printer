@@ -358,7 +358,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bo
             is_fixable=True,
             severity=ir.IssueSeverity.WARNING,
             translation_key="printer_not_calibrated",
-            translation_placeholders={"name": entry.title},
             data={"entry_id": entry.entry_id},
         )
 
