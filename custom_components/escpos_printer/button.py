@@ -12,6 +12,7 @@ from homeassistant.helpers.entity import DeviceInfo
 
 from .device import build_device_info
 from .sample_print import async_print_sample
+from .services._handler_utils import _wrap_unexpected
 
 if TYPE_CHECKING:
     from . import EscposConfigEntry
@@ -55,7 +56,15 @@ class _EscposButton(ButtonEntity):
         except HomeAssistantError:
             raise
         except Exception as err:
-            raise HomeAssistantError(f"Printer operation failed: {err.__class__.__name__}") from err
+            # Mirror the service-handler contract in _handler_utils._for_each_target:
+            # log the full traceback, then raise a sanitised HomeAssistantError so
+            # USB serials / BT MACs / local paths don't leak to the Frontend toast.
+            _LOGGER.exception(
+                "Button %s failed for entry %s",
+                self._attr_translation_key,
+                self._entry.entry_id,
+            )
+            raise _wrap_unexpected(err, str(self._attr_translation_key)) from err
 
     async def _press(self) -> None:
         raise NotImplementedError
