@@ -520,12 +520,11 @@
     },
     "printer_not_calibrated": {
       "title": "Printer not yet calibrated",
-      "description": "The optional calibration tool prints test pages to tune print width and character set for this printer and paper. Run it now, or ignore this — printing works without it.",
       "fix_flow": {
         "step": {
           "calibrate_confirm": {
             "title": "Calibrate printer",
-            "description": "This wizard prints a series of test pages to measure your printer's image implementation, paper width, characters per line, and character encoding — using roughly 15–20 cm of paper in total. Make sure paper is loaded before continuing.",
+            "description": "The optional calibration tool prints test pages to tune print width and character set for this printer and paper. Run it now, or ignore this — printing works without it.\n\nThis wizard prints a series of test pages to measure your printer's image implementation, paper width, characters per line, and character encoding — using roughly 15–20 cm of paper in total. Make sure paper is loaded before continuing.",
             "data": {
               "action": "Action"
             }
