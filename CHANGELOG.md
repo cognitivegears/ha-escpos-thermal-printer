@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Bisofice XGR-POS581 is now recognized in the printer model dropdown,
+  aliased to the bundled POS-5890 profile (hardware-verified via a user's
+  calibration report, #149): 384 px width, 32 columns, Epson-standard
+  codepage indices for CP858/CP1252/CP850/CP437.
 - Device page buttons: Feed paper, Cut paper, Beep, and Sample test print
   (a one-tap demo receipt with the integration logo, styled text, a table,
   and a QR code).

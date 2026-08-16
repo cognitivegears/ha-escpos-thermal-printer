@@ -23,9 +23,11 @@ escpos-php issues all searched):
   reverse-engineering projects, e.g. eliasweingaertner/peripage-A6-
   bluetooth). Note "MTP-3" is a GOOJPRT model, not PeriPage — a
   different, unverified device; don't conflate the two.
-- Symcode/Bisofice: CLOSED as unmappable — storefront brands over
-  mixed OEM hardware, no FCC identity of record; the generic profile
-  is the right answer for these.
+- Symcode/Bisofice: CLOSED as unmappable at the brand level — storefront
+  brands over mixed OEM hardware, no FCC identity of record; the generic
+  profile is the right answer for these. Exception: a specific SKU earns
+  an alias once hardware-verified via the calibration wizard (Bisofice
+  XGR-POS581, issue #149 — aliased below).
 (Resolved by this pass: TM-m10 — TRG-confirmed geometry, registered as
 its own profile in custom_profiles.py with a borrowed-and-flagged
 codepage table; Bixolon SRP-350III/352III and Citizen CT-S801/851 —
@@ -162,6 +164,12 @@ ALIAS_MODELS: dict[str, str] = {
     # Misc verified 58mm/384dot ESC/POS clones.
     "HOIN HOP-E58": "POS-5890",
     "Goojprt PT-210": "POS-5890",
+    # Bisofice XGR-POS581: hardware-verified via the HA calibration wizard
+    # (issue #149): 384 px / Font A 32 columns, and all four matched
+    # codepages (CP858/CP1252/CP850/CP437) sit at POS-5890's
+    # Epson-standard indices (19/16/2/0). Keyed to this one verified SKU;
+    # the Bisofice brand overall stays closed (see module docstring).
+    "Bisofice XGR-POS581": "POS-5890",
     "Netum NT-1809DD": "NT-5890K",
     # Sunmi: V1 same 58mm class as bundled Sunmi-V2; T2 built-in is
     # 80mm/576dots/203dpi per Sunmi docs.
