@@ -97,6 +97,12 @@ class EscposPrinterAdapterBase(
         self._status_interval: int = 0
         self._printer: Any = None
         self._lock = asyncio.Lock()
+        # Serializes get_paper_status() callers against each other (paper
+        # sensor + cover sensor poll independently but share one DLE EOT
+        # round trip). Deliberately separate from self._lock: that one
+        # gates real prints and must let a second status poller bail out
+        # immediately via _probe_lock_or_skip rather than queue behind it.
+        self._status_poll_lock = asyncio.Lock()
         self._cancel_status: Callable[[], None] | None = None
         self._status: bool | None = None
         self._status_listeners: list[Callable[[bool], None]] = []
@@ -267,9 +273,11 @@ class EscposPrinterAdapterBase(
         the paper sensor.
 
         If a print is in flight, returns the last known value instead of
-        contending for the transport.
+        contending for the transport. If another status poll (paper or
+        cover) is already in flight, this call waits for it instead of
+        racing it -- see ``_status_poll_lock``.
         """
-        async with self._probe_lock_or_skip() as acquired:
+        async with self._status_poll_lock, self._probe_lock_or_skip() as acquired:
             if not acquired:
                 _LOGGER.debug("Skipping paper status query; print in flight")
                 return self._last_paper_status
@@ -286,14 +294,37 @@ class EscposPrinterAdapterBase(
             try:
                 printer, owned = await self._acquire_printer_or_offline(hass)
                 # Reaching the printer at all is the reachability signal --
-                # notify here, not after the DLE EOT query below, so a
-                # printer that ignores/times out on paper-status (a real,
+                # notify here, not after the DLE EOT queries below, so a
+                # printer that ignores/times out on status queries (a real,
                 # known category -- see the docstring) stays stably Online
                 # instead of flapping every 5-minute poll (SCAN_INTERVAL
-                # in sensor.py) on that query alone.
+                # in sensor.py) on those queries alone.
                 await self._mark_success()
-                status = await hass.async_add_executor_job(printer.paper_status)
                 failed = False
+                # Query paper status ourselves instead of trusting
+                # python-escpos's paper_status(): it defaults an empty
+                # read to 2 ("plenty of paper"), which is a false "ok" on
+                # a printer/firmware that silently ignores DLE EOT --
+                # exactly the failure this sensor exists to surface.
+                # Parsed like the cover query below: its own try/except so
+                # one query failing doesn't take the other down with it.
+                try:
+                    raw_paper = await hass.async_add_executor_job(
+                        printer.query_status, b"\x10\x04\x04"
+                    )
+                    if not len(raw_paper):
+                        self._last_paper_status = None
+                    elif raw_paper[0] & 0b0110_0000:  # paper-end sensor
+                        self._last_paper_status = 0
+                    elif raw_paper[0] & 0b0000_1100:  # near-end sensor
+                        self._last_paper_status = 1
+                    else:
+                        self._last_paper_status = 2
+                except Exception as paper_err:
+                    _LOGGER.debug(
+                        "Paper status query failed: %s", sanitize_log_message(str(paper_err))
+                    )
+                    self._last_paper_status = None
                 try:
                     raw = await hass.async_add_executor_job(printer.query_status, b"\x10\x04\x02")
                     # DLE EOT n=2 bit 2 (0x04) = cover open. Empty read = unknown,
@@ -322,7 +353,6 @@ class EscposPrinterAdapterBase(
                     await self._release_printer(
                         hass, printer, owned=owned, failed=failed, notify_status=False
                     )
-            self._last_paper_status = int(status)
             return self._last_paper_status
 
     async def get_cover_status(self, hass: HomeAssistant) -> bool | None:

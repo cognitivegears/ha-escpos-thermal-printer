@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A printer that doesn't answer real-time status queries now shows paper
+  status as unknown instead of a false "ok". The paper sensor previously
+  trusted python-escpos's `paper_status()`, which defaults a zero-length
+  read to "plenty of paper" — silently hiding an out-of-paper condition on
+  a printer/firmware that ignores the query.
 - Clearing the preselected printer profile in the add-printer form (network
   discovery, USB, and Bluetooth) now actually stores the Generic
   (no-profile) choice. Previously the discovery suggestion was the schema
