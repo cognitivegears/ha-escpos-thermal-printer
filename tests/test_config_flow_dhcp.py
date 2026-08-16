@@ -51,6 +51,12 @@ async def _start_dhcp_flow(hass, can_connect=True, query_result=None, discovery=
         )
 
 
+def _profile_suggestion(result):
+    """The profile dropdown's suggested_value, or None if not suggested."""
+    marker = next(k for k in result["data_schema"].schema if k.schema == "profile")
+    return (marker.description or {}).get("suggested_value")
+
+
 async def test_dhcp_discovery_shows_network_form(hass):
     result = await _start_dhcp_flow(
         hass, query_result={"manufacturer": "EPSON", "model": "TM-T20II"}
@@ -69,8 +75,11 @@ async def test_dhcp_discovery_preselects_suggested_profile(hass):
     ):
         result = await _start_dhcp_flow(hass, query_result={"model": "TM-T20II"})
     assert result["step_id"] == "network"
+    # Preselection is a suggested_value, not a schema default: an omitted
+    # (cleared) field must fall back to Generic, not to the suggestion.
+    assert _profile_suggestion(result) == "TM-T20II"
     defaults = result["data_schema"]({"host": "192.168.10.157"})
-    assert defaults["profile"] == "TM-T20II"
+    assert defaults["profile"] == ""
 
 
 async def test_dhcp_discovery_unknown_model_keeps_auto_profile(hass):
@@ -79,6 +88,34 @@ async def test_dhcp_discovery_unknown_model_keeps_auto_profile(hass):
     result = await _start_dhcp_flow(hass, query_result={"model": "Mystery-9000"})
     defaults = result["data_schema"]({"host": "192.168.10.157"})
     assert defaults["profile"] == PROFILE_AUTO
+
+
+async def test_dhcp_discovery_cleared_profile_stays_generic(hass):
+    """Clearing the preselected profile must create a Generic (no-profile)
+    entry -- the frontend omits a cleared optional field, and a schema-level
+    default would silently reinstate the discovery suggestion."""
+    from custom_components.escpos_printer.capabilities import PROFILE_AUTO
+
+    with patch(
+        "custom_components.escpos_printer._config_flow.network_steps.suggest_profile",
+        return_value="TM-T20II",
+    ):
+        result = await _start_dhcp_flow(hass, query_result={"model": "TM-T20II"})
+        assert result["step_id"] == "network"
+
+        with patch(
+            "custom_components.escpos_printer._config_flow.network_steps._can_connect",
+            return_value=True,
+        ):
+            # No "profile" key: exactly what the frontend submits after the
+            # user clears the selector.
+            result = await hass.config_entries.flow.async_configure(
+                result["flow_id"], {"host": "192.168.10.157", "port": 9100}
+            )
+            result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["data"]["profile"] == PROFILE_AUTO
 
 
 async def test_dhcp_discovery_title_uses_detected_model(hass):
@@ -221,14 +258,16 @@ async def test_dhcp_discovery_end_to_end_creates_entry_with_detection(hass):
             hass, query_result={"manufacturer": "EPSON", "model": "TM-T20II"}
         )
         assert result["step_id"] == "network"
-        assert result["data_schema"]({"host": "192.168.10.157"})["profile"] == "TM-T20II"
+        assert _profile_suggestion(result) == "TM-T20II"
 
         with patch(
             "custom_components.escpos_printer._config_flow.network_steps._can_connect",
             return_value=True,
         ):
+            # The frontend submits the prefilled suggestion with the form.
             result = await hass.config_entries.flow.async_configure(
-                result["flow_id"], {"host": "192.168.10.157", "port": 9100}
+                result["flow_id"],
+                {"host": "192.168.10.157", "port": 9100, "profile": "TM-T20II"},
             )
             # Complete the codepage step with defaults to create the entry.
             result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
@@ -528,8 +567,7 @@ async def test_dhcp_discovery_rongta_clone_overrides_epson_emulation(hass):
 
     # The overridden identity ("RP820") resolves directly to the custom
     # RP820 profile -- not to the emulated TM-T88III.
-    defaults = result["data_schema"]({"host": "192.168.10.158"})
-    assert defaults["profile"] == "RP820"
+    assert _profile_suggestion(result) == "RP820"
 
     with patch(
         "custom_components.escpos_printer._config_flow.network_steps._can_connect",

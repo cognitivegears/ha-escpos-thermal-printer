@@ -161,7 +161,10 @@ class TestBluetoothSelectStep:
             result = await flow.async_step_bluetooth_select()
 
         profile_key = next(k for k in result["data_schema"].schema if k == CONF_PROFILE)
-        assert profile_key.default() == "NT-5890K"
+        # Suggested_value, not schema default: a cleared field must fall
+        # back to Generic, not have the suggestion reinstated.
+        assert profile_key.description["suggested_value"] == "NT-5890K"
+        assert profile_key.default() == PROFILE_AUTO
 
     @pytest.mark.asyncio
     async def test_select_generic_name_keeps_auto_profile(self, hass, mock_paired_devices):

@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Clearing the preselected printer profile in the add-printer form (network
+  discovery, USB, and Bluetooth) now actually stores the Generic
+  (no-profile) choice. Previously the discovery suggestion was the schema
+  default, so a cleared field was silently reinstated to the suggested
+  profile on submit. The suggestion is now a prefilled value only.
 - The "not yet calibrated" Repairs suggestion is no longer filed for
   printers whose selected profile already carries everything the wizard
   measures (image implementation, pixel width, font columns, and a

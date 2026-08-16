@@ -143,20 +143,20 @@ class NetworkFlowMixin:
         # Discovery flows ran the GS I query before this form is shown, so
         # the detected model can preselect the profile dropdown (preselect
         # only -- the user always confirms). Manual flows query on submit.
-        # Only preselect while the form's suggested host still equals the
-        # discovery host: once the user edits the host on an error
-        # redisplay, the detected model no longer describes that address.
-        default_profile = PROFILE_AUTO
-        suggested_host_matches_discovery = self._discovery_host and (
-            (user_input or {}).get(CONF_HOST, self._discovery_host) == self._discovery_host
-        )
-        detected_model = self._detected.get("model") if suggested_host_matches_discovery else None
-        if detected_model:
+        # The suggestion is a suggested_value, NOT a schema default: the
+        # frontend omits a cleared optional field, and a schema default
+        # would silently reinstate the suggestion the user just removed.
+        # On an error redisplay the user's submitted choice (including a
+        # cleared field) wins over the discovery suggestion.
+        suggested_profile = PROFILE_AUTO
+        if user_input is not None:
+            suggested_profile = user_input.get(CONF_PROFILE, PROFILE_AUTO)
+        elif self._discovery_host and self._detected.get("model"):
             suggestion = await self.hass.async_add_executor_job(
-                suggest_profile, detected_model, None, None
+                suggest_profile, self._detected["model"], None, None
             )
             if suggestion and suggestion in profile_choices:
-                default_profile = suggestion
+                suggested_profile = suggestion
 
         data_schema = vol.Schema(
             {
@@ -165,17 +165,22 @@ class NetworkFlowMixin:
                     vol.Coerce(int), vol.Range(min=1, max=65535)
                 ),
                 vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
-                vol.Optional(CONF_PROFILE, default=default_profile): vol.In(profile_choices),
+                vol.Optional(CONF_PROFILE, default=PROFILE_AUTO): vol.In(profile_choices),
             }
         )
         # Prefer the host the user just typed (on error redisplay) over the
         # original discovery suggestion, so a typo fix isn't clobbered back
         # to the discovered address. This also preserves a manually typed
         # host across an error redisplay on non-discovery flows.
+        suggested_values: dict[str, Any] = {}
         suggested_host = (user_input or {}).get(CONF_HOST) or self._discovery_host
         if suggested_host:
+            suggested_values[CONF_HOST] = suggested_host
+        if suggested_profile != PROFILE_AUTO:
+            suggested_values[CONF_PROFILE] = suggested_profile
+        if suggested_values:
             data_schema = self.add_suggested_values_to_schema(  # type: ignore[attr-defined]
-                data_schema, {CONF_HOST: suggested_host}
+                data_schema, suggested_values
             )
 
         return self.async_show_form(step_id="network", data_schema=data_schema, errors=errors)  # type: ignore[attr-defined,no-any-return]

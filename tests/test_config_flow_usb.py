@@ -236,7 +236,10 @@ class TestUsbStep:
             )
         schema = result["data_schema"].schema
         profile_key = next(k for k in schema if k.schema == CONF_PROFILE)
-        assert profile_key.default() == "TM-T20II"
+        # Suggested_value, not schema default: a cleared field must fall
+        # back to Generic, not have the suggestion reinstated.
+        assert profile_key.description["suggested_value"] == "TM-T20II"
+        assert profile_key.default() == ""
 
     @pytest.mark.asyncio
     async def test_usb_all_devices_preselects_suggested_profile(self, hass) -> None:
@@ -266,7 +269,8 @@ class TestUsbStep:
 
         schema = result["data_schema"].schema
         profile_key = next(k for k in schema if k.schema == CONF_PROFILE)
-        assert profile_key.default() == "TM-T20II"
+        assert profile_key.description["suggested_value"] == "TM-T20II"
+        assert profile_key.default() == ""
 
 
 class TestUsbManualStep:

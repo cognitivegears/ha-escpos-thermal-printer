@@ -170,8 +170,16 @@ class BluetoothFlowMixin:
         )
         profile_choices = await self.hass.async_add_executor_job(get_profile_choices_dict)
         default_device = next(iter(device_choices.keys()))
-        default_profile = await _suggest_bt_default_profile(
-            self.hass, self._paired_bt_devices, default_device, profile_choices
+        # Suggested_value rather than schema default so clearing the field
+        # sticks (the frontend omits cleared optional fields; a schema
+        # default would reinstate the suggestion). An error redisplay keeps
+        # the user's submitted choice instead.
+        suggested_profile = (
+            user_input.get(CONF_PROFILE, PROFILE_AUTO)
+            if user_input is not None
+            else await _suggest_bt_default_profile(
+                self.hass, self._paired_bt_devices, default_device, profile_choices
+            )
         )
 
         # Channel lives in a collapsed "Advanced options" section — almost
@@ -183,7 +191,7 @@ class BluetoothFlowMixin:
         schema_dict: dict[Any, Any] = {
             vol.Required(CONF_BT_DEVICE, default=default_device): vol.In(device_choices),
             vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
-            vol.Optional(CONF_PROFILE, default=default_profile): vol.In(profile_choices),
+            vol.Optional(CONF_PROFILE, default=PROFILE_AUTO): vol.In(profile_choices),
             vol.Required(SECTION_BT_ADVANCED): section(
                 vol.Schema(
                     {
@@ -193,7 +201,9 @@ class BluetoothFlowMixin:
                 {"collapsed": True},
             ),
         }
-        data_schema = vol.Schema(schema_dict)
+        data_schema = self.add_suggested_values_to_schema(  # type: ignore[attr-defined]
+            vol.Schema(schema_dict), {CONF_PROFILE: suggested_profile}
+        )
         return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
             step_id="bluetooth_select", data_schema=data_schema, errors=errors
         )

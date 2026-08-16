@@ -185,11 +185,19 @@ class UsbFlowMixin:
         # Build profile choices dynamically
         profile_choices = await self.hass.async_add_executor_job(get_profile_choices_dict)
 
-        # Preselect a suggested profile for the default (first) device.
+        # Preselect a suggested profile for the default (first) device, as a
+        # suggested_value rather than a schema default so clearing the field
+        # sticks (the frontend omits cleared optional fields; a schema
+        # default would reinstate the suggestion). An error redisplay keeps
+        # the user's submitted choice instead.
         # ponytail: suggestion follows the first discovered printer only;
         # re-computing per selected device would need a two-step flow.
-        default_profile = await _suggest_default_profile(
-            self.hass, self._discovered_printers, profile_choices
+        suggested_profile = (
+            user_input.get(CONF_PROFILE, PROFILE_AUTO)
+            if user_input is not None
+            else await _suggest_default_profile(
+                self.hass, self._discovered_printers, profile_choices
+            )
         )
 
         # _build_usb_device_choices always appends "__manual__", so
@@ -197,12 +205,15 @@ class UsbFlowMixin:
         default_device = (
             next(iter(device_choices.keys())) if self._discovered_printers else "__browse_all__"
         )
-        data_schema = vol.Schema(
-            {
-                vol.Required("usb_device", default=default_device): vol.In(device_choices),
-                vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
-                vol.Optional(CONF_PROFILE, default=default_profile): vol.In(profile_choices),
-            }
+        data_schema = self.add_suggested_values_to_schema(  # type: ignore[attr-defined]
+            vol.Schema(
+                {
+                    vol.Required("usb_device", default=default_device): vol.In(device_choices),
+                    vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
+                    vol.Optional(CONF_PROFILE, default=PROFILE_AUTO): vol.In(profile_choices),
+                }
+            ),
+            {CONF_PROFILE: suggested_profile},
         )
 
         return self.async_show_form(step_id="usb_select", data_schema=data_schema, errors=errors)  # type: ignore[attr-defined,no-any-return]
@@ -324,23 +335,29 @@ class UsbFlowMixin:
         # Build profile choices dynamically
         profile_choices = await self.hass.async_add_executor_job(get_profile_choices_dict)
 
-        # Preselect a suggested profile for the default (first) device.
+        # Preselect a suggested profile for the default (first) device, as a
+        # suggested_value for the same clear-must-stick reason as usb_select.
         # ponytail: suggestion follows the first discovered device only;
         # re-computing per selected device would need a two-step flow.
-        default_profile = await _suggest_default_profile(
-            self.hass, self._all_usb_devices, profile_choices
+        suggested_profile = (
+            user_input.get(CONF_PROFILE, PROFILE_AUTO)
+            if user_input is not None
+            else await _suggest_default_profile(self.hass, self._all_usb_devices, profile_choices)
         )
 
         # Show form with all USB devices - include endpoint configuration
         default_device = next(iter(device_choices.keys()))
-        data_schema = vol.Schema(
-            {
-                vol.Required("usb_device", default=default_device): vol.In(device_choices),
-                vol.Optional(CONF_IN_EP, default=DEFAULT_IN_EP): int,
-                vol.Optional(CONF_OUT_EP, default=DEFAULT_OUT_EP): int,
-                vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
-                vol.Optional(CONF_PROFILE, default=default_profile): vol.In(profile_choices),
-            }
+        data_schema = self.add_suggested_values_to_schema(  # type: ignore[attr-defined]
+            vol.Schema(
+                {
+                    vol.Required("usb_device", default=default_device): vol.In(device_choices),
+                    vol.Optional(CONF_IN_EP, default=DEFAULT_IN_EP): int,
+                    vol.Optional(CONF_OUT_EP, default=DEFAULT_OUT_EP): int,
+                    vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.Coerce(float),
+                    vol.Optional(CONF_PROFILE, default=PROFILE_AUTO): vol.In(profile_choices),
+                }
+            ),
+            {CONF_PROFILE: suggested_profile},
         )
 
         return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
