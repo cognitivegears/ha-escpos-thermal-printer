@@ -526,7 +526,7 @@ async def _send_image_slice(
 
     def _do(p: Any) -> None:
         if is_first and hasattr(p, "set"):
-            p.set(align=align_m, normal_textsize=True)
+            p.set(align=align_m, normal_textsize=True, invert=False)
         if not hasattr(p, "image"):
             p.text("[image printing not supported by this printer]\n")
             return

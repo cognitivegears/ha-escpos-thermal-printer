@@ -138,7 +138,7 @@ async def _qr_under_lock(
 
     def _do_print(printer_obj: Any) -> None:
         if hasattr(printer_obj, "set"):
-            printer_obj.set(align=align_m, normal_textsize=True)
+            printer_obj.set(align=align_m, normal_textsize=True, invert=False)
         printer_obj.qr(data, size=qsize, ec=_map_qr_ec(qec))
 
     await hass.async_add_executor_job(_do_print, printer)

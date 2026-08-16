@@ -129,6 +129,9 @@ async def test_print_qr_resets_text_size(hass):  # type: ignore[no-untyped-def]
     fake.set.assert_called_once()
     kw = fake.set.call_args.kwargs
     assert kw.get("normal_textsize") is True
+    # A prior print_text(invert=True) must not leak into the QR: escpos set()
+    # skips unpassed params, so this path must send invert=False explicitly.
+    assert kw.get("invert") is False
 
 
 async def test_print_text_invert_density_font(hass):  # type: ignore[no-untyped-def]

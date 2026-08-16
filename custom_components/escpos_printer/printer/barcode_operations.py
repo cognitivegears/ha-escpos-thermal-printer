@@ -119,7 +119,7 @@ class BarcodeOperationsMixin:
 
         def _do_print(printer: Any) -> None:
             if hasattr(printer, "set"):
-                printer.set(align=align_m, normal_textsize=True)
+                printer.set(align=align_m, normal_textsize=True, invert=False)
             kwargs: dict[str, Any] = {
                 "height": height_v,
                 "width": width_v,
