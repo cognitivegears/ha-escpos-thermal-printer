@@ -87,42 +87,55 @@ class PrintOperationsMixin:
         feed: int | None = 0,
     ) -> None:
         """Print a QR code to the printer."""
-        data = validate_qr_data(data)
-        align_m = map_align(align)
-        qsize = int(size) if size is not None else 3
-        qsize = max(1, min(16, qsize))
-        qec = (ec or "M").upper()
-        if qec not in ("L", "M", "Q", "H"):
-            qec = "M"
-
-        def _map_qr_ec(level: str) -> Any:
-            try:
-                from escpos import escpos as _esc  # noqa: PLC0415
-
-                return {
-                    "L": getattr(_esc, "QR_ECLEVEL_L", "L"),
-                    "M": getattr(_esc, "QR_ECLEVEL_M", "M"),
-                    "Q": getattr(_esc, "QR_ECLEVEL_Q", "Q"),
-                    "H": getattr(_esc, "QR_ECLEVEL_H", "H"),
-                }[level]
-            except Exception:
-                return level
-
-        def _do_print(printer: Any) -> None:
-            if hasattr(printer, "set"):
-                printer.set(align=align_m, normal_textsize=True)
-            printer.qr(data, size=qsize, ec=_map_qr_ec(qec))
-
         async with self._lock:
             printer, owned = await self._acquire_printer_or_offline(hass)
             failed = True
             try:
-                await hass.async_add_executor_job(_do_print, printer)
+                await _qr_under_lock(hass, printer, data=data, size=size, ec=ec, align=align)
                 await self._apply_cut_and_feed(hass, printer, cut, feed)
                 failed = False
             finally:
                 await self._release_printer(hass, printer, owned=owned, failed=failed)
         await self._mark_success()
+
+
+async def _qr_under_lock(
+    hass: HomeAssistant,
+    printer: Any,
+    *,
+    data: str,
+    size: int | None = None,
+    ec: str | None = None,
+    align: str | None = None,
+) -> None:
+    """Validate + print a QR on an already-acquired connection (lock held by caller)."""
+    data = validate_qr_data(data)
+    align_m = map_align(align)
+    qsize = int(size) if size is not None else 3
+    qsize = max(1, min(16, qsize))
+    qec = (ec or "M").upper()
+    if qec not in ("L", "M", "Q", "H"):
+        qec = "M"
+
+    def _map_qr_ec(level: str) -> Any:
+        try:
+            from escpos import escpos as _esc  # noqa: PLC0415
+
+            return {
+                "L": getattr(_esc, "QR_ECLEVEL_L", "L"),
+                "M": getattr(_esc, "QR_ECLEVEL_M", "M"),
+                "Q": getattr(_esc, "QR_ECLEVEL_Q", "Q"),
+                "H": getattr(_esc, "QR_ECLEVEL_H", "H"),
+            }[level]
+        except Exception:
+            return level
+
+    def _do_print(printer_obj: Any) -> None:
+        if hasattr(printer_obj, "set"):
+            printer_obj.set(align=align_m, normal_textsize=True)
+        printer_obj.qr(data, size=qsize, ec=_map_qr_ec(qec))
+
+    await hass.async_add_executor_job(_do_print, printer)
 
 
 # ---------------------------------------------------------------------------

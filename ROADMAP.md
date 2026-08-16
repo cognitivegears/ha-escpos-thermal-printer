@@ -6,20 +6,27 @@ entity-coverage analysis against HA platform conventions.
 
 ## Planned
 
-### 1. Button entities: Feed, Cut, Calibration print
+### 1. Button entities: Feed, Cut, Beep, Sample print — shipped
 
-The dashboard staples for a receipt printer: tap to advance paper before
-tearing, tap to cut, tap to print a test sheet when debugging alignment.
-Everything needed already exists: `adapter.feed()` / `adapter.cut()`
-(`printer/control_operations.py`) and the `calibration_print` service. Roughly
-three `ButtonEntity` subclasses reusing `build_device_info()`, plus `"button"`
-in `PLATFORMS`, icons, and strings. Beep as a fourth button is optional.
+Device page buttons ship: Feed, Cut, Beep, and Sample test print (a one-tap
+demo receipt with the integration logo, styled text, a table, and a QR
+code), backed by `adapter.feed()` / `adapter.cut()` / `adapter.beep()` and a
+new `sample_print.py` composer built on `batch_connection()`. A
+calibration-sheet button was deliberately **not** added — the new Settings →
+Repairs suggestion (below) already points users at the calibration wizard,
+and the `calibration_print` service remains for the dither/threshold test
+sheet.
+
+New printers also get a fixable Settings → Repairs issue
+("Printer not yet calibrated") that opens the calibration wizard directly,
+so it's discoverable without hunting through the integration's Configure
+menu. See [Calibration wizard](docs/calibration.md).
 
 ### 2. Cash drawer service — and the drawer-kick port as a "geek port"
 
 **Core functionality**: `open_cash_drawer` (python-escpos `cashdraw`, pin 2/5)
 plus a matching device action, and optionally a button entity alongside the
-planned Feed/Cut/Calibration buttons (item 1). The one classic POS capability
+shipped Feed/Cut/Beep/Sample buttons (item 1). The one classic POS capability
 entirely absent from the integration.
 
 **Investigation: general-purpose I/O.** The drawer-kick connector (RJ11/RJ12)

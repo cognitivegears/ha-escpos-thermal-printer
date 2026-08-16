@@ -4,8 +4,16 @@ A guided, print-and-answer wizard that measures four per-printer settings
 and saves them to the entry's options — no manual trial-and-error with the
 options form required.
 
-**Start it from:** Settings → Devices & Services → your printer entry →
-Configure → **"Calibrate printer (prints test pages)"**.
+## Starting the wizard
+
+Two entry points run the same wizard:
+
+- Settings → Devices & Services → your printer entry → Configure →
+  **"Calibrate printer (prints test pages)"**.
+- Settings → Repairs, if a **"Printer not yet calibrated"** suggestion is
+  showing — every printer starts without a saved calibration, so this
+  appears until you either run the wizard or dismiss (ignore) it.
+  Calibrating from either entry point clears the suggestion.
 
 > **Not the same as `calibration_print`.** The `escpos_printer.calibration_print`
 > service prints a one-off dither/threshold test sheet for tuning image

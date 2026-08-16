@@ -80,7 +80,7 @@ _LOGGER = logging.getLogger(__name__)
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
-PLATFORMS: list[str] = ["notify", "binary_sensor", "sensor"]
+PLATFORMS: list[str] = ["notify", "binary_sensor", "sensor", "button"]
 
 # Domain-level singleton flag for one-time service registration.
 # Per-entry state lives on entry.runtime_data (see EscposRuntimeData).
@@ -336,6 +336,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bo
     if os.environ.get("ESC_POS_DISABLE_PLATFORMS") == "1":
         platforms = []
     await hass.config_entries.async_forward_entry_setups(entry, platforms)
+
+    # Calibration nudge: one fixable Repairs issue per never-calibrated
+    # entry. "Calibrated" = any wizard-saved key present in options; the
+    # settings form writes the same keys, which is fine — a user who
+    # found the options flow doesn't need the pointer.
+    from homeassistant.helpers import issue_registry as ir  # noqa: PLC0415
+
+    calibrated = any(
+        key in entry.options
+        for key in (CONF_IMPL, CONF_WIDTH_PIXELS, CONF_LINE_WIDTH, CONF_CODEPAGE)
+    )
+    issue_id = f"printer_not_calibrated_{entry.entry_id}"
+    if calibrated:
+        ir.async_delete_issue(hass, DOMAIN, issue_id)
+    else:
+        ir.async_create_issue(
+            hass,
+            DOMAIN,
+            issue_id,
+            is_fixable=True,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key="printer_not_calibrated",
+            data={"entry_id": entry.entry_id},
+        )
+
     return True
 
 
@@ -390,6 +415,7 @@ async def async_remove_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> N
         profile = entry.options.get(CONF_PROFILE, entry.data.get(CONF_PROFILE))
         if profile:
             ir.async_delete_issue(hass, DOMAIN, f"profile_width_fallback_{profile}")
+        ir.async_delete_issue(hass, DOMAIN, f"printer_not_calibrated_{entry.entry_id}")
     except Exception as err:  # best effort
         _LOGGER.debug(
             "Could not clean up repair issues for entry %s: %s",
