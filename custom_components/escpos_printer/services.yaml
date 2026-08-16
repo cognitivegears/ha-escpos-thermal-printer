@@ -94,7 +94,9 @@ print_text_utf8:
         boolean: {}
     density:
       name: Density
-      description: Print darkness (0-8). The printer keeps the value until changed.
+      description: >-
+        Print density level (0-8). 5 is darkest; values above 5 step back
+        down. The printer keeps the value until changed.
       selector:
         number:
           min: 0
@@ -103,7 +105,9 @@ print_text_utf8:
           mode: slider
     font:
       name: Font
-      description: Printer font. Font B is smaller and fits more columns per line.
+      description: >-
+        Printer font. Font B is smaller and fits more columns per line —
+        raise the printer's configured line width to use the extra columns.
       default: "a"
       selector:
         select:
@@ -226,7 +230,9 @@ print_text:
         boolean: {}
     density:
       name: Density
-      description: Print darkness (0-8). The printer keeps the value until changed.
+      description: >-
+        Print density level (0-8). 5 is darkest; values above 5 step back
+        down. The printer keeps the value until changed.
       selector:
         number:
           min: 0
@@ -235,7 +241,9 @@ print_text:
           mode: slider
     font:
       name: Font
-      description: Printer font. Font B is smaller and fits more columns per line.
+      description: >-
+        Printer font. Font B is smaller and fits more columns per line —
+        raise the printer's configured line width to use the extra columns.
       default: "a"
       selector:
         select:
@@ -1867,7 +1875,9 @@ print_message:
         boolean: {}
     density:
       name: Density
-      description: Print darkness (0-8). The printer keeps the value until changed.
+      description: >-
+        Print density level (0-8). 5 is darkest; values above 5 step back
+        down. The printer keeps the value until changed.
       selector:
         number:
           min: 0
@@ -1876,7 +1886,9 @@ print_message:
           mode: slider
     font:
       name: Font
-      description: Printer font. Font B is smaller and fits more columns per line.
+      description: >-
+        Printer font. Font B is smaller and fits more columns per line —
+        raise the printer's configured line width to use the extra columns.
       default: "a"
       selector:
         select:

@@ -19,7 +19,9 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
-# Status updates are pushed by the adapter's status listener; no polling here.
+# EscposOnlineSensor's status updates are pushed by the adapter's status
+# listener, not polled -- EscposCoverOpenSensor below is the polled one
+# (see its own SCAN_INTERVAL note).
 PARALLEL_UPDATES = 0
 
 # EscposOnlineSensor is push; EscposCoverOpenSensor polls at the same

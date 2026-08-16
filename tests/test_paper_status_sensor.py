@@ -64,7 +64,7 @@ class _YieldingHass:
 
 
 def _query_status_by_mode(
-    *, paper: bytes = b"\x12", cover: bytes = b"\x00"
+    *, paper: bytes = b"\x12", cover: bytes = b"\x12"
 ) -> Callable[[bytes], bytes]:
     """MagicMock side_effect: return different bytes per DLE EOT mode byte.
 
@@ -222,6 +222,16 @@ async def test_cover_status_empty_response_is_unknown():
     adapter._connect = lambda: printer  # type: ignore[method-assign]
     assert await adapter.get_cover_status(_FakeHass()) is None
     assert adapter._last_paper_status is None
+
+
+async def test_cover_status_non_conformant_byte_is_unknown():
+    """A garbage byte (e.g. 0xFF) must not fire a false PROBLEM alarm."""
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+    adapter._status_query_ttl = 0
+    printer = MagicMock()
+    printer.query_status.side_effect = _query_status_by_mode(cover=b"\xff")
+    adapter._connect = lambda: printer  # type: ignore[method-assign]
+    assert await adapter.get_cover_status(_FakeHass()) is None
 
 
 async def test_cover_status_query_error_is_unknown_but_paper_survives():

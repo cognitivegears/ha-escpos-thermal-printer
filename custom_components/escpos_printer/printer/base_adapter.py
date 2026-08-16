@@ -53,6 +53,33 @@ def _get_usb_printer() -> type[Any]:
     return Usb  # type: ignore[no-any-return]
 
 
+# Real-time status byte protocol (DLE EOT n=2/n=4 replies): bits 1 and 4
+# are always set, bits 0 and 7 always clear. Shared by the paper and cover
+# parses below -- a reply failing this isn't the field it claims to be
+# (empty read, or a stale/misaligned byte from a keepalive socket buffer).
+_STATUS_BYTE_MASK = 0b1001_0011
+_STATUS_BYTE_FIXED = 0b0001_0010
+
+
+def _conformant_status_byte(raw: bytes) -> int | None:
+    """First byte of a DLE EOT reply, or ``None`` if empty/non-conformant."""
+    if not len(raw) or raw[0] & _STATUS_BYTE_MASK != _STATUS_BYTE_FIXED:
+        return None
+    return raw[0]
+
+
+def _paper_status_from_reply(raw: bytes) -> int | None:
+    """Parse a DLE EOT n=4 reply into 2=ok/1=low/0=out, or ``None`` if unusable."""
+    byte = _conformant_status_byte(raw)
+    if byte is None:
+        return None
+    if byte & 0b0110_0000:  # paper-end sensor
+        return 0
+    if byte & 0b0000_1100:  # near-end sensor
+        return 1
+    return 2
+
+
 def profile_width_issue_id(entry_id: str | None) -> str:
     """Build the per-entry repair-issue id for the profile-width fallback.
 
@@ -317,18 +344,11 @@ class EscposPrinterAdapterBase(
                     raw_paper = await hass.async_add_executor_job(
                         printer.query_status, b"\x10\x04\x04"
                     )
-                    # Fixed bits 1 and 4 must be set, 0 and 7 clear (real-time
-                    # status byte protocol) -- a null/misaligned read (e.g. a
-                    # stale byte from a keepalive socket buffer) fails this
-                    # and must not fall through to a false "ok".
-                    if not len(raw_paper) or raw_paper[0] & 0b1001_0011 != 0b0001_0010:
-                        self._last_paper_status = None
-                    elif raw_paper[0] & 0b0110_0000:  # paper-end sensor
-                        self._last_paper_status = 0
-                    elif raw_paper[0] & 0b0000_1100:  # near-end sensor
-                        self._last_paper_status = 1
-                    else:
-                        self._last_paper_status = 2
+                    self._last_paper_status = _paper_status_from_reply(raw_paper)
+                    if self._last_paper_status is None:
+                        _LOGGER.debug(
+                            "Paper status read rejected as non-conformant: %r", raw_paper
+                        )
                 except Exception as paper_err:
                     _LOGGER.debug(
                         "Paper status query failed: %s", sanitize_log_message(str(paper_err))
@@ -336,9 +356,16 @@ class EscposPrinterAdapterBase(
                     self._last_paper_status = None
                 try:
                     raw = await hass.async_add_executor_job(printer.query_status, b"\x10\x04\x02")
-                    # DLE EOT n=2 bit 2 (0x04) = cover open. Empty read = unknown,
-                    # never "closed": write-only/silent transports read b"".
-                    self._last_cover_status = bool(raw[0] & 0x04) if len(raw) else None
+                    # DLE EOT n=2 bit 2 (0x04) = cover open. Rejected as
+                    # unknown, never "closed": write-only/silent transports
+                    # read b"", and a garbage byte must not produce either
+                    # answer (false PROBLEM alarm or false all-clear).
+                    byte = _conformant_status_byte(raw)
+                    if byte is None:
+                        _LOGGER.debug("Cover status read rejected as non-conformant: %r", raw)
+                        self._last_cover_status = None
+                    else:
+                        self._last_cover_status = bool(byte & 0x04)
                 except Exception as cover_err:
                     _LOGGER.debug(
                         "Cover status query failed: %s", sanitize_log_message(str(cover_err))

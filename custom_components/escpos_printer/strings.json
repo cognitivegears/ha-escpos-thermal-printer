@@ -1502,7 +1502,7 @@
           "name": "Cut"
         },
         "density": {
-          "description": "Print darkness (0-8). The printer keeps the value until changed.",
+          "description": "Print density level (0-8). 5 is darkest; values above 5 step back down. The printer keeps the value until changed.",
           "name": "Density"
         },
         "encoding": {
@@ -1514,7 +1514,7 @@
           "name": "Feed Lines"
         },
         "font": {
-          "description": "Printer font. Font B is smaller and fits more columns per line.",
+          "description": "Printer font. Font B is smaller and fits more columns per line — raise the printer's configured line width to use the extra columns.",
           "name": "Font"
         },
         "height": {
@@ -1748,7 +1748,7 @@
           "name": "Cut"
         },
         "density": {
-          "description": "Print darkness (0-8). The printer keeps the value until changed.",
+          "description": "Print density level (0-8). 5 is darkest; values above 5 step back down. The printer keeps the value until changed.",
           "name": "Density"
         },
         "encoding": {
@@ -1760,7 +1760,7 @@
           "name": "Feed Lines"
         },
         "font": {
-          "description": "Printer font. Font B is smaller and fits more columns per line.",
+          "description": "Printer font. Font B is smaller and fits more columns per line — raise the printer's configured line width to use the extra columns.",
           "name": "Font"
         },
         "height": {
@@ -1906,7 +1906,7 @@
           "name": "Cut"
         },
         "density": {
-          "description": "Print darkness (0-8). The printer keeps the value until changed.",
+          "description": "Print density level (0-8). 5 is darkest; values above 5 step back down. The printer keeps the value until changed.",
           "name": "Density"
         },
         "feed": {
@@ -1914,7 +1914,7 @@
           "name": "Feed Lines"
         },
         "font": {
-          "description": "Printer font. Font B is smaller and fits more columns per line.",
+          "description": "Printer font. Font B is smaller and fits more columns per line — raise the printer's configured line width to use the extra columns.",
           "name": "Font"
         },
         "height": {

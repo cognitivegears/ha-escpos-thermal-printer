@@ -49,31 +49,33 @@ cash-drawer users (probably an "advanced" config option that renames the
 entities), and safety copy warning that pin voltage is 12/24 V solenoid drive,
 not logic-level.
 
-### 3. Text styling: `invert`, `density`, `font` on `print_text` / `print_message`
+### 3. Text styling: `invert`, `density`, `font` on `print_text` / `print_message` — shipped
 
-The library's `set()` already accepts white-on-black (`invert`), print darkness
-0–8 (`density`), and font A/B (`font`, B = smaller/more columns); the adapter
-just doesn't surface them. Additive schema fields alongside the existing
-`bold`/`underline`/`width`/`height`.
+`invert` (white-on-black), `density` (0–8), and `font` (A/B) are now additive
+schema fields on `print_text`, `print_text_utf8`, and `print_message`, next to
+the existing `bold`/`underline`/`width`/`height`, applied through the
+library's `set()` and scoped so `invert` doesn't leak into a following QR,
+barcode, or image print on the same connection.
 
-### 4. Cover-open / error binary_sensor
+### 4. Cover-open / error binary_sensor — shipped
 
-Cover-open is the second-most-common printer fault after paper-out, and the
-DLE EOT n=2 transmit-status query works on the same transports as the existing
-paper sensor (network + USB). Implementation notes:
+A `binary_sensor.<printer>_cover_open` entity reports a stuck-open cover for
+network and USB printers, backed by the DLE EOT n=2 real-time query. It folds
+into the existing paper sensor's connection (`base_adapter.get_paper_status()`)
+behind a shared 60-second freshness guard, so the two pollers share one round
+trip instead of opening a second connection. A zero-length or non-conformant
+response (missing the real-time-status byte's fixed bits) is treated as
+*unknown*, never "OK"/"closed" — python-escpos's own paper-status default
+would otherwise report a false all-clear on a printer that ignores or
+garbles the query.
 
-- Fold the query into the existing 5-minute paper poll's connection
-  (`base_adapter.get_paper_status()`); do not open a second connection.
-- Treat a zero-length response as *unknown*, never "OK": python-escpos
-  interprets an empty read as a healthy status, so a silent printer would
-  otherwise report a false all-clear.
+### 5. Last-print timestamp sensor — shipped
 
-### 5. Last-print timestamp sensor
-
-`SensorDeviceClass.TIMESTAMP` enabling "no receipt printed today" automations.
-Needs a new `_last_print` field set only in the print paths: the existing
-`_last_ok` is also updated by status probes, so it means "last successful
-operation", not "last print".
+`sensor.<printer>_last_print` (`SensorDeviceClass.TIMESTAMP`) enables "no
+receipt printed today" automations. Distinct from the Online sensor's
+`last_ok`, which status probes also refresh — this is set only by the print
+paths (text, QR, barcode, image, batch), and stays unknown until the first
+print after a restart (not persisted).
 
 ### 6. Print confirmation for network printers
 
