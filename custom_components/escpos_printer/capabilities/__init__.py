@@ -28,6 +28,7 @@ from .features import (
     get_profile_info,
     pick_impl,
     profile_declares_no_images,
+    profile_provides_calibration,
     profile_supports_feature,
 )
 from .line_widths import get_all_line_widths, get_profile_line_widths
@@ -74,6 +75,7 @@ __all__ = [
     "normalize_model",
     "pick_impl",
     "profile_declares_no_images",
+    "profile_provides_calibration",
     "profile_supports_feature",
     "register_custom_profiles",
     "resolve_alias",

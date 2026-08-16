@@ -568,6 +568,7 @@ class EscposPrinterAdapterBase(
         except ImportError:
             return
         profile_name = getattr(self._config, "profile", None) or "default"
+        entry = hass.config_entries.async_get_entry(self.entry_id) if self.entry_id else None
         try:
             ir.async_create_issue(
                 hass,
@@ -577,6 +578,7 @@ class EscposPrinterAdapterBase(
                 severity=ir.IssueSeverity.WARNING,
                 translation_key="profile_width_fallback",
                 translation_placeholders={
+                    "name": entry.title if entry else "ESC/POS printer",
                     "profile": profile_name,
                     "fallback": str(FALLBACK_PROFILE_WIDTH),
                 },

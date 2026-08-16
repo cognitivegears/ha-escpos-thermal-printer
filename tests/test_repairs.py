@@ -15,7 +15,7 @@ _STRINGS_PATH = (
 )
 _APPROVED_PREFIX = (
     "The optional calibration tool prints test pages to tune print width and "
-    "character set for this printer and paper. Run it now, or ignore this — "
+    "character set for “{name}” and its paper. Run it now, or ignore this — "
     "printing works without it.\n\n"
 )
 
@@ -45,11 +45,28 @@ async def test_uncalibrated_entry_raises_issue(hass):  # type: ignore[no-untyped
     assert issue is not None
     assert issue.is_fixable
     assert issue.translation_key == "printer_not_calibrated"
+    assert issue.translation_placeholders == {"name": entry.title}
 
 
 async def test_calibrated_entry_has_no_issue(hass):  # type: ignore[no-untyped-def]
     entry = await _setup_entry(hass, options={CONF_LINE_WIDTH: 42})
     assert _issue(hass, entry) is None
+
+
+async def test_full_profile_entry_has_no_issue(hass):  # type: ignore[no-untyped-def]
+    """A profile carrying impl/width/columns/codepages makes the wizard optional."""
+    from custom_components.escpos_printer.const import CONF_PROFILE
+
+    entry = await _setup_entry(hass, options={CONF_PROFILE: "RP820"})
+    assert _issue(hass, entry) is None
+
+
+async def test_generic_profile_entry_still_gets_issue(hass):  # type: ignore[no-untyped-def]
+    """The generic 'default' profile lacks wizard-equivalent data — keep the nudge."""
+    from custom_components.escpos_printer.const import CONF_PROFILE
+
+    entry = await _setup_entry(hass, options={CONF_PROFILE: "default"})
+    assert _issue(hass, entry) is not None
 
 
 async def test_issue_cleared_after_calibration_reload(hass):  # type: ignore[no-untyped-def]
@@ -87,7 +104,9 @@ def test_fix_flow_strings_match_options_counterparts() -> None:
     for key, step in fix_flow["step"].items():
         counterpart = options["step"][key]
         if key == "calibrate_confirm":
-            assert step["title"] == counterpart["title"]
+            # Title deliberately names the printer — repairs has no device
+            # context, unlike the options flow.
+            assert step["title"] == "Calibrate “{name}”"
             assert step["data"] == counterpart["data"]
             assert step["description"] == _APPROVED_PREFIX + counterpart["description"]
         else:

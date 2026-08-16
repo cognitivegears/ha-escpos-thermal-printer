@@ -152,7 +152,11 @@ class CalibrationFlowMixin:
             }
         )
         return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
-            step_id="calibrate_confirm", data_schema=schema
+            step_id="calibrate_confirm",
+            data_schema=schema,
+            # Used by the repairs fix-flow strings to name the printer; the
+            # options-flow strings ignore it (already in device context).
+            description_placeholders={"name": self.config_entry.title},
         )
 
     def _calibration_adapter(self) -> Any | None:

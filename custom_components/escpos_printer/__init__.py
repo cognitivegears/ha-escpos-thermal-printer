@@ -18,6 +18,7 @@ from .capabilities import (
     is_valid_profile,
     pick_impl,
     profile_declares_no_images,
+    profile_provides_calibration,
 )
 from .const import (
     CONF_ALLOW_LOCAL_IMAGE_URLS,
@@ -340,13 +341,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bo
     # Calibration nudge: one fixable Repairs issue per never-calibrated
     # entry. "Calibrated" = any wizard-saved key present in options; the
     # settings form writes the same keys, which is fine — a user who
-    # found the options flow doesn't need the pointer.
+    # found the options flow doesn't need the pointer. A known profile
+    # that already carries everything the wizard measures counts too.
     from homeassistant.helpers import issue_registry as ir  # noqa: PLC0415
 
     calibrated = any(
         key in entry.options
         for key in (CONF_IMPL, CONF_WIDTH_PIXELS, CONF_LINE_WIDTH, CONF_CODEPAGE)
-    )
+    ) or await hass.async_add_executor_job(profile_provides_calibration, shared["profile"])
     issue_id = f"printer_not_calibrated_{entry.entry_id}"
     if calibrated:
         ir.async_delete_issue(hass, DOMAIN, issue_id)
@@ -358,6 +360,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bo
             is_fixable=True,
             severity=ir.IssueSeverity.WARNING,
             translation_key="printer_not_calibrated",
+            translation_placeholders={"name": entry.title},
             data={"entry_id": entry.entry_id},
         )
 

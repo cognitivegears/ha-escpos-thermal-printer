@@ -149,6 +149,40 @@ def pick_impl(profile_key: str | None) -> str | None:
     return None
 
 
+def profile_provides_calibration(profile_key: str | None) -> bool:
+    """True when a known profile already supplies everything the wizard measures.
+
+    The calibration wizard determines four values: image implementation,
+    paper width in pixels, characters per line, and character encoding.
+    A profile that carries all four (image feature flags, media width,
+    font column counts, and a codePages table) makes the wizard optional,
+    so the not-yet-calibrated Repairs nudge is skipped. Auto/custom/
+    unknown profiles return False.
+    """
+    profile = get_profile_info(profile_key)
+    if not profile:
+        return False
+    if pick_impl(profile_key) is None:
+        return False
+    try:
+        pixels = profile["media"]["width"]["pixels"]
+    except (KeyError, TypeError):
+        return False
+    if not isinstance(pixels, (int, float)):
+        return False
+    from .line_widths import _MIN_PLAUSIBLE_COLUMNS  # noqa: PLC0415
+
+    fonts = profile.get("fonts", {})
+    has_columns = any(
+        isinstance(font, dict)
+        and isinstance(font.get("columns"), int)
+        and font["columns"] >= _MIN_PLAUSIBLE_COLUMNS
+        for font in fonts.values()
+    )
+    code_pages = set(profile.get("codePages", {}).values()) - {"Unknown", ""}
+    return has_columns and bool(code_pages)
+
+
 def profile_declares_no_images(profile_key: str | None) -> bool:
     """True when a known profile explicitly declares no image support."""
     features = get_profile_features(profile_key)

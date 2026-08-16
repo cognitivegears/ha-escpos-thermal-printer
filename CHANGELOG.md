@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- The "not yet calibrated" Repairs suggestion is no longer filed for
+  printers whose selected profile already carries everything the wizard
+  measures (image implementation, pixel width, font columns, and a
+  codepage table). Generic, custom, and incomplete profiles still get
+  the nudge.
+- Repairs issues now name the printer they refer to: the "not yet
+  calibrated" suggestion and the profile-width fallback warning both show
+  the config entry's title in their heading, and the calibration fix-flow
+  dialog names the printer being calibrated. Previously, with multiple
+  printers, identical "Printer not yet calibrated" entries were
+  indistinguishable.
+
 ## [1.2.0] - 2026-08-15
 
 ### Added

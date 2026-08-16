@@ -515,16 +515,16 @@
   },
   "issues": {
     "profile_width_fallback": {
-      "title": "Printer profile is missing the pixel width",
+      "title": "Printer profile for “{name}” is missing the pixel width",
       "description": "The selected printer profile ({profile}) does not expose `media.width.pixels`, so images are being scaled to a generic {fallback}px width. This is usually correct for 58 mm thermals but may print stretched or truncated on 80 mm printers.\n\n**To fix:** open the integration's options and set “Paper width in pixels” (384 for 58 mm, 576 for 80 mm printers), pick a closer matching printer profile, or set `image_width` explicitly in your service calls."
     },
     "printer_not_calibrated": {
-      "title": "Printer not yet calibrated",
+      "title": "Printer “{name}” not yet calibrated",
       "fix_flow": {
         "step": {
           "calibrate_confirm": {
-            "title": "Calibrate printer",
-            "description": "The optional calibration tool prints test pages to tune print width and character set for this printer and paper. Run it now, or ignore this — printing works without it.\n\nThis wizard prints a series of test pages to measure your printer's image implementation, paper width, characters per line, and character encoding — using roughly 15–20 cm of paper in total. Make sure paper is loaded before continuing.",
+            "title": "Calibrate “{name}”",
+            "description": "The optional calibration tool prints test pages to tune print width and character set for “{name}” and its paper. Run it now, or ignore this — printing works without it.\n\nThis wizard prints a series of test pages to measure your printer's image implementation, paper width, characters per line, and character encoding — using roughly 15–20 cm of paper in total. Make sure paper is loaded before continuing.",
             "data": {
               "action": "Action"
             }
