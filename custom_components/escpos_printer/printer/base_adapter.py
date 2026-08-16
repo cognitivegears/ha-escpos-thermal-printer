@@ -312,7 +312,11 @@ class EscposPrinterAdapterBase(
                     raw_paper = await hass.async_add_executor_job(
                         printer.query_status, b"\x10\x04\x04"
                     )
-                    if not len(raw_paper):
+                    # Fixed bits 1 and 4 must be set, 0 and 7 clear (real-time
+                    # status byte protocol) -- a null/misaligned read (e.g. a
+                    # stale byte from a keepalive socket buffer) fails this
+                    # and must not fall through to a false "ok".
+                    if not len(raw_paper) or raw_paper[0] & 0b1001_0011 != 0b0001_0010:
                         self._last_paper_status = None
                     elif raw_paper[0] & 0b0110_0000:  # paper-end sensor
                         self._last_paper_status = 0

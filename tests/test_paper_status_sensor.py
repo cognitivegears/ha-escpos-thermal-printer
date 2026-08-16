@@ -129,7 +129,7 @@ async def test_paper_sensor_unique_id_is_per_entry():
 async def test_adapter_get_paper_status_success():
     adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
     printer = MagicMock()
-    printer.query_status.side_effect = _query_status_by_mode(paper=b"\x0c")  # near-end -> "low"
+    printer.query_status.side_effect = _query_status_by_mode(paper=b"\x1e")  # near-end -> "low"
     adapter._connect = lambda: printer  # type: ignore[method-assign]
     assert await adapter.get_paper_status(_FakeHass()) == 1
     printer.close.assert_called_once()
@@ -141,6 +141,19 @@ async def test_paper_status_empty_response_is_unknown():
     adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
     printer = MagicMock()
     printer.query_status.return_value = b""
+    adapter._connect = lambda: printer  # type: ignore[method-assign]
+    assert await adapter.get_paper_status(_FakeHass()) is None
+
+
+async def test_paper_status_non_conformant_byte_is_unknown():
+    """A reply missing the real-time-status byte's fixed bits (1 and 4) is unknown.
+
+    Not just an empty read -- e.g. a null or stale/misaligned byte left over
+    in a keepalive socket buffer must not fall through to a false "ok".
+    """
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+    printer = MagicMock()
+    printer.query_status.return_value = b"\x00"
     adapter._connect = lambda: printer  # type: ignore[method-assign]
     assert await adapter.get_paper_status(_FakeHass()) is None
 
@@ -219,7 +232,7 @@ async def test_cover_status_query_error_is_unknown_but_paper_survives():
 
     def _side_effect(mode: bytes) -> bytes:
         if mode == b"\x10\x04\x04":
-            return b"\x0c"  # near-end sensor -> "low"
+            return b"\x1e"  # near-end sensor -> "low"
         raise RuntimeError("no response")
 
     printer.query_status.side_effect = _side_effect
@@ -268,7 +281,7 @@ async def test_concurrent_status_polls_share_one_query_round_trip():
     """
     adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
     printer = MagicMock()
-    printer.query_status.side_effect = _query_status_by_mode(paper=b"\x0c", cover=b"\x16")
+    printer.query_status.side_effect = _query_status_by_mode(paper=b"\x1e", cover=b"\x16")
     adapter._connect = lambda: printer  # type: ignore[method-assign]
 
     hass = _YieldingHass()
