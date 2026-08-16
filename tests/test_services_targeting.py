@@ -9,9 +9,14 @@ Covers:
 
 from unittest.mock import MagicMock, patch
 
+from homeassistant.components.notify import DOMAIN as NOTIFY_DOMAIN
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import floor_registry as fr
+from homeassistant.helpers import label_registry as lr
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 import voluptuous as vol
@@ -41,6 +46,36 @@ def _get_device_id_for_entry(hass, entry: MockConfigEntry) -> str:  # type: igno
     )
     assert device is not None
     return device.id
+
+
+def _get_notify_entity_id_for_entry(hass, entry: MockConfigEntry) -> str:  # type: ignore[no-untyped-def]
+    """Return the notify entity registered for this entry (unit tests enable the notify platform)."""
+    registry = er.async_get(hass)
+    entity = next(
+        (
+            e
+            for e in registry.entities.values()
+            if e.domain == NOTIFY_DOMAIN and e.config_entry_id == entry.entry_id
+        ),
+        None,
+    )
+    assert entity is not None
+    return entity.entity_id
+
+
+def _network_side_effect(fakes_by_host: dict):  # type: ignore[no-untyped-def]
+    """Return an ``escpos.printer.Network`` side_effect routing by host.
+
+    ``NetworkPrinterAdapter._connect`` calls ``Network(host, port=..., ...)``
+    with ``host`` positional -- keying the returned mock by ``args[0]`` lets
+    a test assert exactly one of two printers was actually written to,
+    rather than relying on a shared mock's aggregate call count.
+    """
+
+    def _side_effect(*args, **_kwargs):  # type: ignore[no-untyped-def]
+        return fakes_by_host[args[0]]
+
+    return _side_effect
 
 
 async def test_print_text_utf8_service_transcodes(hass):  # type: ignore[no-untyped-def]
@@ -325,7 +360,7 @@ async def test_omitted_target_with_two_entries_warns_once(hass, caplog):  # type
                 {"text": "Hello"},
                 blocking=True,
             )
-    warnings = [r for r in caplog.records if "no device_id specified" in r.message]
+    warnings = [r for r in caplog.records if "no target specified" in r.message]
     assert len(warnings) == 1
     assert "print_text" in warnings[0].message
     assert "2" in warnings[0].message
@@ -343,8 +378,227 @@ async def test_omitted_target_with_one_entry_does_not_warn(hass, caplog):  # typ
                 {"text": "Hello"},
                 blocking=True,
             )
-    warnings = [r for r in caplog.records if "no device_id specified" in r.message]
+    warnings = [r for r in caplog.records if "no target specified" in r.message]
     assert not warnings
+
+
+# ---------------------------------------------------------------------------
+# HA target-picker keys (entity_id/area_id/floor_id/label_id): populated by
+# a service's `target:` block (services.yaml) via HA core's device/entity
+# picker, resolved through async_extract_config_entry_ids in
+# target_resolution._async_get_target_entries_from_targets.
+# ---------------------------------------------------------------------------
+
+
+async def test_entity_id_target_resolves_to_printer_entry(hass):  # type: ignore[no-untyped-def]
+    """entity_id targeting one printer's notify entity prints only that printer."""
+    e1 = await _setup_entry(hass, "1.1.1.1")
+    await _setup_entry(hass, "2.2.2.2")
+    entity1 = _get_notify_entity_id_for_entry(hass, e1)
+
+    fake1, fake2 = MagicMock(), MagicMock()
+    with patch(
+        "escpos.printer.Network",
+        side_effect=_network_side_effect({"1.1.1.1": fake1, "2.2.2.2": fake2}),
+    ):
+        await hass.services.async_call(
+            DOMAIN,
+            "print_text",
+            {"text": "Hello", "entity_id": entity1},
+            blocking=True,
+        )
+    assert fake1.text.called
+    assert not fake2.text.called
+
+
+async def test_area_id_target_resolves_to_printer_entry(hass):  # type: ignore[no-untyped-def]
+    """area_id targeting one printer's device area prints only that printer."""
+    e1 = await _setup_entry(hass, "1.1.1.1")
+    await _setup_entry(hass, "2.2.2.2")
+    d1 = _get_device_id_for_entry(hass, e1)
+
+    area_registry = ar.async_get(hass)
+    area = area_registry.async_create("Kitchen")
+    device_registry = dr.async_get(hass)
+    device_registry.async_update_device(d1, area_id=area.id)
+
+    fake1, fake2 = MagicMock(), MagicMock()
+    with patch(
+        "escpos.printer.Network",
+        side_effect=_network_side_effect({"1.1.1.1": fake1, "2.2.2.2": fake2}),
+    ):
+        await hass.services.async_call(
+            DOMAIN,
+            "print_text",
+            {"text": "Hello", "area_id": area.id},
+            blocking=True,
+        )
+    assert fake1.text.called
+    assert not fake2.text.called
+
+
+async def test_floor_id_target_resolves_to_printer_entry(hass):  # type: ignore[no-untyped-def]
+    """floor_id targeting one printer's device (via its area) prints only that printer."""
+    e1 = await _setup_entry(hass, "1.1.1.1")
+    await _setup_entry(hass, "2.2.2.2")
+    d1 = _get_device_id_for_entry(hass, e1)
+
+    floor_registry = fr.async_get(hass)
+    floor = floor_registry.async_create("Upstairs")
+    area_registry = ar.async_get(hass)
+    area = area_registry.async_create("Bedroom", floor_id=floor.floor_id)
+    device_registry = dr.async_get(hass)
+    device_registry.async_update_device(d1, area_id=area.id)
+
+    fake1, fake2 = MagicMock(), MagicMock()
+    with patch(
+        "escpos.printer.Network",
+        side_effect=_network_side_effect({"1.1.1.1": fake1, "2.2.2.2": fake2}),
+    ):
+        await hass.services.async_call(
+            DOMAIN,
+            "print_text",
+            {"text": "Hello", "floor_id": floor.floor_id},
+            blocking=True,
+        )
+    assert fake1.text.called
+    assert not fake2.text.called
+
+
+async def test_label_id_target_resolves_to_printer_entry(hass):  # type: ignore[no-untyped-def]
+    """label_id assigned to one printer's device prints only that printer."""
+    e1 = await _setup_entry(hass, "1.1.1.1")
+    await _setup_entry(hass, "2.2.2.2")
+    d1 = _get_device_id_for_entry(hass, e1)
+
+    label_registry = lr.async_get(hass)
+    label = label_registry.async_create("Receipts")
+    device_registry = dr.async_get(hass)
+    device_registry.async_update_device(d1, labels={label.label_id})
+
+    fake1, fake2 = MagicMock(), MagicMock()
+    with patch(
+        "escpos.printer.Network",
+        side_effect=_network_side_effect({"1.1.1.1": fake1, "2.2.2.2": fake2}),
+    ):
+        await hass.services.async_call(
+            DOMAIN,
+            "print_text",
+            {"text": "Hello", "label_id": label.label_id},
+            blocking=True,
+        )
+    assert fake1.text.called
+    assert not fake2.text.called
+
+
+async def test_target_resolving_to_not_loaded_entry_warns_and_prints_loaded(hass, caplog):  # type: ignore[no-untyped-def]
+    """A target spanning a not-loaded and a loaded printer warns but still prints the loaded one."""
+    e1 = await _setup_entry(hass, "1.1.1.1")
+    e2 = await _setup_entry(hass, "2.2.2.2")
+    d1 = _get_device_id_for_entry(hass, e1)
+    d2 = _get_device_id_for_entry(hass, e2)
+
+    label_registry = lr.async_get(hass)
+    label = label_registry.async_create("Receipts")
+    device_registry = dr.async_get(hass)
+    device_registry.async_update_device(d1, labels={label.label_id})
+    device_registry.async_update_device(d2, labels={label.label_id})
+
+    assert await hass.config_entries.async_unload(e1.entry_id)
+    await hass.async_block_till_done()
+
+    fake2 = MagicMock()
+    with patch("escpos.printer.Network", return_value=fake2):
+        with caplog.at_level("WARNING"):
+            await hass.services.async_call(
+                DOMAIN,
+                "print_text",
+                {"text": "Hello", "label_id": label.label_id},
+                blocking=True,
+            )
+    assert fake2.text.called
+    warnings = [r for r in caplog.records if "not currently loaded" in r.message]
+    assert len(warnings) == 1
+
+
+async def test_target_resolving_only_to_not_loaded_entries_raises(hass):  # type: ignore[no-untyped-def]
+    """A target resolving only to not-loaded printer(s) raises ServiceValidationError."""
+    e1 = await _setup_entry(hass, "1.1.1.1")
+    # A second, unrelated loaded entry keeps the service registered after e1 unloads.
+    await _setup_entry(hass, "2.2.2.2")
+    d1 = _get_device_id_for_entry(hass, e1)
+
+    area_registry = ar.async_get(hass)
+    area = area_registry.async_create("Attic")
+    device_registry = dr.async_get(hass)
+    device_registry.async_update_device(d1, area_id=area.id)
+
+    assert await hass.config_entries.async_unload(e1.entry_id)
+    await hass.async_block_till_done()
+
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN,
+            "print_text",
+            {"text": "Hello", "area_id": area.id},
+            blocking=True,
+        )
+
+
+async def test_device_id_and_entity_id_union_prints_both(hass):  # type: ignore[no-untyped-def]
+    """A legacy `device_id` plus a picker `entity_id` union: both printers print."""
+    e1 = await _setup_entry(hass, "1.1.1.1")
+    e2 = await _setup_entry(hass, "2.2.2.2")
+    d1 = _get_device_id_for_entry(hass, e1)
+    entity2 = _get_notify_entity_id_for_entry(hass, e2)
+
+    fake1, fake2 = MagicMock(), MagicMock()
+    with patch(
+        "escpos.printer.Network",
+        side_effect=_network_side_effect({"1.1.1.1": fake1, "2.2.2.2": fake2}),
+    ):
+        await hass.services.async_call(
+            DOMAIN,
+            "print_text",
+            {"text": "Hello", "device_id": d1, "entity_id": entity2},
+            blocking=True,
+        )
+    assert fake1.text.called
+    assert fake2.text.called
+
+
+async def test_target_referencing_no_escpos_printer_raises(hass):  # type: ignore[no-untyped-def]
+    """A target that resolves to no ESC/POS printer config entry raises ServiceValidationError.
+
+    An empty area (no devices assigned) is a target the picker helper can
+    resolve without error but that carries no printer -- the same outcome
+    as an entity_id/area_id belonging entirely to other integrations.
+    """
+    await _setup_entry(hass)
+    area_registry = ar.async_get(hass)
+    empty_area = area_registry.async_create("Empty Room")
+
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN,
+            "print_text",
+            {"text": "Hello", "area_id": empty_area.id},
+            blocking=True,
+        )
+
+
+async def test_broadcast_with_entity_id_rejected_by_schema(hass):  # type: ignore[no-untyped-def]
+    """`broadcast: true` + `entity_id` is a schema-layer validation error, like device_id."""
+    entry = await _setup_entry(hass)
+    entity_id = _get_notify_entity_id_for_entry(hass, entry)
+
+    with pytest.raises(vol.Invalid):
+        await hass.services.async_call(
+            DOMAIN,
+            "print_text",
+            {"text": "Hello", "entity_id": entity_id, "broadcast": True},
+            blocking=True,
+        )
 
 
 async def test_preview_omitted_target_with_two_entries_does_not_warn(hass, caplog):  # type: ignore[no-untyped-def]
@@ -367,5 +621,5 @@ async def test_preview_omitted_target_with_two_entries_does_not_warn(hass, caplo
                     blocking=True,
                     return_response=True,
                 )
-    warnings = [r for r in caplog.records if "no device_id specified" in r.message]
+    warnings = [r for r in caplog.records if "no target specified" in r.message]
     assert not warnings

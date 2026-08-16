@@ -1,6 +1,6 @@
 # Services
 
-The integration registers these services. All printer services accept a `device_id` for targeting, plus a `broadcast: true` flag to explicitly print to every configured printer (`broadcast` and `device_id` are mutually exclusive). Omitting both also prints to all printers (kept for backward compatibility), but logs a warning when more than one printer is configured. See [multi-printer.md](multi-printer.md).
+The integration registers these services. All printer services accept Home Assistant's standard `target:` block (devices, entities, areas, floors, labels — new in 1.2.0) and continue to accept the legacy `device_id` field in `data:` — existing automations need no changes. A `broadcast: true` flag explicitly prints to every configured printer (`broadcast` and any target are mutually exclusive). Omitting both also prints to all printers, but that implicit fallback is deprecated and will be removed in 2.0.0 — logging a warning when more than one printer is configured until then. See [multi-printer.md](multi-printer.md).
 
 ## escpos_printer.print_text
 
@@ -249,8 +249,8 @@ choose a `dither` mode and `threshold` for `print_image`.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| device_id | string\|list | Target printer(s); omit to print to all (warns with several printers) |
-| broadcast | boolean | Explicitly print to all printers (mutually exclusive with device_id) |
+| device_id | string\|list | Legacy target field; the standard target picker (device/entity/area/floor/label) also works. Omit to print to all (deprecated fallback, warns with several printers) |
+| broadcast | boolean | Explicitly print to all printers (mutually exclusive with any target: device/entity/area/floor/label) |
 | cut | string | `none`, `partial`, `full` (default `full`) |
 | feed | int | Lines to feed after printing (default 2) |
 

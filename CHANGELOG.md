@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-08-15
+
+### Added
+
+- Print services can now be targeted by entity, area, floor, or label — in
+  addition to device — via Home Assistant's standard `target:` block, and
+  now appear in the entity/device "Add to… → Create as a new action"
+  picker. `calibration_print` is included. Existing `device_id` and
+  `broadcast` fields keep working unchanged; no migration is needed.
+
+### Changed
+
+- A legacy `device_id` in `data:` combined with a picker target (entity,
+  area, floor, or label) unions the two — every printer either resolves to
+  gets printed. Automations created in the UI before 1.2.0 stored
+  `device_id` inside `data:` rather than the newer `target:` block, so
+  their editor now shows an empty target picker; the call still works
+  unchanged.
+
+### Deprecated
+
+- The implicit broadcast-when-no-target fallback (omitting both a target
+  and `broadcast`) is deprecated; it will be removed in 2.0.0. Select a
+  target or set `broadcast: true` instead.
+
 ## [1.1.0] - 2026-08-14
 
 ### Added
@@ -1583,7 +1608,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 Earlier releases: see git history.
 
-[Unreleased]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.8.0...v1.0.0
 [0.8.0]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.7.4...v0.8.0

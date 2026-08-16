@@ -1,22 +1,19 @@
 print_text_utf8:
   name: Print Text (UTF-8)
-  description: Print UTF-8 text with automatic transcoding to printer codepage. Select one or more printer devices as the target.
+  description: Print UTF-8 text with automatic transcoding to printer codepage. Select a target — printer device, entity, area, floor, or label. If no target is selected, prints to every configured printer (deprecated fallback).
+  target:
+    entity:
+      domain: notify
+      integration: escpos_printer
   fields:
-    device_id:
-      name: Device
-      description: Select one or more printer devices (if omitted, broadcasts to all printers)
-      required: false
-      selector:
-        device:
-          integration: escpos_printer
     broadcast:
       name: Broadcast
       description: >
         Explicitly print to every configured printer. Mutually exclusive
-        with device_id. Omitting both device_id and broadcast also targets
-        all printers (kept for backward compatibility), but logs a warning
-        when more than one printer is configured — set broadcast: true to
-        make the intent explicit and silence it.
+        with any target (device, entity, area, floor, or label). Omitting
+        both a target and broadcast also prints to all printers, but that
+        implicit fallback is deprecated and will be removed in 2.0.0 —
+        select a target or set broadcast: true.
       default: false
       selector:
         boolean: {}
@@ -111,23 +108,20 @@ print_text_utf8:
 
 print_text:
   name: Print Text (Raw Encoding)
-  description: Print text to the ESC/POS printer using raw encoding. Select one or more printer devices as the target.
+  description: Print text to the ESC/POS printer using raw encoding. Select a target — printer device, entity, area, floor, or label. If no target is selected, prints to every configured printer (deprecated fallback).
+  target:
+    entity:
+      domain: notify
+      integration: escpos_printer
   fields:
-    device_id:
-      name: Device
-      description: Select one or more printer devices (if omitted, broadcasts to all printers)
-      required: false
-      selector:
-        device:
-          integration: escpos_printer
     broadcast:
       name: Broadcast
       description: >
         Explicitly print to every configured printer. Mutually exclusive
-        with device_id. Omitting both device_id and broadcast also targets
-        all printers (kept for backward compatibility), but logs a warning
-        when more than one printer is configured — set broadcast: true to
-        make the intent explicit and silence it.
+        with any target (device, entity, area, floor, or label). Omitting
+        both a target and broadcast also prints to all printers, but that
+        implicit fallback is deprecated and will be removed in 2.0.0 —
+        select a target or set broadcast: true.
       default: false
       selector:
         boolean: {}
@@ -231,23 +225,20 @@ print_text:
 
 print_qr:
   name: Print QR Code
-  description: Print a QR code. Select one or more printer devices as the target.
+  description: Print a QR code. Select a target — printer device, entity, area, floor, or label. If no target is selected, prints to every configured printer (deprecated fallback).
+  target:
+    entity:
+      domain: notify
+      integration: escpos_printer
   fields:
-    device_id:
-      name: Device
-      description: Select one or more printer devices (if omitted, broadcasts to all printers)
-      required: false
-      selector:
-        device:
-          integration: escpos_printer
     broadcast:
       name: Broadcast
       description: >
         Explicitly print to every configured printer. Mutually exclusive
-        with device_id. Omitting both device_id and broadcast also targets
-        all printers (kept for backward compatibility), but logs a warning
-        when more than one printer is configured — set broadcast: true to
-        make the intent explicit and silence it.
+        with any target (device, entity, area, floor, or label). Omitting
+        both a target and broadcast also prints to all printers, but that
+        implicit fallback is deprecated and will be removed in 2.0.0 —
+        select a target or set broadcast: true.
       default: false
       selector:
         boolean: {}
@@ -316,23 +307,20 @@ print_image:
     renders it before the service call is dispatched — but the field itself
     is a plain string, not evaluated server-side. For a friendlier UI, prefer
     the focused services (Print Image from URL, from Path, Camera Snapshot,
-    Image Entity) — see docs/images.md.
+    Image Entity) — see docs/images.md. If no target is selected, prints to every configured printer (deprecated fallback).
+  target:
+    entity:
+      domain: notify
+      integration: escpos_printer
   fields:
-    device_id:
-      name: Device
-      description: Select one or more printer devices (if omitted, broadcasts to all printers).
-      required: false
-      selector:
-        device:
-          integration: escpos_printer
     broadcast:
       name: Broadcast
       description: >
         Explicitly print to every configured printer. Mutually exclusive
-        with device_id. Omitting both device_id and broadcast also targets
-        all printers (kept for backward compatibility), but logs a warning
-        when more than one printer is configured — set broadcast: true to
-        make the intent explicit and silence it.
+        with any target (device, entity, area, floor, or label). Omitting
+        both a target and broadcast also prints to all printers, but that
+        implicit fallback is deprecated and will be removed in 2.0.0 —
+        select a target or set broadcast: true.
       default: false
       selector:
         boolean: {}
@@ -516,23 +504,20 @@ print_image_url:
   name: Print Image from URL
   description: >
     Print an image fetched from an HTTP(S) URL. SSRF-aware — private,
-    loopback, and link-local addresses are refused.
+    loopback, and link-local addresses are refused. If no target is selected, prints to every configured printer (deprecated fallback).
+  target:
+    entity:
+      domain: notify
+      integration: escpos_printer
   fields:
-    device_id:
-      name: Device
-      description: Select one or more printer devices (if omitted, broadcasts to all printers).
-      required: false
-      selector:
-        device:
-          integration: escpos_printer
     broadcast:
       name: Broadcast
       description: >
         Explicitly print to every configured printer. Mutually exclusive
-        with device_id. Omitting both device_id and broadcast also targets
-        all printers (kept for backward compatibility), but logs a warning
-        when more than one printer is configured — set broadcast: true to
-        make the intent explicit and silence it.
+        with any target (device, entity, area, floor, or label). Omitting
+        both a target and broadcast also prints to all printers, but that
+        implicit fallback is deprecated and will be removed in 2.0.0 —
+        select a target or set broadcast: true.
       default: false
       selector:
         boolean: {}
@@ -715,23 +700,20 @@ print_image_path:
     Print an image from a local file path. The path must lie inside one
     of Home Assistant's allowlist_external_dirs (typically /config or
     /media — add directories under homeassistant -> allowlist_external_dirs
-    in configuration.yaml if needed).
+    in configuration.yaml if needed). If no target is selected, prints to every configured printer (deprecated fallback).
+  target:
+    entity:
+      domain: notify
+      integration: escpos_printer
   fields:
-    device_id:
-      name: Device
-      description: Select one or more printer devices (if omitted, broadcasts to all printers).
-      required: false
-      selector:
-        device:
-          integration: escpos_printer
     broadcast:
       name: Broadcast
       description: >
         Explicitly print to every configured printer. Mutually exclusive
-        with device_id. Omitting both device_id and broadcast also targets
-        all printers (kept for backward compatibility), but logs a warning
-        when more than one printer is configured — set broadcast: true to
-        make the intent explicit and silence it.
+        with any target (device, entity, area, floor, or label). Omitting
+        both a target and broadcast also prints to all printers, but that
+        implicit fallback is deprecated and will be removed in 2.0.0 —
+        select a target or set broadcast: true.
       default: false
       selector:
         boolean: {}
@@ -912,23 +894,20 @@ print_camera_snapshot:
   name: Print Camera Snapshot
   description: >
     Print a live snapshot from a camera entity. Convenience wrapper around
-    print_image with a camera-entity selector for a friendlier UI.
+    print_image with a camera-entity selector for a friendlier UI. If no target is selected, prints to every configured printer (deprecated fallback).
+  target:
+    entity:
+      domain: notify
+      integration: escpos_printer
   fields:
-    device_id:
-      name: Device
-      description: Select one or more printer devices (if omitted, broadcasts to all printers).
-      required: false
-      selector:
-        device:
-          integration: escpos_printer
     broadcast:
       name: Broadcast
       description: >
         Explicitly print to every configured printer. Mutually exclusive
-        with device_id. Omitting both device_id and broadcast also targets
-        all printers (kept for backward compatibility), but logs a warning
-        when more than one printer is configured — set broadcast: true to
-        make the intent explicit and silence it.
+        with any target (device, entity, area, floor, or label). Omitting
+        both a target and broadcast also prints to all printers, but that
+        implicit fallback is deprecated and will be removed in 2.0.0 —
+        select a target or set broadcast: true.
       default: false
       selector:
         boolean: {}
@@ -1110,23 +1089,20 @@ print_image_entity:
   name: Print Image Entity
   description: >
     Print the current frame from an HA image entity (weather radar, ML
-    overlay, generated chart, etc).
+    overlay, generated chart, etc). If no target is selected, prints to every configured printer (deprecated fallback).
+  target:
+    entity:
+      domain: notify
+      integration: escpos_printer
   fields:
-    device_id:
-      name: Device
-      description: Select one or more printer devices (if omitted, broadcasts to all printers).
-      required: false
-      selector:
-        device:
-          integration: escpos_printer
     broadcast:
       name: Broadcast
       description: >
         Explicitly print to every configured printer. Mutually exclusive
-        with device_id. Omitting both device_id and broadcast also targets
-        all printers (kept for backward compatibility), but logs a warning
-        when more than one printer is configured — set broadcast: true to
-        make the intent explicit and silence it.
+        with any target (device, entity, area, floor, or label). Omitting
+        both a target and broadcast also prints to all printers, but that
+        implicit fallback is deprecated and will be removed in 2.0.0 —
+        select a target or set broadcast: true.
       default: false
       selector:
         boolean: {}
@@ -1447,23 +1423,21 @@ calibration_print:
     Print a calibration sheet — a pixel ruler plus a threshold sweep
     strip — for tuning image dither/threshold settings (not the printer
     calibration wizard — see the Calibration docs page). Burns ~10 cm
-    of paper.
+    of paper. If no target is selected, prints to every configured
+    printer (deprecated fallback).
+  target:
+    entity:
+      domain: notify
+      integration: escpos_printer
   fields:
-    device_id:
-      name: Device
-      description: Printer device.
-      required: false
-      selector:
-        device:
-          integration: escpos_printer
     broadcast:
       name: Broadcast
       description: >
         Explicitly print to every configured printer. Mutually exclusive
-        with device_id. Omitting both device_id and broadcast also targets
-        all printers (kept for backward compatibility), but logs a warning
-        when more than one printer is configured — set broadcast: true to
-        make the intent explicit and silence it.
+        with any target (device, entity, area, floor, or label). Omitting
+        both a target and broadcast also prints to all printers, but that
+        implicit fallback is deprecated and will be removed in 2.0.0 —
+        select a target or set broadcast: true.
       default: false
       selector:
         boolean: {}
@@ -1489,23 +1463,20 @@ calibration_print:
 
 print_barcode:
   name: Print Barcode
-  description: Print a barcode. Select one or more printer devices as the target.
+  description: Print a barcode. Select a target — printer device, entity, area, floor, or label. If no target is selected, prints to every configured printer (deprecated fallback).
+  target:
+    entity:
+      domain: notify
+      integration: escpos_printer
   fields:
-    device_id:
-      name: Device
-      description: Select one or more printer devices (if omitted, broadcasts to all printers)
-      required: false
-      selector:
-        device:
-          integration: escpos_printer
     broadcast:
       name: Broadcast
       description: >
         Explicitly print to every configured printer. Mutually exclusive
-        with device_id. Omitting both device_id and broadcast also targets
-        all printers (kept for backward compatibility), but logs a warning
-        when more than one printer is configured — set broadcast: true to
-        make the intent explicit and silence it.
+        with any target (device, entity, area, floor, or label). Omitting
+        both a target and broadcast also prints to all printers, but that
+        implicit fallback is deprecated and will be removed in 2.0.0 —
+        select a target or set broadcast: true.
       default: false
       selector:
         boolean: {}
@@ -1648,23 +1619,20 @@ print_barcode:
 
 feed:
   name: Feed Paper
-  description: Feed the paper a number of lines. Select one or more printer devices as the target.
+  description: Feed the paper a number of lines. Select a target — printer device, entity, area, floor, or label. If no target is selected, prints to every configured printer (deprecated fallback).
+  target:
+    entity:
+      domain: notify
+      integration: escpos_printer
   fields:
-    device_id:
-      name: Device
-      description: Select one or more printer devices (if omitted, broadcasts to all printers)
-      required: false
-      selector:
-        device:
-          integration: escpos_printer
     broadcast:
       name: Broadcast
       description: >
         Explicitly print to every configured printer. Mutually exclusive
-        with device_id. Omitting both device_id and broadcast also targets
-        all printers (kept for backward compatibility), but logs a warning
-        when more than one printer is configured — set broadcast: true to
-        make the intent explicit and silence it.
+        with any target (device, entity, area, floor, or label). Omitting
+        both a target and broadcast also prints to all printers, but that
+        implicit fallback is deprecated and will be removed in 2.0.0 —
+        select a target or set broadcast: true.
       default: false
       selector:
         boolean: {}
@@ -1681,23 +1649,20 @@ feed:
 
 cut:
   name: Cut Paper
-  description: Cut the paper. Select one or more printer devices as the target.
+  description: Cut the paper. Select a target — printer device, entity, area, floor, or label. If no target is selected, prints to every configured printer (deprecated fallback).
+  target:
+    entity:
+      domain: notify
+      integration: escpos_printer
   fields:
-    device_id:
-      name: Device
-      description: Select one or more printer devices (if omitted, broadcasts to all printers)
-      required: false
-      selector:
-        device:
-          integration: escpos_printer
     broadcast:
       name: Broadcast
       description: >
         Explicitly print to every configured printer. Mutually exclusive
-        with device_id. Omitting both device_id and broadcast also targets
-        all printers (kept for backward compatibility), but logs a warning
-        when more than one printer is configured — set broadcast: true to
-        make the intent explicit and silence it.
+        with any target (device, entity, area, floor, or label). Omitting
+        both a target and broadcast also prints to all printers, but that
+        implicit fallback is deprecated and will be removed in 2.0.0 —
+        select a target or set broadcast: true.
       default: false
       selector:
         boolean: {}
@@ -1722,23 +1687,20 @@ cut:
 
 beep:
   name: Beep
-  description: Trigger the printer buzzer (if supported). Select one or more printer devices as the target.
+  description: Trigger the printer buzzer (if supported). Select a target — printer device, entity, area, floor, or label. If no target is selected, prints to every configured printer (deprecated fallback).
+  target:
+    entity:
+      domain: notify
+      integration: escpos_printer
   fields:
-    device_id:
-      name: Device
-      description: Select one or more printer devices (if omitted, broadcasts to all printers)
-      required: false
-      selector:
-        device:
-          integration: escpos_printer
     broadcast:
       name: Broadcast
       description: >
         Explicitly print to every configured printer. Mutually exclusive
-        with device_id. Omitting both device_id and broadcast also targets
-        all printers (kept for backward compatibility), but logs a warning
-        when more than one printer is configured — set broadcast: true to
-        make the intent explicit and silence it.
+        with any target (device, entity, area, floor, or label). Omitting
+        both a target and broadcast also prints to all printers, but that
+        implicit fallback is deprecated and will be removed in 2.0.0 —
+        select a target or set broadcast: true.
       default: false
       selector:
         boolean: {}
@@ -2021,23 +1983,22 @@ print_message:
 
 print_box:
   name: Print Box
-  description: Print text wrapped in a printable border (single/double/ASCII glyphs).
+  description: >-
+    Print text wrapped in a printable border (single/double/ASCII glyphs).
+    If no target is selected, prints to every configured printer (deprecated fallback).
+  target:
+    entity:
+      domain: notify
+      integration: escpos_printer
   fields:
-    device_id:
-      name: Device
-      description: Select one or more printer devices (if omitted, broadcasts to all printers).
-      required: false
-      selector:
-        device:
-          integration: escpos_printer
     broadcast:
       name: Broadcast
       description: >
         Explicitly print to every configured printer. Mutually exclusive
-        with device_id. Omitting both device_id and broadcast also targets
-        all printers (kept for backward compatibility), but logs a warning
-        when more than one printer is configured — set broadcast: true to
-        make the intent explicit and silence it.
+        with any target (device, entity, area, floor, or label). Omitting
+        both a target and broadcast also prints to all printers, but that
+        implicit fallback is deprecated and will be removed in 2.0.0 —
+        select a target or set broadcast: true.
       default: false
       selector:
         boolean: {}
@@ -2121,23 +2082,22 @@ print_box:
 
 print_table:
   name: Print Table
-  description: Print a multi-column table (receipt-style) with optional borders and header.
+  description: >-
+    Print a multi-column table (receipt-style) with optional borders and
+    header. If no target is selected, prints to every configured printer (deprecated fallback).
+  target:
+    entity:
+      domain: notify
+      integration: escpos_printer
   fields:
-    device_id:
-      name: Device
-      description: Select one or more printer devices (if omitted, broadcasts to all printers).
-      required: false
-      selector:
-        device:
-          integration: escpos_printer
     broadcast:
       name: Broadcast
       description: >
         Explicitly print to every configured printer. Mutually exclusive
-        with device_id. Omitting both device_id and broadcast also targets
-        all printers (kept for backward compatibility), but logs a warning
-        when more than one printer is configured — set broadcast: true to
-        make the intent explicit and silence it.
+        with any target (device, entity, area, floor, or label). Omitting
+        both a target and broadcast also prints to all printers, but that
+        implicit fallback is deprecated and will be removed in 2.0.0 —
+        select a target or set broadcast: true.
       default: false
       selector:
         boolean: {}
@@ -2231,23 +2191,20 @@ print_text_image:
     and arbitrary point size. The rendered image is printed through the
     same dither/threshold pipeline as print_image. Use this when you need
     bigger or styled text than the printer's built-in 32-column font can
-    produce.
+    produce. If no target is selected, prints to every configured printer (deprecated fallback).
+  target:
+    entity:
+      domain: notify
+      integration: escpos_printer
   fields:
-    device_id:
-      name: Device
-      description: Select one or more printer devices (if omitted, broadcasts to all printers).
-      required: false
-      selector:
-        device:
-          integration: escpos_printer
     broadcast:
       name: Broadcast
       description: >
         Explicitly print to every configured printer. Mutually exclusive
-        with device_id. Omitting both device_id and broadcast also targets
-        all printers (kept for backward compatibility), but logs a warning
-        when more than one printer is configured — set broadcast: true to
-        make the intent explicit and silence it.
+        with any target (device, entity, area, floor, or label). Omitting
+        both a target and broadcast also prints to all printers, but that
+        implicit fallback is deprecated and will be removed in 2.0.0 —
+        select a target or set broadcast: true.
       default: false
       selector:
         boolean: {}
@@ -2436,23 +2393,20 @@ print_separator:
   description: >
     Print a single decorative rule built by repeating one character to
     fill the printer's line width. Examples — "-" for a single rule,
-    "=" for a heavy rule, "*" or "_" for decorative bars.
+    "=" for a heavy rule, "*" or "_" for decorative bars. If no target is selected, prints to every configured printer (deprecated fallback).
+  target:
+    entity:
+      domain: notify
+      integration: escpos_printer
   fields:
-    device_id:
-      name: Device
-      description: Select one or more printer devices (if omitted, broadcasts to all printers).
-      required: false
-      selector:
-        device:
-          integration: escpos_printer
     broadcast:
       name: Broadcast
       description: >
         Explicitly print to every configured printer. Mutually exclusive
-        with device_id. Omitting both device_id and broadcast also targets
-        all printers (kept for backward compatibility), but logs a warning
-        when more than one printer is configured — set broadcast: true to
-        make the intent explicit and silence it.
+        with any target (device, entity, area, floor, or label). Omitting
+        both a target and broadcast also prints to all printers, but that
+        implicit fallback is deprecated and will be removed in 2.0.0 —
+        select a target or set broadcast: true.
       default: false
       selector:
         boolean: {}
@@ -2506,23 +2460,20 @@ print_kvtable:
   description: >
     Print a two-column label/value table — receipt totals, sensor
     readings, ingredient lists. Labels left-aligned, values per
-    "value_align" (default right).
+    "value_align" (default right). If no target is selected, prints to every configured printer (deprecated fallback).
+  target:
+    entity:
+      domain: notify
+      integration: escpos_printer
   fields:
-    device_id:
-      name: Device
-      description: Select one or more printer devices (if omitted, broadcasts to all printers).
-      required: false
-      selector:
-        device:
-          integration: escpos_printer
     broadcast:
       name: Broadcast
       description: >
         Explicitly print to every configured printer. Mutually exclusive
-        with device_id. Omitting both device_id and broadcast also targets
-        all printers (kept for backward compatibility), but logs a warning
-        when more than one printer is configured — set broadcast: true to
-        make the intent explicit and silence it.
+        with any target (device, entity, area, floor, or label). Omitting
+        both a target and broadcast also prints to all printers, but that
+        implicit fallback is deprecated and will be removed in 2.0.0 —
+        select a target or set broadcast: true.
       default: false
       selector:
         boolean: {}

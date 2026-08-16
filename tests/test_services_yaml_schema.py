@@ -355,6 +355,32 @@ def test_preview_image_schema_optional_output_path():  # type: ignore[no-untyped
     assert out2["output_path"] == "/tmp/p.png"  # noqa: S108
 
 
+# ---------------------------------------------------------------------------
+# Target-picker keys (entity_id/area_id/floor_id/label_id): HA core merges
+# these into call.data when a service declares `target:`. The schemas must
+# accept them (str or [str]) and keep them mutually exclusive with
+# broadcast, same as device_id.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("key", ["entity_id", "area_id", "floor_id", "label_id"])
+@pytest.mark.parametrize("shape", ["single", "list"])
+def test_print_text_schema_accepts_target_picker_keys(key, shape):  # type: ignore[no-untyped-def]
+    from custom_components.escpos_printer.services.schemas import PRINT_TEXT_SCHEMA
+
+    value = "abc123" if shape == "single" else ["abc123", "def456"]
+    out = PRINT_TEXT_SCHEMA({"text": "hi", key: value})
+    assert out[key] == value
+
+
+@pytest.mark.parametrize("key", ["entity_id", "area_id"])
+def test_print_text_schema_rejects_broadcast_with_target_key(key):  # type: ignore[no-untyped-def]
+    from custom_components.escpos_printer.services.schemas import PRINT_TEXT_SCHEMA
+
+    with pytest.raises(vol.Invalid):
+        PRINT_TEXT_SCHEMA({"text": "hi", "broadcast": True, key: "abc123"})
+
+
 def test_calibration_print_schema_defaults():  # type: ignore[no-untyped-def]
     from custom_components.escpos_printer.services.schemas import (
         CALIBRATION_PRINT_SCHEMA,
@@ -679,6 +705,69 @@ def test_no_unquoted_hash_in_plain_scalar_descriptions() -> None:
         "value at YAML-parse time — quote the description or use a '>' "
         "folded scalar:\n  " + "\n  ".join(offenders)
     )
+
+
+# ---------------------------------------------------------------------------
+# target: block declaration (1.2.0) -- lets these services be offered from
+# the entity/device "create as a new action" picker while keeping device_id
+# fully supported for backward compatibility.
+# ---------------------------------------------------------------------------
+
+_TARGETED_SERVICES = frozenset(
+    {
+        "print_text_utf8",
+        "print_text",
+        "print_qr",
+        "print_image",
+        "print_image_url",
+        "print_image_path",
+        "print_camera_snapshot",
+        "print_image_entity",
+        "print_barcode",
+        "print_box",
+        "print_table",
+        "print_text_image",
+        "print_separator",
+        "print_kvtable",
+        "feed",
+        "cut",
+        "beep",
+        "calibration_print",
+    }
+)
+
+_UNTARGETED_WITH_DEVICE_ID = frozenset({"preview_image", "preview_box", "preview_table"})
+
+# Entity-only filter: hassfest rejects device filters on a service target
+# ("use a device selector instead"); devices are still pickable in the UI
+# via their notify entity, matching print_message's long-standing block.
+_EXPECTED_TARGET_BLOCK = {
+    "entity": {"domain": "notify", "integration": "escpos_printer"},
+}
+
+
+def test_services_declare_target_and_drop_device_id_field() -> None:
+    """The 18 automation-facing services declare `target:` and no longer
+    duplicate device selection as a `device_id` field; the three preview_*
+    services (SupportsResponse.ONLY) keep the old device_id field and stay
+    target-less.
+    """
+    services = _load_services_yaml()
+    assert _TARGETED_SERVICES | _UNTARGETED_WITH_DEVICE_ID | {"print_message"} <= set(services)
+    for svc in _TARGETED_SERVICES:
+        svc_def = services[svc]
+        assert svc_def.get("target") == _EXPECTED_TARGET_BLOCK, (
+            f"{svc}.target missing or wrong: {svc_def.get('target')!r}"
+        )
+        assert "device_id" not in svc_def.get("fields", {}), (
+            f"{svc}.fields still declares device_id; the target picker replaces it"
+        )
+    for svc in _UNTARGETED_WITH_DEVICE_ID:
+        svc_def = services[svc]
+        assert "target" not in svc_def, f"{svc} unexpectedly declares target"
+        assert "device_id" in svc_def.get("fields", {}), (
+            f"{svc}.fields must keep device_id (not offered as an automation action)"
+        )
 
 
 def test_icons_json_services_match_services_yaml() -> None:
