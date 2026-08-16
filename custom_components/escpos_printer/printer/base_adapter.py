@@ -8,6 +8,7 @@ from collections.abc import AsyncIterator, Callable
 import contextlib
 import logging
 import textwrap
+import time
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from homeassistant.core import HomeAssistant
@@ -104,6 +105,13 @@ class EscposPrinterAdapterBase(
         self._last_error: Any = None
         self._last_latency_ms: int | None = None
         self._last_paper_status: int | None = None
+        self._last_cover_status: bool | None = None
+        # One DLE EOT connection serves both the paper and cover pollers: a
+        # repeat call inside this window returns cached values instead of
+        # opening a second connection. ponytail: fixed 60s window; make it
+        # configurable only if a real cadence complaint shows up.
+        self._status_query_ttl: float = 60.0
+        self._last_status_query: float | None = None
         self._last_error_reason: str | None = None
         self._last_error_errno: int | None = None
         self._cached_profile_width: int | None = None
@@ -265,6 +273,13 @@ class EscposPrinterAdapterBase(
             if not acquired:
                 _LOGGER.debug("Skipping paper status query; print in flight")
                 return self._last_paper_status
+            now = time.monotonic()
+            if (
+                self._last_status_query is not None
+                and now - self._last_status_query < self._status_query_ttl
+            ):
+                return self._last_paper_status
+            self._last_status_query = now
             printer: Any = None
             owned = False
             failed = True
@@ -279,6 +294,16 @@ class EscposPrinterAdapterBase(
                 await self._mark_success()
                 status = await hass.async_add_executor_job(printer.paper_status)
                 failed = False
+                try:
+                    raw = await hass.async_add_executor_job(printer.query_status, b"\x10\x04\x02")
+                    # DLE EOT n=2 bit 2 (0x04) = cover open. Empty read = unknown,
+                    # never "closed": write-only/silent transports read b"".
+                    self._last_cover_status = bool(raw[0] & 0x04) if len(raw) else None
+                except Exception as cover_err:
+                    _LOGGER.debug(
+                        "Cover status query failed: %s", sanitize_log_message(str(cover_err))
+                    )
+                    self._last_cover_status = None
             except Exception as e:
                 # Connect failures already went through
                 # `_acquire_printer_or_offline`, which set `_last_check` /
@@ -287,6 +312,7 @@ class EscposPrinterAdapterBase(
                 # dedup) -- no bespoke bookkeeping needed for that case.
                 _LOGGER.debug("Paper status query failed: %s", sanitize_log_message(str(e)))
                 self._last_paper_status = None
+                self._last_cover_status = None
                 return None
             finally:
                 if printer is not None:
@@ -298,6 +324,16 @@ class EscposPrinterAdapterBase(
                     )
             self._last_paper_status = int(status)
             return self._last_paper_status
+
+    async def get_cover_status(self, hass: HomeAssistant) -> bool | None:
+        """Cover-open state via DLE EOT n=2 (True=open, None=unknown).
+
+        Piggybacks on get_paper_status()'s connection: the freshness guard
+        there means whichever poller fires first does the single query and
+        the other reads the cache.
+        """
+        await self.get_paper_status(hass)
+        return self._last_cover_status
 
     def add_status_listener(self, callback: Callable[[bool], None]) -> Callable[[], None]:
         """Add a status change listener and return an unsubscribe function."""
@@ -321,6 +357,7 @@ class EscposPrinterAdapterBase(
             "last_error": _iso(self._last_error),
             "last_latency_ms": self._last_latency_ms,
             "paper_status": self._last_paper_status,
+            "cover_open": self._last_cover_status,
             "last_error_reason": self._last_error_reason,
             "last_error_errno": self._last_error_errno,
             "default_chunk_delay_ms": self.default_chunk_delay_ms,

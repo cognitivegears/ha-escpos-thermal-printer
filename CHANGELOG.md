@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - `invert`, `density`, and `font` styling options on `print_text`, `print_text_utf8`, and the notify entity's `print_message` action.
+- Cover-open binary sensor for network and USB printers, sharing the paper sensor's 5-minute poll connection.
 
 ### Fixed
 

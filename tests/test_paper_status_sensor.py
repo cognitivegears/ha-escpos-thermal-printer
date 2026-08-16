@@ -148,3 +148,51 @@ async def test_adapter_get_paper_status_skips_when_print_in_flight():
     async with adapter._lock:
         assert await adapter.get_paper_status(_FakeHass()) == 2
     adapter._connect.assert_not_called()
+
+
+async def test_cover_status_parsed_from_dle_eot_n2():
+    """DLE EOT n=2 bit 2 (0x04) set means the cover is open."""
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+    adapter._status_query_ttl = 0
+    printer = MagicMock()
+    printer.paper_status.return_value = 2
+    printer.query_status.return_value = b"\x16"
+    adapter._connect = lambda: printer  # type: ignore[method-assign]
+    assert await adapter.get_paper_status(_FakeHass()) == 2
+    assert await adapter.get_cover_status(_FakeHass()) is True
+    printer.query_status.assert_called_with(b"\x10\x04\x02")
+
+
+async def test_cover_status_empty_response_is_unknown():
+    """A zero-length DLE EOT read means unknown, never 'closed'/OK."""
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+    adapter._status_query_ttl = 0
+    printer = MagicMock()
+    printer.paper_status.return_value = 2
+    printer.query_status.return_value = b""
+    adapter._connect = lambda: printer  # type: ignore[method-assign]
+    assert await adapter.get_cover_status(_FakeHass()) is None
+
+
+async def test_cover_status_query_error_is_unknown_but_paper_survives():
+    """A cover-query failure must not clobber an otherwise-successful paper read."""
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+    adapter._status_query_ttl = 0
+    printer = MagicMock()
+    printer.paper_status.return_value = 1
+    printer.query_status.side_effect = RuntimeError("no response")
+    adapter._connect = lambda: printer  # type: ignore[method-assign]
+    assert await adapter.get_cover_status(_FakeHass()) is None
+    assert adapter._last_paper_status == 1
+
+
+async def test_cover_status_cached_within_ttl():
+    """A second get_cover_status call inside the TTL window reuses the cache."""
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+    printer = MagicMock()
+    printer.paper_status.return_value = 2
+    printer.query_status.return_value = b"\x16"
+    adapter._connect = lambda: printer  # type: ignore[method-assign]
+    assert await adapter.get_cover_status(_FakeHass()) is True
+    assert await adapter.get_cover_status(_FakeHass()) is True
+    printer.query_status.assert_called_once()

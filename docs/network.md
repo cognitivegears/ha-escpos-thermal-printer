@@ -53,6 +53,8 @@ replaced (or cleared, if the new address doesn't answer either).
 
 Network printers get a `sensor.<printer>_paper_status` entity reporting `ok`, `low`, or `out`, backed by the ESC/POS real-time paper-sensor query (`DLE EOT 4`). It polls on Home Assistant's standard entity cadence and automatically skips a poll while a print is in flight. If the printer doesn't answer the query (not all firmwares implement it) or is unreachable, the sensor shows unavailable. See [automations.md](automations.md) for a paper-low notification example.
 
+A `binary_sensor.<printer>_cover_open` entity reports a stuck-open cover, backed by the same DLE EOT real-time query (`n=2`) and sharing the paper sensor's connection. Firmwares that don't answer it leave the sensor unavailable rather than falsely reporting "closed".
+
 ## Multiple network printers
 
 Add the integration once per printer. Each gets its own device, binary sensor, and notify entity. See [multi-printer.md](multi-printer.md) for targeting in service calls.

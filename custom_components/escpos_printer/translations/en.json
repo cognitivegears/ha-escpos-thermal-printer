@@ -480,6 +480,9 @@
     "binary_sensor": {
       "online": {
         "name": "Online"
+      },
+      "cover_open": {
+        "name": "Cover open"
       }
     },
     "sensor": {
