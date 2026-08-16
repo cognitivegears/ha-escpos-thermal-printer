@@ -26,11 +26,13 @@ start printing in minutes.
 
 ## Features
 
-- Print text with formatting (bold, underline, alignment, font sizes)
+- Print text with formatting (bold, underline, alignment, font sizes, invert, density, font)
 - Print QR codes, barcodes, and images from URLs, files, camera/image entities, or base64 ([guide](docs/images.md))
 - Text effects: boxes, multi-column tables, and custom-font / rotated text ([guide](docs/text-effects.md))
 - Paper feed and cut control
 - Paper status sensor (network/USB): automate on paper low / paper out
+- Cover-open sensor (network/USB): automate on a stuck-open lid
+- Last-print timestamp sensor: automate on "no receipt printed today"
 - Image-print diagnostics sensor: success/failure counts and last-print details for tuning image options ([guide](docs/images.md#diagnostics-sensor))
 - Buzzer/beeper support
 - UTF-8 text with automatic character conversion

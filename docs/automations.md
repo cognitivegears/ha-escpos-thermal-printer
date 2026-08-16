@@ -47,7 +47,7 @@ automation:
 
 ## No receipt printed today
 
-Every printer gets a `sensor.<printer>_last_print` timestamp entity, stamped only by operations that actually put ink/thermal marks on paper (`print_text`, `print_qr`, `print_barcode`, image prints, and batch/text+image combos) — not by status probes or feed/cut/beep. It's enabled by default and stays `unknown` until the first print after a Home Assistant restart.
+Every printer gets a `sensor.<printer>_last_print` timestamp entity, stamped only by operations that actually put ink/thermal marks on paper (`print_text`, `print_qr`, `print_barcode`, image prints, and batch/text+image combos) — not by status probes or feed/cut/beep. It's enabled by default and stays `unknown` until the first print after a Home Assistant restart. Like the paper sensor, it polls on Home Assistant's standard 5-minute cadence, so its state can trail an actual print by up to that long.
 
 ```yaml
 automation:
@@ -58,8 +58,9 @@ automation:
     condition:
       - condition: template
         value_template: >
-          {{ states('sensor.receipt_printer_last_print') == 'unknown' or
-             as_datetime(states('sensor.receipt_printer_last_print')).date() != now().date() }}
+          {% set last_print = states('sensor.receipt_printer_last_print') %}
+          {{ last_print in ['unknown', 'unavailable'] or
+             as_local(as_datetime(last_print)).date() != now().date() }}
     action:
       - service: notify.mobile_app_phone
         data:
