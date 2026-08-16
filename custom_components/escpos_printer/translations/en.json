@@ -497,12 +497,90 @@
           "out": "Out"
         }
       }
+    },
+    "button": {
+      "feed": {
+        "name": "Feed paper"
+      },
+      "cut": {
+        "name": "Cut paper"
+      },
+      "beep": {
+        "name": "Beep"
+      },
+      "sample_print": {
+        "name": "Sample test print"
+      }
     }
   },
   "issues": {
     "profile_width_fallback": {
       "title": "Printer profile is missing the pixel width",
       "description": "The selected printer profile ({profile}) does not expose `media.width.pixels`, so images are being scaled to a generic {fallback}px width. This is usually correct for 58 mm thermals but may print stretched or truncated on 80 mm printers.\n\n**To fix:** open the integration's options and set “Paper width in pixels” (384 for 58 mm, 576 for 80 mm printers), pick a closer matching printer profile, or set `image_width` explicitly in your service calls."
+    },
+    "printer_not_calibrated": {
+      "title": "Printer not yet calibrated",
+      "fix_flow": {
+        "step": {
+          "calibrate_confirm": {
+            "title": "Calibrate printer",
+            "description": "The optional calibration tool prints test pages to tune print width and character set for this printer and paper. Run it now, or ignore this — printing works without it.\n\nThis wizard prints a series of test pages to measure your printer's image implementation, paper width, characters per line, and character encoding — using roughly 15–20 cm of paper in total. Make sure paper is loaded before continuing.",
+            "data": {
+              "action": "Action"
+            }
+          },
+          "calibrate_impl": {
+            "title": "Calibrate: image implementation",
+            "description": "Your printer just printed three numbered test patterns. A working pattern is a crisp checkerboard; a failing one prints stray letters or nothing. Check every pattern that printed cleanly. If none of the patterns printed cleanly, leave all boxes unchecked — the width test will be skipped since it needs a working image mode.",
+            "data": {
+              "impls_clean": "Patterns that printed cleanly",
+              "action": "Action"
+            }
+          },
+          "calibrate_width": {
+            "title": "Calibrate: paper width",
+            "description": "Your printer just printed a labeled box for each candidate width. A box that's too wide for your printer loses its right-side border — either cut off or wrapped into garbled fragments. Pick the WIDEST box whose right-side border printed as a clean, unbroken line. If none of the boxes has an intact right border, choose \"None had an intact right edge\".",
+            "data": {
+              "first_equal": "Widest box with an intact right border",
+              "action": "Action"
+            }
+          },
+          "calibrate_ruler": {
+            "title": "Calibrate: characters per line",
+            "description": "Your printer just printed a ruler line of dots with the numbers 10, 20, 30... embedded in it, followed by one or two leftover lines you can ignore. Look at the FIRST printed line only: find the last complete number on it, then add 1 for every dot printed after that number. Example: if the line ends with \"40..\", enter 42. If you're not sure, choose \"Skip this step\".",
+            "data": {
+              "last_marker": "Characters on the first line",
+              "action": "Action"
+            }
+          },
+          "calibrate_codepage": {
+            "title": "Calibrate: character encoding",
+            "description": "Your printer just printed one numbered line per candidate encoding, each attempting to render \"{sample}\", the ideal text. Check every line whose printout matches its own expected text shown in the checkbox label — including any ? marks. A line that prints exactly what its label shows is a working codepage. If none match, or you'd rather leave the character encoding unchanged, choose \"Skip this step\".",
+            "data": {
+              "codepages_match": "Lines that match their own expected text",
+              "action": "Action"
+            }
+          },
+          "calibrate_summary": {
+            "title": "Calibrate: summary",
+            "description": "Measured settings — image implementation: {impl}; paper width: {width_pixels} px; characters per line: {line_width}; character encoding: {codepage}. Save applies these to the printer's options (any setting not measured above is left unchanged). Optionally enter your printer model first — the next screen and a notification will carry a share link to help add this printer to escpos-printer-db.",
+            "data": {
+              "model": "Printer model (optional, for the share link)",
+              "action": "Action"
+            }
+          }
+        },
+        "error": {
+          "line_width_missing": "Enter the character count from the first line (16–96), or choose \"Skip this step\".",
+          "calibration_print_failed": "Printing the test page failed. Check the printer and try again."
+        },
+        "abort": {
+          "calibration_discarded": "Calibration discarded — no options were changed.",
+          "printer_not_ready": "The printer is not connected — load the integration before calibrating.",
+          "calibration_saved": "Calibration saved and applied. [Open a prefilled GitHub issue]({share_url}) to help add this printer to escpos-printer-db.",
+          "calibration_saved_no_changes": "Calibration finished — no settings were measured, so nothing was changed."
+        }
+      }
     }
   },
   "exceptions": {

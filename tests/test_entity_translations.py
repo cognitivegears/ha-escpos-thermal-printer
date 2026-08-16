@@ -15,6 +15,12 @@ from typing import Any
 from unittest.mock import MagicMock
 
 from custom_components.escpos_printer.binary_sensor import EscposOnlineSensor
+from custom_components.escpos_printer.button import (
+    EscposBeepButton,
+    EscposCutButton,
+    EscposFeedButton,
+    EscposSamplePrintButton,
+)
 from custom_components.escpos_printer.sensor import (
     BluetoothPrinterBatterySensor,
     LastImagePrintSensor,
@@ -37,11 +43,16 @@ class _FakeEntry:
 def _make_entities() -> dict[str, Any]:
     adapter = MagicMock()
     adapter.get_status.return_value = None
+    hass = MagicMock()
     return {
         "binary_sensor.online": EscposOnlineSensor(MagicMock(), _FakeEntry(), adapter),
         "sensor.last_image_print": LastImagePrintSensor(_FakeEntry()),
         "sensor.battery": BluetoothPrinterBatterySensor(_FakeEntry(), "AA:BB:CC:DD:EE:FF"),
         "sensor.paper_status": PaperStatusSensor(_FakeEntry()),
+        "button.feed": EscposFeedButton(hass, _FakeEntry()),
+        "button.cut": EscposCutButton(hass, _FakeEntry()),
+        "button.beep": EscposBeepButton(hass, _FakeEntry()),
+        "button.sample_print": EscposSamplePrintButton(hass, _FakeEntry()),
     }
 
 

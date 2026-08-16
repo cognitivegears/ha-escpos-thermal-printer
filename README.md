@@ -36,6 +36,7 @@ start printing in minutes.
 - UTF-8 text with automatic character conversion
 - 35+ printer profiles with automatic feature detection, plus 23 rebadged/clone models available directly as "(compatible)" dropdown entries
 - Guided calibration wizard: prints test pages to measure image implementation, paper width, columns, and codepage, then saves them for you ([guide](docs/calibration.md))
+- Device page offers Feed / Cut / Beep / Sample test print buttons, and new printers get a Settings → Repairs suggestion linking to the calibration wizard
 - Full UI configuration, no YAML required
 
 ## Quick Start
