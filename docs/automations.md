@@ -45,6 +45,28 @@ automation:
           message: "Paper is {{ trigger.to_state.state }}, replace the roll."
 ```
 
+## No receipt printed today
+
+Every printer gets a `sensor.<printer>_last_print` timestamp entity, stamped only by operations that actually put ink/thermal marks on paper (`print_text`, `print_qr`, `print_barcode`, image prints, and batch/text+image combos) — not by status probes or feed/cut/beep. It's enabled by default and stays `unknown` until the first print after a Home Assistant restart.
+
+```yaml
+automation:
+  - alias: "No Receipt Printed Today"
+    trigger:
+      - platform: time
+        at: "20:00:00"
+    condition:
+      - condition: template
+        value_template: >
+          {{ states('sensor.receipt_printer_last_print') == 'unknown' or
+             as_datetime(states('sensor.receipt_printer_last_print')).date() != now().date() }}
+    action:
+      - service: notify.mobile_app_phone
+        data:
+          title: "Receipt printer"
+          message: "Nothing printed today."
+```
+
 ## Temperature alert
 
 ```yaml

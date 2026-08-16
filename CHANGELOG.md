@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - `invert`, `density`, and `font` styling options on `print_text`, `print_text_utf8`, and the notify entity's `print_message` action.
 - Cover-open binary sensor for network and USB printers, sharing the paper sensor's 5-minute poll connection.
+- Last-print timestamp sensor (`sensor.<printer>_last_print`) for "no receipt printed today" automations.
 
 ### Fixed
 

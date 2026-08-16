@@ -381,7 +381,7 @@ class ImageOperationsMixin:
         if stats is not None:
             stats.total_prints += 1
             stats.last_error_class = None
-        await self._mark_success()
+        await self._mark_success(print_op=True)
 
 
 # ---------------------------------------------------------------------------

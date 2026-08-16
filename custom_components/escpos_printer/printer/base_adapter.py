@@ -108,6 +108,11 @@ class EscposPrinterAdapterBase(
         self._status_listeners: list[Callable[[bool], None]] = []
         self._last_check: Any = None
         self._last_ok: Any = None
+        # Stamped only by paper-moving operations (text/QR/barcode/image/
+        # batch) -- see _mark_success. _last_ok is also refreshed by status
+        # probes, so it means "last successful contact", not "last print"
+        # (ROADMAP item 5).
+        self._last_print: Any = None
         self._last_error: Any = None
         self._last_latency_ms: int | None = None
         self._last_paper_status: int | None = None
@@ -388,6 +393,7 @@ class EscposPrinterAdapterBase(
         return {
             "last_check": _iso(self._last_check),
             "last_ok": _iso(self._last_ok),
+            "last_print": _iso(self._last_print),
             "last_error": _iso(self._last_error),
             "last_latency_ms": self._last_latency_ms,
             "paper_status": self._last_paper_status,
@@ -712,18 +718,24 @@ class EscposPrinterAdapterBase(
 
             await hass.async_add_executor_job(_cut)
 
-    async def _mark_success(self) -> None:
+    async def _mark_success(self, *, print_op: bool = False) -> None:
         """Mark a successful operation (updates status tracking).
 
         Routed through ``_notify_status_change`` (rather than firing
         listeners directly) so a success that doesn't change the status
         -- e.g. the 5-minute paper-status poll on an already-online
         printer -- doesn't re-fire every listener with a no-op update.
+
+        ``print_op=True`` additionally stamps ``_last_print``: ``_last_ok``
+        is also refreshed by status probes, so it means "last successful
+        contact", not "last print" (ROADMAP item 5).
         """
         now = dt_util.utcnow()
         self._last_ok = now
         self._last_check = now
         self._last_error_errno = None
+        if print_op:
+            self._last_print = now
         self._notify_status_change(True)
 
     @contextlib.asynccontextmanager
@@ -751,7 +763,7 @@ class EscposPrinterAdapterBase(
                 failed = False
             finally:
                 await self._release_printer(hass, printer, owned=owned, failed=failed)
-        await self._mark_success()
+        await self._mark_success(print_op=True)
 
     async def print_text_with_image(
         self,
@@ -819,7 +831,7 @@ class EscposPrinterAdapterBase(
                     raise
             finally:
                 await self._release_printer(hass, printer, owned=owned, failed=failed)
-        await self._mark_success()
+        await self._mark_success(print_op=True)
 
 
 class _BatchPage:

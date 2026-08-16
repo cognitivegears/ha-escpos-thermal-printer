@@ -47,7 +47,7 @@ class ControlOperationsMixin:
         """Close a printer instance if owned by the caller."""
         raise NotImplementedError
 
-    async def _mark_success(self) -> None:
+    async def _mark_success(self, *, print_op: bool = False) -> None:
         """Mark a successful operation (implemented in base)."""
         raise NotImplementedError
 

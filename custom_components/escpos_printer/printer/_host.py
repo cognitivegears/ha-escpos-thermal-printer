@@ -76,7 +76,7 @@ class _PrinterHost(Protocol):
     ) -> None:
         """Apply the post-print cut + feed control sequence."""
 
-    async def _mark_success(self) -> None:
+    async def _mark_success(self, *, print_op: bool = False) -> None:
         """Reset failure-count state after a successful operation."""
 
 

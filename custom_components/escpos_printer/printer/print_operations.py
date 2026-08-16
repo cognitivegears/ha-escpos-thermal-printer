@@ -79,7 +79,7 @@ class PrintOperationsMixin:
                 failed = False
             finally:
                 await self._release_printer(hass, printer, owned=owned, failed=failed)
-        await self._mark_success()
+        await self._mark_success(print_op=True)
 
     async def print_qr(
         self: _PrinterHost,
@@ -102,7 +102,7 @@ class PrintOperationsMixin:
                 failed = False
             finally:
                 await self._release_printer(hass, printer, owned=owned, failed=failed)
-        await self._mark_success()
+        await self._mark_success(print_op=True)
 
 
 async def _qr_under_lock(

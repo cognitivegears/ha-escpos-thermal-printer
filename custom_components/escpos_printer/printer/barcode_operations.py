@@ -84,7 +84,7 @@ class BarcodeOperationsMixin:
         """Apply feed and cut operations (implemented in base)."""
         raise NotImplementedError
 
-    async def _mark_success(self) -> None:
+    async def _mark_success(self, *, print_op: bool = False) -> None:
         """Mark a successful operation (implemented in base)."""
         raise NotImplementedError
 
@@ -166,4 +166,4 @@ class BarcodeOperationsMixin:
                 raise
             finally:
                 await self._release_printer(hass, printer, owned=owned, failed=failed)
-        await self._mark_success()
+        await self._mark_success(print_op=True)

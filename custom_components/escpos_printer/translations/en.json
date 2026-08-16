@@ -489,6 +489,9 @@
       "last_image_print": {
         "name": "Last image print"
       },
+      "last_print": {
+        "name": "Last print"
+      },
       "battery": {
         "name": "Battery"
       },
