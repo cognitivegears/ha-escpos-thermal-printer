@@ -14,6 +14,9 @@ Print raw text using the configured codepage. No transcoding.
 | underline | string | `none`, `single`, `double` |
 | width | string\|int | `normal`, `double`, `triple`, or 1–8 |
 | height | string\|int | `normal`, `double`, `triple`, or 1–8 |
+| invert | boolean | White-on-black printing |
+| density | int | Print darkness (0–8). The printer keeps the value until changed |
+| font | string | `a` or `b`. Font B is smaller and fits more columns per line |
 | encoding | string | Codepage override: a python-escpos codepage name such as `CP437`/`CP858` (not a Python codec name) |
 | cut | string | `none`, `partial`, `full` |
 | feed | int | Lines to feed (0–50) |

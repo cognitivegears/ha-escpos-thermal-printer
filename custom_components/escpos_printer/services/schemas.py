@@ -34,6 +34,7 @@ from ..const import (
     ATTR_COLUMN_WIDTHS,
     ATTR_CUT,
     ATTR_DATA,
+    ATTR_DENSITY,
     ATTR_DITHER,
     ATTR_DURATION,
     ATTR_EC,
@@ -172,6 +173,8 @@ def _with_target_validation(schema_dict: dict[Any, Any]) -> vol.All:
 _ALIGN = vol.In(["left", "center", "right"])
 _UNDERLINE = vol.In(["none", "single", "double"])
 _CUT = vol.In(["none", "partial", "full"])
+_FONT = vol.All(cv.string, vol.Lower, vol.In(["a", "b"]))
+_DENSITY = vol.All(vol.Coerce(int), vol.Range(min=0, max=8))
 
 # Width/height accept "normal"|"double"|"triple" or a number 1-8 (the
 # UI surfaces both forms). Coerce numeric strings before checking the
@@ -335,6 +338,9 @@ PRINT_TEXT_SCHEMA = _with_target_validation(
         vol.Optional(ATTR_UNDERLINE): _UNDERLINE,
         vol.Optional(ATTR_WIDTH): _TEXT_SIZE,
         vol.Optional(ATTR_HEIGHT): _TEXT_SIZE,
+        vol.Optional(ATTR_INVERT): cv.boolean,
+        vol.Optional(ATTR_DENSITY): _DENSITY,
+        vol.Optional(ATTR_FONT): _FONT,
         vol.Optional(ATTR_ENCODING): cv.string,
         vol.Optional(ATTR_CUT): _CUT,
         vol.Optional(ATTR_FEED): _FEED,
@@ -351,6 +357,9 @@ PRINT_TEXT_UTF8_SCHEMA = _with_target_validation(
         vol.Optional(ATTR_UNDERLINE): _UNDERLINE,
         vol.Optional(ATTR_WIDTH): _TEXT_SIZE,
         vol.Optional(ATTR_HEIGHT): _TEXT_SIZE,
+        vol.Optional(ATTR_INVERT): cv.boolean,
+        vol.Optional(ATTR_DENSITY): _DENSITY,
+        vol.Optional(ATTR_FONT): _FONT,
         vol.Optional(ATTR_CUT): _CUT,
         vol.Optional(ATTR_FEED): _FEED,
     }
@@ -816,6 +825,9 @@ PRINT_MESSAGE_FIELDS: dict[Any, Any] = {
     vol.Optional("underline"): _UNDERLINE,
     vol.Optional("width"): _TEXT_SIZE,
     vol.Optional("height"): _TEXT_SIZE,
+    vol.Optional("invert"): cv.boolean,
+    vol.Optional("density"): _DENSITY,
+    vol.Optional("font"): _FONT,
     vol.Optional("utf8"): cv.boolean,
     vol.Optional("encoding"): cv.string,
     vol.Optional("cut"): _CUT,

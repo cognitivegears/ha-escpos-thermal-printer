@@ -86,6 +86,30 @@ print_text_utf8:
             - "6"
             - "7"
             - "8"
+    invert:
+      name: Invert
+      description: White-on-black printing
+      default: false
+      selector:
+        boolean: {}
+    density:
+      name: Density
+      description: Print darkness (0-8). The printer keeps the value until changed.
+      selector:
+        number:
+          min: 0
+          max: 8
+          step: 1
+          mode: slider
+    font:
+      name: Font
+      description: Printer font. Font B is smaller and fits more columns per line.
+      default: "a"
+      selector:
+        select:
+          options:
+            - "a"
+            - "b"
     cut:
       name: Cut
       description: Paper cutting mode after printing (defaults to the printer's configured cut mode)
@@ -194,6 +218,30 @@ print_text:
             - "6"
             - "7"
             - "8"
+    invert:
+      name: Invert
+      description: White-on-black printing
+      default: false
+      selector:
+        boolean: {}
+    density:
+      name: Density
+      description: Print darkness (0-8). The printer keeps the value until changed.
+      selector:
+        number:
+          min: 0
+          max: 8
+          step: 1
+          mode: slider
+    font:
+      name: Font
+      description: Printer font. Font B is smaller and fits more columns per line.
+      default: "a"
+      selector:
+        select:
+          options:
+            - "a"
+            - "b"
     encoding:
       name: Encoding
       description: >-
@@ -1811,6 +1859,30 @@ print_message:
             - "6"
             - "7"
             - "8"
+    invert:
+      name: Invert
+      description: White-on-black printing
+      default: false
+      selector:
+        boolean: {}
+    density:
+      name: Density
+      description: Print darkness (0-8). The printer keeps the value until changed.
+      selector:
+        number:
+          min: 0
+          max: 8
+          step: 1
+          mode: slider
+    font:
+      name: Font
+      description: Printer font. Font B is smaller and fits more columns per line.
+      default: "a"
+      selector:
+        select:
+          options:
+            - "a"
+            - "b"
     utf8:
       name: UTF-8 Mode
       description: Enable UTF-8 transcoding (converts special characters to printer-compatible encoding)

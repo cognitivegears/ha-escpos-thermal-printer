@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `invert`, `density`, and `font` styling options on `print_text`, `print_text_utf8`, and the notify entity's `print_message` action.
+
 ### Fixed
 
 - Clearing the preselected printer profile in the add-printer form (network

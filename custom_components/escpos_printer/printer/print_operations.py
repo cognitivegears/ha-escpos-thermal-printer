@@ -39,6 +39,9 @@ class PrintOperationsMixin:
         underline: str | None = None,
         width: str | int | None = None,
         height: str | int | None = None,
+        invert: bool | None = None,
+        density: int | None = None,
+        font: str | int | None = None,
         encoding: str | None = None,
         cut: str | None = DEFAULT_CUT,
         feed: int | None = 0,
@@ -66,6 +69,9 @@ class PrintOperationsMixin:
                     underline=underline,
                     width=width,
                     height=height,
+                    invert=invert,
+                    density=density,
+                    font=font,
                     encoding=encoding,
                     wrap=wrap,
                 )
@@ -157,6 +163,9 @@ async def _print_text_under_lock(
     underline: str | None,
     width: str | int | None,
     height: str | int | None,
+    invert: bool | None = None,
+    density: int | None = None,
+    font: str | int | None = None,
     encoding: str | None,
     wrap: bool = True,
 ) -> None:
@@ -187,6 +196,14 @@ async def _print_text_under_lock(
                 height=hmult,
                 custom_size=use_custom_size,
                 normal_textsize=not use_custom_size,
+                # Always sent: escpos set() skips None params and printer state is
+                # sticky across connections — one inverted job would otherwise leave
+                # every later print white-on-black / font B.
+                invert=bool(invert),
+                font=font if font in ("a", "b") else "a",
+                # density=None -> escpos sends nothing; darkness is a hardware knob
+                # users expect to stick until changed.
+                density=density,
             )
 
         if encoding:

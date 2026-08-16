@@ -129,3 +129,41 @@ async def test_print_qr_resets_text_size(hass):  # type: ignore[no-untyped-def]
     fake.set.assert_called_once()
     kw = fake.set.call_args.kwargs
     assert kw.get("normal_textsize") is True
+
+
+async def test_print_text_invert_density_font(hass):  # type: ignore[no-untyped-def]
+    """Test that invert/density/font pass through print_text to printer.set()."""
+    await _setup_entry(hass)
+
+    fake = MagicMock()
+    with patch("escpos.printer.Network", return_value=fake):
+        await hass.services.async_call(
+            DOMAIN,
+            "print_text",
+            {"text": "hello", "invert": True, "density": 4, "font": "B"},
+            blocking=True,
+        )
+    kw = _get_set_kwargs(fake)
+    assert kw["invert"] is True
+    assert kw["density"] == 4
+    assert kw["font"] == "b"  # schema lowercases
+
+
+async def test_print_text_styling_defaults_reset_sticky_state(hass):  # type: ignore[no-untyped-def]
+    """Test that invert/font are always sent concretely; density stays unset."""
+    await _setup_entry(hass)
+
+    fake = MagicMock()
+    with patch("escpos.printer.Network", return_value=fake):
+        await hass.services.async_call(
+            DOMAIN,
+            "print_text",
+            {"text": "hello"},
+            blocking=True,
+        )
+    kw = _get_set_kwargs(fake)
+    # invert/font always sent concretely so a prior job can't leak state;
+    # density omitted -> None -> escpos sends nothing (sticky by design).
+    assert kw["invert"] is False
+    assert kw["font"] == "a"
+    assert kw["density"] is None
