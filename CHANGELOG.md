@@ -7,22 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Added
-
-- Bisofice XGR-POS581 is now recognized in the printer model dropdown,
-  aliased to the bundled POS-5890 profile (hardware-verified via a user's
-  calibration report, #149): 384 px width, 32 columns, Epson-standard
-  codepage indices for CP858/CP1252/CP850/CP437.
-- Device page buttons: Feed paper, Cut paper, Beep, and Sample test print
-  (a one-tap demo receipt with the integration logo, styled text, a table,
-  and a QR code).
-- Uncalibrated printers now get a dismissible suggestion in Settings →
-  Repairs that launches the calibration wizard directly — no more hunting
-  for it under the integration's Configure menu.
-- Project website (`docs/index.html`) for GitHub Pages: thermal-receipt
-  themed landing page with examples, service overview, blueprint list, and
-  documentation links.
-
 ## [1.2.0] - 2026-08-15
 
 ### Added
@@ -32,6 +16,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   now appear in the entity/device "Add to… → Create as a new action"
   picker. `calibration_print` is included. Existing `device_id` and
   `broadcast` fields keep working unchanged; no migration is needed.
+- Device page buttons: Feed paper, Cut paper, Beep, and Sample test print
+  (a one-tap demo receipt with the integration logo, styled text, a table,
+  and a QR code).
+- Uncalibrated printers now get a dismissible suggestion in Settings →
+  Repairs that launches the calibration wizard directly — no more hunting
+  for it under the integration's Configure menu.
+- Bisofice XGR-POS581 is now recognized in the printer model dropdown,
+  aliased to the bundled POS-5890 profile (hardware-verified via a user's
+  calibration report, #149): 384 px width, 32 columns, Epson-standard
+  codepage indices for CP858/CP1252/CP850/CP437.
+- Project website (`docs/index.html`) for GitHub Pages: thermal-receipt
+  themed landing page with examples, service overview, blueprint list, and
+  documentation links.
 
 ### Changed
 
