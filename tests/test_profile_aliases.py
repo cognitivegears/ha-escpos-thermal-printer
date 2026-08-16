@@ -99,6 +99,8 @@ def test_resolve_alias() -> None:
     assert resolve_alias("Bixolon SRP-352III") == "TM-T20II"
     assert resolve_alias("Citizen CT-S801") == "TM-T20II"
     assert resolve_alias("Citizen CT-S851II") == "TM-T20II"
+    assert resolve_alias("Bisofice XGR-POS581") == "POS-5890"
+    assert resolve_alias("XGR-POS581") == "POS-5890"
     assert resolve_alias("nonsense-model") is None
 
 
