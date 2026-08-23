@@ -135,7 +135,7 @@ jobs:
 
       - name: Upload Opengrep SARIF to Security tab
         if: always()
-        uses: github/codeql-action/upload-sarif@v4.37.4
+        uses: github/codeql-action/upload-sarif@v4.37.7
         with:
           sarif_file: opengrep.sarif
           category: opengrep
@@ -201,7 +201,7 @@ jobs:
 
       - name: Upload Bandit SARIF to Security tab
         if: always()
-        uses: github/codeql-action/upload-sarif@v4.37.4
+        uses: github/codeql-action/upload-sarif@v4.37.7
         with:
           sarif_file: bandit.sarif
 
