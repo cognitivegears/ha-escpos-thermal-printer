@@ -268,14 +268,6 @@ If you see import errors, make sure you've installed in development mode:
 uv sync --all-extras
 ```
 
-### Test Failures
-
-Set the environment variable to skip platform forwarding in tests:
-
-```bash
-ESC_POS_DISABLE_PLATFORMS=1 uv run pytest -q
-```
-
 ### Pre-commit Failures
 
 If pre-commit fails, try updating the hooks:

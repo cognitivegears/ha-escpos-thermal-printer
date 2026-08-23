@@ -147,4 +147,5 @@ async def test_batch_connection_stamps_last_print():
     assert adapter._last_print is None
     async with adapter.batch_connection(_FakeHass()) as page:
         await page.print_text(text="hello")
+        assert adapter._last_print is None  # not stamped per-print inside the batch
     assert adapter._last_print is not None
