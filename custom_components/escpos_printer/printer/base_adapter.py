@@ -346,9 +346,7 @@ class EscposPrinterAdapterBase(
                     )
                     self._last_paper_status = _paper_status_from_reply(raw_paper)
                     if self._last_paper_status is None:
-                        _LOGGER.debug(
-                            "Paper status read rejected as non-conformant: %r", raw_paper
-                        )
+                        _LOGGER.debug("Paper status read rejected as non-conformant: %r", raw_paper)
                 except Exception as paper_err:
                     _LOGGER.debug(
                         "Paper status query failed: %s", sanitize_log_message(str(paper_err))
