@@ -114,6 +114,52 @@ async def test_print_message_entity_service_defaults(hass):  # type: ignore[no-u
     assert kw["normal_textsize"] is True
 
 
+async def test_print_message_entity_service_with_invert_density_font(hass):  # type: ignore[no-untyped-def]
+    """Test that print_message passes invert/density/font through to set()."""
+    await _setup_entry(hass)
+    entity_id = _get_notify_entity_id(hass)
+
+    fake = MagicMock()
+    with patch("escpos.printer.Network", return_value=fake):
+        await hass.services.async_call(
+            DOMAIN,
+            "print_message",
+            {
+                "entity_id": entity_id,
+                "message": "ALERT",
+                "invert": True,
+                "density": 4,
+                "font": "b",
+            },
+            blocking=True,
+        )
+    fake.set.assert_called_once()
+    kw = fake.set.call_args.kwargs
+    assert kw["invert"] is True
+    assert kw["density"] == 4
+    assert kw["font"] == "b"
+
+
+async def test_print_message_entity_service_styling_defaults(hass):  # type: ignore[no-untyped-def]
+    """Test that print_message falls back to hardcoded invert/density/font defaults."""
+    await _setup_entry(hass)
+    entity_id = _get_notify_entity_id(hass)
+
+    fake = MagicMock()
+    with patch("escpos.printer.Network", return_value=fake):
+        await hass.services.async_call(
+            DOMAIN,
+            "print_message",
+            {"entity_id": entity_id, "message": "Simple text"},
+            blocking=True,
+        )
+    fake.set.assert_called_once()
+    kw = fake.set.call_args.kwargs
+    assert kw["invert"] is False
+    assert kw["font"] == "a"
+    assert kw["density"] is None
+
+
 async def test_print_message_with_title(hass):  # type: ignore[no-untyped-def]
     """Test that print_message prepends title to message."""
     await _setup_entry(hass)

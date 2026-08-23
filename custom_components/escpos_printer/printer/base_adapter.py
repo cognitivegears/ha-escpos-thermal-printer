@@ -8,6 +8,7 @@ from collections.abc import AsyncIterator, Callable
 import contextlib
 import logging
 import textwrap
+import time
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from homeassistant.core import HomeAssistant
@@ -50,6 +51,33 @@ def _get_usb_printer() -> type[Any]:
     from escpos.printer import Usb  # noqa: PLC0415
 
     return Usb  # type: ignore[no-any-return]
+
+
+# Real-time status byte protocol (DLE EOT n=2/n=4 replies): bits 1 and 4
+# are always set, bits 0 and 7 always clear. Shared by the paper and cover
+# parses below -- a reply failing this isn't the field it claims to be
+# (empty read, or a stale/misaligned byte from a keepalive socket buffer).
+_STATUS_BYTE_MASK = 0b1001_0011
+_STATUS_BYTE_FIXED = 0b0001_0010
+
+
+def _conformant_status_byte(raw: bytes) -> int | None:
+    """First byte of a DLE EOT reply, or ``None`` if empty/non-conformant."""
+    if not len(raw) or raw[0] & _STATUS_BYTE_MASK != _STATUS_BYTE_FIXED:
+        return None
+    return raw[0]
+
+
+def _paper_status_from_reply(raw: bytes) -> int | None:
+    """Parse a DLE EOT n=4 reply into 2=ok/1=low/0=out, or ``None`` if unusable."""
+    byte = _conformant_status_byte(raw)
+    if byte is None:
+        return None
+    if byte & 0b0110_0000:  # paper-end sensor
+        return 0
+    if byte & 0b0000_1100:  # near-end sensor
+        return 1
+    return 2
 
 
 def profile_width_issue_id(entry_id: str | None) -> str:
@@ -96,14 +124,32 @@ class EscposPrinterAdapterBase(
         self._status_interval: int = 0
         self._printer: Any = None
         self._lock = asyncio.Lock()
+        # Serializes get_paper_status() callers against each other (paper
+        # sensor + cover sensor poll independently but share one DLE EOT
+        # round trip). Deliberately separate from self._lock: that one
+        # gates real prints and must let a second status poller bail out
+        # immediately via _probe_lock_or_skip rather than queue behind it.
+        self._status_poll_lock = asyncio.Lock()
         self._cancel_status: Callable[[], None] | None = None
         self._status: bool | None = None
         self._status_listeners: list[Callable[[bool], None]] = []
         self._last_check: Any = None
         self._last_ok: Any = None
+        # Stamped only by paper-moving operations (text/QR/barcode/image/
+        # batch) -- see _mark_success. _last_ok is also refreshed by status
+        # probes, so it means "last successful contact", not "last print"
+        # (ROADMAP item 5).
+        self._last_print: Any = None
         self._last_error: Any = None
         self._last_latency_ms: int | None = None
         self._last_paper_status: int | None = None
+        self._last_cover_status: bool | None = None
+        # One DLE EOT connection serves both the paper and cover pollers: a
+        # repeat call inside this window returns cached values instead of
+        # opening a second connection. ponytail: fixed 60s window; make it
+        # configurable only if a real cadence complaint shows up.
+        self._status_query_ttl: float = 60.0
+        self._last_status_query: float | None = None
         self._last_error_reason: str | None = None
         self._last_error_errno: int | None = None
         self._cached_profile_width: int | None = None
@@ -259,26 +305,70 @@ class EscposPrinterAdapterBase(
         the paper sensor.
 
         If a print is in flight, returns the last known value instead of
-        contending for the transport.
+        contending for the transport. If another status poll (paper or
+        cover) is already in flight, this call waits for it instead of
+        racing it -- see ``_status_poll_lock``.
         """
-        async with self._probe_lock_or_skip() as acquired:
+        async with self._status_poll_lock, self._probe_lock_or_skip() as acquired:
             if not acquired:
                 _LOGGER.debug("Skipping paper status query; print in flight")
                 return self._last_paper_status
+            now = time.monotonic()
+            if (
+                self._last_status_query is not None
+                and now - self._last_status_query < self._status_query_ttl
+            ):
+                return self._last_paper_status
+            self._last_status_query = now
             printer: Any = None
             owned = False
             failed = True
             try:
                 printer, owned = await self._acquire_printer_or_offline(hass)
                 # Reaching the printer at all is the reachability signal --
-                # notify here, not after the DLE EOT query below, so a
-                # printer that ignores/times out on paper-status (a real,
+                # notify here, not after the DLE EOT queries below, so a
+                # printer that ignores/times out on status queries (a real,
                 # known category -- see the docstring) stays stably Online
                 # instead of flapping every 5-minute poll (SCAN_INTERVAL
-                # in sensor.py) on that query alone.
+                # in sensor.py) on those queries alone.
                 await self._mark_success()
-                status = await hass.async_add_executor_job(printer.paper_status)
                 failed = False
+                # Query paper status ourselves instead of trusting
+                # python-escpos's paper_status(): it defaults an empty
+                # read to 2 ("plenty of paper"), which is a false "ok" on
+                # a printer/firmware that silently ignores DLE EOT --
+                # exactly the failure this sensor exists to surface.
+                # Parsed like the cover query below: its own try/except so
+                # one query failing doesn't take the other down with it.
+                try:
+                    raw_paper = await hass.async_add_executor_job(
+                        printer.query_status, b"\x10\x04\x04"
+                    )
+                    self._last_paper_status = _paper_status_from_reply(raw_paper)
+                    if self._last_paper_status is None:
+                        _LOGGER.debug("Paper status read rejected as non-conformant: %r", raw_paper)
+                except Exception as paper_err:
+                    _LOGGER.debug(
+                        "Paper status query failed: %s", sanitize_log_message(str(paper_err))
+                    )
+                    self._last_paper_status = None
+                try:
+                    raw = await hass.async_add_executor_job(printer.query_status, b"\x10\x04\x02")
+                    # DLE EOT n=2 bit 2 (0x04) = cover open. Rejected as
+                    # unknown, never "closed": write-only/silent transports
+                    # read b"", and a garbage byte must not produce either
+                    # answer (false PROBLEM alarm or false all-clear).
+                    byte = _conformant_status_byte(raw)
+                    if byte is None:
+                        _LOGGER.debug("Cover status read rejected as non-conformant: %r", raw)
+                        self._last_cover_status = None
+                    else:
+                        self._last_cover_status = bool(byte & 0x04)
+                except Exception as cover_err:
+                    _LOGGER.debug(
+                        "Cover status query failed: %s", sanitize_log_message(str(cover_err))
+                    )
+                    self._last_cover_status = None
             except Exception as e:
                 # Connect failures already went through
                 # `_acquire_printer_or_offline`, which set `_last_check` /
@@ -287,6 +377,7 @@ class EscposPrinterAdapterBase(
                 # dedup) -- no bespoke bookkeeping needed for that case.
                 _LOGGER.debug("Paper status query failed: %s", sanitize_log_message(str(e)))
                 self._last_paper_status = None
+                self._last_cover_status = None
                 return None
             finally:
                 if printer is not None:
@@ -296,8 +387,17 @@ class EscposPrinterAdapterBase(
                     await self._release_printer(
                         hass, printer, owned=owned, failed=failed, notify_status=False
                     )
-            self._last_paper_status = int(status)
             return self._last_paper_status
+
+    async def get_cover_status(self, hass: HomeAssistant) -> bool | None:
+        """Cover-open state via DLE EOT n=2 (True=open, None=unknown).
+
+        Piggybacks on get_paper_status()'s connection: the freshness guard
+        there means whichever poller fires first does the single query and
+        the other reads the cache.
+        """
+        await self.get_paper_status(hass)
+        return self._last_cover_status
 
     def add_status_listener(self, callback: Callable[[bool], None]) -> Callable[[], None]:
         """Add a status change listener and return an unsubscribe function."""
@@ -318,9 +418,11 @@ class EscposPrinterAdapterBase(
         return {
             "last_check": _iso(self._last_check),
             "last_ok": _iso(self._last_ok),
+            "last_print": _iso(self._last_print),
             "last_error": _iso(self._last_error),
             "last_latency_ms": self._last_latency_ms,
             "paper_status": self._last_paper_status,
+            "cover_open": self._last_cover_status,
             "last_error_reason": self._last_error_reason,
             "last_error_errno": self._last_error_errno,
             "default_chunk_delay_ms": self.default_chunk_delay_ms,
@@ -641,18 +743,24 @@ class EscposPrinterAdapterBase(
 
             await hass.async_add_executor_job(_cut)
 
-    async def _mark_success(self) -> None:
+    async def _mark_success(self, *, print_op: bool = False) -> None:
         """Mark a successful operation (updates status tracking).
 
         Routed through ``_notify_status_change`` (rather than firing
         listeners directly) so a success that doesn't change the status
         -- e.g. the 5-minute paper-status poll on an already-online
         printer -- doesn't re-fire every listener with a no-op update.
+
+        ``print_op=True`` additionally stamps ``_last_print``: ``_last_ok``
+        is also refreshed by status probes, so it means "last successful
+        contact", not "last print" (ROADMAP item 5).
         """
         now = dt_util.utcnow()
         self._last_ok = now
         self._last_check = now
         self._last_error_errno = None
+        if print_op:
+            self._last_print = now
         self._notify_status_change(True)
 
     @contextlib.asynccontextmanager
@@ -680,7 +788,7 @@ class EscposPrinterAdapterBase(
                 failed = False
             finally:
                 await self._release_printer(hass, printer, owned=owned, failed=failed)
-        await self._mark_success()
+        await self._mark_success(print_op=True)
 
     async def print_text_with_image(
         self,
@@ -748,7 +856,7 @@ class EscposPrinterAdapterBase(
                     raise
             finally:
                 await self._release_printer(hass, printer, owned=owned, failed=failed)
-        await self._mark_success()
+        await self._mark_success(print_op=True)
 
 
 class _BatchPage:
@@ -774,6 +882,9 @@ class _BatchPage:
         underline: str | None = None,
         width: str | int | None = None,
         height: str | int | None = None,
+        invert: bool | None = None,
+        density: int | None = None,
+        font: str | int | None = None,
         encoding: str | None = None,
         wrap: bool = True,
         feed: int | None = 0,
@@ -789,6 +900,9 @@ class _BatchPage:
             underline=underline,
             width=width,
             height=height,
+            invert=invert,
+            density=density,
+            font=font,
             encoding=encoding,
             wrap=wrap,
         )

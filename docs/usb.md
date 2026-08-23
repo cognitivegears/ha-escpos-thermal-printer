@@ -48,6 +48,8 @@ If your printer isn't auto-discovered:
 
 USB printers get a `sensor.<printer>_paper_status` entity reporting `ok`, `low`, or `out`, backed by the ESC/POS real-time paper-sensor query (`DLE EOT 4`) over the IN endpoint. If the printer doesn't answer the query (not all firmwares implement it) or is disconnected, the sensor shows unavailable. Polls skip automatically while a print is in flight.
 
+A `binary_sensor.<printer>_cover_open` entity reports a stuck-open cover, backed by the same DLE EOT real-time query (`n=2`) and sharing the paper sensor's connection. Firmwares that don't answer it leave the sensor unavailable rather than falsely reporting "closed".
+
 ## USB permissions on Linux
 
 If you see `Permission denied`, create a udev rule:

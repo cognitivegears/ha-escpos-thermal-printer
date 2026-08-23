@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
-from custom_components.escpos_printer.binary_sensor import EscposOnlineSensor
+from custom_components.escpos_printer.binary_sensor import EscposCoverOpenSensor, EscposOnlineSensor
 from custom_components.escpos_printer.button import (
     EscposBeepButton,
     EscposCutButton,
@@ -24,6 +24,7 @@ from custom_components.escpos_printer.button import (
 from custom_components.escpos_printer.sensor import (
     BluetoothPrinterBatterySensor,
     LastImagePrintSensor,
+    LastPrintSensor,
     PaperStatusSensor,
 )
 
@@ -46,7 +47,9 @@ def _make_entities() -> dict[str, Any]:
     hass = MagicMock()
     return {
         "binary_sensor.online": EscposOnlineSensor(MagicMock(), _FakeEntry(), adapter),
+        "binary_sensor.cover_open": EscposCoverOpenSensor(_FakeEntry()),
         "sensor.last_image_print": LastImagePrintSensor(_FakeEntry()),
+        "sensor.last_print": LastPrintSensor(_FakeEntry()),
         "sensor.battery": BluetoothPrinterBatterySensor(_FakeEntry(), "AA:BB:CC:DD:EE:FF"),
         "sensor.paper_status": PaperStatusSensor(_FakeEntry()),
         "button.feed": EscposFeedButton(hass, _FakeEntry()),

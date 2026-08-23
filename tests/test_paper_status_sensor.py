@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import Callable
 from datetime import timedelta
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -53,6 +55,33 @@ class _FakeHass:
         return fn(*args)
 
 
+class _YieldingHass:
+    """Like _FakeHass, but actually suspends -- for exercising real interleaving."""
+
+    async def async_add_executor_job(self, fn, *args):  # type: ignore[no-untyped-def]
+        await asyncio.sleep(0)
+        return fn(*args)
+
+
+def _query_status_by_mode(
+    *, paper: bytes = b"\x12", cover: bytes = b"\x12"
+) -> Callable[[bytes], bytes]:
+    """MagicMock side_effect: return different bytes per DLE EOT mode byte.
+
+    Defaults are both "healthy" (paper ok, cover closed) so callers only
+    need to override the mode they care about.
+    """
+
+    def _side_effect(mode: bytes) -> bytes:
+        if mode == b"\x10\x04\x04":
+            return paper
+        if mode == b"\x10\x04\x02":
+            return cover
+        return b""
+
+    return _side_effect
+
+
 @pytest.mark.parametrize(
     ("connection_type", "expected"),
     [
@@ -100,11 +129,33 @@ async def test_paper_sensor_unique_id_is_per_entry():
 async def test_adapter_get_paper_status_success():
     adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
     printer = MagicMock()
-    printer.paper_status.return_value = 1
+    printer.query_status.side_effect = _query_status_by_mode(paper=b"\x1e")  # near-end -> "low"
     adapter._connect = lambda: printer  # type: ignore[method-assign]
     assert await adapter.get_paper_status(_FakeHass()) == 1
     printer.close.assert_called_once()
     assert adapter.get_diagnostics()["paper_status"] == 1
+
+
+async def test_paper_status_empty_response_is_unknown():
+    """A zero-length DLE EOT read means unknown, never a false 'ok' (python-escpos's default)."""
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+    printer = MagicMock()
+    printer.query_status.return_value = b""
+    adapter._connect = lambda: printer  # type: ignore[method-assign]
+    assert await adapter.get_paper_status(_FakeHass()) is None
+
+
+async def test_paper_status_non_conformant_byte_is_unknown():
+    """A reply missing the real-time-status byte's fixed bits (1 and 4) is unknown.
+
+    Not just an empty read -- e.g. a null or stale/misaligned byte left over
+    in a keepalive socket buffer must not fall through to a false "ok".
+    """
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+    printer = MagicMock()
+    printer.query_status.return_value = b"\x00"
+    adapter._connect = lambda: printer  # type: ignore[method-assign]
+    assert await adapter.get_paper_status(_FakeHass()) is None
 
 
 async def test_adapter_get_paper_status_returns_none_on_error():
@@ -148,3 +199,127 @@ async def test_adapter_get_paper_status_skips_when_print_in_flight():
     async with adapter._lock:
         assert await adapter.get_paper_status(_FakeHass()) == 2
     adapter._connect.assert_not_called()
+
+
+async def test_cover_status_parsed_from_dle_eot_n2():
+    """DLE EOT n=2 bit 2 (0x04) set means the cover is open."""
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+    adapter._status_query_ttl = 0
+    printer = MagicMock()
+    printer.query_status.side_effect = _query_status_by_mode(cover=b"\x16")
+    adapter._connect = lambda: printer  # type: ignore[method-assign]
+    assert await adapter.get_paper_status(_FakeHass()) == 2
+    assert await adapter.get_cover_status(_FakeHass()) is True
+    printer.query_status.assert_called_with(b"\x10\x04\x02")
+
+
+async def test_cover_status_empty_response_is_unknown():
+    """A zero-length DLE EOT read means unknown, never 'closed'/OK."""
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+    adapter._status_query_ttl = 0
+    printer = MagicMock()
+    printer.query_status.return_value = b""
+    adapter._connect = lambda: printer  # type: ignore[method-assign]
+    assert await adapter.get_cover_status(_FakeHass()) is None
+    assert adapter._last_paper_status is None
+
+
+async def test_cover_status_non_conformant_byte_is_unknown():
+    """A garbage byte (e.g. 0xFF) must not fire a false PROBLEM alarm."""
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+    adapter._status_query_ttl = 0
+    printer = MagicMock()
+    printer.query_status.side_effect = _query_status_by_mode(cover=b"\xff")
+    adapter._connect = lambda: printer  # type: ignore[method-assign]
+    assert await adapter.get_cover_status(_FakeHass()) is None
+
+
+async def test_cover_status_query_error_is_unknown_but_paper_survives():
+    """A cover-query failure must not clobber an otherwise-successful paper read."""
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+    adapter._status_query_ttl = 0
+    printer = MagicMock()
+
+    def _side_effect(mode: bytes) -> bytes:
+        if mode == b"\x10\x04\x04":
+            return b"\x1e"  # near-end sensor -> "low"
+        raise RuntimeError("no response")
+
+    printer.query_status.side_effect = _side_effect
+    adapter._connect = lambda: printer  # type: ignore[method-assign]
+    assert await adapter.get_cover_status(_FakeHass()) is None
+    assert adapter._last_paper_status == 1
+
+
+async def test_paper_status_query_error_is_unknown_but_cover_survives():
+    """A paper-query failure must not clobber an otherwise-successful cover read."""
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+    adapter._status_query_ttl = 0
+    printer = MagicMock()
+
+    def _side_effect(mode: bytes) -> bytes:
+        if mode == b"\x10\x04\x02":
+            return b"\x16"  # cover open
+        raise RuntimeError("no response")
+
+    printer.query_status.side_effect = _side_effect
+    adapter._connect = lambda: printer  # type: ignore[method-assign]
+    assert await adapter.get_paper_status(_FakeHass()) is None
+    assert adapter._last_cover_status is True
+
+
+async def test_cover_status_cached_within_ttl():
+    """A second get_cover_status call inside the TTL window reuses the cache."""
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+    printer = MagicMock()
+    printer.query_status.side_effect = _query_status_by_mode(cover=b"\x16")
+    adapter._connect = lambda: printer  # type: ignore[method-assign]
+    assert await adapter.get_cover_status(_FakeHass()) is True
+    assert await adapter.get_cover_status(_FakeHass()) is True
+    # One paper + one cover query on the first call; the second is a cache hit.
+    assert printer.query_status.call_count == 2
+
+
+async def test_cover_status_reflected_in_diagnostics():
+    """get_diagnostics()['cover_open'] reflects _last_cover_status after a poll."""
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+    printer = MagicMock()
+    printer.query_status.side_effect = _query_status_by_mode(cover=b"\x16")
+    adapter._connect = lambda: printer  # type: ignore[method-assign]
+    assert await adapter.get_cover_status(_FakeHass()) is True
+    assert adapter.get_diagnostics()["cover_open"] is True
+
+
+async def test_adapter_get_cover_status_skips_when_print_in_flight():
+    """A busy lock returns the last known cover value without opening a connection."""
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+    adapter._last_cover_status = False
+    adapter._connect = MagicMock()  # type: ignore[method-assign]
+    async with adapter._lock:
+        assert await adapter.get_cover_status(_FakeHass()) is False
+    adapter._connect.assert_not_called()
+
+
+async def test_concurrent_status_polls_share_one_query_round_trip():
+    """The paper sensor and cover sensor poll concurrently at setup/on-cadence.
+
+    Regression: the freshness-guard TTL check lived *inside*
+    ``_probe_lock_or_skip``'s hold of the print-serializing lock, so the
+    loser of the race saw that lock already held (by the winner's in-flight
+    query) and took the "print in flight" skip path -- reading a cache that
+    was still empty, instead of waiting for the winner's fresh result.
+    """
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+    printer = MagicMock()
+    printer.query_status.side_effect = _query_status_by_mode(paper=b"\x1e", cover=b"\x16")
+    adapter._connect = lambda: printer  # type: ignore[method-assign]
+
+    hass = _YieldingHass()
+    paper_result, cover_result = await asyncio.gather(
+        adapter.get_paper_status(hass), adapter.get_cover_status(hass)
+    )
+    assert paper_result == 1
+    assert cover_result is True
+    # Exactly one round trip: the second (losing) caller must reuse the
+    # freshly-populated cache, not re-query or read a stale/empty one.
+    assert printer.query_status.call_count == 2

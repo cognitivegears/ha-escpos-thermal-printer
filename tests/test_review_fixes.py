@@ -121,7 +121,7 @@ async def test_paper_status_query_failure_after_connect_does_not_flap_offline(ha
     adapter.add_status_listener(received.append)
 
     fake = MagicMock()
-    fake.paper_status = MagicMock(side_effect=RuntimeError("no response"))
+    fake.query_status = MagicMock(side_effect=RuntimeError("no response"))
     adapter._connect = lambda: fake  # type: ignore[method-assign]
 
     assert await adapter.get_paper_status(hass) is None
@@ -139,7 +139,7 @@ async def test_paper_status_probe_success_marks_online(hass):  # type: ignore[no
     adapter.add_status_listener(received.append)
 
     fake = MagicMock()
-    fake.paper_status.return_value = 2
+    fake.query_status.return_value = b"\x12"  # DLE EOT n=4: paper ok
     adapter._connect = lambda: fake  # type: ignore[method-assign]
 
     assert await adapter.get_paper_status(hass) == 2

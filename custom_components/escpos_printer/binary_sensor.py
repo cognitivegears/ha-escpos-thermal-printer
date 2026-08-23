@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 import contextlib
+from datetime import timedelta
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -10,7 +11,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 
-from .const import CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK
+from .const import CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK, CONNECTION_TYPE_USB
 from .device import build_device_info
 
 if TYPE_CHECKING:
@@ -18,16 +19,31 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
-# Status updates are pushed by the adapter's status listener; no polling here.
+# EscposOnlineSensor's status updates are pushed by the adapter's status
+# listener, not polled -- EscposCoverOpenSensor below is the polled one
+# (see its own SCAN_INTERVAL note).
 PARALLEL_UPDATES = 0
+
+# EscposOnlineSensor is push; EscposCoverOpenSensor polls at the same
+# 5-minute cadence as the paper sensor (they share one connection via the
+# adapter's freshness guard).
+SCAN_INTERVAL = timedelta(minutes=5)
 
 
 async def async_setup_entry(  # type: ignore[no-untyped-def]
     hass: HomeAssistant, entry: EscposConfigEntry, async_add_entities
 ) -> None:
     adapter = entry.runtime_data.adapter
-    entity = EscposOnlineSensor(hass, entry, adapter)
-    async_add_entities([entity])
+    entities: list[BinarySensorEntity] = [EscposOnlineSensor(hass, entry, adapter)]
+    # Cover status needs a real read channel (DLE EOT response); the
+    # Bluetooth/serial transports are write-only — same gate as the
+    # paper sensor in sensor.py.
+    if entry.data.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_NETWORK) in (
+        CONNECTION_TYPE_NETWORK,
+        CONNECTION_TYPE_USB,
+    ):
+        entities.append(EscposCoverOpenSensor(entry))
+    async_add_entities(entities, update_before_add=True)
 
 
 class EscposOnlineSensor(BinarySensorEntity):
@@ -98,3 +114,36 @@ class EscposOnlineSensor(BinarySensorEntity):
             with contextlib.suppress(Exception):
                 self._unsubscribe()
             self._unsubscribe = None
+
+
+class EscposCoverOpenSensor(BinarySensorEntity):
+    """Cover-open fault sensor via the ESC/POS DLE EOT n=2 query."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "cover_open"
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _attr_should_poll = True
+
+    def __init__(self, entry: ConfigEntry) -> None:
+        self._entry = entry
+        self._attr_unique_id = f"{entry.entry_id}_cover_open"
+        self._attr_available = False
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return build_device_info(self._entry)
+
+    async def async_update(self) -> None:
+        runtime = getattr(self._entry, "runtime_data", None)
+        adapter = getattr(runtime, "adapter", None) if runtime else None
+        if adapter is None:
+            self._attr_available = False
+            self._attr_is_on = None
+            return
+        status = await adapter.get_cover_status(self.hass)
+        if status is None:
+            self._attr_available = False
+            self._attr_is_on = None
+            return
+        self._attr_available = True
+        self._attr_is_on = status

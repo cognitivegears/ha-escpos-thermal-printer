@@ -31,7 +31,7 @@ data:
 
 ## Formatted notification (`print_message` entity service)
 
-`notify.send_message` only supports message + title. For full formatting (bold, underline, width, height, alignment, cut, feed, UTF-8 transcoding) use the `escpos_printer.print_message` entity service:
+`notify.send_message` only supports message + title. For full formatting (bold, underline, width, height, invert, density, font, alignment, cut, feed, UTF-8 transcoding) use the `escpos_printer.print_message` entity service:
 
 ```yaml
 service: escpos_printer.print_message

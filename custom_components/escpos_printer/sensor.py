@@ -51,13 +51,14 @@ _PAPER_STATUS_OPTIONS = {2: "ok", 1: "low", 0: "out"}
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: Any
 ) -> None:
-    """Add a battery sensor for Bluetooth printers and a last-print sensor.
+    """Add a battery sensor for Bluetooth printers and the last-print sensors.
 
     Network and USB printers don't have battery state to report — battery
-    sensor only for the BT branch. The last-print diagnostic sensor is
-    always added so users get a live view of the image pipeline.
+    sensor only for the BT branch. The last-print diagnostic sensors are
+    always added so users get a live view of the image pipeline and a
+    transport-independent "last successful print" timestamp.
     """
-    sensors: list[SensorEntity] = [LastImagePrintSensor(entry)]
+    sensors: list[SensorEntity] = [LastImagePrintSensor(entry), LastPrintSensor(entry)]
 
     if entry.data.get(CONF_CONNECTION_TYPE) == CONNECTION_TYPE_BLUETOOTH:
         mac = entry.data.get(CONF_BT_MAC, "")
@@ -129,6 +130,40 @@ class LastImagePrintSensor(SensorEntity):
             "last_slice_count": stats.last_slice_count,
             "last_error_class": stats.last_error_class,
         }
+
+
+class LastPrintSensor(SensorEntity):
+    """Timestamp of the last successful print (text, QR, barcode, image, batch).
+
+    Distinct from the Online sensor's last_ok, which status probes also
+    refresh. Enables "no receipt printed today" automations. State is
+    unknown until the first print after startup (the value is not
+    persisted across restarts).
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "last_print"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_should_poll = True
+
+    def __init__(self, entry: ConfigEntry) -> None:
+        self._entry = entry
+        self._attr_unique_id = f"{entry.entry_id}_last_print"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return build_device_info(self._entry)
+
+    async def async_update(self) -> None:
+        runtime = getattr(self._entry, "runtime_data", None)
+        adapter = getattr(runtime, "adapter", None) if runtime else None
+        if adapter is None:
+            self._attr_available = False
+            self._attr_native_value = None
+            return
+        self._attr_available = True
+        self._attr_native_value = getattr(adapter, "_last_print", None)
 
 
 class BluetoothPrinterBatterySensor(SensorEntity):

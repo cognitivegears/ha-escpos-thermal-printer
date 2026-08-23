@@ -51,7 +51,7 @@ docker compose down  # to stop
 - Unit tests use `pytest-homeassistant-custom-component` with async mode auto-enabled.
 - Integration tests in `tests/integration_tests/` include a virtual printer emulator, mock data generators, and scenario tests.
 - Tests marked `@pytest.mark.integration` require HA runtime and are excluded by default.
-- Set `ESC_POS_DISABLE_PLATFORMS=1` to skip platform forwarding in unit tests.
+- `ESC_POS_DISABLE_PLATFORMS=1` is honored by `async_setup_entry`, but an autouse fixture in `tests/conftest.py` pins it to `0` for non-integration tests, so unit tests always run with full platform forwarding.
 
 ### Dependency Management
 

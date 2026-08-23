@@ -166,7 +166,7 @@ def profile_provides_calibration(profile_key: str | None) -> bool:
         return False
     try:
         pixels = profile["media"]["width"]["pixels"]
-    except (KeyError, TypeError):
+    except KeyError, TypeError:
         return False
     if not isinstance(pixels, (int, float)):
         return False
