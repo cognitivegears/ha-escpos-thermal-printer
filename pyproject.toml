@@ -50,8 +50,8 @@ include = ["custom_components*", "scripts*"]
 dev = [
     "pytest==9.0.3",
     "pytest-homeassistant-custom-component==0.13.355",
-    "mypy==2.3.0",
-    "ruff==0.16.2",
+    "mypy==2.3.1",
+    "ruff==0.16.4",
     "pre-commit==4.6.2",
     "bandit==1.9.4",
     "bandit-sarif-formatter==1.1.1",
