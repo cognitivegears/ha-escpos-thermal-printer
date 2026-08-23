@@ -82,6 +82,11 @@ def fake_escpos_module(request: Any, monkeypatch: pytest.MonkeyPatch) -> Generat
         def charcode(self, *_: Any, **__: Any) -> None:
             pass
 
+        def query_status(self, *_: Any, **__: Any) -> bytes:
+            # b"" -> "unknown" through get_paper_status/get_cover_status,
+            # the correct semantic for a fake with no real read channel.
+            return b""
+
     class _FakeNetwork(_FakeEscposCommon):
         def __init__(self, *_: Any, profile: Any = None, **__: Any) -> None:
             # Mirror real Escpos.__init__: the profile kwarg must be a
@@ -253,22 +258,24 @@ def fake_network_status_probe(request: Any, monkeypatch: pytest.MonkeyPatch) -> 
 
 
 @pytest.fixture(autouse=True)
-def disable_platform_forwarding_for_unit_tests(monkeypatch: Any, request: Any) -> None:
-    """Avoid starting HA http/notify stack in unit tests.
+def pin_platform_forwarding_on_for_unit_tests(monkeypatch: Any, request: Any) -> None:
+    """Pin full platform forwarding on for non-integration tests.
 
-    For tests not marked as 'integration', prevent platform forwarding by
-    setting PLATFORMS to an empty list. Service registration remains intact.
+    Unit tests deliberately run with the real ``PLATFORMS`` list forwarded
+    (notify, binary_sensor, sensor, button) rather than a reduced set --
+    this fixture's only job is making sure a developer's shell with
+    ``ESC_POS_DISABLE_PLATFORMS=1`` exported can't silently change what
+    unit tests exercise.
+
+    Historical note: this used to also try to shrink ``PLATFORMS`` via
+    ``monkeypatch.setattr`` on a separately-imported ``__init__`` module
+    object, but that import binds a distinct module from the package HA
+    actually loads, so the patch never affected ``async_setup_entry`` --
+    the full platform list has always been forwarded in unit tests.
     """
     if request.node.get_closest_marker("integration"):
         return
-    try:
-        import custom_components.escpos_printer.__init__ as cc_init
-
-        # Allow notify platform during unit tests; disable others via env flag
-        monkeypatch.setattr(cc_init, "PLATFORMS", ["notify"], raising=False)
-        monkeypatch.setenv("ESC_POS_DISABLE_PLATFORMS", "0")
-    except Exception:
-        pass
+    monkeypatch.setenv("ESC_POS_DISABLE_PLATFORMS", "0")
 
 
 @pytest.fixture(autouse=True)

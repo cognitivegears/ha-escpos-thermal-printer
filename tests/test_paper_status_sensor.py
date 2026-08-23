@@ -280,6 +280,26 @@ async def test_cover_status_cached_within_ttl():
     assert printer.query_status.call_count == 2
 
 
+async def test_cover_status_reflected_in_diagnostics():
+    """get_diagnostics()['cover_open'] reflects _last_cover_status after a poll."""
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+    printer = MagicMock()
+    printer.query_status.side_effect = _query_status_by_mode(cover=b"\x16")
+    adapter._connect = lambda: printer  # type: ignore[method-assign]
+    assert await adapter.get_cover_status(_FakeHass()) is True
+    assert adapter.get_diagnostics()["cover_open"] is True
+
+
+async def test_adapter_get_cover_status_skips_when_print_in_flight():
+    """A busy lock returns the last known cover value without opening a connection."""
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+    adapter._last_cover_status = False
+    adapter._connect = MagicMock()  # type: ignore[method-assign]
+    async with adapter._lock:
+        assert await adapter.get_cover_status(_FakeHass()) is False
+    adapter._connect.assert_not_called()
+
+
 async def test_concurrent_status_polls_share_one_query_round_trip():
     """The paper sensor and cover sensor poll concurrently at setup/on-cadence.
 

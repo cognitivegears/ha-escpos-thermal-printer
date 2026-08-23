@@ -105,3 +105,46 @@ async def test_last_print_sensor_unavailable_without_adapter():
     sensor = LastPrintSensor(_FakeEntry())  # type: ignore[arg-type]
     await sensor.async_update()
     assert sensor.available is False
+    assert sensor.native_value is None
+
+
+async def test_feed_cut_beep_do_not_stamp_last_print():
+    """Control ops (feed/cut/beep) update _last_ok but never _last_print."""
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+    printer = MagicMock()
+    adapter._connect = lambda: printer  # type: ignore[method-assign]
+
+    await adapter.feed(_FakeHass(), lines=3)
+    await adapter.cut(_FakeHass(), mode="full")
+    await adapter.beep(_FakeHass())
+
+    assert adapter._last_print is None
+    assert adapter._last_ok is not None
+
+
+async def test_print_qr_and_print_barcode_stamp_last_print():
+    """print_qr and print_barcode are print ops -- they stamp _last_print."""
+    qr_adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+    qr_printer = MagicMock()
+    qr_adapter._connect = lambda: qr_printer  # type: ignore[method-assign]
+    assert qr_adapter._last_print is None
+    await qr_adapter.print_qr(_FakeHass(), data="hello")
+    assert qr_adapter._last_print is not None
+
+    barcode_adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+    barcode_printer = MagicMock()
+    barcode_adapter._connect = lambda: barcode_printer  # type: ignore[method-assign]
+    assert barcode_adapter._last_print is None
+    await barcode_adapter.print_barcode(_FakeHass(), code="123456", bc="CODE128")
+    assert barcode_adapter._last_print is not None
+
+
+async def test_batch_connection_stamps_last_print():
+    """batch_connection is a print op -- it stamps _last_print once on exit."""
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+    printer = MagicMock()
+    adapter._connect = lambda: printer  # type: ignore[method-assign]
+    assert adapter._last_print is None
+    async with adapter.batch_connection(_FakeHass()) as page:
+        await page.print_text(text="hello")
+    assert adapter._last_print is not None
