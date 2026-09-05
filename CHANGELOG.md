@@ -7,40 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-05
+
 ### Added
 
 - `invert`, `density`, and `font` styling options on `print_text`, `print_text_utf8`, and the notify entity's `print_message` action.
 - Cover-open binary sensor for network and USB printers, sharing the paper sensor's 5-minute poll connection.
 - Last-print timestamp sensor (`sensor.<printer>_last_print`) for "no receipt printed today" automations.
-
-### Fixed
-
-- A printer that doesn't answer real-time status queries now shows paper
-  status as unknown instead of a false "ok". The paper sensor previously
-  trusted python-escpos's `paper_status()`, which defaults a zero-length
-  read to "plenty of paper" — silently hiding an out-of-paper condition on
-  a printer/firmware that ignores the query.
-- Clearing the preselected printer profile in the add-printer form (network
-  discovery, USB, and Bluetooth) now actually stores the Generic
-  (no-profile) choice. Previously the discovery suggestion was the schema
-  default, so a cleared field was silently reinstated to the suggested
-  profile on submit. The suggestion is now a prefilled value only.
-- The "not yet calibrated" Repairs suggestion is no longer filed for
-  printers whose selected profile already carries everything the wizard
-  measures (image implementation, pixel width, font columns, and a
-  codepage table). Generic, custom, and incomplete profiles still get
-  the nudge.
-- Repairs issues now name the printer they refer to: the "not yet
-  calibrated" suggestion and the profile-width fallback warning both show
-  the config entry's title in their heading, and the calibration fix-flow
-  dialog names the printer being calibrated. Previously, with multiple
-  printers, identical "Printer not yet calibrated" entries were
-  indistinguishable.
-
-## [1.2.0] - 2026-08-15
-
-### Added
-
 - Print services can now be targeted by entity, area, floor, or label — in
   addition to device — via Home Assistant's standard `target:` block, and
   now appear in the entity/device "Add to… → Create as a new action"
@@ -74,6 +47,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - The implicit broadcast-when-no-target fallback (omitting both a target
   and `broadcast`) is deprecated; it will be removed in 2.0.0. Select a
   target or set `broadcast: true` instead.
+
+### Fixed
+
+- A printer that doesn't answer real-time status queries now shows paper
+  status as unknown instead of a false "ok". The paper sensor previously
+  trusted python-escpos's `paper_status()`, which defaults a zero-length
+  read to "plenty of paper" — silently hiding an out-of-paper condition on
+  a printer/firmware that ignores the query.
+- Clearing the preselected printer profile in the add-printer form (network
+  discovery, USB, and Bluetooth) now actually stores the Generic
+  (no-profile) choice. Previously the discovery suggestion was the schema
+  default, so a cleared field was silently reinstated to the suggested
+  profile on submit. The suggestion is now a prefilled value only.
+- The "not yet calibrated" Repairs suggestion is no longer filed for
+  printers whose selected profile already carries everything the wizard
+  measures (image implementation, pixel width, font columns, and a
+  codepage table). Generic, custom, and incomplete profiles still get
+  the nudge.
+- Repairs issues now name the printer they refer to: the "not yet
+  calibrated" suggestion and the profile-width fallback warning both show
+  the config entry's title in their heading, and the calibration fix-flow
+  dialog names the printer being calibrated. Previously, with multiple
+  printers, identical "Printer not yet calibrated" entries were
+  indistinguishable.
 
 ## [1.1.0] - 2026-08-14
 
