@@ -121,6 +121,14 @@ def test_nt80vul_patch_is_idempotent() -> None:
     assert first == second
 
 
+def test_rp326_geometry_patched() -> None:
+    register_custom_profiles()
+    profile_data = escpos.capabilities.get_profile("RP326").profile_data
+    assert profile_data["media"]["width"]["pixels"] == 576
+    assert profile_data["fonts"]["0"]["columns"] == 48
+    assert profile_data["fonts"]["1"]["columns"] == 64
+
+
 def test_aliased_model_through_nt80vul_gets_corrected_line_widths() -> None:
     """Xprinter XP-80C routes through NT-80-V-UL; its columns should now
     reflect the corrected profile data (48, 64), not the plausibility-filter

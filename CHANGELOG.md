@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   width in pixels ÷ 12) instead of silently storing an impossible value —
   several submitted calibration reports had mistyped/miscounted a ruler
   reading this way.
+- The Rongta RP326 profile now defaults to 576 px / 48 columns (Font B 64)
+  instead of an unknown width and 42 columns, per Rongta's manual and a
+  hardware calibration report (#160).
 
 ## [1.2.0] - 2026-09-05
 
