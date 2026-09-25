@@ -15,6 +15,24 @@ from ..const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+# Mirrors network_helpers._ID_MAX_LEN -- same "don't let an untrusted
+# device's descriptor string balloon into stored entry data" reasoning.
+_USB_DESCRIPTOR_MAX_LEN = 80
+
+
+def _sanitize_usb_descriptor(value: str | None) -> str | None:
+    """Printable-only, whitespace-trimmed, length-capped USB descriptor string.
+
+    Mirrors network_helpers._read_id_reply's treatment of a GS I reply --
+    a USB string descriptor is just as untrusted as a network printer's
+    GS I response, so it gets the same control-byte stripping before it's
+    eligible to be stored as detected identity.
+    """
+    if not value:
+        return None
+    cleaned = "".join(c for c in value if c.isprintable()).strip()
+    return cleaned[:_USB_DESCRIPTOR_MAX_LEN] or None
+
 
 def _parse_vid_pid(value: int | str) -> int:
     """Parse a VID or PID value from various formats.
@@ -253,8 +271,19 @@ def _enumerate_usb_devices(
                 continue
             is_known_printer = device.idVendor in THERMAL_PRINTER_VIDS
             try:
-                manufacturer = usb.util.get_string(device, device.iManufacturer) or "Unknown"
-                product = usb.util.get_string(device, device.iProduct) or default_product
+                # Sanitized *raw* descriptor strings (None when absent) are
+                # kept alongside the display-friendly fallback-applied
+                # ``manufacturer``/``product`` below -- callers that persist
+                # "detected identity" (see usb_steps.py) must be able to
+                # tell "the device told us its real name" apart from "we
+                # fell back to a generic label", which the fallback-applied
+                # values alone can't distinguish.
+                manufacturer_raw = _sanitize_usb_descriptor(
+                    usb.util.get_string(device, device.iManufacturer)
+                )
+                product_raw = _sanitize_usb_descriptor(usb.util.get_string(device, device.iProduct))
+                manufacturer = manufacturer_raw or "Unknown"
+                product = product_raw or default_product
                 serial = None
                 try:
                     if device.iSerialNumber:
@@ -270,6 +299,8 @@ def _enumerate_usb_devices(
                         "product_id": device.idProduct,
                         "manufacturer": manufacturer,
                         "product": product,
+                        "manufacturer_raw": manufacturer_raw,
+                        "product_raw": product_raw,
                         "serial_number": serial,
                         "is_known_printer": is_known_printer,
                         "label": f"{manufacturer} {product} ({device.idVendor:04X}:{device.idProduct:04X})",
@@ -282,6 +313,8 @@ def _enumerate_usb_devices(
                         "product_id": device.idProduct,
                         "manufacturer": "Unknown",
                         "product": default_product,
+                        "manufacturer_raw": None,
+                        "product_raw": None,
                         "serial_number": None,
                         "is_known_printer": is_known_printer,
                         "label": f"{default_product} ({device.idVendor:04X}:{device.idProduct:04X})",

@@ -8,6 +8,8 @@ import pytest
 from custom_components.escpos_printer.config_flow import EscposConfigFlow
 from custom_components.escpos_printer.const import (
     CONF_CONNECTION_TYPE,
+    CONF_DETECTED_MANUFACTURER,
+    CONF_DETECTED_MODEL,
     CONF_IN_EP,
     CONF_OUT_EP,
     CONF_PRODUCT_ID,
@@ -178,6 +180,72 @@ class TestUsbStep:
 
         assert result["type"] == "form"
         assert result["step_id"] == "codepage"
+
+    @pytest.mark.asyncio
+    async def test_step_usb_select_stores_real_descriptor_as_detected_identity(
+        self, hass, mock_usb_printers
+    ):
+        """A device with real (non-fallback) descriptor strings gets them stored
+        under the same CONF_DETECTED_* keys network entries use -- but never
+        the serial number, which is privacy-sensitive and only ever folds
+        into the unique_id.
+        """
+        flow = EscposConfigFlow()
+        flow.hass = hass
+        flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB}
+        printers = [
+            {
+                **mock_usb_printers[0],
+                "manufacturer_raw": "EPSON",
+                "product_raw": "TM-T88V",
+                "serial_number": "SN-SHOULD-NOT-LEAK",
+            }
+        ]
+        flow._discovered_printers = printers
+
+        with (
+            patch(
+                "custom_components.escpos_printer._config_flow.usb_steps._can_connect_usb",
+                return_value=(True, None, None),
+            ),
+            patch.object(flow, "async_set_unique_id", return_value=None),
+            patch.object(flow, "_abort_if_unique_id_configured"),
+        ):
+            await flow.async_step_usb_select(
+                {"usb_device": "04B8:0202#0", "timeout": 4.0, "profile": ""}
+            )
+
+        assert flow._user_data[CONF_DETECTED_MANUFACTURER] == "EPSON"
+        assert flow._user_data[CONF_DETECTED_MODEL] == "TM-T88V"
+        assert "serial_number" not in flow._user_data
+        assert "SN-SHOULD-NOT-LEAK" not in flow._user_data.values()
+
+    @pytest.mark.asyncio
+    async def test_step_usb_select_no_detected_identity_for_fallback_descriptor(
+        self, hass, mock_usb_printers
+    ):
+        """The generic "Unknown"/"Thermal Printer" fallback (no real USB
+        string descriptor read) must never be stored as detected identity.
+        """
+        flow = EscposConfigFlow()
+        flow.hass = hass
+        flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_USB}
+        flow._discovered_printers = mock_usb_printers  # entry[1] has no *_raw keys
+
+        with (
+            patch(
+                "custom_components.escpos_printer._config_flow.usb_steps._can_connect_usb",
+                return_value=(True, None, None),
+            ),
+            patch.object(flow, "async_set_unique_id", return_value=None),
+            patch.object(flow, "_abort_if_unique_id_configured"),
+        ):
+            await flow.async_step_usb_select(
+                {"usb_device": "0416:5011#0", "timeout": 4.0, "profile": ""}
+            )
+
+        assert CONF_DETECTED_MANUFACTURER not in flow._user_data
+        assert CONF_DETECTED_MODEL not in flow._user_data
 
     @pytest.mark.asyncio
     async def test_step_usb_connection_test_failure(self, hass, mock_usb_printers):
@@ -446,6 +514,36 @@ class TestUsbDiscoveryStep:
 
         assert result["type"] == "form"
         assert result["step_id"] == "usb_confirm"
+
+    @pytest.mark.asyncio
+    async def test_step_usb_discovery_never_stores_description_as_detected_model(self, hass):
+        """serialx's SerialPortInfo.description falls back to the device
+        basename (e.g. "ttyACM0") -- or, on macOS, "cu.usbserial-<FTDI
+        serial>", which would leak a serial number -- when there's no real
+        iProduct descriptor. Neither is a product name, so CONF_DETECTED_MODEL
+        must never be populated from it in the discovery path (manufacturer
+        is still fine -- it comes straight off iManufacturer).
+        """
+        flow = EscposConfigFlow()
+        flow.hass = hass
+
+        for fallback_description in ("ttyACM0", "cu.usbserial-A6008isP"):
+            discovery_info = MockUsbServiceInfo(
+                device="/dev/usb/001",
+                vid="04B8",
+                pid="0202",
+                serial_number=None,
+                manufacturer="Epson",
+                description=fallback_description,
+            )
+            with (
+                patch.object(flow, "async_set_unique_id", return_value=None),
+                patch.object(flow, "_abort_if_unique_id_configured"),
+            ):
+                await flow.async_step_usb(discovery_info)
+
+            assert CONF_DETECTED_MODEL not in flow._user_data
+            assert flow._user_data[CONF_DETECTED_MANUFACTURER] == "Epson"
 
     @pytest.mark.asyncio
     async def test_step_usb_discovery_already_in_progress_aborts(self, hass):

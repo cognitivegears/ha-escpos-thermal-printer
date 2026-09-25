@@ -8,6 +8,7 @@ from custom_components.escpos_printer._config_flow.network_helpers import (
     _ID_DRAIN_MAX,
     _ID_MAX_LEN,
     _read_id_reply,
+    query_printer_firmware,
     query_printer_id,
 )
 
@@ -170,3 +171,30 @@ def test_query_printer_id_never_raises_on_weird_oserror():
         return_value=sock,
     ):
         assert query_printer_id("192.168.10.157", 9100, 4.0) is None
+
+
+def test_query_printer_firmware_happy_path():
+    fake = FakeSocket(b"\x5f1.05\x00")
+    with patch(
+        "custom_components.escpos_printer._config_flow.network_helpers.socket.create_connection",
+        return_value=fake,
+    ):
+        assert query_printer_firmware("192.168.10.157", 9100, 4.0) == "1.05"
+    assert fake.sent == [b"\x1d\x49\x41"]
+
+
+def test_query_printer_firmware_silent_clone_returns_none():
+    # Clone never answers GS I 65 -> timeout -> None, no exception.
+    with patch(
+        "custom_components.escpos_printer._config_flow.network_helpers.socket.create_connection",
+        return_value=FakeSocket(b""),
+    ):
+        assert query_printer_firmware("192.168.10.157", 9100, 4.0) is None
+
+
+def test_query_printer_firmware_connection_refused_returns_none():
+    with patch(
+        "custom_components.escpos_printer._config_flow.network_helpers.socket.create_connection",
+        side_effect=ConnectionRefusedError,
+    ):
+        assert query_printer_firmware("192.168.10.157", 9100, 4.0) is None

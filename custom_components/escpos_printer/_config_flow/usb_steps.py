@@ -16,6 +16,8 @@ from ..capabilities import (
 )
 from ..const import (
     CONF_CONNECTION_TYPE,
+    CONF_DETECTED_MANUFACTURER,
+    CONF_DETECTED_MODEL,
     CONF_IN_EP,
     CONF_OUT_EP,
     CONF_PRODUCT_ID,
@@ -35,6 +37,7 @@ from .usb_helpers import (
     _discover_usb_printers,
     _generate_usb_unique_id,
     _parse_vid_pid,
+    _sanitize_usb_descriptor,
     _usb_error_to_key,
 )
 
@@ -42,6 +45,25 @@ if TYPE_CHECKING:
     from homeassistant.helpers.service_info.usb import UsbServiceInfo
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _store_detected_identity(user_data: dict[str, Any], device: dict[str, Any] | None) -> None:
+    """Store a discovered USB device's real descriptor strings as detected identity.
+
+    Uses the same ``CONF_DETECTED_MANUFACTURER``/``CONF_DETECTED_MODEL``
+    keys network entries populate from their GS I query -- only when the
+    device reported a real (non-fallback) manufacturer/product string; see
+    ``usb_helpers._enumerate_usb_devices``'s ``manufacturer_raw``/
+    ``product_raw`` fields. Never touches the serial number.
+    """
+    if device is None:
+        return
+    manufacturer = device.get("manufacturer_raw")
+    if manufacturer:
+        user_data[CONF_DETECTED_MANUFACTURER] = manufacturer
+    model = device.get("product_raw")
+    if model:
+        user_data[CONF_DETECTED_MODEL] = model
 
 
 async def _suggest_default_profile(
@@ -156,6 +178,7 @@ class UsbFlowMixin:
                         CONF_PROFILE: profile,
                         "_printer_name": printer_name,  # For entry title
                     }
+                    _store_detected_identity(self._user_data, selected_printer)
 
                     # If custom profile selected, go to custom profile step
                     if profile == PROFILE_CUSTOM:
@@ -305,6 +328,7 @@ class UsbFlowMixin:
                         CONF_PROFILE: profile,
                         "_printer_name": device_name,  # For entry title
                     }
+                    _store_detected_identity(self._user_data, selected_usb_device)
 
                     # If custom profile selected, go to custom profile step
                     if profile == PROFILE_CUSTOM:
@@ -520,6 +544,15 @@ class UsbFlowMixin:
             "_printer_name": discovery_info.description
             or f"USB Printer {vendor_id:04X}:{product_id:04X}",
         }
+        # NOT CONF_DETECTED_MODEL from discovery_info.description: HA's usb
+        # integration builds it from serialx's SerialPortInfo.description,
+        # which falls back to the device basename (e.g. "ttyACM0") -- or,
+        # on macOS, "cu.usbserial-<FTDI serial>" -- when there's no iProduct
+        # descriptor. Neither is a real product name, and the FTDI case
+        # would leak a serial number into stored entry data.
+        detected_manufacturer = _sanitize_usb_descriptor(discovery_info.manufacturer)
+        if detected_manufacturer:
+            self._user_data[CONF_DETECTED_MANUFACTURER] = detected_manufacturer
 
         # Show confirmation step
         return await self.async_step_usb_confirm()

@@ -81,6 +81,9 @@ def _can_connect(host: str, port: int, timeout: float) -> bool:
 
 _GS_I_MAKER = b"\x1d\x49\x42"  # GS I 66 -> maker name ("EPSON")
 _GS_I_MODEL = b"\x1d\x49\x43"  # GS I 67 -> model name ("TM-T20II")
+_GS_I_FIRMWARE = b"\x1d\x49\x41"  # GS I 65 -> firmware version. Deliberately NOT
+# paired with GS I 68 (serial number) here -- the calibration share-report
+# this feeds must never leak a serial number.
 _ID_HEADER = 0x5F
 _ID_MAX_LEN = 80
 _ID_READ_TIMEOUT = 2.0
@@ -143,3 +146,21 @@ def query_printer_id(host: str, port: int, timeout: float) -> dict[str, str] | N
     except OSError:
         _LOGGER.debug("GS I query failed for %s:%s", host, port)
     return result or None
+
+
+def query_printer_firmware(host: str, port: int, timeout: float) -> str | None:
+    """Best-effort firmware version via GS I 65 over raw TCP. Never raises.
+
+    Separate connection/call from ``query_printer_id`` (called from the
+    calibration wizard, not the config flow) but shares the same
+    ``_read_id_reply`` framing parser -- read-only, nothing printed, no
+    printer state changes.
+    """
+    try:
+        with socket.create_connection((host, port), timeout=timeout) as sock:
+            sock.settimeout(_ID_READ_TIMEOUT)
+            sock.sendall(_GS_I_FIRMWARE)
+            return _read_id_reply(sock)
+    except OSError:
+        _LOGGER.debug("GS I firmware query failed for %s:%s", host, port)
+        return None

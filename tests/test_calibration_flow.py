@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
+from urllib.parse import parse_qs, unquote, urlparse
 
 from homeassistant.components import persistent_notification as pn
 from homeassistant.config_entries import ConfigEntryState
@@ -16,15 +17,22 @@ import voluptuous as vol
 from custom_components.escpos_printer._config_flow.calibration import CODEPAGE_CANDIDATES
 from custom_components.escpos_printer.capabilities.loader import _get_capabilities
 from custom_components.escpos_printer.const import (
+    CONF_BT_MAC,
     CONF_CODEPAGE,
     CONF_CONNECTION_TYPE,
+    CONF_DETECTED_MANUFACTURER,
     CONF_DETECTED_MODEL,
     CONF_IMPL,
     CONF_LINE_WIDTH,
+    CONF_MAC_ADDRESS,
+    CONF_PRODUCT_ID,
     CONF_PROFILE,
+    CONF_SERIAL_PORT,
     CONF_TIMEOUT,
+    CONF_VENDOR_ID,
     CONF_WIDTH_PIXELS,
     CONNECTION_TYPE_NETWORK,
+    CONNECTION_TYPE_USB,
     DOMAIN,
 )
 
@@ -64,22 +72,33 @@ def test_codepage_candidates_are_real_encodings():
 
 
 def _make_entry(
-    hass, *, loaded: bool = True, options: dict | None = None, data_extra: dict | None = None
+    hass,
+    *,
+    loaded: bool = True,
+    options: dict | None = None,
+    data_extra: dict | None = None,
+    connection_type: str = CONNECTION_TYPE_NETWORK,
+    unique_id: str = "1.2.3.4:9100",
 ) -> tuple[MockConfigEntry, MagicMock]:
-    """A MockConfigEntry with a mock adapter wired onto runtime_data."""
-    data = {
-        CONF_HOST: "1.2.3.4",
-        CONF_PORT: 9100,
-        CONF_CONNECTION_TYPE: CONNECTION_TYPE_NETWORK,
-    }
+    """A MockConfigEntry with a mock adapter wired onto runtime_data.
+
+    ``unique_id`` also becomes the entry title -- overridable so a test
+    can prove a value (e.g. a USB unique_id carrying a serial number)
+    never leaks via ``entry.title``, which ``build_share_url`` must never
+    read from in the first place.
+    """
+    data: dict = {CONF_CONNECTION_TYPE: connection_type}
+    if connection_type == CONNECTION_TYPE_NETWORK:
+        data[CONF_HOST] = "1.2.3.4"
+        data[CONF_PORT] = 9100
     if data_extra:
         data.update(data_extra)
     entry = MockConfigEntry(
         domain=DOMAIN,
-        title="1.2.3.4:9100",
+        title=unique_id,
         data=data,
         options=options or {},
-        unique_id="1.2.3.4:9100",
+        unique_id=unique_id,
     )
     entry.add_to_hass(hass)
     if loaded:
@@ -986,3 +1005,159 @@ async def test_calibrate_summary_prefills_detected_model(hass):  # type: ignore[
     schema = result["data_schema"].schema
     model_key = next(k for k in schema if k.schema == "model")
     assert model_key.default() == "TM-T20II"
+
+
+def _share_url_body(result: dict) -> str:
+    """URL-decode the ``body`` query param off a ``calibration_saved`` abort result."""
+    share_url = result["description_placeholders"]["share_url"]
+    return unquote(parse_qs(urlparse(share_url).query)["body"][0])
+
+
+async def test_summary_share_url_includes_network_identity_and_firmware(hass):  # type: ignore[no-untyped-def]
+    """Detected identity: connection type, autodetect suggestion, GS I strings, firmware."""
+    entry, _adapter = _make_entry(
+        hass,
+        data_extra={
+            CONF_DETECTED_MANUFACTURER: "EPSON",
+            CONF_DETECTED_MODEL: "TM-T20II",
+        },
+    )
+    result = await _advance_to_summary(hass, entry)
+
+    with patch(
+        "custom_components.escpos_printer._config_flow.calibration_steps.query_printer_firmware",
+        return_value="1.05",
+    ):
+        result2 = await _submit_save(
+            hass, result["flow_id"], {"model": "TM-T20II", "action": "save"}
+        )
+
+    assert result2["reason"] == "calibration_saved"
+    body = _share_url_body(result2)
+    assert "Connection type: network" in body
+    assert "Autodetect suggestion: TM-T20II" in body
+    assert "Detected manufacturer: `EPSON`" in body
+    assert "Detected model: `TM-T20II`" in body
+    assert "Firmware version: `1.05`" in body
+
+
+async def test_summary_share_url_includes_usb_identity_and_suggestion(hass):  # type: ignore[no-untyped-def]
+    """USB entries report hex VID:PID, detected descriptor strings, and an
+    autodetect suggestion that mirrors what setup itself suggested.
+
+    Epson (0x04B8) is deliberately absent from the curated VID:PID table
+    (see capabilities/suggestions.py) -- the suggestion here can only come
+    from the stored product descriptor matching by name, same as setup's
+    own suggestion. Recomputing from VID:PID alone (the pre-fix behavior)
+    would report "none" for this exact case.
+    """
+    entry, _adapter = _make_entry(
+        hass,
+        connection_type=CONNECTION_TYPE_USB,
+        data_extra={
+            CONF_VENDOR_ID: 0x04B8,
+            CONF_PRODUCT_ID: 0x0202,
+            CONF_DETECTED_MANUFACTURER: "EPSON",
+            CONF_DETECTED_MODEL: "TM-T20II",
+        },
+    )
+    result = await _advance_to_summary(hass, entry)
+
+    result2 = await _submit_save(hass, result["flow_id"], {"model": "TM-T20II", "action": "save"})
+
+    assert result2["reason"] == "calibration_saved"
+    body = _share_url_body(result2)
+    assert "Connection type: usb" in body
+    assert "Autodetect suggestion: TM-T20II" in body
+    assert "Detected manufacturer: `EPSON`" in body
+    assert "Detected model: `TM-T20II`" in body
+    assert "USB VID:PID: 04B8:0202" in body
+    assert "Firmware version: (not queried)" in body
+
+
+async def test_summary_share_url_usb_without_stored_descriptor_suggests_none(hass):  # type: ignore[no-untyped-def]
+    """A USB entry added before descriptor persistence (or with no real
+    descriptor) has no CONF_DETECTED_* data -- suggestion falls back to the
+    VID:PID table (Epson isn't in it), and the descriptor lines read
+    "(unknown)" rather than silently reusing the user-typed model field.
+    """
+    entry, _adapter = _make_entry(
+        hass,
+        connection_type=CONNECTION_TYPE_USB,
+        data_extra={CONF_VENDOR_ID: 0x04B8, CONF_PRODUCT_ID: 0x0202},
+    )
+    result = await _advance_to_summary(hass, entry)
+
+    result2 = await _submit_save(hass, result["flow_id"], {"model": "TM-T20II", "action": "save"})
+
+    assert result2["reason"] == "calibration_saved"
+    body = _share_url_body(result2)
+    assert "Autodetect suggestion: none" in body
+    assert "Detected manufacturer: (unknown)" in body
+    assert "Detected model: (unknown)" in body
+
+
+async def test_summary_share_url_never_leaks_addresses_or_serials(hass):  # type: ignore[no-untyped-def]
+    """Privacy regression: host/port/MACs/serial number/serial port never reach the body.
+
+    Even though the entry carries all of these (a network entry's host/
+    port are legitimately used to open the firmware-query socket), none
+    of them are allowlisted fields, so none may appear in the rendered,
+    URL-decoded report body.
+    """
+    private_host = "10.42.6.9"
+    private_port = 19100
+    private_mac = "AA:BB:CC:DD:EE:FF"
+    private_bt_mac = "11:22:33:44:55:66"
+    private_serial_number = "SN-SECRET-0007"
+    private_serial_port = "/dev/ttyUSB7"
+    entry, _adapter = _make_entry(
+        hass,
+        data_extra={
+            CONF_HOST: private_host,
+            CONF_PORT: private_port,
+            CONF_MAC_ADDRESS: private_mac,
+            CONF_BT_MAC: private_bt_mac,
+            "serial_number": private_serial_number,
+            CONF_SERIAL_PORT: private_serial_port,
+        },
+    )
+    result = await _advance_to_summary(hass, entry)
+
+    with patch(
+        "custom_components.escpos_printer._config_flow.calibration_steps.query_printer_firmware",
+        return_value=None,
+    ):
+        result2 = await _submit_save(hass, result["flow_id"], {"model": "", "action": "save"})
+
+    assert result2["reason"] == "calibration_saved"
+    body = _share_url_body(result2)
+    for secret in (
+        private_host,
+        str(private_port),
+        private_mac,
+        private_bt_mac,
+        private_serial_number,
+        private_serial_port,
+        "1.2.3.4",  # the entry title/unique_id's host -- never read either
+    ):
+        assert secret not in body
+
+
+async def test_summary_share_url_never_leaks_usb_unique_id_serial(hass):  # type: ignore[no-untyped-def]
+    """Privacy regression: a USB unique_id carrying a serial number
+    (``usb:VID:PID:serial``) never reaches the report body either."""
+    private_usb_serial = "SN-SECRET-USB-0009"
+    entry, _adapter = _make_entry(
+        hass,
+        connection_type=CONNECTION_TYPE_USB,
+        data_extra={CONF_VENDOR_ID: 0x04B8, CONF_PRODUCT_ID: 0x0202},
+        unique_id=f"usb:04B8:0202:{private_usb_serial}",
+    )
+    result = await _advance_to_summary(hass, entry)
+
+    result2 = await _submit_save(hass, result["flow_id"], {"model": "", "action": "save"})
+
+    assert result2["reason"] == "calibration_saved"
+    body = _share_url_body(result2)
+    assert private_usb_serial not in body

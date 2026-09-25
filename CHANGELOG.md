@@ -13,6 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   recognized in the printer model dropdown, aliased to bundled profiles
   (TM-T20II, TM-T20II, TM-T88V, and TM-T20II respectively) — all
   hardware-verified via users' calibration reports (#165, #170, #169, #176).
+- Calibration reports now include a "Detected identity" section: connection
+  type, the profile AUTODETECT would have suggested, the printer's own
+  self-reported identity (USB vendor/product IDs and descriptor strings, GS
+  I maker/model on network printers), and firmware version — to help
+  improve AUTODETECT coverage. Never includes IPs, ports, hostnames, MAC
+  addresses, serial numbers, or serial port paths.
+- USB config flow now stores the device's own manufacturer/product
+  descriptor strings (when the hardware reports real ones, not the generic
+  "Unknown"/"Thermal Printer" fallback) as the entry's detected
+  manufacturer/model — improving the device page's shown model/manufacturer
+  for USB printers and letting the calibration report mirror setup's own
+  autodetect suggestion.
 
 ### Fixed
 
