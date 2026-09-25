@@ -26,6 +26,11 @@ CODEPAGE_SAMPLE = "café ñ ü é ß ° €"
 
 _ISSUES_URL = "https://github.com/cognitivegears/ha-escpos-thermal-printer/issues/new"
 
+# Sentinel for a firmware field the wizard deliberately never queried
+# (Bluetooth/serial, or USB -- no clean framed-read path through the
+# adapter for those; see calibration_steps.py::_detect_identity).
+NOT_QUERIED = "(not queried)"
+
 
 def _png_data_uri(img: Image.Image) -> str:
     buf = io.BytesIO()
@@ -87,6 +92,72 @@ def codepage_sample_line(encoding: str) -> str:
     return CODEPAGE_SAMPLE.encode(encoding, errors="replace").decode(encoding)
 
 
+def _sanitize_identity(value: object, *, max_len: int = 64) -> str:
+    """Printable-only, backtick-free, length-capped identity string.
+
+    The report body is markdown; a stray backtick in a GS I reply could
+    break out of the ```yaml fence below. Printable-only additionally
+    strips control bytes an untrusted printer reply could stuff in.
+    Absent/non-string input degrades to "(unknown)" rather than "None".
+    """
+    if not isinstance(value, str) or not value:
+        return "(unknown)"
+    cleaned = "".join(c for c in value if c.isprintable()).replace("`", "").strip()
+    return cleaned[:max_len] or "(unknown)"
+
+
+def _identity_value(value: object) -> str:
+    """Sanitized identity value, rendered as inline code unless it's the
+    "(unknown)" sentinel.
+
+    These values are printer-supplied text (GS I replies, USB string
+    descriptors); rendering them as inline code stops GitHub from turning
+    a crafted reply into a rendered link/@mention/#issue-ref. Backticks
+    are already stripped by ``_sanitize_identity``, so wrapping is safe.
+    """
+    sanitized = _sanitize_identity(value)
+    return sanitized if sanitized == "(unknown)" else f"`{sanitized}`"
+
+
+def _identity_section(results: dict[str, object]) -> str:
+    """Render the 'Detected identity' block from an explicit field allowlist.
+
+    Only the fields ``calibration_steps._detect_identity`` explicitly
+    puts into ``results`` are ever read here -- entry data at large
+    (host/port/MAC/serial number/serial port) is never in scope.
+    """
+    connection_type = results.get("connection_type")
+    # Never computed for bluetooth/serial (see _detect_identity) -- "n/a"
+    # instead of "none" keeps that distinct from "we looked and found
+    # nothing" on network/usb.
+    if connection_type in ("network", "usb"):
+        suggestion = results.get("suggestion") or "none"
+    else:
+        suggestion = "n/a"
+    lines = [
+        f"- Connection type: {_sanitize_identity(connection_type)}",
+        f"- Autodetect suggestion: {suggestion}",
+    ]
+    if connection_type in ("network", "usb"):
+        # Both connection types can carry a device-reported manufacturer/
+        # model (network: GS I 66/67; USB: iManufacturer/iProduct string
+        # descriptors) -- same two lines either way.
+        lines.append(
+            f"- Detected manufacturer: {_identity_value(results.get('identity_manufacturer'))}"
+        )
+        lines.append(f"- Detected model: {_identity_value(results.get('identity_model'))}")
+    if connection_type == "usb":
+        lines.append(f"- USB VID:PID: {_sanitize_identity(results.get('identity_usb_vid_pid'))}")
+    # Bluetooth: no device-name field is persisted in entry data (only the
+    # MAC, which is never emitted -- see _detect_identity), so there's
+    # nothing connection-type-specific to add here -- YAGNI on a line that
+    # would always render "(unknown)".
+    firmware = results.get("identity_firmware")
+    firmware_line = firmware if firmware == NOT_QUERIED else _identity_value(firmware)
+    lines.append(f"- Firmware version: {firmware_line}")
+    return "\n".join(lines)
+
+
 def build_share_url(model: str, results: dict[str, object]) -> str:
     """Prefilled GitHub new-issue URL with the full measured dataset."""
     impls_raw = results.get("impls_clean")
@@ -99,6 +170,8 @@ def build_share_url(model: str, results: dict[str, object]) -> str:
     body = (
         f"Printer model: {model}\n"
         f"Configured profile: {results.get('profile') or '(generic)'}\n\n"
+        f"Detected identity:\n"
+        f"{_identity_section(results)}\n\n"
         f"Calibration results:\n"
         f"- Image implementation stored: {results.get('impl') or '(unchanged)'}\n"
         f"- Implementations that printed cleanly: {', '.join(map(str, impls)) or 'none'}\n"

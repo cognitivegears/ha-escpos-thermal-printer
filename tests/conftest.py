@@ -246,6 +246,16 @@ def fake_network_status_probe(request: Any, monkeypatch: pytest.MonkeyPatch) -> 
     its normal "unreachable" path. Tests that want to exercise a specific
     probe outcome already monkeypatch this same target themselves (see
     test_adapter_lifecycle.py), which takes precedence within its scope.
+
+    ``network_adapter.socket`` and ``_config_flow.network_helpers.socket``
+    are the same stdlib ``socket`` module object (a plain ``import
+    socket``, not a rebinding), so this one patch also covers
+    ``network_helpers.query_printer_id``/``query_printer_firmware`` --
+    the calibration wizard's summary/save step calls the latter for every
+    network entry. Tests exercising a specific GS I query result already
+    monkeypatch this same target themselves (see
+    test_network_helpers_query.py), which takes precedence within its
+    scope.
     """
     if request.node.get_closest_marker("integration"):
         return

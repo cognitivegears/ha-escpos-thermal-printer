@@ -10,7 +10,9 @@ from custom_components.escpos_printer._config_flow.calibration import (
     CODEPAGE_CANDIDATES,
     CODEPAGE_SAMPLE,
     IMPL_CANDIDATES,
+    NOT_QUERIED,
     WIDTH_CANDIDATES,
+    _sanitize_identity,
     build_ruler,
     build_share_url,
     checkerboard_data_uri,
@@ -133,3 +135,81 @@ def test_share_url_contains_everything() -> None:
         "media:",
     ):
         assert expected in body
+
+
+def test_sanitize_identity_strips_backticks_controls_and_caps_length() -> None:
+    # Backtick removal: the report body is embedded in markdown (and a
+    # ```yaml fence further down), so a raw backtick from an untrusted GS
+    # I reply must not survive into it.
+    assert _sanitize_identity("Te`st\x07Name") == "TestName"
+    assert _sanitize_identity("A" * 100) == "A" * 64
+    assert _sanitize_identity(None) == "(unknown)"
+    assert _sanitize_identity("") == "(unknown)"
+    assert _sanitize_identity("`\x00") == "(unknown)"
+
+
+def test_share_url_identity_section_network() -> None:
+    url = build_share_url(
+        "TM-T20II",
+        {
+            "profile": "TM-T20II",
+            "connection_type": "network",
+            "suggestion": "TM-T20II",
+            "identity_manufacturer": "EPSON",
+            "identity_model": "TM-T20II",
+            "identity_firmware": "1.05",
+        },
+    )
+    body = parse_qs(urlparse(url).query)["body"][0]
+    for expected in (
+        "Detected identity:",
+        "Connection type: network",
+        "Autodetect suggestion: TM-T20II",
+        # Printer-supplied text renders as inline code so a crafted GS I
+        # reply can't become a rendered GitHub link/@mention/#ref.
+        "Detected manufacturer: `EPSON`",
+        "Detected model: `TM-T20II`",
+        "Firmware version: `1.05`",
+    ):
+        assert expected in body
+
+
+def test_share_url_identity_section_usb_omits_firmware_query_value() -> None:
+    url = build_share_url(
+        "POS-5890",
+        {
+            "profile": "",
+            "connection_type": "usb",
+            "suggestion": "POS-5890",
+            "identity_manufacturer": "Zijiang",
+            "identity_model": "POS-5890",
+            "identity_usb_vid_pid": "0416:5011",
+            "identity_firmware": NOT_QUERIED,
+        },
+    )
+    body = parse_qs(urlparse(url).query)["body"][0]
+    assert "Detected manufacturer: `Zijiang`" in body
+    assert "Detected model: `POS-5890`" in body
+    assert "USB VID:PID: 0416:5011" in body
+    # The NOT_QUERIED sentinel renders plain, not as inline code.
+    assert "Firmware version: (not queried)" in body
+
+
+def test_share_url_identity_section_network_suggestion_none_when_unmatched() -> None:
+    """network/usb DO compute a suggestion -- "none" means it came back empty,
+    distinct from "n/a" (never computed at all, e.g. bluetooth/serial)."""
+    url = build_share_url("Generic", {"profile": "", "connection_type": "network"})
+    body = parse_qs(urlparse(url).query)["body"][0]
+    assert "Autodetect suggestion: none" in body
+
+
+def test_share_url_identity_section_defaults_to_unknown_and_none() -> None:
+    """No identity keys at all (e.g. serial/unrecognized connection type) -- safe defaults."""
+    url = build_share_url("Generic", {"profile": ""})
+    body = parse_qs(urlparse(url).query)["body"][0]
+    assert "Connection type: (unknown)" in body
+    # Never computed for bluetooth/serial/unrecognized types -- "n/a", not
+    # "none" (which means "computed, found nothing").
+    assert "Autodetect suggestion: n/a" in body
+    assert "Firmware version: (not queried)" not in body
+    assert "Firmware version: (unknown)" in body

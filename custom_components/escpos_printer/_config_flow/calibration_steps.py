@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.persistent_notification import async_create as pn_create
 from homeassistant.config_entries import ConfigEntryState
+from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.selector import (
     NumberSelector,
@@ -28,21 +29,31 @@ from homeassistant.helpers.selector import (
 )
 import voluptuous as vol
 
-from ..capabilities import get_profile_codepages, resolve_profile_name
+from ..capabilities import get_profile_codepages, resolve_profile_name, suggest_profile
 from ..const import (
     CONF_CODEPAGE,
+    CONF_CONNECTION_TYPE,
+    CONF_DETECTED_MANUFACTURER,
     CONF_DETECTED_MODEL,
     CONF_IMPL,
     CONF_LINE_WIDTH,
+    CONF_PRODUCT_ID,
     CONF_PROFILE,
+    CONF_TIMEOUT,
+    CONF_VENDOR_ID,
     CONF_WIDTH_PIXELS,
+    CONNECTION_TYPE_NETWORK,
+    CONNECTION_TYPE_USB,
     DEFAULT_IMPL,
+    DEFAULT_PORT,
+    DEFAULT_TIMEOUT,
 )
 from ..security import sanitize_log_message
 from .calibration import (
     CODEPAGE_CANDIDATES,
     CODEPAGE_SAMPLE,
     IMPL_CANDIDATES,
+    NOT_QUERIED,
     WIDTH_CANDIDATES,
     build_ruler,
     build_share_url,
@@ -50,6 +61,7 @@ from .calibration import (
     codepage_sample_line,
     width_bar_data_uri,
 )
+from .network_helpers import query_printer_firmware
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigFlowResult
@@ -553,18 +565,86 @@ class CalibrationFlowMixin:
             description_placeholders={"sample": CODEPAGE_SAMPLE},
         )
 
+    async def _detect_identity(self) -> dict[str, Any]:
+        """Recompute connection-type identity + autodetect suggestion for the report.
+
+        Explicit allowlist read straight off ``entry.data`` -- only the
+        keys named below are ever read/returned; host/port/MAC/serial
+        number/serial port are never emitted, beyond what a network
+        firmware query strictly needs to open its own short-lived socket.
+        """
+        data = self.config_entry.data
+        connection_type = data.get(CONF_CONNECTION_TYPE)
+        identity: dict[str, Any] = {
+            "connection_type": connection_type,
+            "suggestion": None,
+            "identity_firmware": NOT_QUERIED,
+        }
+        if connection_type == CONNECTION_TYPE_NETWORK:
+            manufacturer = data.get(CONF_DETECTED_MANUFACTURER)
+            model = data.get(CONF_DETECTED_MODEL)
+            identity["identity_manufacturer"] = manufacturer
+            identity["identity_model"] = model
+            identity["suggestion"] = await self.hass.async_add_executor_job(
+                suggest_profile, model, None, None
+            )
+            host = data.get(CONF_HOST)
+            if host:
+                port = data.get(CONF_PORT, DEFAULT_PORT)
+                timeout = float(data.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
+                identity["identity_firmware"] = await self.hass.async_add_executor_job(
+                    query_printer_firmware, host, port, timeout
+                )
+        elif connection_type == CONNECTION_TYPE_USB:
+            vendor_id = data.get(CONF_VENDOR_ID)
+            product_id = data.get(CONF_PRODUCT_ID)
+            model = data.get(CONF_DETECTED_MODEL)
+            identity["identity_manufacturer"] = data.get(CONF_DETECTED_MANUFACTURER)
+            identity["identity_model"] = model
+            if isinstance(vendor_id, int) and isinstance(product_id, int):
+                identity["identity_usb_vid_pid"] = f"{vendor_id:04X}:{product_id:04X}"
+                # suggest_profile's descriptor-name match (see
+                # capabilities/suggestions.py) is what setup's own
+                # suggestion was mainly driven by -- passing the stored
+                # descriptor here mirrors that exactly, instead of
+                # recomputing from VID:PID alone and reporting "none" for
+                # a printer setup correctly identified by name.
+                identity["suggestion"] = await self.hass.async_add_executor_job(
+                    suggest_profile, model, vendor_id, product_id
+                )
+            # No clean framed-read path for a variable-length GS I reply
+            # through the USB adapter (unlike network's own raw socket) --
+            # identity_firmware stays NOT_QUERIED.
+        # Bluetooth: no device-name field is persisted in entry data today
+        # (only the MAC, which the privacy rules forbid sending), so the
+        # report's allowlist render falls back to "(unknown)". Serial has
+        # nothing beyond connection type. Both leave identity_firmware at
+        # its NOT_QUERIED default.
+        return identity
+
     async def _calib_results(self) -> dict[str, Any]:
         """Measured-value dict for ``build_share_url`` (profile + versions included)."""
         profile = self.config_entry.options.get(
             CONF_PROFILE, self.config_entry.data.get(CONF_PROFILE)
         )
         integration_version, escpos_version = await self.hass.async_add_executor_job(_read_versions)
+        try:
+            identity = await self._detect_identity()
+        except Exception as err:
+            # Best-effort: an unexpected failure here must never replace
+            # the whole share link with an "Unknown error" abort screen --
+            # the report is still useful without the identity section.
+            _LOGGER.warning(
+                "Calibration identity detection failed: %s", sanitize_log_message(str(err))
+            )
+            identity = {}
         return {
             **self._calib,
             **self._calib_extra,
             "profile": profile,
             "integration_version": integration_version,
             "escpos_version": escpos_version,
+            **identity,
         }
 
     async def _save_calibration(self, user_input: dict[str, Any]) -> ConfigFlowResult:
@@ -580,6 +660,21 @@ class CalibrationFlowMixin:
         the only way to show the share link *after* saving. A persistent
         notification carries the same link for after the dialog closes.
         """
+        if not self._calib:
+            # Nothing measured: the merge below would be a no-op (no key
+            # from _CALIB_TO_CONF to apply) and there's no share link to
+            # build, so skip both.
+            return self.async_abort(  # type: ignore[attr-defined,no-any-return]
+                reason="calibration_saved_no_changes"
+            )
+
+        model = user_input.get("model", "").strip() or _SHARE_LINK_MODEL_PLACEHOLDER
+        # Computed before the options update/reload below: _detect_identity's
+        # network firmware query opens its own short-lived socket, and
+        # reloading the entry first would race that against the reloaded
+        # adapter's keepalive connection.
+        results = await self._calib_results()
+
         merged: dict[str, Any] = {**dict(self.config_entry.options)}
         for calib_key, conf_key in _CALIB_TO_CONF.items():
             if calib_key in self._calib:
@@ -590,13 +685,7 @@ class CalibrationFlowMixin:
             # this path ends in an abort, so reload explicitly.
             self.hass.config_entries.async_schedule_reload(self.config_entry.entry_id)
 
-        if not self._calib:
-            return self.async_abort(  # type: ignore[attr-defined,no-any-return]
-                reason="calibration_saved_no_changes"
-            )
-
-        model = user_input.get("model", "").strip() or _SHARE_LINK_MODEL_PLACEHOLDER
-        share_url = build_share_url(model, await self._calib_results())
+        share_url = build_share_url(model, results)
         pn_create(
             self.hass,
             f"[Open a prefilled GitHub issue]({share_url}) to contribute your printer's "
