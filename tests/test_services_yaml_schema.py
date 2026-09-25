@@ -404,7 +404,7 @@ def test_print_text_image_schema_rejects_fallback_image():  # type: ignore[no-un
         PRINT_TEXT_IMAGE_SCHEMA,
     )
 
-    with pytest.raises(vol.Invalid, match="extra keys not allowed"):
+    with pytest.raises(vol.Invalid, match="fallback_image"):
         PRINT_TEXT_IMAGE_SCHEMA(
             {
                 "text": "hi",
