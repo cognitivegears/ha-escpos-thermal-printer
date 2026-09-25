@@ -63,7 +63,7 @@ async def _setup_device_with_profile(hass: Any, profile: str) -> str:
 
     device_registry = dr.async_get(hass)
     device = next(
-        (d for d in device_registry.devices.values() if entry.entry_id in d.config_entries),
+        iter(dr.async_entries_for_config_entry(device_registry, entry.entry_id)),
         None,
     )
     assert device is not None, "Expected a device entry for the printer"

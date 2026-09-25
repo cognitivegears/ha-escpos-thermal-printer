@@ -41,7 +41,7 @@ async def _setup_entry(hass, host: str = "1.2.3.4") -> MockConfigEntry:  # type:
 def _get_device_id_for_entry(hass, entry: MockConfigEntry) -> str:  # type: ignore[no-untyped-def]
     device_registry = dr.async_get(hass)
     device = next(
-        (d for d in device_registry.devices.values() if entry.entry_id in d.config_entries),
+        iter(dr.async_entries_for_config_entry(device_registry, entry.entry_id)),
         None,
     )
     assert device is not None

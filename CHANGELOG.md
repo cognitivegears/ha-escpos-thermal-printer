@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Epson TM-T20, Epson TM-T20IV, Toast TP200, and SAM4S Callisto-102D are now
+  recognized in the printer model dropdown, aliased to bundled profiles
+  (TM-T20II, TM-T20II, TM-T88V, and TM-T20II respectively) — all
+  hardware-verified via users' calibration reports (#165, #170, #169, #176).
+
+### Fixed
+
+- The calibration wizard's column-count step now rejects a Font A count
+  wider than physically fits the calibrated printable width (max columns =
+  width in pixels ÷ 12) instead of silently storing an impossible value —
+  several submitted calibration reports had mistyped/miscounted a ruler
+  reading this way.
+- The Rongta RP326 profile now defaults to 576 px / 48 columns (Font B 64)
+  instead of an unknown width and 42 columns, per Rongta's manual and a
+  hardware calibration report (#160).
+
 ## [1.2.0] - 2026-09-05
 
 ### Added

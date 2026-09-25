@@ -3,7 +3,7 @@
 Unlike ``aliases.py`` (which points a display name at an *existing* bundled
 profile), this module either builds genuinely new profile dicts (RP820,
 TM-m30III) or corrects data in place (the clone-firmware codePages dedupe
-below, and NT-80-V-UL's font columns) inside
+below, NT-80-V-UL's font columns, and RP326's geometry) inside
 ``escpos.capabilities.CAPABILITIES["profiles"]`` so the fix applies
 everywhere: the config-flow dropdown, the calibration codepage filter, and
 the printer constructors (all of which resolve profile names through that
@@ -78,6 +78,30 @@ def _patch_nt80vul_fonts(profiles: dict[str, Any]) -> None:
     if fonts.get("0", {}).get("columns") == 12:
         fonts["0"]["columns"] = 48
     if fonts.get("1", {}).get("columns") == 9:
+        fonts["1"]["columns"] = 64
+
+
+def _patch_rp326_geometry(profiles: dict[str, Any]) -> None:
+    """Fill in RP326's missing width and correct its font columns, in place.
+
+    The bundled profile declares width "Unknown" and Font A/B 42/56.
+    Rongta's RP32X user manual V1.3 section 4.1 gives 203dpi / 72mm /
+    576 dots with 12x24 and 9x17 fonts, the RP326 product page says Font
+    A 48 / Font B 64, and neither documents a column-mode switch (unlike
+    the RP850P's SW-5). Hardware-verified via the HA calibration wizard
+    (issue #160): 576 px / Font A 48 columns. Codepages are unchanged:
+    all four calibration codepages matched the bundled table's indices.
+    Guarded so a second call is a no-op.
+    """
+    profile = profiles.get("RP326")
+    if profile is None:
+        return
+    if profile.get("media", {}).get("width", {}).get("pixels") == "Unknown":
+        profile["media"] = {"dpi": 203, "width": {"mm": 72, "pixels": 576}}
+    fonts = profile.get("fonts", {})
+    if fonts.get("0", {}).get("columns") == 42:
+        fonts["0"]["columns"] = 48
+    if fonts.get("1", {}).get("columns") == 56:
         fonts["1"]["columns"] = 64
 
 
@@ -310,6 +334,7 @@ def register_custom_profiles() -> None:
 
         _dedupe_clone_codepages(profiles)
         _patch_nt80vul_fonts(profiles)
+        _patch_rp326_geometry(profiles)
         _register_rp820(profiles)
         _register_tm_m30iii(profiles)
         _register_tm_m10(profiles)

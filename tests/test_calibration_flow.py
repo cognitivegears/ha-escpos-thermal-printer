@@ -586,6 +586,35 @@ async def test_ruler_continue_without_marker_shows_missing_error(hass):  # type:
     assert result2["errors"]["base"] == "line_width_missing"
 
 
+async def test_ruler_marker_exceeding_calibrated_width_rejected(hass):  # type: ignore[no-untyped-def]
+    """576 px caps Font A at 48 columns (576 // 12) -- a report of 49
+    (issues #174, #176, #179) is a physically impossible ruler miscount and
+    must be rejected instead of stored; 48 is still accepted."""
+    entry, _adapter = _make_entry(hass)
+    result = await _open_calibrate(hass, entry)
+    result2 = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"impls_clean": ["bitImageRaster"], "action": "continue"}
+    )
+    result3 = await hass.config_entries.options.async_configure(
+        result2["flow_id"], {"first_equal": "576", "action": "continue"}
+    )
+    assert result3["step_id"] == "calibrate_ruler"
+
+    result4 = await hass.config_entries.options.async_configure(
+        result3["flow_id"], {"last_marker": 49, "action": "continue"}
+    )
+
+    assert result4["type"] == "form"
+    assert result4["step_id"] == "calibrate_ruler"
+    assert result4["errors"]["base"] == "line_width_exceeds_width"
+
+    result5 = await hass.config_entries.options.async_configure(
+        result4["flow_id"], {"last_marker": 48, "action": "continue"}
+    )
+
+    assert result5["step_id"] == "calibrate_codepage"
+
+
 async def test_ruler_low_value_rejected_by_schema(hass):  # type: ignore[no-untyped-def]
     """1-15 is below the narrowest plausible printer width -- the
     NumberSelector's min=16 rejects it at schema level."""
