@@ -183,6 +183,12 @@ ALIAS_MODELS: dict[str, str] = {
     # the Bisofice brand overall stays closed (see module docstring).
     "Bisofice XGR-POS581": "POS-5890",
     "Netum NT-1809DD": "NT-5890K",
+    # Netum NT-806: calibration report (issue #172) gave 576 px / 48 cols,
+    # CP850/CP437 matched but CP858/CP1252 garbled at the Epson-standard
+    # 19/16. The printer's self-test codepage table (firmware 2.20AR, 72mm,
+    # 48/64 cols) matches bundled KR-306 index-for-index across 0-70:
+    # CP1252 at 11/49, CP858 at 14/31, 16 = Latvian, 19 = PC747.
+    "Netum NT-806": "KR-306",
     # SAM4S Callisto-102D: hardware-verified via the HA calibration wizard
     # (issue #176): 576 px, all four codepages (CP858/CP1252/CP850/CP437)
     # matched TM-T20II's indices, all impls clean. The report also logged 49
