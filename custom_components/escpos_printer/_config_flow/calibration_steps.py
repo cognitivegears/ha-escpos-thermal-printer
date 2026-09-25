@@ -397,10 +397,17 @@ class CalibrationFlowMixin:
             if user_input.get("action") == "skip":
                 return await self.async_step_calibrate_codepage()
             marker = user_input.get("last_marker")
+            width_pixels = self._calib.get("width_pixels")
             if marker is None:
                 # "Continue" with an empty count is ambiguous -- make the
                 # user either type what they measured or skip explicitly.
                 errors["base"] = "line_width_missing"
+            elif isinstance(width_pixels, int) and marker > width_pixels // 12:
+                # Font A is a fixed 12 dots wide on ESC/POS printers, so a
+                # count wider than width_pixels // 12 can't be real -- a few
+                # calibration reports (#174, #176, #179) typed an impossible
+                # column count, almost certainly a ruler miscount.
+                errors["base"] = "line_width_exceeds_width"
             else:
                 self._calib["line_width"] = marker
                 return await self.async_step_calibrate_codepage()

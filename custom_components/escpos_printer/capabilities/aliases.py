@@ -67,9 +67,21 @@ ALIAS_MODELS: dict[str, str] = {
     "Epson TM-T20X": "TM-T20II",
     "Epson TM-T82II": "TM-T20II",
     "Epson TM-T82III": "TM-T20II",
+    # Epson TM-T20/TM-T20IV: hardware-verified via the HA calibration wizard
+    # (issue #165 / issue #170): 576 px / Font A 48 columns, and all four
+    # codepages (CP858/CP1252/CP850/CP437) matched TM-T20II's Epson-standard
+    # indices (19/16/2/0), all three impls clean. No bundled "TM-T20" profile
+    # exists to alias to directly.
+    "Epson TM-T20": "TM-T20II",
+    "Epson TM-T20IV": "TM-T20II",
     # Epson TM-T88 successors: same 80mm/512dots/180dpi lineage as TM-T88V.
     "Epson TM-T88VI": "TM-T88V",
     "Epson TM-T88VII": "TM-T88V",
+    # Toast TP200: hardware-verified via the HA calibration wizard
+    # (issue #169): 512 px / Font A 42 columns (TM-T88V's 180dpi/512 class),
+    # and all four codepages (CP858/CP1252/CP850/CP437) matched TM-T88V's
+    # indices, all impls clean. Keyed to this one verified SKU.
+    "Toast TP200": "TM-T88V",
     # Epson TM-T70/TM-T70II ANK (alphanumeric) models: upstream
     # escpos-printer-db profiles for both match TM-T88V's class exactly
     # (512px/180dpi, Font A/B 42/56 columns, codepage indices agree at
@@ -171,6 +183,13 @@ ALIAS_MODELS: dict[str, str] = {
     # the Bisofice brand overall stays closed (see module docstring).
     "Bisofice XGR-POS581": "POS-5890",
     "Netum NT-1809DD": "NT-5890K",
+    # SAM4S Callisto-102D: hardware-verified via the HA calibration wizard
+    # (issue #176): 576 px, all four codepages (CP858/CP1252/CP850/CP437)
+    # matched TM-T20II's indices, all impls clean. The report also logged 49
+    # Font A columns, but 49 cols is physically impossible at 576 px with
+    # 12-dot Font A (max 48) -- a ruler miscount; TM-T20II's default 48 is
+    # correct.
+    "SAM4S Callisto-102D": "TM-T20II",
     # Sunmi: V1 same 58mm class as bundled Sunmi-V2; T2 built-in is
     # 80mm/576dots/203dpi per Sunmi docs.
     "Sunmi V1": "Sunmi-V2",
