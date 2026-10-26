@@ -24,4 +24,4 @@ jobs:
         # does not publish versioned tags for the hassfest sub-action;
         # update by re-pinning after reviewing
         # https://github.com/home-assistant/actions/commits/master
-        uses: home-assistant/actions/hassfest@a7c616ce81ccda50150bf1595786c71b1883fabb  # master as of 2026-05-24
+        uses: home-assistant/actions/hassfest@86d4564712fa02543c808e3a693dd04f9d3f8361  # master as of 2026-05-24
