@@ -203,3 +203,20 @@ async def test_print_message_utf8_mode(hass):  # type: ignore[no-untyped-def]
     # The transcoded text should be what gets printed
     printed_text = fake.text.call_args[0][0]
     assert printed_text == "transcoded text"
+
+
+async def test_print_message_utf8_prints_emoji_lines_as_images(hass):  # type: ignore[no-untyped-def]
+    """With utf8=True, a message line holding an emoji goes out as a bitmap."""
+    await _setup_entry(hass)
+    entity_id = _get_notify_entity_id(hass)
+
+    fake = MagicMock()
+    with patch("escpos.printer.Network", return_value=fake):
+        await hass.services.async_call(
+            DOMAIN,
+            "print_message",
+            {"entity_id": entity_id, "message": "Garage 🚪 open", "utf8": True},
+            blocking=True,
+        )
+    assert fake.image.called
+    fake.text.assert_not_called()

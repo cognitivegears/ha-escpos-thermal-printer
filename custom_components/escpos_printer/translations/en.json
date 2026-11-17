@@ -1911,6 +1911,10 @@
           "description": "Print density level (0-8). 5 is darkest; values above 5 step back down. The printer keeps the value until changed.",
           "name": "Density"
         },
+        "emoji": {
+          "description": "How to print emoji. `auto` prints lines with emoji as small images (using the bundled Noto Emoji font) and everything else as normal text. `strip` removes emoji. `off` keeps the old behavior, where each emoji prints as a `?`. Emoji lines honor alignment, font and size, but not bold, underline or invert.",
+          "name": "Emoji"
+        },
         "feed": {
           "description": "Number of lines to feed after printing",
           "name": "Feed Lines"

@@ -29,6 +29,7 @@ from ..const import (
     ATTR_DATA,
     ATTR_DENSITY,
     ATTR_EC,
+    ATTR_EMOJI,
     ATTR_ENCODING,
     ATTR_FEED,
     ATTR_FONT,
@@ -85,6 +86,7 @@ from ..security import (
 from ..text_effects import render_box, render_table, render_text_image, resolve_style
 from ..text_utils import transcode_to_codepage
 from ._handler_utils import _for_each_target
+from .emoji_printing import EMOJI_MODE_AUTO, plan_parts, print_parts
 from .target_resolution import _async_get_target_entries, _get_adapter_and_defaults
 
 _LOGGER = logging.getLogger(__name__)
@@ -117,8 +119,35 @@ async def handle_print_text_utf8(call: ServiceCall) -> None:
     """Handle print_text_utf8 service call."""
 
     async def _body(entry: Any, adapter: Any, defaults: Any, config: Any) -> None:
-        text = call.data[ATTR_TEXT]
         codepage = config.codepage or DEFAULT_CODEPAGE
+        text, emoji_parts = plan_parts(
+            call.data[ATTR_TEXT], call.data.get(ATTR_EMOJI, EMOJI_MODE_AUTO)
+        )
+        text_kwargs = {
+            "align": call.data.get(ATTR_ALIGN) or defaults.get("align"),
+            "bold": call.data.get(ATTR_BOLD),
+            "underline": call.data.get(ATTR_UNDERLINE),
+            "width": call.data.get(ATTR_WIDTH),
+            "height": call.data.get(ATTR_HEIGHT),
+            "invert": call.data.get(ATTR_INVERT),
+            "density": call.data.get(ATTR_DENSITY),
+            "font": call.data.get(ATTR_FONT),
+        }
+        cut = call.data.get(ATTR_CUT) or defaults.get("cut")
+        feed = call.data.get(ATTR_FEED)
+
+        if emoji_parts is not None:
+            await print_parts(
+                call.hass,
+                adapter,
+                emoji_parts,
+                codepage=codepage,
+                text_kwargs=text_kwargs,
+                cut=cut,
+                feed=feed,
+            )
+            return
+
         transcoded_text = await call.hass.async_add_executor_job(
             transcode_to_codepage, text, codepage
         )
@@ -131,17 +160,10 @@ async def handle_print_text_utf8(call: ServiceCall) -> None:
         await adapter.print_text(
             call.hass,
             text=transcoded_text,
-            align=call.data.get(ATTR_ALIGN) or defaults.get("align"),
-            bold=call.data.get(ATTR_BOLD),
-            underline=call.data.get(ATTR_UNDERLINE),
-            width=call.data.get(ATTR_WIDTH),
-            height=call.data.get(ATTR_HEIGHT),
-            invert=call.data.get(ATTR_INVERT),
-            density=call.data.get(ATTR_DENSITY),
-            font=call.data.get(ATTR_FONT),
             encoding=None,  # printer uses configured codepage
-            cut=call.data.get(ATTR_CUT) or defaults.get("cut"),
-            feed=call.data.get(ATTR_FEED),
+            cut=cut,
+            feed=feed,
+            **text_kwargs,
         )
 
     await _for_each_target(call, "print_text_utf8", _body)

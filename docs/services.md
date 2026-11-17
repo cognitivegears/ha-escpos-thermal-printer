@@ -25,6 +25,12 @@ Print raw text using the configured codepage. No transcoding.
 
 Same as `print_text` but auto-converts UTF-8 characters to printer-compatible encoding (curly quotes → straight, em-dash → `--`, accented letters simplified when needed). Does not accept the `encoding` parameter.
 
+Emoji are printed too: see the [emoji guide](emoji.md). One extra parameter controls them:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| emoji | string | `auto` (default) prints lines with emoji as small images and everything else as text, `strip` removes emoji, `off` prints each emoji as `?` |
+
 ## escpos_printer.print_message
 
 Entity service for the notify platform. Targets a notify entity and supports all text formatting plus optional UTF-8 transcoding via `utf8: true`, plus an optional image. Same parameters as `print_text` plus:
@@ -33,7 +39,7 @@ Entity service for the notify platform. Targets a notify entity and supports all
 |-----------|------|-------------|
 | message | string | Text (required) |
 | title | string | Printed before the message |
-| utf8 | boolean | Enable UTF-8 transcoding |
+| utf8 | boolean | Enable UTF-8 transcoding (also prints emoji, see the [emoji guide](emoji.md)) |
 | image | string | Optional image source: same forms as `print_image`. See [Images guide](images.md). |
 | image_width | int | Target image width (pixels) |
 | image_align | string | `left`, `center`, `right` |

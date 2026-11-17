@@ -204,6 +204,13 @@ ATTR_MIRROR = "mirror"
 ATTR_AUTO_RESIZE = "auto_resize"
 ATTR_FALLBACK_IMAGE = "fallback_image"
 
+# Emoji handling for ``print_text_utf8``.
+ATTR_EMOJI = "emoji"
+EMOJI_MODE_AUTO = "auto"
+EMOJI_MODE_STRIP = "strip"
+EMOJI_MODE_OFF = "off"
+EMOJI_MODES = (EMOJI_MODE_AUTO, EMOJI_MODE_STRIP, EMOJI_MODE_OFF)
+
 # Text-effects (box / table / text-image).
 ATTR_STYLE = "style"
 ATTR_PADDING = "padding"

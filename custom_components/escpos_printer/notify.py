@@ -13,10 +13,11 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity import DeviceInfo
 
-from .const import DEFAULT_CODEPAGE
+from .const import DEFAULT_CODEPAGE, EMOJI_MODE_AUTO
 from .device import build_device_info
 from .image_sources import extract_image_kwargs
 from .security import sanitize_log_message
+from .services.emoji_printing import plan_parts, print_parts
 from .services.schemas import PRINT_MESSAGE_FIELDS
 from .text_utils import transcode_to_codepage
 
@@ -109,9 +110,17 @@ class EscposNotifyEntity(NotifyEntity):
         # UTF-8 transcoding (same logic as print_text_utf8 service).
         use_utf8 = kwargs.get("utf8", False)
         encoding = kwargs.get("encoding")
+        emoji_parts = None
         if use_utf8:
             codepage = adapter.config.codepage or DEFAULT_CODEPAGE
-            text = await self._hass.async_add_executor_job(transcode_to_codepage, text, codepage)
+            # Emoji can't be transcoded; image-only messages and messages with
+            # an attached image keep the old behavior (emoji print as "?").
+            if kwargs.get("image") is None:
+                text, emoji_parts = plan_parts(text, EMOJI_MODE_AUTO)
+            if emoji_parts is None:
+                text = await self._hass.async_add_executor_job(
+                    transcode_to_codepage, text, codepage
+                )
             encoding = None  # Let printer use configured codepage
 
         # ``or`` (not ``dict.get(k, default)``) so an explicit ``None``
@@ -133,6 +142,20 @@ class EscposNotifyEntity(NotifyEntity):
         image_source_raw = kwargs.get("image")
 
         try:
+            if emoji_parts is not None:
+                # Lines with emoji print as bitmaps, the rest as native text.
+                await print_parts(
+                    self._hass,
+                    adapter,
+                    emoji_parts,
+                    codepage=codepage,
+                    text_kwargs={
+                        k: v for k, v in text_kwargs.items() if k not in ("text", "encoding")
+                    },
+                    cut=kwargs.get("cut") or defaults.get("cut"),
+                    feed=kwargs.get("feed", 0),
+                )
+                return
             if image_source_raw is None:
                 # Plain text-only path.
                 await adapter.print_text(
