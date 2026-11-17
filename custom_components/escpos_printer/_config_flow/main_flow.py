@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -10,6 +11,7 @@ from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.core import callback
 import voluptuous as vol
 
+from ..bluez_pairing import PairingResult
 from ..const import (
     CONF_CONNECTION_TYPE,
     CONNECTION_TYPE_BLUETOOTH,
@@ -57,6 +59,15 @@ class EscposConfigFlow(
         self._paired_bt_devices: list[dict[str, Any]] = []
         self._show_all_bt_devices: bool = False
         self._pending_bt: dict[str, Any] = {}
+        self._pending_bt_errors: dict[str, str] = {}
+        self._bt_task: asyncio.Task[Any] | None = None
+        self._bt_pair_result: PairingResult | None = None
+
+    @callback
+    def async_remove(self) -> None:
+        """Stop a Bluetooth scan or pairing still running when the dialog is closed."""
+        if self._bt_task is not None and not self._bt_task.done():
+            self._bt_task.cancel()
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle step 1: Connection type selection.

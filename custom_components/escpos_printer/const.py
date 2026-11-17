@@ -66,6 +66,12 @@ BT_MANUAL_ENTRY_KEY = "__manual__"
 # Sentinel for "show all paired devices, not just imaging-class" in the picker.
 BT_SHOW_ALL_KEY = "__show_all__"
 
+# Sentinel for "scan for nearby devices" in the picker.
+BT_SCAN_KEY = "__scan__"
+
+# Form field holding the PIN the user types when the default PINs were refused.
+CONF_BT_PIN = "bt_pin"
+
 # Default values
 DEFAULT_PORT = 9100
 DEFAULT_TIMEOUT = 4.0
@@ -203,6 +209,13 @@ ATTR_DENSITY = "density"
 ATTR_MIRROR = "mirror"
 ATTR_AUTO_RESIZE = "auto_resize"
 ATTR_FALLBACK_IMAGE = "fallback_image"
+
+# Emoji handling for ``print_text_utf8``.
+ATTR_EMOJI = "emoji"
+EMOJI_MODE_AUTO = "auto"
+EMOJI_MODE_STRIP = "strip"
+EMOJI_MODE_OFF = "off"
+EMOJI_MODES = (EMOJI_MODE_AUTO, EMOJI_MODE_STRIP, EMOJI_MODE_OFF)
 
 # Text-effects (box / table / text-image).
 ATTR_STYLE = "style"

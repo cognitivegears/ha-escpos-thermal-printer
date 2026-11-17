@@ -11,6 +11,8 @@ Functions:
 * :func:`list_paired_bluetooth_devices` — enumerate already-paired BT
   devices including their Class-of-Device (used by the config flow's
   picker; imaging-class filtering happens at the helper level).
+* :func:`parse_bluez_devices` — the shared parser behind the paired list
+  and the discovery scan in :mod:`bluez_pairing`.
 * :func:`query_bt_battery_percentage` — read
   ``org.bluez.Battery1.Percentage`` for a given MAC; used by the battery
   sensor entity. Returns ``None`` when the device doesn't expose
@@ -100,31 +102,23 @@ async def _get_managed_objects(bus: Any) -> dict[str, Any] | None:
         return None
 
 
-async def list_paired_bluetooth_devices() -> list[dict[str, Any]]:
-    """Enumerate Bluetooth devices paired on the host.
+def parse_bluez_devices(
+    managed: dict[str, Any], *, paired_only: bool = True
+) -> list[dict[str, Any]]:
+    """Turn a bluez ``GetManagedObjects`` reply into the flow's device dicts.
 
-    Returns a list of ``{mac, name, alias, label, class, is_imaging,
-    has_spp, _choice_key}`` dicts. Returns an empty list when bluez isn't
-    reachable so callers can degrade to manual MAC entry.
+    Each dict carries ``{mac, name, alias, label, class, is_imaging, has_spp,
+    paired, rssi, _choice_key}``. With ``paired_only`` the unpaired devices
+    that a discovery scan leaves in bluez's cache are skipped.
     """
-    bus = await _connect_system_bus()
-    if bus is None:
-        return []
-    try:
-        managed = await _get_managed_objects(bus)
-    finally:
-        with contextlib.suppress(Exception):
-            bus.disconnect()
-    if managed is None:
-        return []
-
     devices: list[dict[str, Any]] = []
     for ifaces in managed.values():
         device_props = ifaces.get("org.bluez.Device1")
         if not device_props:
             continue
         paired_var = device_props.get("Paired")
-        if paired_var is None or not bool(getattr(paired_var, "value", False)):
+        paired = paired_var is not None and bool(getattr(paired_var, "value", False))
+        if paired_only and not paired:
             continue
         mac_var = device_props.get("Address")
         if mac_var is None:
@@ -142,6 +136,8 @@ async def list_paired_bluetooth_devices() -> list[dict[str, Any]]:
         uuids_var = device_props.get("UUIDs")
         uuids_value = getattr(uuids_var, "value", None) if uuids_var is not None else None
         uuids = [str(u) for u in uuids_value] if isinstance(uuids_value, (list, tuple)) else []
+        rssi_var = device_props.get("RSSI")
+        rssi = getattr(rssi_var, "value", None) if rssi_var is not None else None
         devices.append(
             {
                 "mac": mac,
@@ -151,10 +147,31 @@ async def list_paired_bluetooth_devices() -> list[dict[str, Any]]:
                 "class": class_value,
                 "is_imaging": is_imaging_device(class_value),
                 "has_spp": has_spp_uuid(uuids),
+                "paired": paired,
+                "rssi": rssi if isinstance(rssi, int) else None,
                 "_choice_key": mac,
             }
         )
     return devices
+
+
+async def list_paired_bluetooth_devices() -> list[dict[str, Any]]:
+    """Enumerate Bluetooth devices paired on the host.
+
+    Returns an empty list when bluez isn't reachable so callers can degrade
+    to manual MAC entry.
+    """
+    bus = await _connect_system_bus()
+    if bus is None:
+        return []
+    try:
+        managed = await _get_managed_objects(bus)
+    finally:
+        with contextlib.suppress(Exception):
+            bus.disconnect()
+    if managed is None:
+        return []
+    return parse_bluez_devices(managed, paired_only=True)
 
 
 async def query_bt_battery_percentage(mac: str) -> int | None:  # noqa: PLR0911

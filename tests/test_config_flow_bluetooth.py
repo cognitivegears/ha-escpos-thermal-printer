@@ -185,8 +185,8 @@ class TestBluetoothSelectStep:
         assert profile_key.default() == PROFILE_AUTO
 
     @pytest.mark.asyncio
-    async def test_no_paired_devices_routes_to_guidance(self, hass):
-        """Empty paired list shows the no_devices guidance step, not raw manual entry."""
+    async def test_no_paired_devices_offers_scan_or_manual(self, hass):
+        """Empty paired list shows the no_devices menu (scan / manual), not raw manual entry."""
         flow = EscposConfigFlow()
         flow.hass = hass
         flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH}
@@ -198,19 +198,9 @@ class TestBluetoothSelectStep:
         ):
             result = await flow.async_step_bluetooth_select()
 
-        assert result["type"] == "form"
+        assert result["type"] == "menu"
         assert result["step_id"] == "bluetooth_no_devices"
-
-    @pytest.mark.asyncio
-    async def test_no_devices_step_submission_routes_to_manual(self, hass):
-        """Submitting the no_devices form drops to manual MAC entry."""
-        flow = EscposConfigFlow()
-        flow.hass = hass
-        flow._user_data = {CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH}
-
-        result = await flow.async_step_bluetooth_no_devices(user_input={})
-        assert result["type"] == "form"
-        assert result["step_id"] == "bluetooth_manual"
+        assert result["menu_options"] == ["bluetooth_scan", "bluetooth_manual"]
 
     @pytest.mark.asyncio
     async def test_manual_entry_option_routes(self, hass, mock_paired_devices):

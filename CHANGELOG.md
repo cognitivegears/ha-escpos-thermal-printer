@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- German translation of the whole integration: setup and options dialogs, calibration wizard,
+  repairs, errors and every service with its fields. A test keeps every translation in step
+  with `strings.json` (same keys, same placeholders).
+- Bluetooth printers can now be scanned for and paired right in the setup
+  dialog — no more `bluetoothctl pair` / `trust` in a terminal. Choose
+  *Scan for nearby devices*, pick the printer and Home Assistant pairs it,
+  tries the common default PINs (`0000`, `1234`, asking for one if both are
+  refused) and marks it trusted so it reconnects after a reboot. Hosts
+  without D-Bus access keep the manual MAC entry.
+
+- Emoji now print. `print_text_utf8` (and the notify entity's `print_message`
+  with `utf8: true`) draws lines that contain an emoji as small bitmaps with
+  the bundled monochrome Noto Emoji font and keeps every other line as
+  native text, all on one connection. The new `emoji` option chooses
+  between `auto` (default), `strip` and `off` (the old `?`).
+  `print_text_image` falls back to the emoji font for emoji as well. Skin
+  tones, joined sequences, flags and keycaps are handled. See
+  [docs/emoji.md](docs/emoji.md).
 - Epson TM-T20, Epson TM-T20IV, Toast TP200, and SAM4S Callisto-102D are now
   recognized in the printer model dropdown, aliased to bundled profiles
   (TM-T20II, TM-T20II, TM-T88V, and TM-T20II respectively) — all

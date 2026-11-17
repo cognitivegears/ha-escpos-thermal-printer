@@ -2,18 +2,36 @@
 
 For portable, battery-powered ESC/POS printers (Netum, MUNBYN, POS-58 generics, Phomemo Classic line).
 
-> **Important:** Home Assistant's built-in Bluetooth integration scans for and discovers devices, but it does **not** pair Classic Bluetooth devices like thermal printers. You must pair the printer manually at the operating system level **before** adding it in HA. The integration never initiates pairing itself.
+> **Pairing happens in the setup dialog.** Home Assistant's built-in Bluetooth integration scans for devices but does not pair Classic Bluetooth devices like thermal printers. This integration closes that gap: it can scan for your printer, pair it and mark it as trusted while you add it. If bluez isn't reachable from Home Assistant (see [Requirements](#requirements)), pair the printer on the host first, as described [below](#pairing-by-hand-fallback).
 
 ## Requirements
 
 - A Linux host with the kernel `AF_BLUETOOTH` socket family. Any HA OS, Supervised, Core, or Container with `--net=host` works.
 - A working Bluetooth adapter on the host.
-- The printer **paired on the host** before adding it in HA (see below).
-- For the paired-device picker in the config flow, read access to the system D-Bus (`/run/dbus`). Without it, the flow falls back to manual MAC entry.
+- Access to the system D-Bus (`/run/dbus`) so the setup dialog can scan for printers and pair them. Without it, pair the printer on the host and enter its MAC address manually.
 
-## Pairing walkthrough (HA OS / Supervised)
+## Adding a printer (scan and pair)
 
-This is the most common setup. You'll need terminal access to the HA host.
+1. Switch the printer on and put it into pairing mode. Most printers do this when you hold the power button until the LED blinks. Keep it within a few metres of the Home Assistant host.
+2. Go to **Settings → Devices & Services**, click **Add Integration** and search for **ESC/POS Thermal Printer**.
+3. Choose **Bluetooth (RFCOMM)** as the connection type.
+4. Pick your printer from the list. Paired printers show up right away; for a new one choose **Scan for nearby devices** and wait about 12 seconds. Devices that are not paired yet are marked *not paired yet*.
+5. Submit the form. Home Assistant pairs the printer (this takes a few seconds), marks it trusted so it reconnects after a reboot, and tests the connection.
+6. Accept the defaults and finish.
+
+The scan only lists Classic Bluetooth devices. By default the list shows likely printers: devices that report the imaging class, advertise the Serial Port Profile or carry a model name the integration knows. Pick **Show all Bluetooth devices** if yours is missing.
+
+### PIN codes
+
+Most printers pair without a PIN or with `0000` or `1234`. The setup dialog tries both automatically. If the printer refuses them, it asks for the PIN; look in the printer's manual or on its label.
+
+### What the integration changes on the host
+
+Pairing registers a short-lived bluez pairing agent over D-Bus, pairs the one device you picked and sets its *trusted* flag, exactly like `bluetoothctl pair` followed by `bluetoothctl trust`. The agent is removed again as soon as pairing ends. Nothing else on the host is touched.
+
+## Pairing by hand (fallback)
+
+Use this when the setup dialog can't reach bluez (for example HA Container without the `/run/dbus` mount) or the scan doesn't find your printer.
 
 ### Before you start: install a terminal add-on
 
@@ -90,12 +108,12 @@ The printer should be in this list. You can also check `bluetoothctl devices Tru
 1. Go to **Settings → Devices & Services**
 2. Click **Add Integration** and search for **ESC/POS Thermal Printer**
 3. Choose **Bluetooth (RFCOMM)** as the connection type
-4. Pick your printer from the paired-device list (or use **Manual MAC entry** if it doesn't show up)
+4. Pick your printer from the list (or use **Manual MAC entry** if it doesn't show up)
 5. Accept the defaults and finish
 
 > If HA shows "No paired Bluetooth printers found" right after pairing, restart Home Assistant (**Settings → System → Restart**) and try again.
 
-The dropdown filters to imaging-class Bluetooth devices by default so your phone and headset don't clutter the list. If your printer doesn't advertise the Class-of-Device correctly (some cheap models don't), pick **Show all paired Bluetooth devices** from the dropdown. Or use **Manual MAC entry** if you already know the address.
+The dropdown filters to imaging-class Bluetooth devices by default so your phone and headset don't clutter the list. If your printer doesn't advertise the Class-of-Device correctly (some cheap models don't), pick **Show all Bluetooth devices** from the dropdown. Or use **Manual MAC entry** if you already know the address.
 
 The **RFCOMM channel** is hidden by default; almost every ESC/POS printer uses channel 1. If the connection test fails with `bt_channel_refused` you'll be prompted for a different one. Power users can also enable HA's *Advanced Mode* in their profile to surface the field up-front.
 
@@ -188,6 +206,8 @@ Bluetooth Classic / RFCOMM has security properties you should understand before 
 
 ### Pairing problems
 
+- **The scan in the setup dialog finds nothing**: Make sure the printer is in pairing mode, power-cycle it and scan again. Printers that are already connected to a phone usually don't answer a scan.
+- **Pairing fails in the setup dialog with "refused the PIN"**: Enter the PIN from the printer's manual. If the printer has none, pair it once with `bluetoothctl` (see above) and add it afterwards.
 - **Printer doesn't appear in `bluetoothctl devices` even after scanning**: Power-cycle the printer, make sure it's in pairing mode (often signalled by a fast-blinking LED), and confirm it's within ~10 m of the HA host. Some printers stop advertising after a minute or two.
 - **`bluetoothctl pair` fails or times out**: Try again with the printer freshly powered on. If prompted for a PIN, try `0000` or `1234`. Some printers need to be removed first: `bluetoothctl remove XX:XX:XX:XX:XX:XX`, then re-pair.
 - **Printer disappears after rebooting HA**: You skipped `bluetoothctl trust`. Run it now; trusting is what tells BlueZ to auto-reconnect.
