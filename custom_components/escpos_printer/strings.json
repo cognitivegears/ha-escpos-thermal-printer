@@ -93,14 +93,14 @@
       },
       "bluetooth_select": {
         "title": "Configure Bluetooth printer",
-        "description": "Select a paired Bluetooth printer. If your printer isn't listed, pair it on the host first (HA OS: Settings → System → Hardware; otherwise run 'bluetoothctl pair AA:BB:CC:DD:EE:FF' on the host) and try again, or choose Manual MAC entry.",
+        "description": "Select a printer from the list. Devices marked \"not paired yet\" are paired automatically once you submit. Don't see yours? Put the printer into pairing mode and choose \"Scan for nearby devices\".",
         "data": {
           "bt_device": "Bluetooth device",
           "timeout": "Timeout (seconds)",
           "profile": "Printer profile"
         },
         "data_description": {
-          "bt_device": "Select your printer from the list of paired Bluetooth devices.",
+          "bt_device": "Select your printer. Choose \"Scan for nearby devices\" to search for printers that aren't paired with this host yet.",
           "timeout": "Connection timeout in seconds.",
           "profile": "Select your printer model — or Generic (no profile) if it isn't listed; rebadged models appear as \"(compatible)\" entries."
         },
@@ -118,7 +118,7 @@
       },
       "bluetooth_manual": {
         "title": "Manual Bluetooth configuration",
-        "description": "Enter the Bluetooth MAC address of a printer you have already paired on the host (HA OS: Settings → System → Hardware; otherwise 'bluetoothctl pair [MAC]'). The integration only opens an RFCOMM socket — pairing must be done outside the integration.",
+        "description": "Enter the Bluetooth MAC address of your printer. It must already be paired with the host - to pair it from Home Assistant instead, go back and use \"Scan for nearby devices\".",
         "data": {
           "bt_mac": "MAC address",
           "rfcomm_channel": "RFCOMM channel",
@@ -133,10 +133,12 @@
         }
       },
       "bluetooth_no_devices": {
-        "title": "No paired Bluetooth printers found",
-        "description": "Your Home Assistant host can't see any paired Bluetooth printers. Pair the printer first, then come back to this screen.\n\n**On Home Assistant OS / Supervised**: open Settings → Devices & services → Bluetooth, put your printer into pairing mode, and accept the pairing.\n\n**On Home Assistant Core or Container**: pair from the host shell:\n\n```\nbluetoothctl\n[bluetooth]# scan on\n[bluetooth]# pair AA:BB:CC:DD:EE:FF\n[bluetooth]# trust AA:BB:CC:DD:EE:FF\n```\n\nIf bluez D-Bus isn't reachable from this container (rootless Docker, no `/run/dbus` mount), use the **socat host bridge** described in the [setup guide]({docs_url}). Or if you already know the printer's MAC address, **submit this form** to enter it manually.",
-        "data": {},
-        "data_description": {}
+        "title": "No Bluetooth printers found",
+        "description": "Home Assistant doesn't see a paired Bluetooth printer yet.\n\nSwitch the printer on, put it into pairing mode (usually by holding the power button until the LED blinks) and let Home Assistant scan for it - it pairs the printer for you.\n\nIf a scan finds nothing, bluez D-Bus may not be reachable from this container (rootless Docker, no `/run/dbus` mount). Enter the MAC address manually or use the **socat host bridge** described in the [setup guide]({docs_url}).",
+        "menu_options": {
+          "bluetooth_scan": "Scan for nearby printers",
+          "bluetooth_manual": "Enter the MAC address manually"
+        }
       },
       "bluetooth_channel_retry": {
         "title": "Try a different RFCOMM channel",
@@ -281,6 +283,16 @@
           "product_id": "USB Product ID. Use the 0x-prefixed hex form, e.g. 0x0E03. A plain decimal number is also accepted.",
           "timeout": "Connection timeout in seconds."
         }
+      },
+      "bluetooth_pin": {
+        "title": "Enter the printer's PIN",
+        "description": "{name} refused the usual default PINs (0000 and 1234). Enter the PIN from the printer's manual or its label.",
+        "data": {
+          "bt_pin": "PIN"
+        },
+        "data_description": {
+          "bt_pin": "Often 0000, 1234, 1111 or 8888."
+        }
       }
     },
     "error": {
@@ -312,7 +324,15 @@
       "serial_permission_denied": "Permission denied accessing serial port. On Linux, add the Home Assistant user to the 'dialout' group (sudo usermod -aG dialout homeassistant).",
       "serial_port_not_found": "Serial port not found. Verify the port path or URL is correct.",
       "serial_port_busy": "Serial port is busy. Another process may be using it.",
-      "invalid_baudrate": "Invalid baud rate. Select one of the supported rates."
+      "invalid_baudrate": "Invalid baud rate. Select one of the supported rates.",
+      "bt_pair_failed": "Pairing failed. Switch the printer off and on, put it into pairing mode and try again.",
+      "bt_pair_auth_failed": "The printer refused the PIN.",
+      "bt_pair_rejected": "The printer rejected the pairing request.",
+      "bt_pair_timeout": "Pairing timed out. Make sure the printer is switched on, in pairing mode and close to the host.",
+      "bt_pair_unreachable": "The printer could not be reached. Is it switched on and in range, and not connected to another device?",
+      "bt_pair_busy": "Another pairing is already in progress on this host. Wait a moment and try again.",
+      "bt_pair_not_found": "The printer disappeared from the Bluetooth device list. Scan again.",
+      "bt_pair_unavailable": "The Bluetooth adapter isn't ready. Check that Bluetooth is enabled on the host."
     },
     "abort": {
       "already_configured": "This printer is already configured.",
@@ -322,6 +342,10 @@
       "invalid_usb_device": "Invalid USB device configuration. Vendor ID and Product ID are required.",
       "unique_id_mismatch": "This connection detail belongs to a different printer than the one being reconfigured. Remove and re-add the integration if you want to switch to a different physical printer.",
       "reconfigure_successful": "Printer connection updated successfully."
+    },
+    "progress": {
+      "bluetooth_scan": "Searching for Bluetooth printers nearby. Switch your printer on and put it into pairing mode. This takes about 12 seconds.",
+      "bluetooth_pair": "Pairing with {name}. This can take up to 30 seconds."
     },
     "create_entry": {
       "generic_profile": "Printer added with generic defaults (no profile selected). If prints come out wrong, such as wrong width, garbled images, or odd characters, open the printer's entry in Settings > Devices & services, select **Configure**, then **Calibrate printer** to measure the correct settings on paper."

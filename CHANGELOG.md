@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Bluetooth printers can now be scanned for and paired right in the setup
+  dialog — no more `bluetoothctl pair` / `trust` in a terminal. Choose
+  *Scan for nearby devices*, pick the printer and Home Assistant pairs it,
+  tries the common default PINs (`0000`, `1234`, asking for one if both are
+  refused) and marks it trusted so it reconnects after a reboot. Hosts
+  without D-Bus access keep the manual MAC entry.
+
 - Epson TM-T20, Epson TM-T20IV, Toast TP200, and SAM4S Callisto-102D are now
   recognized in the printer model dropdown, aliased to bundled profiles
   (TM-T20II, TM-T20II, TM-T88V, and TM-T20II respectively) — all

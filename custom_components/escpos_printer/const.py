@@ -66,6 +66,12 @@ BT_MANUAL_ENTRY_KEY = "__manual__"
 # Sentinel for "show all paired devices, not just imaging-class" in the picker.
 BT_SHOW_ALL_KEY = "__show_all__"
 
+# Sentinel for "scan for nearby devices" in the picker.
+BT_SCAN_KEY = "__scan__"
+
+# Form field holding the PIN the user types when the default PINs were refused.
+CONF_BT_PIN = "bt_pin"
+
 # Default values
 DEFAULT_PORT = 9100
 DEFAULT_TIMEOUT = 4.0
