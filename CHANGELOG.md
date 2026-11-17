@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- German translation of the whole integration: setup and options dialogs, calibration wizard,
+  repairs, errors and every service with its fields. A test keeps every translation in step
+  with `strings.json` (same keys, same placeholders).
 - Bluetooth printers can now be scanned for and paired right in the setup
   dialog — no more `bluetoothctl pair` / `trust` in a terminal. Choose
   *Scan for nearby devices*, pick the printer and Home Assistant pairs it,
