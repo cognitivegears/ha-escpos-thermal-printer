@@ -265,6 +265,7 @@ See [`blueprints/README.md`](blueprints/README.md) for import instructions, per-
 | [Network printers](docs/network.md) | TCP/IP setup |
 | [USB printers](docs/usb.md) | USB setup, permissions, container pass-through |
 | [Bluetooth printers](docs/bluetooth.md) | Pairing, RFCOMM, container caveats |
+| [Emoji](docs/emoji.md) | Printing emoji, the `emoji` option |
 | [Serial printers](docs/serial.md) | Serial/UART setup, ESPHome proxy, write chunking |
 | [Services](docs/services.md) | Service parameter reference |
 | [Images](docs/images.md) | Image printing: sources, processing, reliability, recipes |

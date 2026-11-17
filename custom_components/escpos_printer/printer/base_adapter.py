@@ -960,3 +960,7 @@ class _BatchPage:
     async def feed(self, lines: int) -> None:
         """Feed blank lines on the held connection."""
         await self._adapter._apply_cut_and_feed(self._hass, self._printer, "none", lines)
+
+    async def cut_and_feed(self, cut: str | None, feed: int | None) -> None:
+        """Feed, then cut, on the held connection — the usual end of a receipt."""
+        await self._adapter._apply_cut_and_feed(self._hass, self._printer, cut, feed)

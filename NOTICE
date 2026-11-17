@@ -19,3 +19,14 @@ License: The DejaVu changes are public domain. The base fonts are
 released under the Bitstream Vera Fonts Copyright (a permissive
 license). The full license text is at
 ``custom_components/escpos_printer/fonts/LICENSE``.
+
+Noto Emoji
+----------
+
+File: ``custom_components/escpos_printer/fonts/NotoEmoji-Regular.ttf``
+
+Origin: https://github.com/google/fonts/tree/main/ofl/notoemoji (the
+monochrome Noto Emoji variable font, instantiated at weight 400).
+
+License: SIL Open Font License 1.1, Copyright 2013 Google LLC. The full
+license text is at ``custom_components/escpos_printer/fonts/NotoEmoji-OFL.txt``.
