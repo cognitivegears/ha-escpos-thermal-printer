@@ -52,8 +52,10 @@ start printing in minutes.
 - Thermal printer with ESC/POS support (most receipt printers)
 - **Network printers:** Accessible on your network (typically port 9100)
 - **USB printers:** Connected directly to your Home Assistant host (requires libusb)
-- **Bluetooth printers:** Linux host with kernel `AF_BLUETOOTH` support;
-  printer paired on the host before adding to HA. See [Bluetooth printers](docs/bluetooth.md).
+- **Bluetooth Classic printers:** Use a Linux host with kernel `AF_BLUETOOTH` support.
+  The setup dialog handles scanning and pairing. [Bluetooth Classic setup](docs/bluetooth.md#bluetooth-classic-rfcomm)
+- **Bluetooth LE printers:** Use Home Assistant's Bluetooth integration with a local
+  adapter or a connectable proxy. [Bluetooth LE setup](docs/bluetooth.md#bluetooth-low-energy-ble)
 - **Serial printers:** Linux host with serial port access (`dialout` group); or use
   an ESPHome serial proxy over the network. See [Serial printers](docs/serial.md).
 
@@ -223,7 +225,7 @@ This integration works with any printer supported by
 
 ## Bluetooth (RFCOMM) printers
 
-Cheap thermal printers (Netum, MUNBYN, POS-58 generics, Phomemo Classic line, etc.) connect over **Bluetooth Classic / RFCOMM**. Pair the printer on the host first, then add it in HA; the integration opens a raw RFCOMM socket to an already-paired device but does not handle pairing itself. Bluetooth Classic is plaintext by default, so don't route sensitive content (OTPs, 2FA codes, door logs) to a BT printer.
+Cheap thermal printers (Netum, MUNBYN, POS-58 generics, Phomemo Classic line, etc.) connect over **Bluetooth Classic / RFCOMM**. The setup dialog scans for the printer, pairs it and marks it trusted, so there is no terminal work; the integration then opens a raw RFCOMM socket to it. Hosts without D-Bus access can still pair by hand and enter the MAC address. Bluetooth Classic is plaintext by default, so don't route sensitive content (OTPs, 2FA codes, door logs) to a BT printer.
 
 See [docs/bluetooth.md](docs/bluetooth.md) for the full pairing walkthrough, container deployment notes, the `socat` host-bridge fallback, and security considerations.
 
@@ -264,7 +266,8 @@ See [`blueprints/README.md`](blueprints/README.md) for import instructions, per-
 | [Calibration](docs/calibration.md) | Guided wizard that measures and saves your printer's settings |
 | [Network printers](docs/network.md) | TCP/IP setup |
 | [USB printers](docs/usb.md) | USB setup, permissions, container pass-through |
-| [Bluetooth printers](docs/bluetooth.md) | Pairing, RFCOMM, container caveats |
+| [Bluetooth printers](docs/bluetooth.md) | BLE discovery, printer profiles, and RFCOMM pairing |
+| [Emoji](docs/emoji.md) | Printing emoji, the `emoji` option |
 | [Serial printers](docs/serial.md) | Serial/UART setup, ESPHome proxy, write chunking |
 | [Services](docs/services.md) | Service parameter reference |
 | [Images](docs/images.md) | Image printing: sources, processing, reliability, recipes |

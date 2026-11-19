@@ -27,6 +27,7 @@ from __future__ import annotations
 # Re-export all public symbols for backward compatibility
 from .accent_fallback_map import ACCENT_FALLBACK_MAP
 from .codepage_mapping import CODEPAGE_TO_CODEC, get_codec_name
+from .emoji import TextRun, contains_emoji, render_form, split_runs, strip_emoji
 from .lookalike_map import LOOKALIKE_MAP
 from .transcoding import (
     apply_accent_fallback,
@@ -40,10 +41,15 @@ __all__ = [
     "ACCENT_FALLBACK_MAP",
     "CODEPAGE_TO_CODEC",
     "LOOKALIKE_MAP",
+    "TextRun",
     "apply_accent_fallback",
     "apply_lookalike_map",
+    "contains_emoji",
     "get_codec_name",
     "get_unmappable_chars",
     "normalize_unicode",
+    "render_form",
+    "split_runs",
+    "strip_emoji",
     "transcode_to_codepage",
 ]

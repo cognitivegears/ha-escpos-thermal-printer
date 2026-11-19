@@ -9,7 +9,7 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 
 from .capabilities import (
@@ -20,9 +20,11 @@ from .capabilities import (
     profile_declares_no_images,
     profile_provides_calibration,
 )
+from .capabilities.ble_profiles import get_ble_profiles
 from .const import (
     CONF_ALLOW_LOCAL_IMAGE_URLS,
     CONF_BAUDRATE,
+    CONF_BLE_PROFILE,
     CONF_BT_MAC,
     CONF_CODEPAGE,
     CONF_CONNECTION_TYPE,
@@ -217,6 +219,24 @@ async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) ->
     return True
 
 
+async def _bluetooth_config(
+    hass: HomeAssistant, entry: EscposConfigEntry, shared: dict[str, Any]
+) -> BluetoothPrinterConfig:
+    """Build the saved Bluetooth printer configuration."""
+    profile = None
+    if (key := entry.data.get(CONF_BLE_PROFILE)) is not None:
+        profiles = await hass.async_add_executor_job(get_ble_profiles)
+        profile = profiles.get(key)
+        if profile is None:
+            raise ConfigEntryError(translation_domain=DOMAIN, translation_key="ble_profile_missing")
+    return BluetoothPrinterConfig(
+        mac=str(entry.data.get(CONF_BT_MAC, "")),
+        rfcomm_channel=int(entry.data.get(CONF_RFCOMM_CHANNEL, DEFAULT_RFCOMM_CHANNEL)),
+        ble_profile=profile,
+        **shared,
+    )
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bool:
     """Set up ESC/POS Printer from a config entry."""
     _LOGGER.debug("Setting up escpos_printer entry: %s", entry.entry_id)
@@ -250,11 +270,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bo
             **shared,
         )
     elif connection_type == CONNECTION_TYPE_BLUETOOTH:
-        config = BluetoothPrinterConfig(
-            mac=str(entry.data.get(CONF_BT_MAC, "")),
-            rfcomm_channel=int(entry.data.get(CONF_RFCOMM_CHANNEL, DEFAULT_RFCOMM_CHANNEL)),
-            **shared,
-        )
+        config = await _bluetooth_config(hass, entry, shared)
     elif connection_type == CONNECTION_TYPE_SERIAL:
         config = SerialPrinterConfig(
             serial_port=str(entry.data.get(CONF_SERIAL_PORT, "")),
@@ -345,10 +361,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: EscposConfigEntry) -> bo
     # that already carries everything the wizard measures counts too.
     from homeassistant.helpers import issue_registry as ir  # noqa: PLC0415
 
-    calibrated = any(
-        key in entry.options
-        for key in (CONF_IMPL, CONF_WIDTH_PIXELS, CONF_LINE_WIDTH, CONF_CODEPAGE)
-    ) or await hass.async_add_executor_job(profile_provides_calibration, shared["profile"])
+    calibrated = (
+        CONF_BLE_PROFILE in entry.data
+        or any(
+            key in entry.options
+            for key in (CONF_IMPL, CONF_WIDTH_PIXELS, CONF_LINE_WIDTH, CONF_CODEPAGE)
+        )
+        or await hass.async_add_executor_job(profile_provides_calibration, shared["profile"])
+    )
     issue_id = f"printer_not_calibrated_{entry.entry_id}"
     if calibrated:
         ir.async_delete_issue(hass, DOMAIN, issue_id)

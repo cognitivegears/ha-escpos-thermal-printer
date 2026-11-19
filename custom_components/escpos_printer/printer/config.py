@@ -16,7 +16,7 @@ flagged here so the next contributor understands the asymmetry.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from ..const import (
     DEFAULT_BAUDRATE,
@@ -26,6 +26,9 @@ from ..const import (
     DEFAULT_SERIAL_WRITE_CHUNK_DELAY_MS,
     DEFAULT_SERIAL_WRITE_CHUNK_SIZE,
 )
+
+if TYPE_CHECKING:
+    from ..capabilities.ble_profiles import BlePrinterProfile
 
 
 @dataclass
@@ -71,11 +74,12 @@ class UsbPrinterConfig(BasePrinterConfig):
 
 @dataclass
 class BluetoothPrinterConfig(BasePrinterConfig):
-    """Configuration for Bluetooth Classic / RFCOMM printers."""
+    """Configuration for Bluetooth Classic and Bluetooth LE printers."""
 
     connection_type: Literal["bluetooth"] = field(default="bluetooth", repr=False)
     mac: str = ""
     rfcomm_channel: int = DEFAULT_RFCOMM_CHANNEL
+    ble_profile: BlePrinterProfile | None = None
 
 
 @dataclass

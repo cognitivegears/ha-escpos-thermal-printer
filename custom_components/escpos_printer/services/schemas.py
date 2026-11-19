@@ -38,6 +38,7 @@ from ..const import (
     ATTR_DITHER,
     ATTR_DURATION,
     ATTR_EC,
+    ATTR_EMOJI,
     ATTR_ENCODING,
     ATTR_FALLBACK_IMAGE,
     ATTR_FEED,
@@ -86,6 +87,7 @@ from ..const import (
     DEFAULT_LINE_SPACING,
     DEFAULT_THRESHOLD,
     DITHER_MODES,
+    EMOJI_MODES,
     IMPL_MODES,
     ROTATION_VALUES,
     TARGET_PICKER_KEYS,
@@ -360,6 +362,7 @@ PRINT_TEXT_UTF8_SCHEMA = _with_target_validation(
         vol.Optional(ATTR_INVERT): cv.boolean,
         vol.Optional(ATTR_DENSITY): _DENSITY,
         vol.Optional(ATTR_FONT): _FONT,
+        vol.Optional(ATTR_EMOJI): vol.In(EMOJI_MODES),
         vol.Optional(ATTR_CUT): _CUT,
         vol.Optional(ATTR_FEED): _FEED,
     }

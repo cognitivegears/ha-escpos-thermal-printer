@@ -8,6 +8,7 @@ from homeassistant.core import HomeAssistant
 
 from .const import (
     CONF_BAUDRATE,
+    CONF_BLE_PROFILE,
     CONF_BT_MAC,
     CONF_CODEPAGE,
     CONF_CONNECTION_TYPE,
@@ -103,7 +104,11 @@ async def async_get_config_entry_diagnostics(
             runtime["out_ep"] = f"0x{config.out_ep:02X}" if config.out_ep else None
         elif isinstance(config, BluetoothPrinterConfig):
             runtime["mac"] = config.mac
-            runtime["rfcomm_channel"] = config.rfcomm_channel
+            runtime.update(
+                {CONF_BLE_PROFILE: config.ble_profile.name}
+                if config.ble_profile
+                else {CONF_RFCOMM_CHANNEL: config.rfcomm_channel}
+            )
         elif connection_type == CONNECTION_TYPE_SERIAL and isinstance(config, SerialPrinterConfig):
             runtime["serial_port"] = config.serial_port  # redacted by TO_REDACT
             runtime["baudrate"] = config.baudrate
@@ -133,7 +138,11 @@ async def async_get_config_entry_diagnostics(
         entry_data = {
             CONF_CONNECTION_TYPE: CONNECTION_TYPE_BLUETOOTH,
             CONF_BT_MAC: data.get(CONF_BT_MAC),
-            CONF_RFCOMM_CHANNEL: data.get(CONF_RFCOMM_CHANNEL),
+            **(
+                {CONF_BLE_PROFILE: data[CONF_BLE_PROFILE]}
+                if CONF_BLE_PROFILE in data
+                else {CONF_RFCOMM_CHANNEL: data.get(CONF_RFCOMM_CHANNEL)}
+            ),
             CONF_CODEPAGE: data.get(CONF_CODEPAGE),
             CONF_PROFILE: data.get(CONF_PROFILE),
             CONF_LINE_WIDTH: data.get(CONF_LINE_WIDTH),

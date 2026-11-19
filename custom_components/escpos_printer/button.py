@@ -6,10 +6,12 @@ import logging
 from typing import TYPE_CHECKING
 
 from homeassistant.components.button import ButtonEntity
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import DeviceInfo
 
+from .const import CONF_BLE_PROFILE, DOMAIN
 from .device import build_device_info
 from .sample_print import async_print_sample
 from .services._handler_utils import _wrap_unexpected
@@ -28,14 +30,10 @@ FEED_LINES = 3
 async def async_setup_entry(  # type: ignore[no-untyped-def]
     hass: HomeAssistant, entry: EscposConfigEntry, async_add_entities
 ) -> None:
-    async_add_entities(
-        [
-            EscposFeedButton(hass, entry),
-            EscposCutButton(hass, entry),
-            EscposBeepButton(hass, entry),
-            EscposSamplePrintButton(hass, entry),
-        ]
-    )
+    buttons = [EscposFeedButton(hass, entry), EscposSamplePrintButton(hass, entry)]
+    if CONF_BLE_PROFILE not in entry.data:
+        buttons[1:1] = [EscposCutButton(hass, entry), EscposBeepButton(hass, entry)]
+    async_add_entities(buttons)
 
 
 class _EscposButton(ButtonEntity):
@@ -50,7 +48,16 @@ class _EscposButton(ButtonEntity):
     def device_info(self) -> DeviceInfo:
         return build_device_info(self._entry)
 
+    @property
+    def available(self) -> bool:
+        """Report whether the current entry has a loaded printer adapter."""
+        return hasattr(self._entry, "runtime_data")
+
     async def async_press(self) -> None:
+        if self._entry.state is not ConfigEntryState.LOADED or not self.available:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="printer_entry_unavailable"
+            )
         try:
             await self._press()
         except HomeAssistantError:

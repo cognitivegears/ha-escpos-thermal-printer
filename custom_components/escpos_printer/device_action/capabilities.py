@@ -33,6 +33,7 @@ from ..const import (
     ATTR_TIMES,
     ATTR_UNDERLINE,
     ATTR_WIDTH,
+    CONF_BLE_PROFILE,
     DOMAIN,
 )
 from .actions import _get_entry_id_from_device
@@ -65,6 +66,14 @@ async def _get_profile_for_device(hass: HomeAssistant, device_id: str) -> str | 
     return profile
 
 
+def _is_ble_printer(hass: HomeAssistant, device: dr.DeviceEntry | dr.ChildDeviceEntry) -> bool:
+    return any(
+        (entry := hass.config_entries.async_get_entry(entry_id)) is not None
+        and CONF_BLE_PROFILE in entry.data
+        for entry_id in device.config_entries
+    )
+
+
 async def async_get_actions(hass: HomeAssistant, device_id: str) -> list[dict[str, str]]:
     """List device actions for ESC/POS printers."""
     device_registry = dr.async_get(hass)
@@ -77,8 +86,7 @@ async def async_get_actions(hass: HomeAssistant, device_id: str) -> list[dict[st
     if not any(identifier[0] == DOMAIN for identifier in device.identifiers):
         return []
 
-    # Return all available actions
-    return [
+    actions = [
         {
             CONF_DOMAIN: DOMAIN,
             CONF_TYPE: ACTION_PRINT_TEXT_UTF8,
@@ -120,6 +128,9 @@ async def async_get_actions(hass: HomeAssistant, device_id: str) -> list[dict[st
             CONF_DEVICE_ID: device_id,
         },
     ]
+    if _is_ble_printer(hass, device):
+        return [action for action in actions if action[CONF_TYPE] not in (ACTION_CUT, ACTION_BEEP)]
+    return actions
 
 
 def _get_capabilities_schema(action_type: str, cut_modes: list[str]) -> dict[str, vol.Schema]:
@@ -248,6 +259,9 @@ async def async_get_action_capabilities(
     hass: HomeAssistant, config: ConfigType
 ) -> dict[str, vol.Schema]:
     """List action capabilities."""
+    device = dr.async_get(hass).async_get(config[CONF_DEVICE_ID])
+    if device and _is_ble_printer(hass, device):
+        return _get_capabilities_schema(config[CONF_TYPE], ["none"])
     profile = await _get_profile_for_device(hass, config[CONF_DEVICE_ID])
     cut_modes = await hass.async_add_executor_job(get_profile_cut_modes, profile)
     return _get_capabilities_schema(config[CONF_TYPE], cut_modes)

@@ -114,6 +114,21 @@ print_text_utf8:
           options:
             - "a"
             - "b"
+    emoji:
+      name: Emoji
+      description: >-
+        How to print emoji. `auto` prints lines with emoji as small images
+        (using the bundled Noto Emoji font) and everything else as normal
+        text. `strip` removes emoji. `off` keeps the old behavior, where
+        each emoji prints as a `?`. Emoji lines honor alignment, font and
+        size, but not bold, underline or invert.
+      default: "auto"
+      selector:
+        select:
+          options:
+            - "auto"
+            - "strip"
+            - "off"
     cut:
       name: Cut
       description: Paper cutting mode after printing (defaults to the printer's configured cut mode)
