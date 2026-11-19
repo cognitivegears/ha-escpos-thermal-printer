@@ -52,8 +52,10 @@ start printing in minutes.
 - Thermal printer with ESC/POS support (most receipt printers)
 - **Network printers:** Accessible on your network (typically port 9100)
 - **USB printers:** Connected directly to your Home Assistant host (requires libusb)
-- **Bluetooth printers:** Linux host with kernel `AF_BLUETOOTH` support;
-  pairing happens in the setup dialog (scan, pair, trust). See [Bluetooth printers](docs/bluetooth.md).
+- **Bluetooth Classic printers:** Use a Linux host with kernel `AF_BLUETOOTH` support.
+  The setup dialog handles scanning and pairing. [Bluetooth Classic setup](docs/bluetooth.md#bluetooth-classic-rfcomm)
+- **Bluetooth LE printers:** Use Home Assistant's Bluetooth integration with a local
+  adapter or a connectable proxy. [Bluetooth LE setup](docs/bluetooth.md#bluetooth-low-energy-ble)
 - **Serial printers:** Linux host with serial port access (`dialout` group); or use
   an ESPHome serial proxy over the network. See [Serial printers](docs/serial.md).
 
@@ -264,7 +266,7 @@ See [`blueprints/README.md`](blueprints/README.md) for import instructions, per-
 | [Calibration](docs/calibration.md) | Guided wizard that measures and saves your printer's settings |
 | [Network printers](docs/network.md) | TCP/IP setup |
 | [USB printers](docs/usb.md) | USB setup, permissions, container pass-through |
-| [Bluetooth printers](docs/bluetooth.md) | Pairing, RFCOMM, container caveats |
+| [Bluetooth printers](docs/bluetooth.md) | BLE discovery, printer profiles, and RFCOMM pairing |
 | [Emoji](docs/emoji.md) | Printing emoji, the `emoji` option |
 | [Serial printers](docs/serial.md) | Serial/UART setup, ESPHome proxy, write chunking |
 | [Services](docs/services.md) | Service parameter reference |

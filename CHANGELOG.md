@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Bluetooth LE discovery and raster printing through Home Assistant's
+  Bluetooth integration, with Fichero Mini Pocket Printer (3561),
+  Crafts&Co (4777), and Fichero D11s profiles.
+
 - German translation of the whole integration: setup and options dialogs, calibration wizard,
   repairs, errors and every service with its fields. A test keeps every translation in step
   with `strings.json` (same keys, same placeholders).
@@ -49,6 +53,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   autodetect suggestion.
 
 ### Fixed
+
+- Update Last Print as soon as a print succeeds, and handle device-page
+  button presses while a printer entry reloads.
 
 - The calibration wizard's column-count step now rejects a Font A count
   wider than physically fits the calibrated printable width (max columns =

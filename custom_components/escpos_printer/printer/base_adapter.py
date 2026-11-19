@@ -140,6 +140,7 @@ class EscposPrinterAdapterBase(
         # probes, so it means "last successful contact", not "last print"
         # (ROADMAP item 5).
         self._last_print: Any = None
+        self._print_listeners: list[Callable[[], None]] = []
         self._last_error: Any = None
         self._last_latency_ms: int | None = None
         self._last_paper_status: int | None = None
@@ -408,6 +409,15 @@ class EscposPrinterAdapterBase(
                 self._status_listeners.remove(callback)
 
         return _remove
+
+    def add_print_listener(self, callback: Callable[[], None]) -> Callable[[], None]:
+        """Subscribe to completed prints and return an unsubscribe function."""
+        self._print_listeners.append(callback)
+
+        def remove() -> None:
+            self._print_listeners.remove(callback)
+
+        return remove
 
     def get_diagnostics(self) -> dict[str, Any]:
         """Return diagnostic information about the adapter."""
@@ -761,6 +771,9 @@ class EscposPrinterAdapterBase(
         self._last_error_errno = None
         if print_op:
             self._last_print = now
+            for listener in list(self._print_listeners):
+                with contextlib.suppress(Exception):
+                    listener()
         self._notify_status_change(True)
 
     @contextlib.asynccontextmanager

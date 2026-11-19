@@ -1,4 +1,57 @@
-# Bluetooth (RFCOMM) Printers
+# Bluetooth printers
+
+## Bluetooth Low Energy (BLE)
+
+1. Set up Home Assistant's [Bluetooth integration](https://www.home-assistant.io/integrations/bluetooth/)
+   with a local adapter or a proxy that supports active connections.
+2. Switch on the printer and disconnect it from its mobile app.
+3. Add **ESC/POS Thermal Printer** and choose **Bluetooth Low Energy (BLE)**.
+4. Select your printer profile and the device from the list. Choose **Refresh
+   list** if it has just been switched on, or enter its Bluetooth address.
+5. Submit the form. Home Assistant checks the printer's model over GATT.
+   Open the device page and press **Sample test print**.
+
+### Fichero Label Printer (D11s)
+
+Choose **Fichero Label Printer (D11s)** for Action article 3212141. The
+profile uses the AiYin print commands and advances to the next label
+after each job. The integration profile is awaiting a hardware test.
+Use gap labels and fit the content within 96 dots
+across by 240 dots along the feed for 30 mm labels. For text that should
+run along the long side of the label, use `print_text_image` with
+`rotation: 90`. A standalone feed advances by one label.
+[Action product page](https://www.action.com/de-de/p/3212141/fichero-etikettendrucker/)
+· [D11s protocol reference](https://github.com/0xMH/fichero-printer/blob/main/docs/PROTOCOL.md)
+
+### Continuous-paper profiles
+
+The **LuckPrinter (384 dots, continuous paper)** profile is for continuous-paper
+devices using the Lujiang command set. BLE print jobs use raster graphics for
+text, images, QR codes, and software barcodes. Image size must fit the printhead.
+BLE printing does not require a system PIN or pairing in the phone's settings.
+
+### Crafts&Co Fichero Mini Pocket Printer (4777)
+
+Choose **Crafts&Co Fichero Mini Pocket Printer (4777)** if the Bluetooth
+name begins with `CRAFTS&CO|4777` or `CRAFTS&CO_4777`. The profile uses
+the firmware-specific commands for a 384-dot continuous-paper raster.
+Test printing with the compressed raster format and standalone paper
+feed were confirmed on a `CRAFTS&CO|4777` device with firmware V3.20.
+If you previously added the device with the generic LuckPrinter profile,
+open the integration entry's menu, choose **Reconfigure**, and select
+the 4777 profile. The address and existing entities carry over.
+[Fichero Printer app](https://play.google.com/store/apps/details?id=com.lj.fichero)
+
+### Fichero Mini Pocket Printer (3561)
+
+Choose **Fichero Mini Pocket Printer (3561)** for the 203 dpi model. This
+preset uses the 384-dot Lujiang raster mode for continuous paper. Check
+the model number on the printer or packaging before selecting the preset,
+since the 300 dpi Fichero pocket printer uses a different printhead.
+[Action's 3561 manual](https://asset.action.com/image/upload/v1730448470/Final/Documents/Quality%20Product%20Documents/handleiding_fichero_thermal_pocket_printer_set_1.pdf)
+· [Lujiang protocol reference](https://github.com/ChiaraCannolee/thermal-pocket-printer-basic/blob/main/PROTOCOL.md)
+
+## Bluetooth Classic (RFCOMM)
 
 For portable, battery-powered ESC/POS printers (Netum, MUNBYN, POS-58 generics, Phomemo Classic line).
 

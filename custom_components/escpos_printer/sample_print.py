@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 
 from homeassistant.core import HomeAssistant
 
+from .const import CONF_BLE_PROFILE
 from .text_effects.box import render_box
 from .text_effects.table import render_table
 
@@ -33,7 +34,11 @@ async def async_print_sample(hass: HomeAssistant, entry: EscposConfigEntry) -> N
     """Print the sample receipt on the entry's printer."""
     from . import _shared_print_config  # noqa: PLC0415 (avoid import cycle at module load)
 
-    adapter = entry.runtime_data.adapter
+    runtime = entry.runtime_data
+    adapter = runtime.adapter
+    if CONF_BLE_PROFILE in entry.data:
+        await adapter.print_text(hass, text=f"Test print\n{entry.title}", cut="none")
+        return
     line_width = _shared_print_config(entry)["line_width"]
     logo = await hass.async_add_executor_job(_logo_data_uri)
 
@@ -65,7 +70,7 @@ async def async_print_sample(hass: HomeAssistant, entry: EscposConfigEntry) -> N
     # Batch pages never cut (documented _BatchPage contract) — follow-up
     # cut like the calibration wizard does. "none" would make the button
     # print an uncut dangling receipt, so fall back to full.
-    cut_mode = entry.runtime_data.defaults.get("cut") or "full"
+    cut_mode = runtime.defaults.get("cut") or "full"
     if cut_mode == "none":
         cut_mode = "full"
     await adapter.cut(hass, mode=cut_mode)

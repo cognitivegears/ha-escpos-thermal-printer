@@ -119,3 +119,17 @@ async def test_button_press_error_is_logged_and_sanitised(hass, caplog):  # type
     assert any("feed" in rec.message and rec.levelname == "ERROR" for rec in caplog.records), (
         "no exception log emitted for the failed press"
     )
+
+
+async def test_stale_button_reports_unloaded_entry(hass):  # type: ignore[no-untyped-def]
+    """An in-flight service dispatch may reach a button as its entry unloads."""
+    from custom_components.escpos_printer.button import EscposFeedButton
+
+    entry = await _setup_entry(hass)
+    button = EscposFeedButton(hass, entry)
+    assert button.available
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert not button.available
+    with pytest.raises(HomeAssistantError) as exc_info:
+        await button.async_press()
+    assert exc_info.value.translation_key == "printer_entry_unavailable"

@@ -52,6 +52,7 @@ CONF_IN_EP = "in_ep"
 CONF_OUT_EP = "out_ep"
 
 # Bluetooth configuration keys
+CONF_BLE_PROFILE = "ble_profile"
 CONF_BT_MAC = "bt_mac"
 CONF_BT_DEVICE = "bt_device"
 CONF_RFCOMM_CHANNEL = "rfcomm_channel"

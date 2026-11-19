@@ -293,6 +293,22 @@
         "data_description": {
           "bt_pin": "Oft 0000, 1234, 1111 oder 8888."
         }
+      },
+      "bluetooth_le": {
+        "title": "Bluetooth-LE-Drucker",
+        "description": "Schalte den Drucker ein und trenne ihn von der Handy-App. Wähle das Druckerprofil und das Gerät aus der Liste. Aktualisiere die Liste, wenn der Drucker noch fehlt. Du kannst auch seine Bluetooth-Adresse eingeben.",
+        "data": {
+          "ble_profile": "Druckerprofil",
+          "bt_mac": "Gerät oder Bluetooth-Adresse"
+        }
+      },
+      "reconfigure_bluetooth_le": {
+        "title": "Bluetooth-LE-Drucker",
+        "description": "Schalte den Drucker ein und trenne ihn von der Handy-App. Wähle das Druckerprofil und das Gerät aus der Liste. Aktualisiere die Liste, wenn der Drucker noch fehlt. Du kannst auch seine Bluetooth-Adresse eingeben.",
+        "data": {
+          "ble_profile": "Druckerprofil",
+          "bt_mac": "Gerät oder Bluetooth-Adresse"
+        }
       }
     },
     "error": {
@@ -332,7 +348,12 @@
       "bt_pair_unreachable": "Der Drucker ist nicht erreichbar. Ist er eingeschaltet, in Reichweite und nicht mit einem anderen Gerät verbunden?",
       "bt_pair_busy": "Auf diesem Host läuft bereits eine andere Kopplung. Warte einen Moment und versuche es erneut.",
       "bt_pair_not_found": "Der Drucker ist aus der Liste der Bluetooth-Geräte verschwunden. Suche erneut.",
-      "bt_pair_unavailable": "Der Bluetooth-Adapter ist nicht bereit. Prüfe, ob Bluetooth auf dem Host aktiviert ist."
+      "bt_pair_unavailable": "Der Bluetooth-Adapter ist nicht bereit. Prüfe, ob Bluetooth auf dem Host aktiviert ist.",
+      "ble_not_available": "Richte zuerst die Bluetooth-Integration von Home Assistant ein.",
+      "ble_not_found": "Kein verbindungsfähiger Bluetooth-Adapter oder Proxy sieht diese Adresse. Schalte den Drucker ein und aktualisiere die Liste.",
+      "ble_model_mismatch": "Das Gerät entspricht dem gewählten Druckerprofil nicht. Prüfe Modell und Bluetooth-Adresse.",
+      "ble_cannot_connect": "Der Drucker antwortet nicht. Schließe die Hersteller-App und versuche es in der Nähe des Bluetooth-Adapters erneut.",
+      "ble_use_4777_profile": "Wähle das Profil „Crafts&Co Fichero Mini Pocket Printer (4777)“ für diesen Drucker."
     },
     "abort": {
       "already_configured": "Dieser Drucker ist bereits eingerichtet.",
@@ -485,6 +506,21 @@
         },
         "data_description": {
           "custom_line_width": "Anzahl der Zeichen, die in eine Zeile passen."
+        }
+      },
+      "ble_settings": {
+        "title": "Bluetooth-LE-Druckereinstellungen",
+        "data": {
+          "timeout": "Zeitüberschreitung (Sekunden)",
+          "default_align": "Standardausrichtung",
+          "status_interval": "Statusabfrage-Intervall (Sekunden)",
+          "allow_local_image_urls": "Lokale Bild-URLs erlauben"
+        },
+        "data_description": {
+          "timeout": "Zeitlimit für den Verbindungsaufbau in Sekunden.",
+          "default_align": "Standardausrichtung beim Drucken von Text.",
+          "status_interval": "Wie oft der Druckerstatus abgefragt wird (0 zum Deaktivieren).",
+          "allow_local_image_urls": "Erlaubt print_image_url (und den übrigen Bilddiensten), URLs abzurufen, die auf private, LAN- oder Loopback-Adressen zeigen, und Nicht-Standard-Ports zu verwenden (z. B. eine lokale Kamera, ein Frigate-Proxy auf :5000 oder deine Home-Assistant-Instanz auf :8123). Standardmäßig aus. Cloud-Metadaten- und Link-Local-Adressen bleiben auch dann gesperrt."
         }
       }
     }
@@ -717,6 +753,33 @@
     },
     "table_columns_exceed_width": {
       "message": "Spaltenbreiten plus Trennzeichen benötigen {needed} Zeichen, verfügbar sind aber nur {available} (Zeilenbreite des Druckers: {line_width}). Verringere die Spaltenbreiten oder total_width."
+    },
+    "ble_print_failed": {
+      "message": "Der BLE-Druckauftrag wurde nicht bestätigt."
+    },
+    "ble_printer_error": {
+      "message": "Prüfe Papier, Deckel und Temperatur des BLE-Druckers."
+    },
+    "ble_profile_missing": {
+      "message": "Das gespeicherte Bluetooth-LE-Druckerprofil fehlt."
+    },
+    "ble_unsupported": {
+      "message": "Diese Aktion ist für den Bluetooth-LE-Drucker nicht verfügbar."
+    },
+    "ble_image_too_wide": {
+      "message": "Das Druckbild ist breiter als {width} Pixel."
+    },
+    "ble_job_too_long": {
+      "message": "Der Druckauftrag ist länger als {rows} Pixel."
+    },
+    "printer_entry_unavailable": {
+      "message": "Der Drucker wird gerade geladen oder ist nicht verfügbar."
+    },
+    "ble_use_4777_profile": {
+      "message": "Wähle das Profil „Crafts&Co Fichero Mini Pocket Printer (4777)“ für diesen Drucker."
+    },
+    "ble_buffer_overrun": {
+      "message": "Der BLE-Drucker hat Daten verworfen, weil sein Empfangspuffer voll war."
     }
   },
   "services": {
