@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-22
+
 ### Breaking changes
 
 - **Minimum Home Assistant version raised to 2026.9.0.** HA 2026.9 replaced
@@ -1727,7 +1729,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 Earlier releases: see git history.
 
-[Unreleased]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.8.0...v1.0.0
