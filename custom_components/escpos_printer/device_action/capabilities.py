@@ -7,7 +7,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.typing import ConfigType
-import voluptuous as vol
+import probatio as vol
 
 from ..capabilities import get_profile_cut_modes
 from ..const import (

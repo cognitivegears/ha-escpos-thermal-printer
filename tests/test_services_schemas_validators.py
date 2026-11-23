@@ -10,8 +10,8 @@ branches that the happy-path callers never hit.
 
 from __future__ import annotations
 
+import probatio as vol
 import pytest
-import voluptuous as vol
 
 from custom_components.escpos_printer.security import (
     MAX_BEEP_DURATION,

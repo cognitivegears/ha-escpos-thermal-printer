@@ -7,8 +7,7 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.helpers.selector import SerialPortSelector
-from homeassistant.helpers.typing import UNDEFINED, UndefinedType
-import voluptuous as vol
+import probatio as vol
 
 from ..capabilities import (
     PROFILE_AUTO,
@@ -180,7 +179,7 @@ class SerialFlowMixin:
                     # when the entry still carries the original
                     # auto-generated one -- a user's manual rename must
                     # never be clobbered.
-                    title: str | UndefinedType = UNDEFINED
+                    title = reconfigure_entry.title  # unchanged title is a no-op
                     old_port = reconfigure_entry.data.get(CONF_SERIAL_PORT, "")
                     if reconfigure_entry.title == f"Serial {sanitize_log_message(old_port)}":
                         title = f"Serial {sanitize_log_message(port)}"

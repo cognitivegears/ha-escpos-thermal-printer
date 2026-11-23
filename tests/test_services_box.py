@@ -75,7 +75,7 @@ async def test_print_box_padding_adds_blank_rows(hass) -> None:  # type: ignore[
 
 async def test_print_box_invalid_style_rejected_at_schema(hass) -> None:  # type: ignore[no-untyped-def]
     await _setup_entry(hass)
-    import voluptuous as vol
+    import probatio as vol
 
     with patch("escpos.printer.Network"):
         try:
@@ -87,8 +87,8 @@ async def test_print_box_invalid_style_rejected_at_schema(hass) -> None:  # type
             )
         except vol.Invalid:
             return
-        # HA may wrap voluptuous errors; fail only if the call succeeded.
-        raise AssertionError("expected voluptuous error for bad style")
+        # HA may wrap schema validation errors; fail only if the call succeeded.
+        raise AssertionError("expected schema validation error for bad style")
 
 
 async def test_print_box_strips_control_chars_before_layout(hass) -> None:  # type: ignore[no-untyped-def]
