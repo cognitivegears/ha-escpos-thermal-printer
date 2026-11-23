@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   the bundled KR-306 profile, whose codepage table matches the printer's
   self-test page index-for-index (#172). This fixes CP858/CP1252 printing
   garbled text with the generic profile.
+- POSX EVO Green and Rongta RP850 are now recognized in the printer model
+  dropdown, aliased to the TM-T88V and RP820 profiles respectively, from
+  users' calibration reports (#188, #210). The EVO Green matched TM-T88V's
+  geometry and all four tested codepages; the RP850's 576 px / 48-column
+  geometry matches RP820, but its codepages weren't tested.
 - Calibration reports now include a "Detected identity" section: connection
   type, the profile AUTODETECT would have suggested, the printer's own
   self-reported identity (USB vendor/product IDs and descriptor strings, GS
