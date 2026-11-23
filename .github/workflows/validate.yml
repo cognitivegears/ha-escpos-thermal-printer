@@ -35,7 +35,7 @@ jobs:
           # fetches the head SHA, causing `git rev-parse <base>^..<head>`
           # to fail with "unknown revision"). 0 = full history.
           fetch-depth: 0
-      - uses: actions/setup-python@v7.0.0
+      - uses: actions/setup-python@v7.1.0
         with:
           python-version: '3.14'
 
@@ -55,8 +55,15 @@ jobs:
           # disagreeing with master about fixture setup, which surfaces
           # as `KeyError: 'device_registry'` and timezone-fixture
           # teardown failures rather than as real HA-master breakages.
-          pip install --upgrade git+https://github.com/home-assistant/core.git@dev
+          #
+          # Order matters: the harness pins an exact released HA
+          # (homeassistant==X), so installing it *after* HA dev silently
+          # downgrades HA back to that release and the canary never tests
+          # dev at all. Install the harness first, then HA dev on top, and
+          # fail loudly if HA isn't a dev build.
           pip install --upgrade git+https://github.com/MatthewFlamm/pytest-homeassistant-custom-component.git@master
+          pip install --upgrade git+https://github.com/home-assistant/core.git@dev
+          python -c "from homeassistant.const import __version__ as v; print('HA', v); assert 'dev' in v, v"
 
       - name: Check dependency sync (manifest vs pyproject)
         run: |
@@ -120,7 +127,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
-      - uses: actions/setup-python@v7.0.0
+      - uses: actions/setup-python@v7.1.0
         with:
           python-version: '3.14'
 

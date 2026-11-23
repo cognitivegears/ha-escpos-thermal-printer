@@ -7,7 +7,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.typing import ConfigType
-import voluptuous as vol
+import probatio as vol
 
 from ..capabilities import get_profile_cut_modes
 from ..const import (
@@ -67,11 +67,9 @@ async def _get_profile_for_device(hass: HomeAssistant, device_id: str) -> str | 
 
 
 def _is_ble_printer(hass: HomeAssistant, device: dr.DeviceEntry | dr.ChildDeviceEntry) -> bool:
-    return any(
-        (entry := hass.config_entries.async_get_entry(entry_id)) is not None
-        and CONF_BLE_PROFILE in entry.data
-        for entry_id in device.config_entries
-    )
+    entry_id = _get_entry_id_from_device(hass, device.id)
+    entry = hass.config_entries.async_get_entry(entry_id) if entry_id else None
+    return entry is not None and CONF_BLE_PROFILE in entry.data
 
 
 async def async_get_actions(hass: HomeAssistant, device_id: str) -> list[dict[str, str]]:

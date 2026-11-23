@@ -10,9 +10,9 @@ from urllib.parse import parse_qs, unquote, urlparse
 from homeassistant.components import persistent_notification as pn
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_HOST, CONF_PORT
+import probatio as vol
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
-import voluptuous as vol
 
 from custom_components.escpos_printer._config_flow.calibration import CODEPAGE_CANDIDATES
 from custom_components.escpos_printer.capabilities.loader import _get_capabilities

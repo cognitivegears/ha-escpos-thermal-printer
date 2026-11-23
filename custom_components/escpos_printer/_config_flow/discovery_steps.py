@@ -16,7 +16,6 @@ from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
-from homeassistant.helpers.typing import UNDEFINED, UndefinedType
 
 from ..const import CONF_MAC_ADDRESS, DEFAULT_PORT, DEFAULT_TIMEOUT, DOMAIN
 from .network_helpers import (
@@ -107,7 +106,7 @@ class DiscoveryFlowMixin:
             # user's manual rename must never be clobbered (same heuristic
             # as network_steps.async_step_reconfigure_network).
             new_data = {**entry.data, CONF_HOST: host}
-            title: str | UndefinedType = UNDEFINED
+            title = entry.title  # unchanged title is a no-op
             if is_auto_network_title(entry.title, entry.data):
                 title = make_network_entry_title(new_data)
             self.hass.config_entries.async_update_entry(

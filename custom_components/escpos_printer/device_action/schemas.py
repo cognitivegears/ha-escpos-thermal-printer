@@ -6,7 +6,7 @@ from typing import Any
 
 from homeassistant.const import CONF_DEVICE_ID, CONF_DOMAIN, CONF_TYPE
 from homeassistant.helpers import config_validation as cv
-import voluptuous as vol
+import probatio as vol
 
 from ..const import (
     ATTR_ALIGN,

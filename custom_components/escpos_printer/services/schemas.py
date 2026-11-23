@@ -14,7 +14,7 @@ from typing import Any
 
 from homeassistant.components.notify import ATTR_MESSAGE, ATTR_TITLE
 from homeassistant.helpers import config_validation as cv
-import voluptuous as vol
+import probatio as vol
 
 from ..const import (
     ATTR_ALIGN,

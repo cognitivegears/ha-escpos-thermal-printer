@@ -20,7 +20,7 @@ body:
     attributes:
       label: Home Assistant version
       description: Settings → About → Home Assistant version
-      placeholder: "2026.5.0"
+      placeholder: "2026.9.0"
     validations:
       required: true
 

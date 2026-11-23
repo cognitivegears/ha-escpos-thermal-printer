@@ -178,7 +178,6 @@ class TestCallPair:
     @pytest.mark.asyncio
     async def test_timeout_cancels_pairing(self):
         async def hang():
-            import asyncio
 
             await asyncio.sleep(10)
 

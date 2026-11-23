@@ -19,8 +19,8 @@ import re
 
 from homeassistant.helpers.service import _SERVICES_SCHEMA
 from homeassistant.util.yaml import load_yaml_dict
+import probatio as vol
 import pytest
-import voluptuous as vol
 
 from custom_components.escpos_printer.const import (
     DOMAIN,

@@ -27,7 +27,7 @@ from homeassistant.helpers.selector import (
     NumberSelectorConfig,
     NumberSelectorMode,
 )
-import voluptuous as vol
+import probatio as vol
 
 from ..capabilities import get_profile_codepages, resolve_profile_name, suggest_profile
 from ..const import (

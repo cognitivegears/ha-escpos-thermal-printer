@@ -44,13 +44,14 @@ MANIFEST_EXCLUDES: set[str] = {"pillow", "dbus-fast"}
 # Packages for which we intentionally keep a version range in the HA manifest
 # to avoid conflicts with Home Assistant's own pins.
 MANIFEST_OVERRIDES: dict[str, str] = {
-    # serialx is pinned by HA core via package_constraints.txt (1.7.0 in
-    # 2026.5.0, 1.7.3 in 2026.5.4, 1.8.0 in 2026.6.0). An exact pin in
+    # serialx is pinned by HA core via package_constraints.txt (1.9.0 in
+    # 2026.9.0, 1.10.0 in 2026.9.3, 1.11.0 in 2026.10.4). An exact pin in
     # manifest.json would be unsatisfiable on HA versions that carry a
-    # different pin. The 1.7→1.8 change only touched the async write API;
-    # this integration uses the sync API throughout, so >=1.7.0,<2 is safe
-    # across the supported HA window. pyproject.toml pins ==1.7.3 for CI.
-    "serialx": ">=1.7.0,<2",
+    # different pin. The floor tracks the oldest supported HA (2026.9.0);
+    # this integration uses the sync API throughout, so >=1.9.0,<2 is safe
+    # across the supported HA window. pyproject.toml pins the CI harness's
+    # version (see the comment there).
+    "serialx": ">=1.9.0,<2",
 }
 
 

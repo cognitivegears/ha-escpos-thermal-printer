@@ -116,8 +116,8 @@ async def test_notify_image_failure_does_not_leak_url_credentials(  # type: igno
 ):
     await _setup_entry(hass)
     fake = MagicMock()
-    # Provide an obviously-bad URL with userinfo. The voluptuous schema
-    # accepts it as a string; the resolver rejects it before fetching.
+    # Provide an obviously-bad URL with userinfo. The schema accepts it as
+    # a string; the resolver rejects it before fetching.
     with patch("escpos.printer.Network", return_value=fake):
         try:
             await hass.services.async_call(
@@ -132,6 +132,12 @@ async def test_notify_image_failure_does_not_leak_url_credentials(  # type: igno
             )
         except Exception:
             pass
-    for record in caplog.records:
+    # Only the integration's own loggers are under test. HA core's
+    # event-bus DEBUG line ("Bus:Handling <Event call_service ...>") echoes
+    # raw service data and shows up whenever an earlier test leaves the
+    # homeassistant.core logger at DEBUG -- that's HA's logging, not ours.
+    ours = [r for r in caplog.records if r.name.startswith("custom_components.escpos_printer")]
+    assert any(r.name.endswith("image_operations") for r in ours), "failure path not logged"
+    for record in ours:
         assert "hunter2" not in record.getMessage()
         assert "alice" not in record.getMessage()

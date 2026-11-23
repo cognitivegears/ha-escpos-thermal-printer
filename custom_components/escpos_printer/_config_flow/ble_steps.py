@@ -11,7 +11,7 @@ from homeassistant.helpers.selector import (
     SelectSelectorConfig,
     SelectSelectorMode,
 )
-import voluptuous as vol
+import probatio as vol
 
 from ..capabilities.ble_profiles import (
     CRAFTSCO_4777_DIALECT,

@@ -218,9 +218,13 @@ async def test_cancellation_mid_print_still_cuts(hass, tmp_path):  # type: ignor
     task_ref: dict[str, asyncio.Task] = {}
 
     def _maybe_cancel(*_a, **_kw):  # type: ignore[no-untyped-def]
+        # Runs on the executor thread (printer I/O is offloaded), so the
+        # cancel must be marshalled onto the event loop -- Task.cancel()
+        # is not thread-safe and, called directly from here, can leave the
+        # loop never waking to deliver it (intermittent hang).
         cancel_after["n"] += 1
         if cancel_after["n"] >= 2 and "task" in task_ref:
-            task_ref["task"].cancel()
+            hass.loop.call_soon_threadsafe(task_ref["task"].cancel)
 
     fake.image.side_effect = _maybe_cancel
 

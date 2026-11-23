@@ -64,6 +64,7 @@ docker compose down  # to stop
 
 ## Key Patterns
 
+- **Minimum Home Assistant is 2026.9.0** (`hacs.json`). Schemas use HA's `probatio` validation library via `import probatio as vol`, never `import voluptuous` (see the `dependency-pins` skill).
 - All printer I/O runs on executor threads via `hass.async_add_executor_job()`.
 - Printer adapters use an `asyncio.Lock` to serialize print operations.
 - Late import of `escpos.printer.Network` and `escpos.printer.Usb` avoids import errors during HA startup.
@@ -77,7 +78,7 @@ docker compose down  # to stop
 
 ### Image services: field-set parity invariant
 
-All six image-printing services (`print_image`, `print_image_url`, `print_image_path`, `print_camera_snapshot`, `print_image_entity`, `preview_image`) share a single voluptuous option-set mixin (`_image_option_fragment()` in `services/schemas.py`) and a single backend dispatcher (`_dispatch_print_image()` in `services/print_handlers.py`). Their `services.yaml` field definitions are therefore duplicated metadata — when adding/renaming/removing an option, update all six blocks in lockstep.
+All six image-printing services (`print_image`, `print_image_url`, `print_image_path`, `print_camera_snapshot`, `print_image_entity`, `preview_image`) share a single probatio option-set mixin (`_image_option_fragment()` in `services/schemas.py`) and a single backend dispatcher (`_dispatch_print_image()` in `services/print_handlers.py`). Their `services.yaml` field definitions are therefore duplicated metadata — when adding/renaming/removing an option, update all six blocks in lockstep.
 
 `tests/test_services_yaml_schema.py::test_image_services_share_common_field_metadata` enforces the invariant: every common field's `name`, `description`, and `selector` must match `print_image`'s. The `default:` *may* legitimately differ on `auto_resize`, `autocontrast`, and `feed` (each focused service picks its own friendly default) — those keys are listed in `_DEFAULT_MAY_VARY` in the test. Any drift outside that allowlist is a test failure.
 

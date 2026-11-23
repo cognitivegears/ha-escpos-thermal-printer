@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.const import CONF_DEVICE_ID, CONF_DOMAIN, CONF_TYPE
+import probatio as vol
 import pytest
-import voluptuous as vol
 
 from custom_components.escpos_printer.const import DOMAIN
 from custom_components.escpos_printer.device_action.capabilities import (

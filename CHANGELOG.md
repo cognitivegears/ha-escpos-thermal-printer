@@ -9,28 +9,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- Bluetooth LE discovery and raster printing through Home Assistant's
-  Bluetooth integration, with Fichero Mini Pocket Printer (3561),
-  Crafts&Co (4777), and Fichero D11s profiles.
+- German translations, emoji printing, and Bluetooth Classic scanning
+  and pairing in the setup dialog.
+- Bluetooth LE raster printing with Crafts&Co 4777 and Fichero 3561
+  and D11s profiles. The 4777 was tested on firmware V3.20. Hardware
+  testing of the 3561 and D11s profiles is pending.
 
-- German translation of the whole integration: setup and options dialogs, calibration wizard,
-  repairs, errors and every service with its fields. A test keeps every translation in step
-  with `strings.json` (same keys, same placeholders).
-- Bluetooth printers can now be scanned for and paired right in the setup
-  dialog — no more `bluetoothctl pair` / `trust` in a terminal. Choose
-  *Scan for nearby devices*, pick the printer and Home Assistant pairs it,
-  tries the common default PINs (`0000`, `1234`, asking for one if both are
-  refused) and marks it trusted so it reconnects after a reboot. Hosts
-  without D-Bus access keep the manual MAC entry.
+### Fixed
 
-- Emoji now print. `print_text_utf8` (and the notify entity's `print_message`
-  with `utf8: true`) draws lines that contain an emoji as small bitmaps with
-  the bundled monochrome Noto Emoji font and keeps every other line as
-  native text, all on one connection. The new `emoji` option chooses
-  between `auto` (default), `strip` and `off` (the old `?`).
-  `print_text_image` falls back to the emoji font for emoji as well. Skin
-  tones, joined sequences, flags and keycaps are handled. See
-  [docs/emoji.md](docs/emoji.md).
+- Update Last Print immediately after a successful job and handle
+  device-page button presses during an integration reload.
+
+## [1.3.0] - 2026-11-22
+
+### Breaking changes
+
+- **Minimum Home Assistant version raised to 2026.9.0.** HA 2026.9 replaced
+  voluptuous with `probatio` as its validation library, and from 2026.10
+  HA's own type hints use probatio types. The integration now imports
+  probatio directly, which does not exist before HA 2026.9. HACS will not
+  offer this release to older installs; 1.2.x keeps working on HA 2026.5+.
+
+### Changed
+
+- Schemas use HA's `probatio` validation library (`import probatio as vol`)
+  instead of voluptuous; a ruff rule now bans `import voluptuous`.
+- Config-flow title updates no longer use HA's `UNDEFINED` sentinel, which
+  HA 2026.12 deprecates in favour of a new `Undefined`; the entry's current
+  title is passed instead, which is a no-op when unchanged.
+- Device targeting reads `DeviceEntry.config_entry_id` directly; the
+  fallback to the deprecated `config_entries` set (needed before HA 2026.8)
+  is gone.
+- `wcwidth` (used to line up box/table text effects) bumped from 0.8.3 to
+  0.9.5, which uses a C extension, with a pure-Python fallback where no
+  binary wheel exists.
+- Dev/CI: mypy 2.4.1, ruff 0.17.6, pre-commit 4.7.0, diff-cover 11.0.4,
+  newer gitleaks/pymarkdown hooks, and updated setup-python, CodeQL, and
+  hassfest actions.
+- Dev/CI: test harness bumped to `pytest-homeassistant-custom-component`
+  0.13.375 (HA 2026.10.4) and the `serialx` dev pin to 1.11.0 to match;
+  `manifest.json` now requires `serialx>=1.9.0,<2` (HA 2026.9.0's pin).
+- Dev/CI: the HA-dev canary job installed the test harness *after* HA dev,
+  which silently downgraded HA back to the harness's release, so it never
+  actually tested HA dev. It now installs the harness first and asserts HA
+  is a dev build.
+- Dev/CI: removed 17 stale pip-audit ignores (aiohttp, cryptography, PyJWT
+  advisories for versions the security job no longer installs).
+
+### Added
+
 - Epson TM-T20, Epson TM-T20IV, Toast TP200, and SAM4S Callisto-102D are now
   recognized in the printer model dropdown, aliased to bundled profiles
   (TM-T20II, TM-T20II, TM-T88V, and TM-T20II respectively) — all
@@ -39,6 +66,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   the bundled KR-306 profile, whose codepage table matches the printer's
   self-test page index-for-index (#172). This fixes CP858/CP1252 printing
   garbled text with the generic profile.
+- POSX EVO Green and Rongta RP850 are now recognized in the printer model
+  dropdown, aliased to the TM-T88V and RP820 profiles respectively, from
+  users' calibration reports (#188, #210). The EVO Green matched TM-T88V's
+  geometry and all four tested codepages; the RP850's 576 px / 48-column
+  geometry matches RP820, but its codepages weren't tested.
 - Calibration reports now include a "Detected identity" section: connection
   type, the profile AUTODETECT would have suggested, the printer's own
   self-reported identity (USB vendor/product IDs and descriptor strings, GS
@@ -54,8 +86,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- Update Last Print as soon as a print succeeds, and handle device-page
-  button presses while a printer entry reloads.
+- Fixed two flaky tests: `test_cancellation_mid_print_still_cuts` cancelled
+  an asyncio task from the executor thread (not thread-safe; it could hang
+  the suite), and the URL-credential leak test failed whenever an earlier
+  test left HA core's event-bus logger at DEBUG. The leak test now checks
+  only the integration's own loggers.
 
 - The calibration wizard's column-count step now rejects a Font A count
   wider than physically fits the calibrated printable width (max columns =
@@ -1707,7 +1742,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 Earlier releases: see git history.
 
-[Unreleased]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/cognitivegears/ha-escpos-thermal-printer/compare/v0.8.0...v1.0.0

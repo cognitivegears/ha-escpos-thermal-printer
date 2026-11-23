@@ -6,7 +6,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.config_entries import ConfigFlowResult
-import voluptuous as vol
+import probatio as vol
 
 from ..capabilities import (
     PROFILE_AUTO,

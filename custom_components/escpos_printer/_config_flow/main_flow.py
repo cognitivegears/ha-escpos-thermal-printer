@@ -9,7 +9,7 @@ from typing import Any
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.core import callback
-import voluptuous as vol
+import probatio as vol
 
 from ..bluez_pairing import PairingResult
 from ..const import (
