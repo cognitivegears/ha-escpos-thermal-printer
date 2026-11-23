@@ -58,7 +58,7 @@ async def test_cut_invalid_mode_rejected_by_schema(hass):  # type: ignore[no-unt
     Previously the handler accepted anything and warned at runtime; the
     schema is the right enforcement point.
     """
-    import voluptuous as vol
+    import probatio as vol
 
     await _setup_entry(hass)
     fake = MagicMock()
@@ -78,7 +78,7 @@ async def test_feed_zero_rejected_by_schema(hass):  # type: ignore[no-untyped-de
     Previously the handler clamped silently; the schema is the right
     enforcement point.
     """
-    import voluptuous as vol
+    import probatio as vol
 
     await _setup_entry(hass)
     fake = MagicMock()

@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Breaking changes
+
+- **Minimum Home Assistant version raised to 2026.9.0.** HA 2026.9 replaced
+  voluptuous with `probatio` as its validation library, and from 2026.10
+  HA's own type hints use probatio types. The integration now imports
+  probatio directly, which does not exist before HA 2026.9. HACS will not
+  offer this release to older installs; 1.2.x keeps working on HA 2026.5+.
+
+### Changed
+
+- Schemas use HA's `probatio` validation library (`import probatio as vol`)
+  instead of voluptuous; a ruff rule now bans `import voluptuous`.
+- Config-flow title updates no longer use HA's `UNDEFINED` sentinel, which
+  HA 2026.12 deprecates in favour of a new `Undefined`; the entry's current
+  title is passed instead, which is a no-op when unchanged.
+- Device targeting reads `DeviceEntry.config_entry_id` directly; the
+  fallback to the deprecated `config_entries` set (needed before HA 2026.8)
+  is gone.
+- Dev/CI: test harness bumped to `pytest-homeassistant-custom-component`
+  0.13.375 (HA 2026.10.4) and the `serialx` dev pin to 1.11.0 to match;
+  `manifest.json` now requires `serialx>=1.9.0,<2` (HA 2026.9.0's pin).
+- Dev/CI: the HA-dev canary job installed the test harness *after* HA dev,
+  which silently downgraded HA back to the harness's release, so it never
+  actually tested HA dev. It now installs the harness first and asserts HA
+  is a dev build.
+- Dev/CI: removed 17 stale pip-audit ignores (aiohttp, cryptography, PyJWT
+  advisories for versions the security job no longer installs).
+
 ### Added
 
 - Epson TM-T20, Epson TM-T20IV, Toast TP200, and SAM4S Callisto-102D are now
@@ -36,6 +64,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   autodetect suggestion.
 
 ### Fixed
+
+- Fixed two flaky tests: `test_cancellation_mid_print_still_cuts` cancelled
+  an asyncio task from the executor thread (not thread-safe; it could hang
+  the suite), and the URL-credential leak test failed whenever an earlier
+  test left HA core's event-bus logger at DEBUG. The leak test now checks
+  only the integration's own loggers.
 
 - The calibration wizard's column-count step now rejects a Font A count
   wider than physically fits the calibrated printable width (max columns =

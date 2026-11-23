@@ -87,7 +87,7 @@ async def test_print_separator_width_clamped_to_line_width(hass) -> None:  # typ
 
 async def test_print_separator_rejects_empty_char(hass) -> None:  # type: ignore[no-untyped-def]
     await _setup_entry(hass)
-    import voluptuous as vol
+    import probatio as vol
 
     with patch("escpos.printer.Network"):
         try:
@@ -99,12 +99,12 @@ async def test_print_separator_rejects_empty_char(hass) -> None:  # type: ignore
             )
         except vol.Invalid:
             return
-        raise AssertionError("expected voluptuous error for empty char")
+        raise AssertionError("expected schema validation error for empty char")
 
 
 async def test_print_separator_rejects_multi_char(hass) -> None:  # type: ignore[no-untyped-def]
     await _setup_entry(hass)
-    import voluptuous as vol
+    import probatio as vol
 
     with patch("escpos.printer.Network"):
         try:
@@ -116,7 +116,7 @@ async def test_print_separator_rejects_multi_char(hass) -> None:  # type: ignore
             )
         except vol.Invalid:
             return
-        raise AssertionError("expected voluptuous error for multi-char")
+        raise AssertionError("expected schema validation error for multi-char")
 
 
 def test_clamp_warning_names_the_caller_field(caplog) -> None:  # type: ignore[no-untyped-def]
@@ -144,7 +144,7 @@ def test_clamp_warning_names_the_caller_field(caplog) -> None:  # type: ignore[n
 
 async def test_print_separator_rejects_control_char(hass) -> None:  # type: ignore[no-untyped-def]
     await _setup_entry(hass)
-    import voluptuous as vol
+    import probatio as vol
 
     with patch("escpos.printer.Network"):
         try:
@@ -156,4 +156,4 @@ async def test_print_separator_rejects_control_char(hass) -> None:  # type: igno
             )
         except vol.Invalid:
             return
-        raise AssertionError("expected voluptuous error for control char")
+        raise AssertionError("expected schema validation error for control char")

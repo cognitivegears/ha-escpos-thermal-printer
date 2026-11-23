@@ -7,8 +7,7 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_PORT
-from homeassistant.helpers.typing import UNDEFINED, UndefinedType
-import voluptuous as vol
+import probatio as vol
 
 from ..capabilities import (
     PROFILE_AUTO,
@@ -266,7 +265,7 @@ class NetworkFlowMixin:
                 # auto-generated one -- a user's manual rename must never be
                 # clobbered. Built from new_data so a fresh detection (or a
                 # cleared one) is reflected in the new title.
-                title: str | UndefinedType = UNDEFINED
+                title = reconfigure_entry.title  # unchanged title is a no-op
                 if is_auto_network_title(reconfigure_entry.title, reconfigure_entry.data):
                     title = make_network_entry_title(new_data)
 

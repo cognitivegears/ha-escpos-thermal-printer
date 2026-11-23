@@ -71,7 +71,7 @@ async def test_print_table_row_separators(hass) -> None:  # type: ignore[no-unty
 
 async def test_print_table_rejects_bad_rows_shape_at_schema(hass) -> None:  # type: ignore[no-untyped-def]
     await _setup_entry(hass)
-    import voluptuous as vol
+    import probatio as vol
 
     with patch("escpos.printer.Network"):
         try:
@@ -83,7 +83,7 @@ async def test_print_table_rejects_bad_rows_shape_at_schema(hass) -> None:  # ty
             )
         except vol.Invalid:
             return
-        raise AssertionError("expected voluptuous error for bad rows shape")
+        raise AssertionError("expected schema validation error for bad rows shape")
 
 
 async def test_print_table_uses_printer_line_width_when_total_width_omitted(

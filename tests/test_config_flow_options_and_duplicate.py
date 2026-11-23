@@ -3,8 +3,8 @@
 from unittest.mock import patch
 
 from homeassistant.const import CONF_HOST, CONF_PORT
+import probatio as vol
 from pytest_homeassistant_custom_component.common import MockConfigEntry
-import voluptuous as vol
 
 from custom_components.escpos_printer.const import (
     CONF_ALLOW_LOCAL_IMAGE_URLS,

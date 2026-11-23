@@ -117,7 +117,7 @@ async def test_print_text_image_default_font_is_dejavu_mono(hass) -> None:  # ty
 
 async def test_print_text_image_rejects_bad_rotation(hass) -> None:  # type: ignore[no-untyped-def]
     await _setup_entry(hass)
-    import voluptuous as vol
+    import probatio as vol
 
     with patch("escpos.printer.Network", return_value=MagicMock()):
         try:
@@ -129,7 +129,7 @@ async def test_print_text_image_rejects_bad_rotation(hass) -> None:  # type: ign
             )
         except vol.Invalid:
             return
-        raise AssertionError("expected voluptuous error for invalid rotation")
+        raise AssertionError("expected schema validation error for invalid rotation")
 
 
 async def test_print_text_image_accepts_font_under_config_fonts_dir(hass) -> None:  # type: ignore[no-untyped-def]
@@ -213,8 +213,8 @@ async def test_print_text_image_rejects_image_rotation_and_image_align(hass) -> 
     dispatch); passing either must now be a validation error at the schema
     layer instead of a silent no-op.
     """
+    import probatio as vol
     import pytest
-    import voluptuous as vol
 
     await _setup_entry(hass)
     for bad_field, value in (("image_rotation", 90), ("image_align", "center")):

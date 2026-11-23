@@ -8,7 +8,7 @@ from typing import Any
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.data_entry_flow import section
 from homeassistant.exceptions import HomeAssistantError
-import voluptuous as vol
+import probatio as vol
 
 from ..capabilities import (
     PROFILE_AUTO,

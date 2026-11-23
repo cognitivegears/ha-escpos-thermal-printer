@@ -121,7 +121,7 @@ async def test_print_kvtable_bordered_style(hass) -> None:  # type: ignore[no-un
 
 async def test_print_kvtable_rejects_three_col_rows(hass) -> None:  # type: ignore[no-untyped-def]
     await _setup_entry(hass)
-    import voluptuous as vol
+    import probatio as vol
 
     with patch("escpos.printer.Network"):
         try:
@@ -133,12 +133,12 @@ async def test_print_kvtable_rejects_three_col_rows(hass) -> None:  # type: igno
             )
         except vol.Invalid:
             return
-        raise AssertionError("expected voluptuous error for 3-col row")
+        raise AssertionError("expected schema validation error for 3-col row")
 
 
 async def test_print_kvtable_rejects_empty_items(hass) -> None:  # type: ignore[no-untyped-def]
     await _setup_entry(hass)
-    import voluptuous as vol
+    import probatio as vol
 
     with patch("escpos.printer.Network"):
         try:
@@ -150,7 +150,7 @@ async def test_print_kvtable_rejects_empty_items(hass) -> None:  # type: ignore[
             )
         except vol.Invalid:
             return
-        raise AssertionError("expected voluptuous error for empty items")
+        raise AssertionError("expected schema validation error for empty items")
 
 
 async def test_print_kvtable_total_width_too_small_raises_service_error(hass) -> None:  # type: ignore[no-untyped-def]

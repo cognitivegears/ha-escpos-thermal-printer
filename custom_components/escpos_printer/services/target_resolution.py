@@ -124,21 +124,15 @@ async def _async_get_target_entries(
             _LOGGER.warning("Targeted device %s not found in registry; skipping", device_id)
             continue
 
-        # Get config entry IDs from the device.
-        # DeviceEntry.config_entries is deprecated in HA 2026.8 (removal 2027.8)
-        # in favour of config_entry_id; our floor (2026.5) predates that
-        # attribute, so prefer it only when present.
-        entry_id = getattr(device, "config_entry_id", None)
-        entry_ids = [entry_id] if entry_id else device.config_entries
-        matched = False
-        for config_entry_id in entry_ids:
-            # Check if this config entry is for our domain
-            entry = hass.config_entries.async_get_entry(config_entry_id)
-            if entry and entry.domain == DOMAIN:
-                target_entry_ids.add(config_entry_id)
-                matched = True
-        if not matched:
+        # Since HA 2026.8 a device belongs to exactly one config entry
+        # (DeviceEntry.config_entry_id); the old config_entries set is a
+        # deprecated wrapper around it.
+        config_entry_id = device.config_entry_id
+        entry = hass.config_entries.async_get_entry(config_entry_id)
+        if entry is None or entry.domain != DOMAIN:
             _LOGGER.warning("Targeted device %s is not an ESC/POS printer; skipping", device_id)
+            continue
+        target_entry_ids.add(config_entry_id)
 
     # Get the actual config entry objects
     loaded_entry_ids = {e.entry_id for e in hass.config_entries.async_loaded_entries(DOMAIN)}
