@@ -82,6 +82,11 @@ ALIAS_MODELS: dict[str, str] = {
     # and all four codepages (CP858/CP1252/CP850/CP437) matched TM-T88V's
     # indices, all impls clean. Keyed to this one verified SKU.
     "Toast TP200": "TM-T88V",
+    # POSX EVO Green: hardware-verified via the HA calibration wizard
+    # (issue #188, USB): 512 px / Font A 42 columns (TM-T88V's 512 class),
+    # and all four codepages (CP858/CP1252/CP850/CP437) matched TM-T88V's
+    # indices, raster and column impls clean. Keyed to this one verified SKU.
+    "POSX EVO Green": "TM-T88V",
     # Epson TM-T70/TM-T70II ANK (alphanumeric) models: upstream
     # escpos-printer-db profiles for both match TM-T88V's class exactly
     # (512px/180dpi, Font A/B 42/56 columns, codepage indices agree at
@@ -151,6 +156,15 @@ ALIAS_MODELS: dict[str, str] = {
     # codepage table with the same reserved slots 11-14.
     "Rongta RP80": "RP820",
     "Rongta RP328": "RP820",
+    # Rongta RP850 (reported as "RP850 (A)", a hardware-revision suffix):
+    # calibration report (issue #210) gave 576 px / Font A 48 columns,
+    # raster and column impls clean -- RP820's geometry in the 48-column
+    # DIP position. The codepage step was skipped, so codepages are NOT
+    # hardware-verified; RP820 sends the same Epson-standard 0/2/16/19 as
+    # the generic profile for the common four, so this is no worse than
+    # generic if the firmware differs. Same DIP column-mode caveat as the
+    # RP850P above.
+    "Rongta RP850": "RP820",
     # Bixolon SRP-350III: official user's manual v2.00 section 8-1 states
     # 180dpi / 72mm printing width (= 512-dot class) with Font A/B
     # defaults 42/56 -- exactly TM-T88V's geometry. Its 203dpi sibling
