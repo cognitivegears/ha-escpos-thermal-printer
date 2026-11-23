@@ -5,8 +5,6 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from escpos.constants import GS
-
 from ..security import (
     MAX_BEEP_DURATION,
     MAX_BEEP_TIMES,
@@ -20,6 +18,7 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
+GS = b"\x1d"
 
 class ControlOperationsMixin:
     """Mixin providing feed, cut, and beep methods."""
