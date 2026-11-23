@@ -25,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Device targeting reads `DeviceEntry.config_entry_id` directly; the
   fallback to the deprecated `config_entries` set (needed before HA 2026.8)
   is gone.
+- `wcwidth` (used to line up box/table text effects) bumped from 0.8.3 to
+  0.9.5, which uses a C extension, with a pure-Python fallback where no
+  binary wheel exists.
+- Dev/CI: mypy 2.4.1, ruff 0.17.6, pre-commit 4.7.0, diff-cover 11.0.4,
+  newer gitleaks/pymarkdown hooks, and updated setup-python, CodeQL, and
+  hassfest actions.
 - Dev/CI: test harness bumped to `pytest-homeassistant-custom-component`
   0.13.375 (HA 2026.10.4) and the `serialx` dev pin to 1.11.0 to match;
   `manifest.json` now requires `serialx>=1.9.0,<2` (HA 2026.9.0's pin).

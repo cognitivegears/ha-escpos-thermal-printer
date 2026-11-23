@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@v7.0.0
+        uses: actions/setup-python@v7.1.0
         with:
           python-version: '3.14'
 
@@ -135,7 +135,7 @@ jobs:
 
       - name: Upload Opengrep SARIF to Security tab
         if: always()
-        uses: github/codeql-action/upload-sarif@v4.37.7
+        uses: github/codeql-action/upload-sarif@v4.39.4
         with:
           sarif_file: opengrep.sarif
           category: opengrep
@@ -209,7 +209,7 @@ jobs:
 
       - name: Upload Bandit SARIF to Security tab
         if: always()
-        uses: github/codeql-action/upload-sarif@v4.37.7
+        uses: github/codeql-action/upload-sarif@v4.39.4
         with:
           sarif_file: bandit.sarif
 

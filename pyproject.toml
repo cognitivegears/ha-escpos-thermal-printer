@@ -20,7 +20,7 @@ dependencies = [
   # Visual-width measurement for the text-effects box / table padders so
   # CJK / fullwidth / emoji columns line up under the 1-col-per-glyph
   # text mode (instead of silently misaligning via len()).
-  "wcwidth==0.8.3",
+  "wcwidth==0.9.5",
   # Serial port support. serialx is used instead of bare pyserial because
   # serial_for_url() transparently dispatches to native device paths
   # (/dev/ttyUSB0), esphome://, rfc2217://, and socket:// — enabling
@@ -50,9 +50,9 @@ include = ["custom_components*", "scripts*"]
 dev = [
     "pytest==9.0.3",
     "pytest-homeassistant-custom-component==0.13.375",
-    "mypy==2.3.1",
-    "ruff==0.16.9",
-    "pre-commit==4.6.2",
+    "mypy==2.4.1",
+    "ruff==0.17.6",
+    "pre-commit==4.7.0",
     "bandit==1.9.4",
     "bandit-sarif-formatter==1.1.1",
     "pip-audit==2.10.1",
@@ -66,7 +66,7 @@ dev = [
     # main to enforce >=90% on changed lines, on top of the global
     # `fail_under=80`). Catches regressions in large PRs where the
     # global average masks new untested code.
-    "diff-cover==10.6.0",
+    "diff-cover==11.0.4",
 ]
 security = [
   "bandit==1.9.4",

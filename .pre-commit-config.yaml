@@ -41,7 +41,7 @@ repos:
   # CI format gate runs the pyproject-pinned ruff, so a version skew here
   # can locally format code in a way CI then rejects.
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.9
+    rev: v0.17.6
     hooks:
       - id: ruff-check
         args: [--fix]
@@ -63,7 +63,7 @@ repos:
   # Secret-scanning. Cheap insurance against accidentally committing
   # a printer credential or webhook URL embedded in an example YAML.
   - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.21.2
+    rev: v8.30.1
     hooks:
       - id: gitleaks
 
@@ -78,7 +78,7 @@ repos:
   # rewrites `+` prose conjunctions to `-` list markers; fix
   # findings by hand using `scripts/md_fix.py` (safe targeted fixer).
   - repo: https://github.com/jackdewinter/pymarkdown
-    rev: v0.9.37
+    rev: v0.9.42
     hooks:
       - id: pymarkdown
         args: [--config, .pymarkdown.json, scan]
