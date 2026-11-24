@@ -127,6 +127,7 @@ class EscposNotifyEntity(NotifyEntity):
             "invert": kwargs.get("invert", False),
             "density": kwargs.get("density"),
             "font": kwargs.get("font", "a"),
+            "line_height": kwargs.get("line_height"),
             "encoding": encoding,
         }
 

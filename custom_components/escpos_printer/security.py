@@ -50,6 +50,9 @@ MAX_BEEP_TIMES = 9  # Maximum beep repetitions (python-escpos Escpos.buzzer() ha
 # two fields share a meaning. Units are python-escpos "buzzer ticks"
 # (~100ms per tick on most supported printers).
 MAX_BEEP_DURATION = 9  # python-escpos Escpos.buzzer() hard limit
+# ESC 3 n line spacing in 1/180-inch units (python-escpos line_spacing(),
+# divisor=180, accepts 0-255).
+MAX_LINE_HEIGHT = 255
 
 # Image processing bounds (mirror in `services.yaml` + voluptuous schemas).
 IMAGE_WIDTH_MIN = 16

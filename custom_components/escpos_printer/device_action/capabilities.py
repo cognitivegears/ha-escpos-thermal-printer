@@ -45,6 +45,7 @@ from .constants import (
     ACTION_PRINT_QR,
     ACTION_PRINT_TEXT,
     ACTION_PRINT_TEXT_UTF8,
+    ACTION_RESET,
 )
 
 
@@ -117,6 +118,11 @@ async def async_get_actions(hass: HomeAssistant, device_id: str) -> list[dict[st
         {
             CONF_DOMAIN: DOMAIN,
             CONF_TYPE: ACTION_BEEP,
+            CONF_DEVICE_ID: device_id,
+        },
+        {
+            CONF_DOMAIN: DOMAIN,
+            CONF_TYPE: ACTION_RESET,
             CONF_DEVICE_ID: device_id,
         },
     ]

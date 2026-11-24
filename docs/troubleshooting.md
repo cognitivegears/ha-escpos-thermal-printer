@@ -213,6 +213,7 @@ The [calibration wizard](calibration.md) can usually diagnose and fix wrong or m
 - **Special characters missing**: printer codepage doesn't support them. Use `print_text_utf8` for best-effort transliteration.
 - **Text wraps wrong**: line width setting wrong. 32 for 58mm paper, 42–48 for 80mm.
 - **Print too light/dark**: printer hardware setting. Not controllable from the integration.
+- **Everything prints in a wrong mode** (double-size, inverted, odd spacing) after an interrupted job: call `escpos_printer.reset` (or the **Reset printer** device action) to re-initialise the printer with `ESC @`.
 
 ## Service errors
 
@@ -238,6 +239,8 @@ The [calibration wizard](calibration.md) can usually diagnose and fix garbled im
 - **Paper jams during cutting**: wrong paper width, debris in cutter, or low-grade paper.
 
 ## Debug logging
+
+The **Online** connectivity sensor's attributes carry the last failure without any logging: `last_error_reason`, plus `last_error_errno` for USB, Bluetooth, and serial printers — the OS error number of the last transport failure (for example 13 permission denied, 19 no such device, 16 busy, 5 I/O error). It's cleared on the next successful operation.
 
 Add to `configuration.yaml`:
 

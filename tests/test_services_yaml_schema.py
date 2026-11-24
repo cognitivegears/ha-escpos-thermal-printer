@@ -732,6 +732,7 @@ _TARGETED_SERVICES = frozenset(
         "feed",
         "cut",
         "beep",
+        "reset",
         "calibration_print",
     }
 )

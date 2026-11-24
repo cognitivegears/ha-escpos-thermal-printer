@@ -474,7 +474,8 @@
       "print_barcode": "Print Barcode",
       "feed": "Feed Paper",
       "cut": "Cut Paper",
-      "beep": "Beep"
+      "beep": "Beep",
+      "reset": "Reset Printer"
     }
   },
   "entity": {
@@ -1587,6 +1588,10 @@
           "description": "White-on-black printing",
           "name": "Invert"
         },
+        "line_height": {
+          "description": "Printer line spacing for this text, in 1/180-inch units (0-255); about 30 is the usual default (1/6 inch). Lower values print a more compact receipt. Reset to the printer default after the text, so it doesn't affect later prints. Leave empty for the printer default.",
+          "name": "Line Height"
+        },
         "message": {
           "description": "The text to print",
           "name": "Message"
@@ -1646,6 +1651,10 @@
         "feed": {
           "description": "Number of lines to feed after printing",
           "name": "Feed Lines"
+        },
+        "native": {
+          "description": "Let the printer render the QR code itself (ESC/POS GS ( k) instead of sending it as an image — faster and sharper on printers that support it. Falls back to image rendering when the printer profile reports no native QR support. Leave off if codes print as garbage or not at all.",
+          "name": "Native Rendering"
         },
         "size": {
           "description": "QR code size (1-16)",
@@ -1772,6 +1781,10 @@
         "invert": {
           "description": "White-on-black printing",
           "name": "Invert"
+        },
+        "line_height": {
+          "description": "Printer line spacing for this text, in 1/180-inch units (0-255); about 30 is the usual default (1/6 inch). Lower values print a more compact receipt. Reset to the printer default after the text, so it doesn't affect later prints. Leave empty for the printer default.",
+          "name": "Line Height"
         },
         "text": {
           "description": "The text to print",
@@ -1927,6 +1940,10 @@
           "description": "White-on-black printing",
           "name": "Invert"
         },
+        "line_height": {
+          "description": "Printer line spacing for this text, in 1/180-inch units (0-255); about 30 is the usual default (1/6 inch). Lower values print a more compact receipt. Reset to the printer default after the text, so it doesn't affect later prints. Leave empty for the printer default.",
+          "name": "Line Height"
+        },
         "text": {
           "description": "The text to print (UTF-8 characters will be converted to printer-compatible encoding)",
           "name": "Text"
@@ -1941,6 +1958,16 @@
         }
       },
       "name": "Print Text (UTF-8)"
+    },
+    "reset": {
+      "description": "Re-initialise the printer (ESC @): clears its input buffer and resets text formatting, line spacing, and codepage selection to the power-on defaults. A recovery path for a printer stuck in a wrong mode after an interrupted job. Does not feed or cut paper. Select a target — printer device, entity, area, floor, or label. If no target is selected, resets every configured printer (deprecated fallback).",
+      "fields": {
+        "broadcast": {
+          "description": "Explicitly print to every configured printer. Mutually exclusive with any target (device, entity, area, floor, or label). Omitting both a target and broadcast also prints to all printers, but that implicit fallback is deprecated and will be removed in 2.0.0 — select a target or set broadcast: true.",
+          "name": "Broadcast"
+        }
+      },
+      "name": "Reset Printer"
     }
   }
 }

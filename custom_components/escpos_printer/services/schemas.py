@@ -57,10 +57,12 @@ from ..const import (
     ATTR_INVERT,
     ATTR_ITEMS,
     ATTR_LABEL_WIDTH,
+    ATTR_LINE_HEIGHT,
     ATTR_LINE_SPACING,
     ATTR_LINES,
     ATTR_MIRROR,
     ATTR_MODE,
+    ATTR_NATIVE,
     ATTR_OUTPUT_PATH,
     ATTR_PADDING,
     ATTR_POS,
@@ -108,6 +110,7 @@ from ..security import (
     MAX_FONT_PATH_LENGTH,
     MAX_FONT_SIZE_PT,
     MAX_IMAGE_PATH_LENGTH,
+    MAX_LINE_HEIGHT,
     MAX_QR_DATA_LENGTH,
     MAX_SEPARATOR_REPEAT,
     MAX_TABLE_CELL_LENGTH,
@@ -175,6 +178,10 @@ _UNDERLINE = vol.In(["none", "single", "double"])
 _CUT = vol.In(["none", "partial", "full"])
 _FONT = vol.All(cv.string, vol.Lower, vol.In(["a", "b"]))
 _DENSITY = vol.All(vol.Coerce(int), vol.Range(min=0, max=8))
+# ESC/POS line spacing (ESC 3 n) in 1/180-inch units. Named line_height,
+# not line_spacing: print_text_image already uses line_spacing for its PIL
+# renderer's line-height multiplier.
+_LINE_HEIGHT = vol.All(vol.Coerce(int), vol.Range(min=0, max=MAX_LINE_HEIGHT))
 
 # Width/height accept "normal"|"double"|"triple" or a number 1-8 (the
 # UI surfaces both forms). Coerce numeric strings before checking the
@@ -341,6 +348,7 @@ PRINT_TEXT_SCHEMA = _with_target_validation(
         vol.Optional(ATTR_INVERT): cv.boolean,
         vol.Optional(ATTR_DENSITY): _DENSITY,
         vol.Optional(ATTR_FONT): _FONT,
+        vol.Optional(ATTR_LINE_HEIGHT): _LINE_HEIGHT,
         vol.Optional(ATTR_ENCODING): cv.string,
         vol.Optional(ATTR_CUT): _CUT,
         vol.Optional(ATTR_FEED): _FEED,
@@ -360,6 +368,7 @@ PRINT_TEXT_UTF8_SCHEMA = _with_target_validation(
         vol.Optional(ATTR_INVERT): cv.boolean,
         vol.Optional(ATTR_DENSITY): _DENSITY,
         vol.Optional(ATTR_FONT): _FONT,
+        vol.Optional(ATTR_LINE_HEIGHT): _LINE_HEIGHT,
         vol.Optional(ATTR_CUT): _CUT,
         vol.Optional(ATTR_FEED): _FEED,
     }
@@ -373,6 +382,7 @@ PRINT_QR_SCHEMA = _with_target_validation(
         vol.Optional(ATTR_SIZE): vol.All(vol.Coerce(int), vol.Range(min=1, max=16)),
         vol.Optional(ATTR_EC): vol.In(["L", "M", "Q", "H"]),
         vol.Optional(ATTR_ALIGN): _ALIGN,
+        vol.Optional(ATTR_NATIVE, default=False): cv.boolean,
         vol.Optional(ATTR_CUT): _CUT,
         vol.Optional(ATTR_FEED): _FEED,
     }
@@ -814,6 +824,10 @@ BEEP_SCHEMA = _with_target_validation(
 )
 
 
+# No fields beyond the target: ESC @ takes no parameters.
+RESET_SCHEMA = _with_target_validation({**_TARGET_FIELDS})
+
+
 # Schema for the notify entity's `print_message` action. Wrapped in
 # `cv.make_entity_service_schema` by the notify platform itself, so we
 # only export the inner dict here.
@@ -828,6 +842,7 @@ PRINT_MESSAGE_FIELDS: dict[Any, Any] = {
     vol.Optional("invert"): cv.boolean,
     vol.Optional("density"): _DENSITY,
     vol.Optional("font"): _FONT,
+    vol.Optional("line_height"): _LINE_HEIGHT,
     vol.Optional("utf8"): cv.boolean,
     vol.Optional("encoding"): cv.string,
     vol.Optional("cut"): _CUT,
@@ -859,4 +874,5 @@ __all__ = [
     "PRINT_TEXT_IMAGE_SCHEMA",
     "PRINT_TEXT_SCHEMA",
     "PRINT_TEXT_UTF8_SCHEMA",
+    "RESET_SCHEMA",
 ]

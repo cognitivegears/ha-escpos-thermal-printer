@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- New `escpos_printer.reset` service and matching **Reset printer** device
+  action: re-initialises the printer (ESC @, python-escpos `hw("INIT")`),
+  clearing its input buffer and resetting text modes, line spacing, and
+  codepage selection. A cheap recovery path for a printer left in a wrong
+  mode by an interrupted job.
+- `print_qr` gains an opt-in `native` field (default `false`) that lets
+  the printer render the QR code itself (ESC/POS `GS ( k`) instead of
+  printing an image. Falls back to image rendering when the printer
+  profile declares no native QR support, or when python-escpos rejects the
+  request before any bytes are sent. Default output is unchanged.
+- `print_text`, `print_text_utf8`, and `print_message` gain a
+  `line_height` field: ESC/POS line spacing (`ESC 3 n`, 1/180-inch units,
+  0–255) for compact receipts. It's reset to the printer default right
+  after the text so it can't leak into a following print. Named
+  `line_height` because `print_text_image` already has a `line_spacing`
+  field with different (PIL multiplier) semantics.
+- The Online connectivity sensor now exposes `last_error_errno` (the OS
+  error number of the last USB/Bluetooth/serial transport failure, already
+  in diagnostics) as a state attribute.
+
+### Changed
+
+- The last-image-print diagnostic sensor is now push-updated from the
+  adapter as each image print finishes or fails, instead of polling every
+  5 minutes.
+
 ## [1.3.0] - 2026-11-22
 
 ### Breaking changes

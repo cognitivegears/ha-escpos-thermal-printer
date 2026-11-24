@@ -73,6 +73,12 @@ def fake_escpos_module(request: Any, monkeypatch: pytest.MonkeyPatch) -> Generat
         def buzzer(self, *_: Any, **__: Any) -> None:
             pass
 
+        def hw(self, *_: Any, **__: Any) -> None:
+            pass
+
+        def line_spacing(self, *_: Any, **__: Any) -> None:
+            pass
+
         def beep(self, *_: Any, **__: Any) -> None:
             pass
 

@@ -53,3 +53,12 @@ async def handle_beep(call: ServiceCall) -> None:
         )
 
     await _for_each_target(call, "beep", _body)
+
+
+async def handle_reset(call: ServiceCall) -> None:
+    """Handle reset service call (ESC @ printer re-initialisation)."""
+
+    async def _body(entry: Any, adapter: Any, _defaults: Any, _config: Any) -> None:
+        await adapter.reset(call.hass)
+
+    await _for_each_target(call, "reset", _body)

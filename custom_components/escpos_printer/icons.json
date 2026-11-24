@@ -37,6 +37,7 @@
     "calibration_print": "mdi:ruler",
     "feed": "mdi:arrow-down-thick",
     "cut": "mdi:content-cut",
-    "beep": "mdi:bell-ring"
+    "beep": "mdi:bell-ring",
+    "reset": "mdi:restart"
   }
 }

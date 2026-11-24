@@ -8,6 +8,8 @@ gives users a real "low battery" signal they can automate on.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+import contextlib
 from datetime import timedelta
 import logging
 from typing import Any
@@ -19,7 +21,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 
 from .bluez import query_bt_battery_percentage
@@ -90,7 +92,10 @@ class LastImagePrintSensor(SensorEntity):
     _attr_translation_key = "last_image_print"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_entity_registry_enabled_default = False
-    _attr_should_poll = True
+    # Push: the adapter fires its image-stats listener after every image
+    # print or failure (see EscposPrinterAdapterBase.add_image_stats_listener),
+    # so there's nothing to poll for.
+    _attr_should_poll = False
     _unrecorded_attributes = frozenset(
         {
             "total_failures",
@@ -105,15 +110,43 @@ class LastImagePrintSensor(SensorEntity):
     def __init__(self, entry: ConfigEntry) -> None:
         self._entry = entry
         self._attr_unique_id = f"{entry.entry_id}_last_image_print"
+        self._unsubscribe: Callable[[], None] | None = None
 
     @property
     def device_info(self) -> DeviceInfo:
         return build_device_info(self._entry)
 
-    async def async_update(self) -> None:
-        """Pull the in-memory ImageStats snapshot off the adapter."""
+    def _adapter(self) -> Any:
         runtime = getattr(self._entry, "runtime_data", None)
-        adapter = getattr(runtime, "adapter", None) if runtime else None
+        return getattr(runtime, "adapter", None) if runtime else None
+
+    async def async_added_to_hass(self) -> None:
+        """Subscribe to the adapter's image-stats updates."""
+        add_listener = getattr(self._adapter(), "add_image_stats_listener", None)
+        if callable(add_listener):
+            self._unsubscribe = add_listener(self._on_image_stats)
+
+    async def async_will_remove_from_hass(self) -> None:
+        if self._unsubscribe:
+            with contextlib.suppress(Exception):
+                self._unsubscribe()
+            self._unsubscribe = None
+
+    @callback
+    def _on_image_stats(self) -> None:
+        self._refresh()
+        self.async_write_ha_state()
+
+    async def async_update(self) -> None:
+        """Pull the in-memory ImageStats snapshot off the adapter.
+
+        Runs once at add time (``update_before_add=True``); later changes
+        arrive via the push listener.
+        """
+        self._refresh()
+
+    def _refresh(self) -> None:
+        adapter = self._adapter()
         stats = getattr(adapter, "_image_stats", None)
         if stats is None:
             self._attr_available = False
