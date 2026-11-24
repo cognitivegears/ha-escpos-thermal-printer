@@ -1916,6 +1916,22 @@ print_message:
       default: false
       selector:
         boolean: {}
+    emoji:
+      name: Emoji
+      description: >-
+        How to print emoji when UTF-8 Mode is on and no image is attached.
+        `auto` prints lines with emoji as small images (using the bundled
+        Noto Emoji font) and everything else as normal text. `strip` removes
+        emoji. `off` keeps the old behavior, where each emoji prints as a
+        `?`. Emoji lines honor alignment, font and size, but not bold,
+        underline or invert.
+      default: "auto"
+      selector:
+        select:
+          options:
+            - "auto"
+            - "strip"
+            - "off"
     encoding:
       name: Encoding
       description: >-

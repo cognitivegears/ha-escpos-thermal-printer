@@ -832,6 +832,7 @@ PRINT_MESSAGE_FIELDS: dict[Any, Any] = {
     vol.Optional("density"): _DENSITY,
     vol.Optional("font"): _FONT,
     vol.Optional("utf8"): cv.boolean,
+    vol.Optional(ATTR_EMOJI): vol.In(EMOJI_MODES),
     vol.Optional("encoding"): cv.string,
     vol.Optional("cut"): _CUT,
     vol.Optional("feed"): _FEED,

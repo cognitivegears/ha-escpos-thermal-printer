@@ -13,7 +13,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity import DeviceInfo
 
-from .const import DEFAULT_CODEPAGE, EMOJI_MODE_AUTO
+from .const import ATTR_EMOJI, DEFAULT_CODEPAGE, EMOJI_MODE_AUTO
 from .device import build_device_info
 from .image_sources import extract_image_kwargs
 from .security import sanitize_log_message
@@ -116,7 +116,7 @@ class EscposNotifyEntity(NotifyEntity):
             # Emoji can't be transcoded; image-only messages and messages with
             # an attached image keep the old behavior (emoji print as "?").
             if kwargs.get("image") is None:
-                text, emoji_parts = plan_parts(text, EMOJI_MODE_AUTO)
+                text, emoji_parts = plan_parts(text, kwargs.get(ATTR_EMOJI) or EMOJI_MODE_AUTO)
             if emoji_parts is None:
                 text = await self._hass.async_add_executor_job(
                     transcode_to_codepage, text, codepage

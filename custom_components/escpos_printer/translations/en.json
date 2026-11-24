@@ -1594,6 +1594,10 @@
           "description": "Print density level (0-8). 5 is darkest; values above 5 step back down. The printer keeps the value until changed.",
           "name": "Density"
         },
+        "emoji": {
+          "description": "How to print emoji when UTF-8 Mode is on and no image is attached. `auto` prints lines with emoji as small images (using the bundled Noto Emoji font) and everything else as normal text. `strip` removes emoji. `off` keeps the old behavior, where each emoji prints as a `?`. Emoji lines honor alignment, font and size, but not bold, underline or invert.",
+          "name": "Emoji"
+        },
         "encoding": {
           "description": "Codepage override — a python-escpos codepage name such as CP437 or CP858 (not a Python codec name). Ignored when UTF-8 mode is enabled.",
           "name": "Encoding"

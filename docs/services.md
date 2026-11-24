@@ -40,6 +40,7 @@ Entity service for the notify platform. Targets a notify entity and supports all
 | message | string | Text (required) |
 | title | string | Printed before the message |
 | utf8 | boolean | Enable UTF-8 transcoding (also prints emoji, see the [emoji guide](emoji.md)) |
+| emoji | string | `auto` (default), `strip` or `off`; used with `utf8: true` when no image is attached |
 | image | string | Optional image source: same forms as `print_image`. See [Images guide](images.md). |
 | image_width | int | Target image width (pixels) |
 | image_align | string | `left`, `center`, `right` |

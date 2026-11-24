@@ -29,7 +29,9 @@ Alignment, font (A or B) and the size multipliers (`width` / `height`) apply to 
 | `strip` | Emoji are removed, together with the space they leave behind. |
 | `off` | Emoji print as `?`, like in earlier versions. |
 
-The notify entity's `print_message` action does the same whenever `utf8: true` is set.
+The notify entity's `print_message` action takes the same `emoji` option. It applies whenever `utf8: true` is set and no image is attached.
+
+Emoji lines are rendered before anything is sent to the printer. A long run of emoji lines is split into several images, so it prints at any size; if a line can't be rendered at all, the call fails with nothing printed.
 
 ## Which emoji work
 

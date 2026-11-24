@@ -1594,6 +1594,10 @@
           "description": "Druckdichte (0–8). 5 ist am dunkelsten; höhere Werte gehen wieder zurück. Der Drucker behält den Wert, bis er geändert wird.",
           "name": "Dichte"
         },
+        "emoji": {
+          "description": "Wie Emoji gedruckt werden, wenn der UTF-8-Modus aktiv ist und kein Bild angehängt ist. `auto` druckt Zeilen mit Emoji als kleine Bilder (mit der mitgelieferten Noto-Emoji-Schrift) und alles andere als normalen Text. `strip` entfernt Emoji. `off` behält das alte Verhalten bei, bei dem jedes Emoji als `?` gedruckt wird. Emoji-Zeilen beachten Ausrichtung, Schrift und Größe, aber nicht Fett, Unterstrichen oder Invertiert.",
+          "name": "Emoji"
+        },
         "encoding": {
           "description": "Überschreibt die Codepage – ein python-escpos-Codepage-Name wie CP437 oder CP858 (kein Python-Codec-Name). Wird ignoriert, wenn der UTF-8-Modus aktiv ist.",
           "name": "Kodierung"

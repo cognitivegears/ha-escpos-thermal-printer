@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, patch
 
 from homeassistant.components.notify import DOMAIN as NOTIFY_DOMAIN
 from homeassistant.helpers import entity_registry as er
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.escpos_printer.const import DOMAIN
@@ -220,3 +221,21 @@ async def test_print_message_utf8_prints_emoji_lines_as_images(hass):  # type: i
         )
     assert fake.image.called
     fake.text.assert_not_called()
+
+
+@pytest.mark.parametrize(("mode", "printed"), [("off", "Garage ? open"), ("strip", "Garage open")])
+async def test_print_message_emoji_option_opts_out_of_images(hass, mode, printed):  # type: ignore[no-untyped-def]
+    """The emoji option lets a utf8 message keep printing as plain text."""
+    await _setup_entry(hass)
+    entity_id = _get_notify_entity_id(hass)
+
+    fake = MagicMock()
+    with patch("escpos.printer.Network", return_value=fake):
+        await hass.services.async_call(
+            DOMAIN,
+            "print_message",
+            {"entity_id": entity_id, "message": "Garage 🚪 open", "utf8": True, "emoji": mode},
+            blocking=True,
+        )
+    fake.image.assert_not_called()
+    assert fake.text.call_args[0][0] == printed

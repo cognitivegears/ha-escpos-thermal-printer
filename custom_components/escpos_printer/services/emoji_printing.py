@@ -96,6 +96,32 @@ def _render_emoji_png(
     return buffer.getvalue()
 
 
+def _render_emoji_part(text: str, **render_kwargs: Any) -> list[bytes]:
+    """Render one emoji part to one or more PNGs. Blocking — call on the executor.
+
+    A long run of emoji lines can exceed the renderer's canvas limits
+    (large size multipliers reach them after a few dozen lines), so a part
+    that is too big is halved by lines until every piece fits. A single
+    line that still doesn't fit raises the renderer's ``ValueError``.
+    """
+    try:
+        return [_render_emoji_png(text, **render_kwargs)]
+    except ValueError:
+        lines = text.split("\n")
+        if len(lines) < 2:
+            raise
+        middle = len(lines) // 2
+        return [
+            *_render_emoji_part("\n".join(lines[:middle]), **render_kwargs),
+            *_render_emoji_part("\n".join(lines[middle:]), **render_kwargs),
+        ]
+
+
+def _render_emoji_parts(parts: list[TextPart], **render_kwargs: Any) -> list[list[bytes]]:
+    """Render every emoji part of ``parts`` (empty list for text parts)."""
+    return [_render_emoji_part(part.text, **render_kwargs) if part.emoji else [] for part in parts]
+
+
 def _emoji_font_size(text_kwargs: dict[str, Any]) -> int:
     """Pixel size matching the requested native font and size multiplier."""
     base = _FONT_SIZE_B if text_kwargs.get("font") == "b" else _FONT_SIZE_A
@@ -121,29 +147,35 @@ async def print_parts(
     ``text_kwargs`` (alignment, bold, size, ...). Emoji parts honour the
     alignment, the font (A/B) and the size multiplier; bold, underline and
     invert don't apply to the rendered bitmaps.
+
+    Every emoji part is rendered before the connection opens, so text that
+    can't be rendered fails the call with nothing on paper instead of
+    stopping halfway through the receipt and marking the printer offline.
     """
     align = text_kwargs.get("align") or "left"
     max_width_px = int(adapter.get_profile_pixel_width(hass) or FALLBACK_PROFILE_WIDTH)
     font_size = _emoji_font_size(text_kwargs)
 
+    rendered = await hass.async_add_executor_job(
+        partial(
+            _render_emoji_parts,
+            parts,
+            font_size=font_size,
+            max_width_px=max_width_px,
+            align=align,
+            font_name="dejavu_mono",
+        )
+    )
+
     async with adapter.batch_connection(hass) as page:
-        for part in parts:
+        for part, pngs in zip(parts, rendered, strict=True):
             if not part.emoji:
                 text = await hass.async_add_executor_job(transcode_to_codepage, part.text, codepage)
                 await page.print_text(**{**text_kwargs, "text": text, "encoding": None})
                 continue
-            png = await hass.async_add_executor_job(
-                partial(
-                    _render_emoji_png,
-                    part.text,
-                    font_size=font_size,
-                    max_width_px=max_width_px,
-                    align=align,
-                    font_name="dejavu_mono",
-                )
-            )
-            data_uri = "data:image/png;base64," + base64.b64encode(png).decode("ascii")
-            await page.print_image(image=data_uri)
+            for png in pngs:
+                data_uri = "data:image/png;base64," + base64.b64encode(png).decode("ascii")
+                await page.print_image(image=data_uri)
         await page.cut_and_feed(cut, feed)
 
 

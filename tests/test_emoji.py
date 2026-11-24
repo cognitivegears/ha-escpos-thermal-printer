@@ -183,13 +183,45 @@ class TestPrintText:
         fake = MagicMock()
         with (
             patch("escpos.printer.Network", return_value=fake),
-            patch.object(emoji_printing, "print_parts") as print_parts,
+            patch(
+                "custom_components.escpos_printer.services.print_handlers.print_parts"
+            ) as print_parts,
         ):
             await hass.services.async_call(
                 DOMAIN, "print_text_utf8", {"text": "no emoji here"}, blocking=True
             )
         print_parts.assert_not_called()
         fake.text.assert_called_once_with("no emoji here")
+
+    async def test_long_emoji_run_at_large_size_is_split_into_several_images(self, hass):
+        """A run too tall for one canvas prints as several images, not an error."""
+        await _setup_entry(hass)
+        fake = MagicMock()
+        text = "Heading\n" + "\n".join(f"✅ item {n}" for n in range(60))
+        with patch("escpos.printer.Network", return_value=fake):
+            await hass.services.async_call(
+                DOMAIN,
+                "print_text_utf8",
+                {"text": text, "width": 8, "height": 8},
+                blocking=True,
+            )
+        assert fake.image.call_count > 1
+        fake.text.assert_called_once_with("Heading\n")
+
+    async def test_render_failure_prints_nothing(self, hass):
+        """Emoji lines are rendered before the connection opens."""
+        await _setup_entry(hass)
+        fake = MagicMock()
+        with (
+            patch("escpos.printer.Network", return_value=fake),
+            patch.object(emoji_printing, "_render_emoji_png", side_effect=ValueError("too big")),
+            pytest.raises(Exception, match="too big"),
+        ):
+            await hass.services.async_call(
+                DOMAIN, "print_text_utf8", {"text": "Heading\nDoor 🚪 open"}, blocking=True
+            )
+        fake.text.assert_not_called()
+        fake.image.assert_not_called()
 
     async def test_off_mode_prints_question_marks_like_before(self, hass):
         await _setup_entry(hass)
