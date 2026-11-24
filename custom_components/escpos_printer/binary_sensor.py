@@ -58,6 +58,7 @@ class EscposOnlineSensor(BinarySensorEntity):
             "last_error",
             "last_latency_ms",
             "last_error_reason",
+            "last_error_errno",
             "connection_info",
         }
     )
@@ -101,6 +102,10 @@ class EscposOnlineSensor(BinarySensorEntity):
             "last_error": diag.get("last_error"),
             "last_latency_ms": diag.get("last_latency_ms"),
             "last_error_reason": diag.get("last_error_reason"),
+            # OS errno of the last transport failure (USB/Bluetooth/serial
+            # track it; None for network or after a success) -- lets an
+            # automation tell e.g. EACCES (permissions) from ENODEV (unplugged).
+            "last_error_errno": diag.get("last_error_errno"),
         }
 
         # Add connection-specific info

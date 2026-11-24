@@ -211,6 +211,7 @@ For ready-to-import scripts and automations see the
 | `escpos_printer.feed` | Feed paper |
 | `escpos_printer.cut` | Cut paper |
 | `escpos_printer.beep` | Sound the buzzer |
+| `escpos_printer.reset` | Re-initialise a printer stuck in a wrong mode (ESC @) |
 
 ## Supported Printers
 

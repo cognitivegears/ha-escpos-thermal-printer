@@ -133,6 +133,9 @@ class EscposPrinterAdapterBase(
         self._cancel_status: Callable[[], None] | None = None
         self._status: bool | None = None
         self._status_listeners: list[Callable[[bool], None]] = []
+        # Fired (on the event loop) whenever _image_stats changes, so the
+        # last-image-print sensor can push instead of polling.
+        self._image_stats_listeners: list[Callable[[], None]] = []
         self._last_check: Any = None
         self._last_ok: Any = None
         # Stamped only by paper-moving operations (text/QR/barcode/image/
@@ -408,6 +411,27 @@ class EscposPrinterAdapterBase(
                 self._status_listeners.remove(callback)
 
         return _remove
+
+    def add_image_stats_listener(self, callback: Callable[[], None]) -> Callable[[], None]:
+        """Add an image-stats change listener and return an unsubscribe function.
+
+        Unlike :meth:``add_status_listener`` this fires on every update, not
+        only on a transition: each image print (or failure) changes the
+        counters even when nothing else does.
+        """
+        self._image_stats_listeners.append(callback)
+
+        def _remove() -> None:
+            with contextlib.suppress(ValueError):
+                self._image_stats_listeners.remove(callback)
+
+        return _remove
+
+    def _notify_image_stats(self) -> None:
+        """Notify image-stats listeners. Must be called on the event loop."""
+        for cb in list(self._image_stats_listeners):
+            with contextlib.suppress(Exception):
+                cb()
 
     def get_diagnostics(self) -> dict[str, Any]:
         """Return diagnostic information about the adapter."""
@@ -885,6 +909,7 @@ class _BatchPage:
         invert: bool | None = None,
         density: int | None = None,
         font: str | int | None = None,
+        line_height: int | None = None,
         encoding: str | None = None,
         wrap: bool = True,
         feed: int | None = 0,
@@ -903,6 +928,7 @@ class _BatchPage:
             invert=invert,
             density=density,
             font=font,
+            line_height=line_height,
             encoding=encoding,
             wrap=wrap,
         )

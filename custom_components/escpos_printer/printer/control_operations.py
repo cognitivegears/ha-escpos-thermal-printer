@@ -22,7 +22,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class ControlOperationsMixin:
-    """Mixin providing feed, cut, and beep methods."""
+    """Mixin providing feed, cut, beep, and reset methods."""
 
     # These attributes are expected from the base class
     _keepalive: bool
@@ -158,6 +158,31 @@ class ControlOperationsMixin:
             failed = True
             try:
                 await hass.async_add_executor_job(_beep_inner, printer)
+                failed = False
+            finally:
+                await self._release_printer(hass, printer, owned=owned, failed=failed)
+        await self._mark_success()
+
+    async def reset(self, hass: HomeAssistant) -> None:
+        """Re-initialise the printer (ESC @, python-escpos ``hw("INIT")``).
+
+        Clears the printer's input buffer and resets every print mode
+        (alignment, size, bold, invert, line spacing, codepage selection)
+        to its power-on default -- a cheap recovery path for a printer
+        left in a stuck mode by an aborted job. Doesn't move paper, so it
+        is a control operation, not a print: ``_last_print`` is not
+        stamped.
+        """
+
+        def _reset_inner(printer: Any) -> None:
+            _LOGGER.debug("Sending printer reset (ESC @)")
+            printer.hw("INIT")
+
+        async with self._lock:
+            printer, owned = await self._acquire_printer_or_offline(hass)
+            failed = True
+            try:
+                await hass.async_add_executor_job(_reset_inner, printer)
                 failed = False
             finally:
                 await self._release_printer(hass, printer, owned=owned, failed=failed)

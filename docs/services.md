@@ -17,6 +17,7 @@ Print raw text using the configured codepage. No transcoding.
 | invert | boolean | White-on-black printing |
 | density | int | Print density level (0–8). 5 is darkest; values above 5 step back down. The printer keeps the value until changed |
 | font | string | `a` or `b`. Font B is smaller and fits more columns per line — raise the printer's configured line width to use the extra columns |
+| line_height | int | Printer line spacing (ESC/POS `ESC 3`) for this text, in 1/180-inch units (0–255). About 30 is the usual default (1/6 inch); lower values print a more compact receipt. Reset to the printer default after the text, so it never carries over to the next print. Omit for the printer default. Not the same as `print_text_image`'s `line_spacing` multiplier |
 | encoding | string | Codepage override: a python-escpos codepage name such as `CP437`/`CP858` (not a Python codec name) |
 | cut | string | `none`, `partial`, `full` |
 | feed | int | Lines to feed (0–50) |
@@ -54,8 +55,16 @@ Entity service for the notify platform. Targets a notify entity and supports all
 | size | int | Module size 1–16 (default 3) |
 | ec | string | Error correction: `L`, `M`, `Q`, `H` |
 | align | string | `left`, `center`, `right` |
+| native | boolean | Let the printer render the code itself (ESC/POS `GS ( k`) instead of sending it as an image (default `false`). See below |
 | cut | string | `none`, `partial`, `full` |
 | feed | int | Lines to feed (0–50) |
+
+By default the QR code is rendered on the Home Assistant host and printed as an image, which works on every printer. `native: true` sends the data instead and lets the printer draw the code: faster, and sharper on printers that support it. `size` is then the printer's module size in dots. Not every printer implements the command, so the integration falls back to image rendering when:
+
+- the configured printer profile says it has no native QR support (`qrCode: false`, e.g. `TM-U220`, `POS-5890`, `simple`), or
+- python-escpos rejects the request before anything is sent.
+
+Generic, auto-detected, and custom profiles are assumed to support it. If a printer accepts the command but prints garbage or nothing, leave `native` off for that printer.
 
 ## escpos_printer.print_barcode
 
@@ -243,6 +252,18 @@ If the printer supports it.
 |-----------|------|-------------|
 | times | int | Number of beeps (default 2) |
 | duration | int | Beep duration (default 4) |
+
+## escpos_printer.reset
+
+Re-initialise the printer (ESC/POS `ESC @`, python-escpos `hw("INIT")`). Clears the printer's input buffer and resets text formatting (alignment, size, bold, invert), line spacing, and codepage selection to the power-on defaults. Use it as a recovery step when a printer is stuck in a wrong mode after an interrupted job (everything prints double-size or inverted, for example). It doesn't feed or cut paper, and it can't clear hardware faults such as an open cover or a paper jam. Also available as a **Reset printer** device action.
+
+Takes no parameters beyond the target.
+
+```yaml
+action: escpos_printer.reset
+target:
+  entity_id: notify.esc_pos_printer_192_168_1_100_9100
+```
 
 ## escpos_printer.calibration_print
 

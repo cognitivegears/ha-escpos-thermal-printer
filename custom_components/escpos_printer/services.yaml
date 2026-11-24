@@ -114,6 +114,19 @@ print_text_utf8:
           options:
             - "a"
             - "b"
+    line_height:
+      name: Line Height
+      description: >-
+        Printer line spacing for this text, in 1/180-inch units (0-255);
+        about 30 is the usual default (1/6 inch). Lower values print a more
+        compact receipt. Reset to the printer default after the text, so it
+        doesn't affect later prints. Leave empty for the printer default.
+      selector:
+        number:
+          min: 0
+          max: 255
+          step: 1
+          mode: box
     cut:
       name: Cut
       description: Paper cutting mode after printing (defaults to the printer's configured cut mode)
@@ -250,6 +263,19 @@ print_text:
           options:
             - "a"
             - "b"
+    line_height:
+      name: Line Height
+      description: >-
+        Printer line spacing for this text, in 1/180-inch units (0-255);
+        about 30 is the usual default (1/6 inch). Lower values print a more
+        compact receipt. Reset to the printer default after the text, so it
+        doesn't affect later prints. Leave empty for the printer default.
+      selector:
+        number:
+          min: 0
+          max: 255
+          step: 1
+          mode: box
     encoding:
       name: Encoding
       description: >-
@@ -335,6 +361,17 @@ print_qr:
             - "left"
             - "center"
             - "right"
+    native:
+      name: Native Rendering
+      description: >-
+        Let the printer render the QR code itself (ESC/POS GS ( k) instead
+        of sending it as an image — faster and sharper on printers that
+        support it. Falls back to image rendering when the printer profile
+        reports no native QR support. Leave off if codes print as garbage
+        or not at all.
+      default: false
+      selector:
+        boolean: {}
     cut:
       name: Cut
       description: Paper cutting mode after printing (defaults to the printer's configured cut mode)
@@ -1781,6 +1818,32 @@ beep:
           step: 1
           mode: slider
 
+reset:
+  name: Reset Printer
+  description: >-
+    Re-initialise the printer (ESC @): clears its input buffer and resets
+    text formatting, line spacing, and codepage selection to the power-on
+    defaults. A recovery path for a printer stuck in a wrong mode after an
+    interrupted job. Does not feed or cut paper. Select a target — printer
+    device, entity, area, floor, or label. If no target is selected, resets
+    every configured printer (deprecated fallback).
+  target:
+    entity:
+      domain: notify
+      integration: escpos_printer
+  fields:
+    broadcast:
+      name: Broadcast
+      description: >
+        Explicitly print to every configured printer. Mutually exclusive
+        with any target (device, entity, area, floor, or label). Omitting
+        both a target and broadcast also prints to all printers, but that
+        implicit fallback is deprecated and will be removed in 2.0.0 —
+        select a target or set broadcast: true.
+      default: false
+      selector:
+        boolean: {}
+
 print_message:
   name: Print Formatted Message
   description: >
@@ -1895,6 +1958,19 @@ print_message:
           options:
             - "a"
             - "b"
+    line_height:
+      name: Line Height
+      description: >-
+        Printer line spacing for this text, in 1/180-inch units (0-255);
+        about 30 is the usual default (1/6 inch). Lower values print a more
+        compact receipt. Reset to the printer default after the text, so it
+        doesn't affect later prints. Leave empty for the printer default.
+      selector:
+        number:
+          min: 0
+          max: 255
+          step: 1
+          mode: box
     utf8:
       name: UTF-8 Mode
       description: Enable UTF-8 transcoding (converts special characters to printer-compatible encoding)

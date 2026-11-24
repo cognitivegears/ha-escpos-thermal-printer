@@ -45,6 +45,7 @@ from .constants import (
     ACTION_PRINT_QR,
     ACTION_PRINT_TEXT,
     ACTION_PRINT_TEXT_UTF8,
+    ACTION_RESET,
 )
 
 
@@ -107,6 +108,8 @@ async def async_call_action_from_config(
             times=config.get(ATTR_TIMES, 2),
             duration=config.get(ATTR_DURATION, 4),
         )
+    elif action_type == ACTION_RESET:
+        await adapter.reset(hass)
 
 
 async def _call_print_text_utf8(

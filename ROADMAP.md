@@ -102,18 +102,22 @@ retry double-prints. Retry only on positive evidence the job did not go
 through, and keep everything after the committed send exception-safe so it
 cannot re-fire.
 
-### 7. Smaller items
+### 7. Smaller items — shipped
 
-- **`hw("INIT")` reset service**: cheap recovery path for a wedged printer.
-- **Native QR rendering** (`qr(native=True)`): faster and sharper than the
-  image path, but needs a fallback since not all printers support it.
-- **ESC/POS `line_spacing()`**: compact receipts. Note the name collides with
-  the PIL renderer's `line_spacing` field on `print_text_image`; pick a
-  distinct service field name.
-- **Push updates for the image-print sensor**: it currently polls on a
-  5-minute interval despite the adapter having a listener mechanism.
-- **`_last_error_errno` in the Online sensor's attributes**: already tracked
-  by the adapters and exposed in diagnostics, just not on the entity.
+- **`hw("INIT")` reset service** — shipped as `escpos_printer.reset` plus a
+  **Reset printer** device action (no button entity: it's a recovery step,
+  not an everyday control).
+- **Native QR rendering** — shipped as `print_qr`'s opt-in `native` field.
+  Falls back to the image path when the profile declares no `qrCode`
+  support or python-escpos rejects the request; the native command is
+  built in a buffer first, so a fallback never follows a partial send.
+- **ESC/POS `line_spacing()`** — shipped as `line_height` (1/180-inch units)
+  on `print_text`, `print_text_utf8`, and `print_message`, reset after the
+  text like `invert`. Distinct from `print_text_image`'s `line_spacing`.
+- **Push updates for the image-print sensor** — shipped: it subscribes to a
+  new adapter image-stats listener and no longer polls.
+- **`_last_error_errno` in the Online sensor's attributes** — shipped as the
+  `last_error_errno` attribute.
 
 ## Planned for 2.0.0 (breaking)
 

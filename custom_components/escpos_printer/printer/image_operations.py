@@ -172,10 +172,12 @@ async def prepare_image_for_print(
             stats.last_decoded_dims = (img_obj.width, img_obj.height)
             stats.last_decoded_bytes = raw_len
             stats.last_slice_count = slice_count
+            _notify_image_stats(host)
     except Exception as err:
         if stats is not None:
             stats.total_failures += 1
             stats.last_error_class = type(err).__name__
+            _notify_image_stats(host)
         raise
 
     return PreparedImage(
@@ -373,6 +375,7 @@ class ImageOperationsMixin:
                     if stats is not None:
                         stats.total_failures += 1
                         stats.last_error_class = type(err).__name__
+                        _notify_image_stats(self)
                     with contextlib.suppress(Exception):
                         await self._apply_cut_and_feed(hass, printer, cleanup_cut(cut), feed or 1)
                     raise
@@ -381,12 +384,24 @@ class ImageOperationsMixin:
         if stats is not None:
             stats.total_prints += 1
             stats.last_error_class = None
+            _notify_image_stats(self)
         await self._mark_success(print_op=True)
 
 
 # ---------------------------------------------------------------------------
 # Internal helpers (module-level so they're testable without an adapter).
 # ---------------------------------------------------------------------------
+
+
+def _notify_image_stats(host: Any) -> None:
+    """Push an ``ImageStats`` change to the adapter's listeners, if any.
+
+    ``getattr`` so lightweight test hosts without the listener plumbing
+    keep working.
+    """
+    notify = getattr(host, "_notify_image_stats", None)
+    if callable(notify):
+        notify()
 
 
 def _describe_undecodable(raw: bytes, content_type: str | None) -> str:

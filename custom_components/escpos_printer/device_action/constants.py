@@ -11,6 +11,7 @@ ACTION_PRINT_BARCODE = "print_barcode"
 ACTION_FEED = "feed"
 ACTION_CUT = "cut"
 ACTION_BEEP = "beep"
+ACTION_RESET = "reset"
 
 ACTION_TYPES = {
     ACTION_PRINT_TEXT_UTF8,
@@ -21,4 +22,5 @@ ACTION_TYPES = {
     ACTION_FEED,
     ACTION_CUT,
     ACTION_BEEP,
+    ACTION_RESET,
 }

@@ -29,8 +29,9 @@ from ..const import (
     SERVICE_PRINT_TEXT,
     SERVICE_PRINT_TEXT_IMAGE,
     SERVICE_PRINT_TEXT_UTF8,
+    SERVICE_RESET,
 )
-from .control_handlers import handle_beep, handle_cut, handle_feed
+from .control_handlers import handle_beep, handle_cut, handle_feed, handle_reset
 from .print_handlers import (
     handle_calibration_print,
     handle_preview_box,
@@ -73,6 +74,7 @@ from .schemas import (
     PRINT_TEXT_IMAGE_SCHEMA,
     PRINT_TEXT_SCHEMA,
     PRINT_TEXT_UTF8_SCHEMA,
+    RESET_SCHEMA,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -255,6 +257,14 @@ async def async_setup_services(hass: HomeAssistant) -> None:
     )
     _LOGGER.debug("Registered service %s.%s", DOMAIN, SERVICE_BEEP)
 
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_RESET,
+        handle_reset,
+        schema=RESET_SCHEMA,
+    )
+    _LOGGER.debug("Registered service %s.%s", DOMAIN, SERVICE_RESET)
+
 
 async def async_unload_services(hass: HomeAssistant) -> None:
     """Unload all services when the last config entry is removed."""
@@ -279,4 +289,5 @@ async def async_unload_services(hass: HomeAssistant) -> None:
     hass.services.async_remove(DOMAIN, SERVICE_FEED)
     hass.services.async_remove(DOMAIN, SERVICE_CUT)
     hass.services.async_remove(DOMAIN, SERVICE_BEEP)
+    hass.services.async_remove(DOMAIN, SERVICE_RESET)
     _LOGGER.debug("Unloaded all %s services", DOMAIN)

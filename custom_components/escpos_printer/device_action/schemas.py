@@ -42,6 +42,7 @@ from .constants import (
     ACTION_PRINT_QR,
     ACTION_PRINT_TEXT,
     ACTION_PRINT_TEXT_UTF8,
+    ACTION_RESET,
     ACTION_TYPES,
 )
 
@@ -146,6 +147,11 @@ _BEEP_SCHEMA: dict[vol.Marker | str, Any] = {
     vol.Optional(ATTR_DURATION): vol.All(vol.Coerce(int), vol.Range(min=1, max=10)),
 }
 
+_RESET_SCHEMA: dict[vol.Marker | str, Any] = {
+    **_BASE_SCHEMA,
+    vol.Required(CONF_TYPE): ACTION_RESET,
+}
+
 ACTION_SCHEMA = vol.Any(
     vol.Schema(_PRINT_TEXT_UTF8_SCHEMA),
     vol.Schema(_PRINT_TEXT_SCHEMA),
@@ -155,4 +161,5 @@ ACTION_SCHEMA = vol.Any(
     vol.Schema(_FEED_SCHEMA),
     vol.Schema(_CUT_SCHEMA),
     vol.Schema(_BEEP_SCHEMA),
+    vol.Schema(_RESET_SCHEMA),
 )

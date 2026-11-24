@@ -73,3 +73,32 @@ async def test_online_binary_sensor_not_unknown_after_default_setup(hass):  # ty
     # The recurring timer is still off by default; only the one-shot
     # initial probe ran.
     assert entry.runtime_data.adapter._cancel_status is None  # type: ignore[attr-defined]
+
+
+def test_online_sensor_exposes_last_error_errno():
+    """The adapter-tracked transport errno rides along as an Online-sensor attribute."""
+    adapter = MagicMock()
+    adapter.get_status.return_value = False
+    adapter.get_diagnostics.return_value = {
+        "last_error_reason": "USB device not found",
+        "last_error_errno": 19,
+    }
+
+    sensor = EscposOnlineSensor(MagicMock(), _FakeEntry(), adapter)  # type: ignore[arg-type]
+
+    attrs = sensor.extra_state_attributes
+    assert attrs["last_error_errno"] == 19
+    assert attrs["last_error_reason"] == "USB device not found"
+    # High-churn diagnostic value: kept out of the recorder like its siblings.
+    assert "last_error_errno" in EscposOnlineSensor._unrecorded_attributes
+
+
+def test_online_sensor_last_error_errno_none_by_default():
+    from custom_components.escpos_printer.printer.config import NetworkPrinterConfig
+    from custom_components.escpos_printer.printer.network_adapter import NetworkPrinterAdapter
+
+    adapter = NetworkPrinterAdapter(NetworkPrinterConfig(host="1.2.3.4"))
+    sensor = EscposOnlineSensor(MagicMock(), _FakeEntry(), adapter)  # type: ignore[arg-type]
+
+    assert "last_error_errno" in sensor.extra_state_attributes
+    assert sensor.extra_state_attributes["last_error_errno"] is None

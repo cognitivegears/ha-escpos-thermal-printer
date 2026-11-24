@@ -42,7 +42,9 @@ from ..const import (
     ATTR_INVERT,
     ATTR_ITEMS,
     ATTR_LABEL_WIDTH,
+    ATTR_LINE_HEIGHT,
     ATTR_LINE_SPACING,
+    ATTR_NATIVE,
     ATTR_OUTPUT_PATH,
     ATTR_PADDING,
     ATTR_POS,
@@ -105,6 +107,7 @@ async def handle_print_text(call: ServiceCall) -> None:
             invert=call.data.get(ATTR_INVERT),
             density=call.data.get(ATTR_DENSITY),
             font=call.data.get(ATTR_FONT),
+            line_height=call.data.get(ATTR_LINE_HEIGHT),
             encoding=call.data.get(ATTR_ENCODING),
             cut=call.data.get(ATTR_CUT) or defaults.get("cut"),
             feed=call.data.get(ATTR_FEED),
@@ -139,6 +142,7 @@ async def handle_print_text_utf8(call: ServiceCall) -> None:
             invert=call.data.get(ATTR_INVERT),
             density=call.data.get(ATTR_DENSITY),
             font=call.data.get(ATTR_FONT),
+            line_height=call.data.get(ATTR_LINE_HEIGHT),
             encoding=None,  # printer uses configured codepage
             cut=call.data.get(ATTR_CUT) or defaults.get("cut"),
             feed=call.data.get(ATTR_FEED),
@@ -813,6 +817,7 @@ async def handle_print_qr(call: ServiceCall) -> None:
             size=call.data.get(ATTR_SIZE),
             ec=call.data.get(ATTR_EC),
             align=call.data.get(ATTR_ALIGN) or defaults.get("align"),
+            native=bool(call.data.get(ATTR_NATIVE, False)),
             cut=call.data.get(ATTR_CUT) or defaults.get("cut"),
             feed=call.data.get(ATTR_FEED),
         )
