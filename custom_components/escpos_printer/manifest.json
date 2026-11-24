@@ -1,7 +1,7 @@
 {
-  "after_dependencies": ["bluetooth"],
   "domain": "escpos_printer",
   "name": "ESC/POS Thermal Printer",
+  "after_dependencies": ["bluetooth"],
   "codeowners": [
     "@cognitivegears"
   ],
