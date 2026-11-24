@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .base_adapter import EscposPrinterAdapterBase
+from .ble_adapter import BlePrinterAdapter
 from .bluetooth_adapter import BluetoothPrinterAdapter
 from .config import (
     BluetoothPrinterConfig,
@@ -20,6 +21,8 @@ def create_printer_adapter(config: PrinterConfigTypes) -> EscposPrinterAdapterBa
     if isinstance(config, UsbPrinterConfig):
         return UsbPrinterAdapter(config)
     if isinstance(config, BluetoothPrinterConfig):
+        if config.ble_profile is not None:
+            return BlePrinterAdapter(config, config.ble_profile)
         return BluetoothPrinterAdapter(config)
     if isinstance(config, SerialPrinterConfig):
         return SerialPrinterAdapter(config)

@@ -16,7 +16,10 @@ Native Home Assistant control for ESC/POS thermal receipt printers connected via
 
 After install, restart Home Assistant and add the integration from **Settings → Devices & Services**. Pick your connection type (Network, USB, Bluetooth, or Serial) and follow the prompts.
 
-**Bluetooth users**: pair the printer on the host (e.g. via `bluetoothctl pair AA:BB:CC:DD:EE:FF`) **before** adding the integration. The integration does not initiate pairing itself.
+For a Classic printer, choose **Bluetooth (RFCOMM)** to scan and pair during
+setup. For a BLE printer, choose **Bluetooth Low Energy (BLE)** and select the
+printer profile and device. Home Assistant uses its Bluetooth integration to
+connect directly to BLE printers.
 
 **Serial users**: on Linux, add the HA user to the `dialout` group (`sudo usermod -aG dialout homeassistant`). ESPHome serial proxies are supported using `esphome://host:port` as the port.
 

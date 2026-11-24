@@ -1,7 +1,18 @@
-"""Bluetooth Classic / RFCOMM configuration steps mixin."""
+"""Bluetooth Classic / RFCOMM configuration steps mixin.
+
+Flow overview (the pairing steps are new; the rest predates them)::
+
+    bluetooth_select ──► bluetooth_scan ──► bluetooth_select   (discovery)
+          │
+          ├─ paired device ────────────────► connection probe ─► codepage
+          └─ unpaired device ─► bluetooth_pair ─► bluetooth_pair_finish
+                                   ▲                  │ PIN refused
+                                   └─ bluetooth_pin ◄─┘
+"""
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -10,6 +21,7 @@ from homeassistant.data_entry_flow import section
 from homeassistant.exceptions import HomeAssistantError
 import probatio as vol
 
+from ..bluez_pairing import PAIR_ERROR_AUTH_FAILED, PairingResult
 from ..capabilities import (
     PROFILE_AUTO,
     PROFILE_CUSTOM,
@@ -18,9 +30,11 @@ from ..capabilities import (
 )
 from ..const import (
     BT_MANUAL_ENTRY_KEY,
+    BT_SCAN_KEY,
     BT_SHOW_ALL_KEY,
     CONF_BT_DEVICE,
     CONF_BT_MAC,
+    CONF_BT_PIN,
     CONF_CONNECTION_TYPE,
     CONF_PROFILE,
     CONF_RFCOMM_CHANNEL,
@@ -38,6 +52,9 @@ from .bluetooth_helpers import (
     _is_printer_candidate,
     _list_paired_bluetooth_devices,
     _normalize_bt_mac,
+    _pair_bluetooth_device,
+    _pair_error_to_key,
+    _scan_bluetooth_devices,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -76,9 +93,12 @@ class BluetoothFlowMixin:
     and methods (typically provided by ConfigFlow and other mixins):
     - hass: HomeAssistant instance
     - _user_data: dict for storing flow data
-    - _paired_bt_devices: list of paired Bluetooth devices
+    - _paired_bt_devices: devices offered in the picker — the paired ones, plus
+      unpaired ones (``paired: False``) after a discovery scan
     - _show_all_bt_devices: bool — when True, drop the imaging-only filter
-    - _pending_bt: in-progress BT config awaiting channel-retry
+    - _pending_bt: in-progress BT config awaiting channel-retry or pairing
+    - _pending_bt_errors: form errors to show on the next picker render
+    - _bt_task / _bt_pair_result: background scan/pair task and its outcome
     - async_set_unique_id(): Set unique ID for the config entry
     - _abort_if_unique_id_configured(): Abort if ID already exists
     - async_show_form(): Show a form to the user
@@ -91,63 +111,84 @@ class BluetoothFlowMixin:
     _paired_bt_devices: list[dict[str, Any]]
     _show_all_bt_devices: bool
     _pending_bt: dict[str, Any]
+    _pending_bt_errors: dict[str, str]
+    _bt_task: asyncio.Task[Any] | None
+    _bt_pair_result: PairingResult | None
+
+    async def _handle_bt_shortcut(self, selected: str) -> ConfigFlowResult:
+        """Route the picker's non-device entries (manual entry, show all, scan)."""
+        if selected == BT_MANUAL_ENTRY_KEY:
+            return await self.async_step_bluetooth_manual()
+        if selected == BT_SCAN_KEY:
+            return await self.async_step_bluetooth_scan()
+        self._show_all_bt_devices = True
+        return await self.async_step_bluetooth_select()
+
+    async def _handle_bt_selection(
+        self, user_input: dict[str, Any], errors: dict[str, str]
+    ) -> ConfigFlowResult | None:
+        """Act on a submitted picker form.
+
+        Returns the next flow result, or ``None`` after adding to ``errors`` so
+        the caller re-renders the picker.
+        """
+        _LOGGER.debug(
+            "Config flow Bluetooth select input keys: %s",
+            sorted(user_input.keys()),
+        )
+        selected = user_input.get(CONF_BT_DEVICE)
+        if selected in (BT_MANUAL_ENTRY_KEY, BT_SHOW_ALL_KEY, BT_SCAN_KEY):
+            return await self._handle_bt_shortcut(selected)
+
+        chosen = next(
+            (d for d in self._paired_bt_devices if d.get("_choice_key") == selected),
+            None,
+        )
+        if chosen is None:
+            errors["base"] = "invalid_bt_mac"
+            return None
+        # The channel arrives nested under the collapsed advanced section;
+        # tolerate a flat key for programmatic callers that bypass the schema.
+        advanced = user_input.get(SECTION_BT_ADVANCED) or {}
+        try:
+            channel = validate_rfcomm_channel(
+                advanced.get(
+                    CONF_RFCOMM_CHANNEL,
+                    user_input.get(CONF_RFCOMM_CHANNEL, DEFAULT_RFCOMM_CHANNEL),
+                )
+            )
+        except HomeAssistantError:
+            errors["base"] = "invalid_rfcomm_channel"
+            return None
+
+        mac = chosen["mac"]
+        settings = {
+            "mac": mac,
+            "channel": channel,
+            "timeout": float(user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)),
+            "profile": user_input.get(CONF_PROFILE, PROFILE_AUTO),
+            "printer_name": chosen.get("name") or f"Bluetooth Printer {mac}",
+        }
+        if not chosen.get("paired", True):
+            # Found by a scan but not paired yet: pair first, then carry on
+            # with the connection probe.
+            self._pending_bt = settings
+            return await self.async_step_bluetooth_pair()
+        return await self._finalize_bt_step(
+            **settings, errors=errors, return_step="bluetooth_select"
+        )
 
     async def async_step_bluetooth_select(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Handle Bluetooth printer selection from paired devices."""
-        errors: dict[str, str] = {}
+        """Handle Bluetooth printer selection (paired devices, plus scan results)."""
+        errors: dict[str, str] = dict(self._pending_bt_errors)
+        self._pending_bt_errors = {}
 
         if user_input is not None:
-            _LOGGER.debug(
-                "Config flow Bluetooth select input keys: %s",
-                sorted(user_input.keys()),
-            )
-            selected = user_input.get(CONF_BT_DEVICE)
-            if selected == BT_MANUAL_ENTRY_KEY:
-                return await self.async_step_bluetooth_manual()
-            if selected == BT_SHOW_ALL_KEY:
-                self._show_all_bt_devices = True
-                return await self.async_step_bluetooth_select()
-
-            chosen = next(
-                (d for d in self._paired_bt_devices if d.get("_choice_key") == selected),
-                None,
-            )
-            if chosen is None:
-                errors["base"] = "invalid_bt_mac"
-            else:
-                mac = chosen["mac"]
-                timeout = float(user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
-                # The channel arrives nested under the collapsed advanced
-                # section; tolerate a flat key for programmatic callers that
-                # bypass the schema.
-                advanced = user_input.get(SECTION_BT_ADVANCED) or {}
-                try:
-                    channel = validate_rfcomm_channel(
-                        advanced.get(
-                            CONF_RFCOMM_CHANNEL,
-                            user_input.get(CONF_RFCOMM_CHANNEL, DEFAULT_RFCOMM_CHANNEL),
-                        )
-                    )
-                except HomeAssistantError:
-                    errors["base"] = "invalid_rfcomm_channel"
-                    channel = DEFAULT_RFCOMM_CHANNEL
-                profile = user_input.get(CONF_PROFILE, PROFILE_AUTO)
-
-            if not errors:
-                assert chosen is not None  # narrowed by errors check above
-                result = await self._finalize_bt_step(
-                    mac=mac,
-                    channel=channel,
-                    timeout=timeout,
-                    profile=profile,
-                    printer_name=chosen.get("name") or f"Bluetooth Printer {mac}",
-                    errors=errors,
-                    return_step="bluetooth_select",
-                )
-                if result is not None:
-                    return result
+            result = await self._handle_bt_selection(user_input, errors)
+            if result is not None:
+                return result
 
         # Discover paired devices via bluez D-Bus, but only on the first render.
         # Re-renders after a validation/connection error reuse the cached list -
@@ -211,25 +252,131 @@ class BluetoothFlowMixin:
     async def async_step_bluetooth_no_devices(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Guidance step when no paired Bluetooth devices are visible.
+        """Offer a scan or manual entry when no paired Bluetooth devices are visible.
 
-        Shown when bluez D-Bus is unreachable (rootless Docker, missing
-        ``/run/dbus`` mount, non-Linux) or when the host has no paired BT
-        devices at all. Tells the user how to pair, then offers a path to
-        manual MAC entry for users who already know the address.
+        Shown when the host has no paired BT devices at all, or when bluez
+        D-Bus is unreachable (rootless Docker, missing ``/run/dbus`` mount,
+        non-Linux) — in which case a scan comes back empty and this menu is
+        shown again, now pointing at the manual / bridge fallbacks.
         """
-        if user_input is not None:
-            return await self.async_step_bluetooth_manual()
-
-        return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
+        return self.async_show_menu(  # type: ignore[attr-defined,no-any-return]
             step_id="bluetooth_no_devices",
-            data_schema=vol.Schema({}),
+            menu_options=["bluetooth_scan", "bluetooth_manual"],
             description_placeholders={
                 "docs_url": (
                     "https://github.com/cognitivegears/ha-escpos-thermal-printer"
                     "#bluetooth-rfcomm-printers"
                 )
             },
+        )
+
+    async def async_step_bluetooth_scan(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Search for nearby Bluetooth devices while showing a progress dialog."""
+        if self._bt_task is None:
+            self._bt_task = self.hass.async_create_task(_scan_bluetooth_devices(self.hass))
+        if not self._bt_task.done():
+            return self.async_show_progress(  # type: ignore[attr-defined,no-any-return]
+                step_id="bluetooth_scan",
+                progress_action="bluetooth_scan",
+                progress_task=self._bt_task,
+            )
+        task, self._bt_task = self._bt_task, None
+        try:
+            devices = task.result()
+        except Exception:
+            _LOGGER.exception("Bluetooth discovery scan crashed")
+            devices = []
+        if devices:
+            self._paired_bt_devices = devices
+            self._show_all_bt_devices = False
+            next_step = "bluetooth_select"
+        else:
+            next_step = "bluetooth_no_devices"
+        return self.async_show_progress_done(next_step_id=next_step)  # type: ignore[attr-defined,no-any-return]
+
+    async def async_step_bluetooth_pair(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Pair and trust the selected printer while showing a progress dialog."""
+        pending = self._pending_bt
+        if self._bt_task is None:
+            self._bt_task = self.hass.async_create_task(
+                _pair_bluetooth_device(pending["mac"], pending.get("pin"))
+            )
+        if not self._bt_task.done():
+            return self.async_show_progress(  # type: ignore[attr-defined,no-any-return]
+                step_id="bluetooth_pair",
+                progress_action="bluetooth_pair",
+                progress_task=self._bt_task,
+                description_placeholders={"name": pending["printer_name"]},
+            )
+        task, self._bt_task = self._bt_task, None
+        try:
+            self._bt_pair_result = task.result()
+        except Exception:
+            _LOGGER.exception("Bluetooth pairing crashed")
+            self._bt_pair_result = PairingResult(False)
+        return self.async_show_progress_done(next_step_id="bluetooth_pair_finish")  # type: ignore[attr-defined,no-any-return]
+
+    async def async_step_bluetooth_pair_finish(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Continue with the connection probe once pairing worked, else explain why not."""
+        result = self._bt_pair_result or PairingResult(False)
+        self._bt_pair_result = None
+        pending = self._pending_bt
+
+        if not result.success:
+            _LOGGER.warning(
+                "Bluetooth pairing with %s failed: %s",
+                sanitize_log_message(pending.get("mac", "")),
+                result.error,
+            )
+            if result.error == PAIR_ERROR_AUTH_FAILED:
+                return await self.async_step_bluetooth_pin()
+            self._pending_bt_errors = {"base": _pair_error_to_key(result.error)}
+            return await self.async_step_bluetooth_select()
+
+        for device in self._paired_bt_devices:
+            if device.get("mac") == pending["mac"]:
+                device["paired"] = True
+        errors: dict[str, str] = {}
+        probed = await self._finalize_bt_step(
+            mac=pending["mac"],
+            channel=pending["channel"],
+            timeout=pending["timeout"],
+            profile=pending["profile"],
+            printer_name=pending["printer_name"],
+            errors=errors,
+            return_step="bluetooth_select",
+        )
+        if probed is not None:
+            return probed
+        self._pending_bt_errors = errors
+        return await self.async_step_bluetooth_select()
+
+    async def async_step_bluetooth_pin(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Ask for the printer's PIN after the common default PINs were refused."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            pin = str(user_input.get(CONF_BT_PIN, "")).strip()
+            if pin:
+                self._pending_bt["pin"] = pin
+                return await self.async_step_bluetooth_pair()
+            errors["base"] = "bt_pair_auth_failed"
+        elif "pin" in self._pending_bt:
+            # A PIN was already submitted and refused again.
+            errors["base"] = "bt_pair_auth_failed"
+
+        return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
+            step_id="bluetooth_pin",
+            data_schema=vol.Schema({vol.Required(CONF_BT_PIN): str}),
+            errors=errors,
+            description_placeholders={"name": self._pending_bt.get("printer_name", "")},
         )
 
     async def async_step_bluetooth_channel_retry(

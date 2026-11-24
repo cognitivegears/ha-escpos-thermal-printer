@@ -1,0 +1,8 @@
+{
+  "name": "Fichero Label Printer (D11s)",
+  "width": 96,
+  "dialect": "aiyin",
+  "label_rows": 240,
+  "advertisement_prefixes": ["FICHERO_", "D11s"],
+  "model_names": ["D11s", "FICHERO_5836"]
+}

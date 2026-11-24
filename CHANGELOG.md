@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- German translations, emoji printing, and Bluetooth Classic scanning
+  and pairing in the setup dialog.
+- Bluetooth LE raster printing with Crafts&Co 4777 and Fichero 3561
+  and D11s profiles. The 4777 was tested on firmware V3.20. Hardware
+  testing of the 3561 and D11s profiles is pending.
+
+### Fixed
+
+- Update Last Print immediately after a successful job and handle
+  device-page button presses during an integration reload.
+
 ## [1.3.0] - 2026-11-22
 
 ### Breaking changes

@@ -1,0 +1,2041 @@
+{
+  "title": "ESC/POS-Thermodrucker",
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "Verbindungsart",
+        "description": "Wähle, wie dein Drucker angeschlossen ist.",
+        "data": {
+          "connection_type": "Verbindungsart"
+        },
+        "data_description": {
+          "connection_type": "Wähle „Netzwerk“ für Drucker per TCP/IP oder „USB“ für direkt angeschlossene Drucker."
+        }
+      },
+      "network": {
+        "title": "Netzwerkdrucker einrichten",
+        "description": "Gib die Verbindungsdaten deines ESC/POS-Netzwerkdruckers ein.",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "timeout": "Zeitüberschreitung (Sekunden)",
+          "profile": "Druckerprofil"
+        },
+        "data_description": {
+          "host": "IP-Adresse oder Hostname des Druckers.",
+          "port": "Netzwerkport (meist 9100).",
+          "timeout": "Zeitlimit für den Verbindungsaufbau in Sekunden.",
+          "profile": "Wähle dein Druckermodell – oder „Generisch (kein Profil)“, falls es nicht aufgeführt ist; umgelabelte Modelle erscheinen als „(kompatibel)“. Wähle „Benutzerdefiniert“, um einen Profilnamen von Hand einzugeben."
+        }
+      },
+      "usb_select": {
+        "title": "USB-Drucker einrichten",
+        "description": "Wähle deinen USB-Thermodrucker aus der Liste der erkannten Geräte.",
+        "data": {
+          "usb_device": "USB-Gerät",
+          "timeout": "Zeitüberschreitung (Sekunden)",
+          "profile": "Druckerprofil"
+        },
+        "data_description": {
+          "usb_device": "Wähle deinen Drucker aus den erkannten USB-Geräten.",
+          "timeout": "Zeitlimit für den Verbindungsaufbau in Sekunden.",
+          "profile": "Wähle dein Druckermodell – oder „Generisch (kein Profil)“, falls es nicht aufgeführt ist; umgelabelte Modelle erscheinen als „(kompatibel)“."
+        }
+      },
+      "usb_all_devices": {
+        "title": "USB-Gerät auswählen",
+        "description": "Alle angeschlossenen USB-Geräte durchsuchen. Hinweis: Nicht jedes USB-Gerät ist ein Thermodrucker – wähle deinen Drucker aus der Liste unten.",
+        "data": {
+          "usb_device": "USB-Gerät",
+          "in_ep": "Eingangs-Endpunkt (erweitert)",
+          "out_ep": "Ausgangs-Endpunkt (erweitert)",
+          "timeout": "Zeitüberschreitung (Sekunden)",
+          "profile": "Druckerprofil"
+        },
+        "data_description": {
+          "usb_device": "Wähle deinen Drucker aus allen angeschlossenen USB-Geräten.",
+          "in_ep": "Lass den Standardwert (130), solange dein Drucker funktioniert. Das ist die USB-Adresse, über die der Druckerstatus empfangen wird.",
+          "out_ep": "Lass den Standardwert (1), solange dein Drucker funktioniert. Das ist die USB-Adresse, über die Daten an den Drucker gesendet werden.",
+          "timeout": "Zeitlimit für den Verbindungsaufbau in Sekunden.",
+          "profile": "Wähle dein Druckermodell – oder „Generisch (kein Profil)“, falls es nicht aufgeführt ist; umgelabelte Modelle erscheinen als „(kompatibel)“."
+        }
+      },
+      "usb_manual": {
+        "title": "USB manuell konfigurieren",
+        "description": "Gib die USB-Hersteller-ID (Vendor ID) und Produkt-ID deines Druckers ein. Du findest sie unter Linux mit „lsusb“ und unter Windows im Geräte-Manager.",
+        "data": {
+          "vendor_id": "Hersteller-ID (Vendor ID)",
+          "product_id": "Produkt-ID",
+          "in_ep": "Eingangs-Endpunkt (erweitert)",
+          "out_ep": "Ausgangs-Endpunkt (erweitert)",
+          "timeout": "Zeitüberschreitung (Sekunden)",
+          "profile": "Druckerprofil"
+        },
+        "data_description": {
+          "vendor_id": "USB-Hersteller-ID. Verwende die mit 0x beginnende Hex-Schreibweise von lsusb bzw. der Erkennung, z. B. 0x04B8 (empfohlen). Eine einfache Dezimalzahl wird ebenfalls akzeptiert.",
+          "product_id": "USB-Produkt-ID. Verwende die mit 0x beginnende Hex-Schreibweise, z. B. 0x0E03. Eine einfache Dezimalzahl wird ebenfalls akzeptiert.",
+          "in_ep": "Lass den Standardwert (130), solange dein Drucker funktioniert. Das ist die USB-Adresse, über die der Druckerstatus empfangen wird.",
+          "out_ep": "Lass den Standardwert (1), solange dein Drucker funktioniert. Das ist die USB-Adresse, über die Daten an den Drucker gesendet werden.",
+          "timeout": "Zeitlimit für den Verbindungsaufbau in Sekunden.",
+          "profile": "Wähle dein Druckermodell – oder „Generisch (kein Profil)“, falls es nicht aufgeführt ist; umgelabelte Modelle erscheinen als „(kompatibel)“."
+        }
+      },
+      "usb_confirm": {
+        "title": "USB-Drucker bestätigen",
+        "description": "Ein USB-Thermodrucker wurde erkannt: {printer_name}. Lege das Druckerprofil fest.",
+        "data": {
+          "profile": "Druckerprofil"
+        },
+        "data_description": {
+          "profile": "Wähle dein Druckermodell – oder „Generisch (kein Profil)“, falls es nicht aufgeführt ist; umgelabelte Modelle erscheinen als „(kompatibel)“."
+        }
+      },
+      "bluetooth_select": {
+        "title": "Bluetooth-Drucker einrichten",
+        "description": "Wähle einen Drucker aus der Liste. Geräte mit dem Zusatz „noch nicht gekoppelt“ werden beim Absenden automatisch gekoppelt. Dein Drucker fehlt? Versetze ihn in den Kopplungsmodus und wähle „Nach Geräten in der Nähe suchen“.",
+        "data": {
+          "bt_device": "Bluetooth-Gerät",
+          "timeout": "Zeitüberschreitung (Sekunden)",
+          "profile": "Druckerprofil"
+        },
+        "data_description": {
+          "bt_device": "Wähle deinen Drucker. Mit „Nach Geräten in der Nähe suchen“ findest du Drucker, die mit diesem Host noch nicht gekoppelt sind.",
+          "timeout": "Zeitlimit für den Verbindungsaufbau in Sekunden.",
+          "profile": "Wähle dein Druckermodell – oder „Generisch (kein Profil)“, falls es nicht aufgeführt ist; umgelabelte Modelle erscheinen als „(kompatibel)“."
+        },
+        "sections": {
+          "advanced_options": {
+            "name": "Erweiterte Optionen",
+            "data": {
+              "rfcomm_channel": "RFCOMM-Kanal"
+            },
+            "data_description": {
+              "rfcomm_channel": "RFCOMM-Kanal (bei ESC/POS-Druckern fast immer 1; zur Kontrolle führe auf dem Host „bluetoothctl info [MAC]“ aus und suche die Zeile „Channel:“ im SerialPort-Dienst-Eintrag)."
+            }
+          }
+        }
+      },
+      "bluetooth_manual": {
+        "title": "Bluetooth manuell konfigurieren",
+        "description": "Gib die Bluetooth-MAC-Adresse deines Druckers ein. Er muss bereits mit dem Host gekoppelt sein – um ihn stattdessen aus Home Assistant zu koppeln, gehe zurück und wähle „Nach Geräten in der Nähe suchen“.",
+        "data": {
+          "bt_mac": "MAC-Adresse",
+          "rfcomm_channel": "RFCOMM-Kanal",
+          "timeout": "Zeitüberschreitung (Sekunden)",
+          "profile": "Druckerprofil"
+        },
+        "data_description": {
+          "bt_mac": "Bluetooth-MAC-Adresse im Format AA:BB:CC:DD:EE:FF.",
+          "rfcomm_channel": "RFCOMM-Kanal (bei ESC/POS-Druckern fast immer 1).",
+          "timeout": "Zeitlimit für den Verbindungsaufbau in Sekunden.",
+          "profile": "Wähle dein Druckermodell – oder „Generisch (kein Profil)“, falls es nicht aufgeführt ist; umgelabelte Modelle erscheinen als „(kompatibel)“."
+        }
+      },
+      "bluetooth_no_devices": {
+        "title": "Keine Bluetooth-Drucker gefunden",
+        "description": "Home Assistant sieht noch keinen gekoppelten Bluetooth-Drucker.\n\nSchalte den Drucker ein, versetze ihn in den Kopplungsmodus (meist durch langes Drücken der Ein-Taste, bis die LED blinkt) und lass Home Assistant danach suchen – der Drucker wird für dich gekoppelt.\n\nFindet die Suche nichts, ist bluez-D-Bus aus diesem Container womöglich nicht erreichbar (Rootless Docker, kein Mount von `/run/dbus`). Gib die MAC-Adresse dann von Hand ein oder nutze die **socat-Host-Brücke** aus der [Einrichtungsanleitung]({docs_url}).",
+        "menu_options": {
+          "bluetooth_scan": "Nach Druckern in der Nähe suchen",
+          "bluetooth_manual": "MAC-Adresse manuell eingeben"
+        }
+      },
+      "bluetooth_channel_retry": {
+        "title": "Anderen RFCOMM-Kanal versuchen",
+        "description": "Der Drucker unter {mac} hat den Standard-RFCOMM-Kanal (1) abgelehnt. Die meisten ESC/POS-Drucker nutzen Kanal 1 – deiner verwendet möglicherweise einen anderen. Führe auf dem Host `bluetoothctl info [MAC]` aus und suche die Zeile „Channel:“ im SerialPort-Dienst-Eintrag. Ohne Shell-Zugriff probiere 2 oder 3.",
+        "data": {
+          "rfcomm_channel": "RFCOMM-Kanal"
+        },
+        "data_description": {
+          "rfcomm_channel": "Kanalnummer (1–30); siehe den SDP-Diensteintrag des Druckers."
+        }
+      },
+      "codepage": {
+        "title": "Druckereinstellungen",
+        "description": "Lege Zeichenkodierung und Standardwerte für den Druck fest.",
+        "data": {
+          "codepage": "Zeichenkodierung",
+          "line_width": "Zeichen pro Zeile",
+          "width_pixels": "Papierbreite in Pixeln (optional)",
+          "impl": "Methode für den Bilddruck",
+          "default_align": "Standardausrichtung",
+          "default_cut": "Standard-Schnittmodus"
+        },
+        "data_description": {
+          "codepage": "Zeichenkodierung bzw. Codepage für Text. Wähle „Benutzerdefiniert“, um eine Codepage von Hand einzugeben.",
+          "line_width": "Anzahl der Zeichen pro Zeile (Spalten). Wähle eine Voreinstellung oder gib eine eigene Zahl ein.",
+          "width_pixels": "Überschreibt die druckbare Breite des Profils für Bilder. Leer lassen, um das Profil zu verwenden. Übliche Werte: 384 (58 mm), 576 (80 mm).",
+          "impl": "ESC/POS-Befehlssatz zum Drucken von Bildern. „Automatisch“ folgt dem Druckerprofil; ändere ihn, wenn Bilder verzerrt oder gar nicht gedruckt werden.",
+          "default_align": "Standardausrichtung beim Drucken von Text.",
+          "default_cut": "Standard-Papierschnitt nach dem Drucken."
+        }
+      },
+      "custom_profile": {
+        "title": "Benutzerdefiniertes Druckerprofil",
+        "description": "Gib den Profilnamen aus der escpos-printer-db ein.",
+        "data": {
+          "custom_profile": "Profilname"
+        },
+        "data_description": {
+          "custom_profile": "Der genaue Profilschlüssel aus der escpos-printer-db (z. B. „TM-T88V“, „default“)."
+        }
+      },
+      "custom_codepage": {
+        "title": "Benutzerdefinierte Zeichenkodierung",
+        "description": "Gib den Namen einer eigenen Codepage bzw. Zeichenkodierung ein.",
+        "data": {
+          "custom_codepage": "Codepage"
+        },
+        "data_description": {
+          "custom_codepage": "Der Name der Codepage (z. B. „CP437“, „ISO_8859-1“, „CP932“)."
+        }
+      },
+      "custom_line_width": {
+        "title": "Benutzerdefinierte Zeilenbreite",
+        "description": "Gib die Anzahl der Zeichen pro Zeile ein.",
+        "data": {
+          "custom_line_width": "Zeichen pro Zeile"
+        },
+        "data_description": {
+          "custom_line_width": "Anzahl der Zeichen, die in eine Zeile passen (z. B. 32, 42, 48)."
+        }
+      },
+      "serial": {
+        "title": "Serielle Drucker einrichten",
+        "description": "Wähle den seriellen Anschluss deines Druckers und lege die Verbindungseinstellungen fest.",
+        "data": {
+          "serial_port": "Serieller Anschluss",
+          "baudrate": "Baudrate",
+          "timeout": "Zeitüberschreitung (Sekunden)",
+          "profile": "Druckerprofil"
+        },
+        "data_description": {
+          "serial_port": "Pfad des seriellen Anschlusses (z. B. /dev/ttyUSB0, /dev/ttyACM0, COM3) oder URL (z. B. esphome://host:6053?port_name=Name, rfc2217://host:2217, socket://host:9100).",
+          "baudrate": "Baudrate der seriellen Verbindung.",
+          "timeout": "Zeitlimit für den Verbindungsaufbau in Sekunden.",
+          "profile": "Wähle dein Druckermodell – oder „Generisch (kein Profil)“, falls es nicht aufgeführt ist; umgelabelte Modelle erscheinen als „(kompatibel)“. Wähle „Benutzerdefiniert“, um einen Profilnamen von Hand einzugeben."
+        }
+      },
+      "reconfigure_network": {
+        "title": "Verbindung des Netzwerkdruckers aktualisieren",
+        "description": "Aktualisiere die Verbindungsdaten deines ESC/POS-Netzwerkdruckers.",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "timeout": "Zeitüberschreitung (Sekunden)"
+        },
+        "data_description": {
+          "host": "IP-Adresse oder Hostname des Druckers.",
+          "port": "Netzwerkport (meist 9100).",
+          "timeout": "Zeitlimit für den Verbindungsaufbau in Sekunden."
+        }
+      },
+      "reconfigure_serial": {
+        "title": "Verbindung des seriellen Druckers aktualisieren",
+        "description": "Aktualisiere den seriellen Anschluss und die Verbindungseinstellungen deines Druckers.",
+        "data": {
+          "serial_port": "Serieller Anschluss",
+          "baudrate": "Baudrate",
+          "timeout": "Zeitüberschreitung (Sekunden)"
+        },
+        "data_description": {
+          "serial_port": "Pfad des seriellen Anschlusses (z. B. /dev/ttyUSB0, /dev/ttyACM0, COM3) oder URL (z. B. esphome://host:6053?port_name=Name, rfc2217://host:2217, socket://host:9100).",
+          "baudrate": "Baudrate der seriellen Verbindung.",
+          "timeout": "Zeitlimit für den Verbindungsaufbau in Sekunden."
+        }
+      },
+      "reconfigure_bluetooth": {
+        "title": "Verbindung des Bluetooth-Druckers aktualisieren",
+        "description": "Aktualisiere die Bluetooth-MAC-Adresse und die Verbindungseinstellungen deines Druckers.",
+        "data": {
+          "bt_mac": "MAC-Adresse",
+          "rfcomm_channel": "RFCOMM-Kanal",
+          "timeout": "Zeitüberschreitung (Sekunden)"
+        },
+        "data_description": {
+          "bt_mac": "Bluetooth-MAC-Adresse im Format AA:BB:CC:DD:EE:FF.",
+          "rfcomm_channel": "RFCOMM-Kanal (bei ESC/POS-Druckern fast immer 1).",
+          "timeout": "Zeitlimit für den Verbindungsaufbau in Sekunden."
+        }
+      },
+      "reconfigure_usb": {
+        "title": "Verbindung des USB-Druckers aktualisieren",
+        "description": "Wähle deinen USB-Thermodrucker erneut aus der Liste der erkannten Geräte.",
+        "data": {
+          "usb_device": "USB-Gerät",
+          "timeout": "Zeitüberschreitung (Sekunden)"
+        },
+        "data_description": {
+          "usb_device": "Wähle deinen Drucker aus den erkannten USB-Geräten.",
+          "timeout": "Zeitlimit für den Verbindungsaufbau in Sekunden."
+        }
+      },
+      "reconfigure_usb_manual": {
+        "title": "USB manuell konfigurieren",
+        "description": "Gib die USB-Hersteller-ID (Vendor ID) und Produkt-ID deines Druckers ein. Du findest sie unter Linux mit „lsusb“ und unter Windows im Geräte-Manager.",
+        "data": {
+          "vendor_id": "Hersteller-ID (Vendor ID)",
+          "product_id": "Produkt-ID",
+          "timeout": "Zeitüberschreitung (Sekunden)"
+        },
+        "data_description": {
+          "vendor_id": "USB-Hersteller-ID. Verwende die mit 0x beginnende Hex-Schreibweise von lsusb bzw. der Erkennung, z. B. 0x04B8 (empfohlen). Eine einfache Dezimalzahl wird ebenfalls akzeptiert.",
+          "product_id": "USB-Produkt-ID. Verwende die mit 0x beginnende Hex-Schreibweise, z. B. 0x0E03. Eine einfache Dezimalzahl wird ebenfalls akzeptiert.",
+          "timeout": "Zeitlimit für den Verbindungsaufbau in Sekunden."
+        }
+      },
+      "bluetooth_pin": {
+        "title": "PIN des Druckers eingeben",
+        "description": "{name} hat die üblichen Standard-PINs (0000 und 1234) abgelehnt. Gib die PIN aus der Anleitung oder vom Aufkleber des Druckers ein.",
+        "data": {
+          "bt_pin": "PIN"
+        },
+        "data_description": {
+          "bt_pin": "Oft 0000, 1234, 1111 oder 8888."
+        }
+      },
+      "bluetooth_le": {
+        "title": "Bluetooth-LE-Drucker",
+        "description": "Schalte den Drucker ein und trenne ihn von der Handy-App. Wähle das Druckerprofil und das Gerät aus der Liste. Aktualisiere die Liste, wenn der Drucker noch fehlt. Du kannst auch seine Bluetooth-Adresse eingeben.",
+        "data": {
+          "ble_profile": "Druckerprofil",
+          "bt_mac": "Gerät oder Bluetooth-Adresse"
+        }
+      },
+      "reconfigure_bluetooth_le": {
+        "title": "Bluetooth-LE-Drucker",
+        "description": "Schalte den Drucker ein und trenne ihn von der Handy-App. Wähle das Druckerprofil und das Gerät aus der Liste. Aktualisiere die Liste, wenn der Drucker noch fehlt. Du kannst auch seine Bluetooth-Adresse eingeben.",
+        "data": {
+          "ble_profile": "Druckerprofil",
+          "bt_mac": "Gerät oder Bluetooth-Adresse"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Die Verbindung zum Netzwerkdrucker ist fehlgeschlagen. Prüfe IP-Adresse und Port (die meisten ESC/POS-Drucker hören auf 9100), ob der Drucker eingeschaltet und im selben Netzwerk erreichbar ist und ob keine Firewall die Verbindung blockiert. Schläft der Drucker im Leerlauf, drucke einmal etwas, um ihn aufzuwecken.",
+      "cannot_connect_usb": "Die Verbindung zum USB-Drucker ist fehlgeschlagen. Prüfe, ob der Drucker angeschlossen ist und die Berechtigungen stimmen.",
+      "usb_permission_denied": "Zugriff auf das USB-Gerät verweigert. Füge unter Linux udev-Regeln hinzu oder starte mit passenden Berechtigungen. Stelle bei Docker/HAOS sicher, dass das USB-Gerät an den Container durchgereicht wird.",
+      "usb_kernel_driver_active": "Für dieses USB-Gerät ist ein Kernel-Treiber aktiv. Beende andere Druckdienste oder löse den Treiber (z. B. usblp unter Linux) bzw. setze ihn auf die Sperrliste.",
+      "usb_device_busy": "Das USB-Gerät ist belegt. Möglicherweise nutzt eine andere Anwendung oder ein anderer Treiber den Drucker.",
+      "usb_io_error": "USB-E/A-Fehler beim Öffnen des Geräts. Das kann vorübergehend sein (Reset, Autosuspend oder Stromproblem). Versuche es erneut oder stecke den Drucker um.",
+      "usb_device_not_found": "USB-Gerät nicht gefunden. Prüfe, ob der Drucker angeschlossen und die Hersteller-/Produkt-ID korrekt ist.",
+      "usb_backend_missing": "USB-Backend (libusb) nicht gefunden. Installiere libusb auf deinem System.",
+      "already_configured": "Dieser Drucker ist bereits eingerichtet.",
+      "invalid_profile": "Ungültiger Druckerprofilname.",
+      "invalid_codepage": "Ungültige Codepage bzw. Zeichenkodierung.",
+      "invalid_line_width": "Ungültige Zeilenbreite. Es muss eine positive Zahl sein.",
+      "invalid_usb_device": "Ungültige USB-Geräteauswahl.",
+      "invalid_discovery_info": "Ungültige USB-Erkennungsdaten.",
+      "invalid_endpoint": "Ungültige USB-Endpunktadresse. Sie muss zwischen 0x00 und 0xFF (0–255) liegen.",
+      "cannot_connect_bt": "Die Verbindung zum Bluetooth-Drucker ist fehlgeschlagen. Prüfe, ob das Gerät gekoppelt, eingeschaltet und in Reichweite ist.",
+      "bt_unavailable": "Bluetooth Classic (AF_BLUETOOTH/RFCOMM) ist in dieser Umgebung nicht verfügbar. Bei Home Assistant Container braucht der Container dafür meist „--net=host“ sowie die Fähigkeiten NET_ADMIN und NET_RAW. Siehe die README für die Einrichtung.",
+      "bt_permission_denied": "Zugriff auf den Bluetooth-Socket verweigert. Stelle sicher, dass der Home-Assistant-Prozess auf bluez zugreifen darf (unter normalem Linux meist über die Gruppe „bluetooth“).",
+      "bt_device_not_found": "Bluetooth-Gerät nicht gefunden. Koppel den Drucker zuerst mit „bluetoothctl“ auf dem Host oder über HA OS Einstellungen → System → Hardware.",
+      "bt_host_down": "Der Bluetooth-Drucker ist nicht erreichbar. Stelle sicher, dass er eingeschaltet und in Reichweite ist und nicht gerade mit einem anderen Host verbunden ist (die meisten BT-Drucker nehmen nur eine Verbindung gleichzeitig an).",
+      "bt_timeout": "Zeitüberschreitung beim Verbinden mit dem Bluetooth-Drucker. Möglicherweise schläft er – drucke einmal etwas, um ihn aufzuwecken, oder erhöhe das Zeitlimit.",
+      "bt_channel_refused": "Der Drucker ist erreichbar, hat den RFCOMM-Kanal aber abgelehnt. Die meisten ESC/POS-Drucker nutzen Kanal 1 – versuche einen anderen Kanal oder prüfe mit „bluetoothctl info [MAC]“ auf dem Host den Kanal des SerialPort-Diensteintrags.",
+      "invalid_bt_mac": "Ungültige Bluetooth-MAC-Adresse. Erwartet wird das Format AA:BB:CC:DD:EE:FF.",
+      "invalid_rfcomm_channel": "Ungültiger RFCOMM-Kanal. Er muss zwischen 1 und 30 liegen.",
+      "cannot_connect_serial": "Die Verbindung zum seriellen Drucker ist fehlgeschlagen. Prüfe, ob der Anschluss existiert und die Berechtigungen stimmen.",
+      "serial_permission_denied": "Zugriff auf den seriellen Anschluss verweigert. Füge unter Linux den Home-Assistant-Benutzer zur Gruppe „dialout“ hinzu (sudo usermod -aG dialout homeassistant).",
+      "serial_port_not_found": "Serieller Anschluss nicht gefunden. Prüfe, ob Pfad bzw. URL des Anschlusses stimmen.",
+      "serial_port_busy": "Der serielle Anschluss ist belegt. Möglicherweise nutzt ihn ein anderer Prozess.",
+      "invalid_baudrate": "Ungültige Baudrate. Wähle eine der unterstützten Raten.",
+      "bt_pair_failed": "Das Koppeln ist fehlgeschlagen. Schalte den Drucker aus und wieder ein, versetze ihn in den Kopplungsmodus und versuche es erneut.",
+      "bt_pair_auth_failed": "Der Drucker hat die PIN abgelehnt.",
+      "bt_pair_rejected": "Der Drucker hat die Kopplungsanfrage abgelehnt.",
+      "bt_pair_timeout": "Zeitüberschreitung beim Koppeln. Stelle sicher, dass der Drucker eingeschaltet, im Kopplungsmodus und in der Nähe des Hosts ist.",
+      "bt_pair_unreachable": "Der Drucker ist nicht erreichbar. Ist er eingeschaltet, in Reichweite und nicht mit einem anderen Gerät verbunden?",
+      "bt_pair_busy": "Auf diesem Host läuft bereits eine andere Kopplung. Warte einen Moment und versuche es erneut.",
+      "bt_pair_not_found": "Der Drucker ist aus der Liste der Bluetooth-Geräte verschwunden. Suche erneut.",
+      "bt_pair_unavailable": "Der Bluetooth-Adapter ist nicht bereit. Prüfe, ob Bluetooth auf dem Host aktiviert ist.",
+      "ble_not_available": "Richte zuerst die Bluetooth-Integration von Home Assistant ein.",
+      "ble_not_found": "Kein verbindungsfähiger Bluetooth-Adapter oder Proxy sieht diese Adresse. Schalte den Drucker ein und aktualisiere die Liste.",
+      "ble_model_mismatch": "Das Gerät entspricht dem gewählten Druckerprofil nicht. Prüfe Modell und Bluetooth-Adresse.",
+      "ble_cannot_connect": "Der Drucker antwortet nicht. Schließe die Hersteller-App und versuche es in der Nähe des Bluetooth-Adapters erneut.",
+      "ble_use_4777_profile": "Wähle das Profil „Crafts&Co Fichero Mini Pocket Printer (4777)“ für diesen Drucker."
+    },
+    "abort": {
+      "already_configured": "Dieser Drucker ist bereits eingerichtet.",
+      "already_in_progress": "Die Einrichtung läuft bereits.",
+      "cannot_connect": "Das erkannte Gerät nimmt keine Druckerverbindungen an.",
+      "invalid_discovery_info": "Ungültige USB-Erkennungsdaten.",
+      "invalid_usb_device": "Ungültige USB-Gerätekonfiguration. Hersteller-ID und Produkt-ID sind erforderlich.",
+      "unique_id_mismatch": "Diese Verbindungsdaten gehören zu einem anderen Drucker als dem, der neu konfiguriert wird. Entferne die Integration und richte sie neu ein, wenn du zu einem anderen Drucker wechseln möchtest.",
+      "reconfigure_successful": "Die Druckerverbindung wurde aktualisiert."
+    },
+    "progress": {
+      "bluetooth_scan": "Es wird nach Bluetooth-Druckern in der Nähe gesucht. Schalte deinen Drucker ein und versetze ihn in den Kopplungsmodus. Das dauert etwa 12 Sekunden.",
+      "bluetooth_pair": "Kopplung mit {name}. Das kann bis zu 30 Sekunden dauern."
+    },
+    "create_entry": {
+      "generic_profile": "Der Drucker wurde mit generischen Standardwerten hinzugefügt (kein Profil gewählt). Wenn der Druck nicht stimmt, etwa bei falscher Breite, verzerrten Bildern oder seltsamen Zeichen, öffne den Eintrag des Druckers unter Einstellungen > Geräte & Dienste, wähle **Konfigurieren** und dann **Drucker kalibrieren**, um die richtigen Einstellungen auf Papier auszumessen."
+    }
+  },
+  "options": {
+    "error": {
+      "invalid_profile": "Ungültiger Druckerprofilname.",
+      "invalid_codepage": "Ungültige Codepage bzw. Zeichenkodierung.",
+      "invalid_line_width": "Ungültige Zeilenbreite. Es muss eine positive Zahl sein.",
+      "line_width_missing": "Gib die Zeichenanzahl der ersten Zeile ein (16–96) oder wähle „Diesen Schritt überspringen“.",
+      "line_width_exceeds_width": "Das sind mehr Zeichen, als auf die gewählte druckbare Breite passen. Zähle nur die erste gedruckte Zeile: die letzte Zahl darin plus die Punkte danach.",
+      "bt_status_interval_too_low": "Das Statusabfrage-Intervall muss bei Bluetooth-Druckern 0 (deaktiviert) oder mindestens 60 Sekunden betragen.",
+      "calibration_print_failed": "Das Drucken der Testseite ist fehlgeschlagen. Prüfe den Drucker und versuche es erneut."
+    },
+    "abort": {
+      "calibration_discarded": "Kalibrierung verworfen – es wurden keine Optionen geändert.",
+      "printer_not_ready": "Der Drucker ist nicht verbunden – lade die Integration, bevor du kalibrierst.",
+      "calibration_saved": "Kalibrierung gespeichert und angewendet. [Öffne ein vorausgefülltes GitHub-Issue]({share_url}), um zu helfen, diesen Drucker in die escpos-printer-db aufzunehmen.",
+      "calibration_saved_no_changes": "Kalibrierung abgeschlossen – es wurden keine Einstellungen gemessen, daher blieb alles unverändert."
+    },
+    "step": {
+      "init": {
+        "menu_options": {
+          "settings": "Druckereinstellungen",
+          "calibrate": "Drucker kalibrieren (druckt Testseiten)"
+        }
+      },
+      "settings": {
+        "title": "Druckeroptionen",
+        "description": "Lege die Druckereinstellungen fest. Beim Ändern des Profils werden die Kodierungsoptionen auf die Standardwerte zurückgesetzt.",
+        "data": {
+          "timeout": "Zeitüberschreitung (Sekunden)",
+          "profile": "Druckerprofil",
+          "codepage": "Zeichenkodierung",
+          "line_width": "Zeichen pro Zeile",
+          "width_pixels": "Papierbreite in Pixeln (optional)",
+          "default_align": "Standardausrichtung",
+          "default_cut": "Standard-Schnittmodus",
+          "reliability_profile": "Zuverlässigkeitsprofil für Bilder",
+          "impl": "Methode für den Bilddruck",
+          "keepalive": "Dauerhafte Verbindung halten",
+          "status_interval": "Statusabfrage-Intervall (Sekunden)",
+          "allow_local_image_urls": "Lokale Bild-URLs erlauben",
+          "serial_write_chunk_size": "Blockgröße beim Schreiben (Bytes)",
+          "serial_write_chunk_delay_ms": "Pause zwischen Blöcken (ms)"
+        },
+        "data_description": {
+          "timeout": "Zeitlimit für den Verbindungsaufbau in Sekunden.",
+          "profile": "Wähle dein Druckermodell. Beim Ändern werden die Kodierungsoptionen zurückgesetzt.",
+          "codepage": "Zeichenkodierung bzw. Codepage für Text.",
+          "line_width": "Anzahl der Zeichen pro Zeile (Spalten). Wähle eine Voreinstellung oder gib eine eigene Zahl ein.",
+          "width_pixels": "Überschreibt die druckbare Breite des Profils für Bilder. Leer lassen, um das Profil zu verwenden. Übliche Werte: 384 (58 mm), 576 (80 mm).",
+          "default_align": "Standardausrichtung beim Drucken von Text.",
+          "default_cut": "Standard-Papierschnitt nach dem Drucken.",
+          "reliability_profile": "Wählt sichere Standardwerte für Bild-Blockgröße, Pause zwischen den Blöcken und ESC/POS-Bildbefehl. Optionen im Dienstaufruf haben immer Vorrang.",
+          "impl": "ESC/POS-Befehlssatz zum Drucken von Bildern. „Automatisch“ folgt dem Druckerprofil; ändere ihn, wenn Bilder verzerrt oder gar nicht gedruckt werden.",
+          "keepalive": "Hält die Verbindung zwischen Druckaufträgen offen (nur Netzwerkdrucker).",
+          "status_interval": "Wie oft der Druckerstatus abgefragt wird (0 zum Deaktivieren).",
+          "allow_local_image_urls": "Erlaubt print_image_url (und den übrigen Bilddiensten), URLs abzurufen, die auf private, LAN- oder Loopback-Adressen zeigen, und Nicht-Standard-Ports zu verwenden (z. B. eine lokale Kamera, ein Frigate-Proxy auf :5000 oder deine Home-Assistant-Instanz auf :8123). Standardmäßig aus. Cloud-Metadaten- und Link-Local-Adressen bleiben auch dann gesperrt.",
+          "serial_write_chunk_size": "Maximale Bytes pro Schreibaufruf. Setze 128 für serielle ESPHome-/ESP32-Proxys, um Pufferüberläufe zu vermeiden. 0 deaktiviert die Aufteilung.",
+          "serial_write_chunk_delay_ms": "Pause zwischen aufeinanderfolgenden Blöcken (Millisekunden). Gibt dem Empfänger Zeit, seinen Puffer zu leeren. Gilt nur bei einer Blockgröße ungleich null."
+        }
+      },
+      "calibrate_confirm": {
+        "title": "Drucker kalibrieren",
+        "description": "Dieser Assistent druckt mehrere Testseiten, um die Bildmethode, Papierbreite, Zeichen pro Zeile und Zeichenkodierung deines Druckers zu ermitteln – insgesamt etwa 15–20 cm Papier. Lege vor dem Fortfahren Papier ein.",
+        "data": {
+          "action": "Aktion"
+        }
+      },
+      "calibrate_impl": {
+        "title": "Kalibrieren: Bildmethode",
+        "description": "Dein Drucker hat gerade drei nummerierte Testmuster gedruckt. Ein funktionierendes Muster ist ein sauberes Schachbrett; ein fehlerhaftes druckt vereinzelte Buchstaben oder nichts. Hake jedes Muster an, das sauber gedruckt wurde. Wurde kein Muster sauber gedruckt, lass alle Kästchen leer – der Breitentest wird dann übersprungen, weil er eine funktionierende Bildmethode braucht.",
+        "data": {
+          "impls_clean": "Sauber gedruckte Muster",
+          "action": "Aktion"
+        }
+      },
+      "calibrate_width": {
+        "title": "Kalibrieren: Papierbreite",
+        "description": "Dein Drucker hat gerade für jede mögliche Breite einen beschrifteten Kasten gedruckt. Ein Kasten, der für deinen Drucker zu breit ist, verliert seinen rechten Rand – er wird abgeschnitten oder in Fragmenten umgebrochen. Wähle den BREITESTEN Kasten, dessen rechter Rand als saubere, ununterbrochene Linie gedruckt wurde. Hat kein Kasten einen intakten rechten Rand, wähle „Kein rechter Rand war intakt“.",
+        "data": {
+          "first_equal": "Breitester Kasten mit intaktem rechten Rand",
+          "action": "Aktion"
+        }
+      },
+      "calibrate_ruler": {
+        "title": "Kalibrieren: Zeichen pro Zeile",
+        "description": "Dein Drucker hat gerade eine Linealzeile aus Punkten mit den Zahlen 10, 20, 30 … gedruckt, gefolgt von einer oder zwei übrigen Zeilen, die du ignorieren kannst. Betrachte nur die ERSTE gedruckte Zeile: Suche die letzte vollständige Zahl darin und addiere 1 für jeden Punkt danach. Beispiel: Endet die Zeile mit „40..“, gib 42 ein. Bist du unsicher, wähle „Diesen Schritt überspringen“.",
+        "data": {
+          "last_marker": "Zeichen in der ersten Zeile",
+          "action": "Aktion"
+        }
+      },
+      "calibrate_codepage": {
+        "title": "Kalibrieren: Zeichenkodierung",
+        "description": "Dein Drucker hat gerade pro möglicher Kodierung eine nummerierte Zeile gedruckt, die jeweils den idealen Text „{sample}“ darzustellen versucht. Hake jede Zeile an, deren Ausdruck ihrem eigenen erwarteten Text aus der Kästchenbeschriftung entspricht – auch inklusive etwaiger ?-Zeichen. Eine Zeile, die genau das druckt, was ihre Beschriftung zeigt, ist eine funktionierende Codepage. Passt keine, oder möchtest du die Zeichenkodierung lieber unverändert lassen, wähle „Diesen Schritt überspringen“.",
+        "data": {
+          "codepages_match": "Zeilen, die ihrem erwarteten Text entsprechen",
+          "action": "Aktion"
+        }
+      },
+      "calibrate_summary": {
+        "title": "Kalibrieren: Zusammenfassung",
+        "description": "Gemessene Einstellungen – Bildmethode: {impl}; Papierbreite: {width_pixels} px; Zeichen pro Zeile: {line_width}; Zeichenkodierung: {codepage}. „Speichern“ übernimmt diese in die Druckeroptionen (nicht gemessene Einstellungen bleiben unverändert). Gib optional vorher dein Druckermodell an – der nächste Bildschirm und eine Benachrichtigung enthalten dann einen Link zum Teilen, um diesen Drucker in die escpos-printer-db aufzunehmen.",
+        "data": {
+          "model": "Druckermodell (optional, für den Link zum Teilen)",
+          "action": "Aktion"
+        }
+      },
+      "custom_profile": {
+        "title": "Benutzerdefiniertes Druckerprofil",
+        "description": "Gib den Profilnamen aus der escpos-printer-db ein.",
+        "data": {
+          "custom_profile": "Profilname"
+        },
+        "data_description": {
+          "custom_profile": "Der genaue Profilschlüssel aus der escpos-printer-db."
+        }
+      },
+      "custom_codepage": {
+        "title": "Benutzerdefinierte Zeichenkodierung",
+        "description": "Gib den Namen einer eigenen Codepage bzw. Zeichenkodierung ein.",
+        "data": {
+          "custom_codepage": "Codepage"
+        },
+        "data_description": {
+          "custom_codepage": "Der Name der Codepage (z. B. „CP437“, „ISO_8859-1“)."
+        }
+      },
+      "custom_line_width": {
+        "title": "Benutzerdefinierte Zeilenbreite",
+        "description": "Gib die Anzahl der Zeichen pro Zeile ein.",
+        "data": {
+          "custom_line_width": "Zeichen pro Zeile"
+        },
+        "data_description": {
+          "custom_line_width": "Anzahl der Zeichen, die in eine Zeile passen."
+        }
+      },
+      "ble_settings": {
+        "title": "Bluetooth-LE-Druckereinstellungen",
+        "data": {
+          "timeout": "Zeitüberschreitung (Sekunden)",
+          "default_align": "Standardausrichtung",
+          "status_interval": "Statusabfrage-Intervall (Sekunden)",
+          "allow_local_image_urls": "Lokale Bild-URLs erlauben"
+        },
+        "data_description": {
+          "timeout": "Zeitlimit für den Verbindungsaufbau in Sekunden.",
+          "default_align": "Standardausrichtung beim Drucken von Text.",
+          "status_interval": "Wie oft der Druckerstatus abgefragt wird (0 zum Deaktivieren).",
+          "allow_local_image_urls": "Erlaubt print_image_url (und den übrigen Bilddiensten), URLs abzurufen, die auf private, LAN- oder Loopback-Adressen zeigen, und Nicht-Standard-Ports zu verwenden (z. B. eine lokale Kamera, ein Frigate-Proxy auf :5000 oder deine Home-Assistant-Instanz auf :8123). Standardmäßig aus. Cloud-Metadaten- und Link-Local-Adressen bleiben auch dann gesperrt."
+        }
+      }
+    }
+  },
+  "device_automation": {
+    "action_type": {
+      "print_text_utf8": "Text drucken (UTF-8)",
+      "print_text": "Text drucken (Rohkodierung)",
+      "print_qr": "QR-Code drucken",
+      "print_image": "Bild drucken",
+      "print_barcode": "Barcode drucken",
+      "feed": "Papier vorschieben",
+      "cut": "Papier schneiden",
+      "beep": "Piepton"
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "online": {
+        "name": "Online"
+      },
+      "cover_open": {
+        "name": "Abdeckung offen"
+      }
+    },
+    "sensor": {
+      "last_image_print": {
+        "name": "Letzter Bilddruck"
+      },
+      "last_print": {
+        "name": "Letzter Druck"
+      },
+      "battery": {
+        "name": "Batterie"
+      },
+      "paper_status": {
+        "name": "Papierstatus",
+        "state": {
+          "ok": "OK",
+          "low": "Wenig",
+          "out": "Leer"
+        }
+      }
+    },
+    "button": {
+      "feed": {
+        "name": "Papier vorschieben"
+      },
+      "cut": {
+        "name": "Papier schneiden"
+      },
+      "beep": {
+        "name": "Piepton"
+      },
+      "sample_print": {
+        "name": "Beispiel-Testdruck"
+      }
+    }
+  },
+  "issues": {
+    "profile_width_fallback": {
+      "title": "Im Druckerprofil für „{name}“ fehlt die Pixelbreite",
+      "description": "Das gewählte Druckerprofil ({profile}) liefert kein `media.width.pixels`, daher werden Bilder auf eine generische Breite von {fallback} px skaliert. Das passt meist für 58-mm-Thermodrucker, kann bei 80-mm-Druckern aber gestreckt oder abgeschnitten gedruckt werden.\n\n**So behebst du es:** Öffne die Optionen der Integration und setze „Papierbreite in Pixeln“ (384 bei 58 mm, 576 bei 80 mm), wähle ein besser passendes Druckerprofil oder setze `image_width` ausdrücklich in deinen Dienstaufrufen."
+    },
+    "printer_not_calibrated": {
+      "title": "Drucker „{name}“ ist noch nicht kalibriert",
+      "fix_flow": {
+        "step": {
+          "calibrate_confirm": {
+            "title": "„{name}“ kalibrieren",
+            "description": "Das optionale Kalibrierungswerkzeug druckt Testseiten, um Druckbreite und Zeichensatz für „{name}“ und sein Papier abzustimmen. Führe es jetzt aus oder ignoriere den Hinweis – das Drucken funktioniert auch ohne.\n\nDieser Assistent druckt mehrere Testseiten, um die Bildmethode, Papierbreite, Zeichen pro Zeile und Zeichenkodierung deines Druckers zu ermitteln – insgesamt etwa 15–20 cm Papier. Lege vor dem Fortfahren Papier ein.",
+            "data": {
+              "action": "Aktion"
+            }
+          },
+          "calibrate_impl": {
+            "title": "Kalibrieren: Bildmethode",
+            "description": "Dein Drucker hat gerade drei nummerierte Testmuster gedruckt. Ein funktionierendes Muster ist ein sauberes Schachbrett; ein fehlerhaftes druckt vereinzelte Buchstaben oder nichts. Hake jedes Muster an, das sauber gedruckt wurde. Wurde kein Muster sauber gedruckt, lass alle Kästchen leer – der Breitentest wird dann übersprungen, weil er eine funktionierende Bildmethode braucht.",
+            "data": {
+              "impls_clean": "Sauber gedruckte Muster",
+              "action": "Aktion"
+            }
+          },
+          "calibrate_width": {
+            "title": "Kalibrieren: Papierbreite",
+            "description": "Dein Drucker hat gerade für jede mögliche Breite einen beschrifteten Kasten gedruckt. Ein Kasten, der für deinen Drucker zu breit ist, verliert seinen rechten Rand – er wird abgeschnitten oder in Fragmenten umgebrochen. Wähle den BREITESTEN Kasten, dessen rechter Rand als saubere, ununterbrochene Linie gedruckt wurde. Hat kein Kasten einen intakten rechten Rand, wähle „Kein rechter Rand war intakt“.",
+            "data": {
+              "first_equal": "Breitester Kasten mit intaktem rechten Rand",
+              "action": "Aktion"
+            }
+          },
+          "calibrate_ruler": {
+            "title": "Kalibrieren: Zeichen pro Zeile",
+            "description": "Dein Drucker hat gerade eine Linealzeile aus Punkten mit den Zahlen 10, 20, 30 … gedruckt, gefolgt von einer oder zwei übrigen Zeilen, die du ignorieren kannst. Betrachte nur die ERSTE gedruckte Zeile: Suche die letzte vollständige Zahl darin und addiere 1 für jeden Punkt danach. Beispiel: Endet die Zeile mit „40..“, gib 42 ein. Bist du unsicher, wähle „Diesen Schritt überspringen“.",
+            "data": {
+              "last_marker": "Zeichen in der ersten Zeile",
+              "action": "Aktion"
+            }
+          },
+          "calibrate_codepage": {
+            "title": "Kalibrieren: Zeichenkodierung",
+            "description": "Dein Drucker hat gerade pro möglicher Kodierung eine nummerierte Zeile gedruckt, die jeweils den idealen Text „{sample}“ darzustellen versucht. Hake jede Zeile an, deren Ausdruck ihrem eigenen erwarteten Text aus der Kästchenbeschriftung entspricht – auch inklusive etwaiger ?-Zeichen. Eine Zeile, die genau das druckt, was ihre Beschriftung zeigt, ist eine funktionierende Codepage. Passt keine, oder möchtest du die Zeichenkodierung lieber unverändert lassen, wähle „Diesen Schritt überspringen“.",
+            "data": {
+              "codepages_match": "Zeilen, die ihrem erwarteten Text entsprechen",
+              "action": "Aktion"
+            }
+          },
+          "calibrate_summary": {
+            "title": "Kalibrieren: Zusammenfassung",
+            "description": "Gemessene Einstellungen – Bildmethode: {impl}; Papierbreite: {width_pixels} px; Zeichen pro Zeile: {line_width}; Zeichenkodierung: {codepage}. „Speichern“ übernimmt diese in die Druckeroptionen (nicht gemessene Einstellungen bleiben unverändert). Gib optional vorher dein Druckermodell an – der nächste Bildschirm und eine Benachrichtigung enthalten dann einen Link zum Teilen, um diesen Drucker in die escpos-printer-db aufzunehmen.",
+            "data": {
+              "model": "Druckermodell (optional, für den Link zum Teilen)",
+              "action": "Aktion"
+            }
+          }
+        },
+        "error": {
+          "line_width_missing": "Gib die Zeichenanzahl der ersten Zeile ein (16–96) oder wähle „Diesen Schritt überspringen“.",
+          "line_width_exceeds_width": "Das sind mehr Zeichen, als auf die gewählte druckbare Breite passen. Zähle nur die erste gedruckte Zeile: die letzte Zahl darin plus die Punkte danach.",
+          "calibration_print_failed": "Das Drucken der Testseite ist fehlgeschlagen. Prüfe den Drucker und versuche es erneut."
+        },
+        "abort": {
+          "calibration_discarded": "Kalibrierung verworfen – es wurden keine Optionen geändert.",
+          "printer_not_ready": "Der Drucker ist nicht verbunden – lade die Integration, bevor du kalibrierst.",
+          "calibration_saved": "Kalibrierung gespeichert und angewendet. [Öffne ein vorausgefülltes GitHub-Issue]({share_url}), um zu helfen, diesen Drucker in die escpos-printer-db aufzunehmen.",
+          "calibration_saved_no_changes": "Kalibrierung abgeschlossen – es wurden keine Einstellungen gemessen, daher blieb alles unverändert."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "no_target_found": {
+      "message": "Keine gültigen ESC/POS-Drucker als Ziel gefunden. Bitte wähle ein Druckergerät."
+    },
+    "must_be_string": {
+      "message": "{field} muss eine Zeichenkette sein."
+    },
+    "must_be_integer": {
+      "message": "{field} muss eine ganze Zahl sein."
+    },
+    "text_too_long": {
+      "message": "{field} überschreitet die maximale Länge von {max}."
+    },
+    "value_empty": {
+      "message": "{field} darf nicht leer sein."
+    },
+    "barcode_control_chars": {
+      "message": "Die Barcode-Daten enthalten unzulässige Steuerzeichen."
+    },
+    "url_invalid": {
+      "message": "Die Bild-URL ist ungültig: {reason}"
+    },
+    "path_not_found": {
+      "message": "Die {kind}-Datei existiert nicht oder ist keine reguläre Datei."
+    },
+    "path_access_error": {
+      "message": "Auf die {kind}-Datei kann nicht zugegriffen werden: {error}"
+    },
+    "path_not_regular_file": {
+      "message": "Der {kind}-Pfad ist keine reguläre Datei."
+    },
+    "path_too_large": {
+      "message": "Die {kind}-Datei ist zu groß (maximal {max_mb} MB)."
+    },
+    "path_extension_not_allowed": {
+      "message": "Die Dateiendung „{extension}“ der {kind}-Datei ist nicht erlaubt. Erlaubte Endungen: {allowed}."
+    },
+    "font_path_outside_allowlist": {
+      "message": "Der Schriftpfad „{path}“ liegt außerhalb der erlaubten Verzeichnisse."
+    },
+    "font_path_symlink_rejected": {
+      "message": "Der Schriftpfad darf kein Symlink sein."
+    },
+    "must_be_list": {
+      "message": "{field} muss eine Liste sein."
+    },
+    "list_length_exceeds_max": {
+      "message": "Die Länge von {field} ({count}) überschreitet das Maximum von {max}."
+    },
+    "list_empty": {
+      "message": "{field} muss mindestens einen Eintrag enthalten."
+    },
+    "table_cell_too_long": {
+      "message": "Eine Tabellenzelle überschreitet die maximale Länge von {max}."
+    },
+    "base64_too_large": {
+      "message": "Das Base64-Bild ist zu groß (maximal ca. {max_mb} MB dekodiert)."
+    },
+    "base64_invalid_format": {
+      "message": "Das Base64-Bild muss ein data:image/[Untertyp];base64,…-URI sein."
+    },
+    "base64_decode_error": {
+      "message": "Die Base64-Bilddaten sind ungültig: {error}"
+    },
+    "invalid_entity_id": {
+      "message": "„{value}“ ist keine gültige entity_id für die Domain „{domain}“."
+    },
+    "choice_invalid": {
+      "message": "{field} muss einer von {choices} sein; erhalten: „{value}“."
+    },
+    "numeric_out_of_range": {
+      "message": "{field} muss zwischen {min} und {max} liegen."
+    },
+    "image_source_empty": {
+      "message": "Die Bildquelle muss eine nicht leere Zeichenkette sein."
+    },
+    "image_source_bad_data_uri": {
+      "message": "Es werden nur data:image/[Untertyp];base64,…-Daten-URIs unterstützt."
+    },
+    "image_too_large": {
+      "message": "Das Bild ist zu groß (maximal {max_mb} MB)."
+    },
+    "image_path_outside_allowlist": {
+      "message": "Der Bildpfad liegt außerhalb der erlaubten externen Verzeichnisse von Home Assistant."
+    },
+    "preview_requires_target": {
+      "message": "{service} benötigt mindestens ein Druckerziel."
+    },
+    "preview_requires_single_target": {
+      "message": "{service} benötigt genau ein Druckerziel; erhalten: {count}."
+    },
+    "invalid_output_path": {
+      "message": "Der output_path „{path}“ ist ungültig: {error}"
+    },
+    "output_path_outside_tempdir": {
+      "message": "Der output_path „{path}“ muss im temporären Systemverzeichnis liegen ({tempdir})."
+    },
+    "kvtable_width_too_small": {
+      "message": "total_width {total_width} ist für eine zweispaltige kvtable mit Stil {style} zu klein; die kleinste nutzbare total_width ist {minimum}."
+    },
+    "table_columns_exceed_width": {
+      "message": "Spaltenbreiten plus Trennzeichen benötigen {needed} Zeichen, verfügbar sind aber nur {available} (Zeilenbreite des Druckers: {line_width}). Verringere die Spaltenbreiten oder total_width."
+    },
+    "ble_print_failed": {
+      "message": "Der BLE-Druckauftrag wurde nicht bestätigt."
+    },
+    "ble_printer_error": {
+      "message": "Prüfe Papier, Deckel und Temperatur des BLE-Druckers."
+    },
+    "ble_profile_missing": {
+      "message": "Das gespeicherte Bluetooth-LE-Druckerprofil fehlt."
+    },
+    "ble_unsupported": {
+      "message": "Diese Aktion ist für den Bluetooth-LE-Drucker nicht verfügbar."
+    },
+    "ble_image_too_wide": {
+      "message": "Das Druckbild ist breiter als {width} Pixel."
+    },
+    "ble_job_too_long": {
+      "message": "Der Druckauftrag ist länger als {rows} Pixel."
+    },
+    "printer_entry_unavailable": {
+      "message": "Der Drucker wird gerade geladen oder ist nicht verfügbar."
+    },
+    "ble_use_4777_profile": {
+      "message": "Wähle das Profil „Crafts&Co Fichero Mini Pocket Printer (4777)“ für diesen Drucker."
+    },
+    "ble_buffer_overrun": {
+      "message": "Der BLE-Drucker hat Daten verworfen, weil sein Empfangspuffer voll war."
+    }
+  },
+  "services": {
+    "beep": {
+      "description": "Löst den Summer des Druckers aus (sofern unterstützt). Wähle ein Ziel – Druckergerät, Entität, Bereich, Etage oder Label. Ohne Ziel wird auf allen eingerichteten Druckern gedruckt (veralteter Rückfall).",
+      "fields": {
+        "broadcast": {
+          "description": "Druckt ausdrücklich auf allen eingerichteten Druckern. Schließt jedes Ziel (Gerät, Entität, Bereich, Etage oder Label) aus. Auch ohne Ziel und ohne Broadcast wird auf allen Druckern gedruckt, dieser stillschweigende Rückfall ist aber veraltet und entfällt in 2.0.0 – wähle ein Ziel oder setze broadcast: true.",
+          "name": "Broadcast"
+        },
+        "duration": {
+          "description": "Dauer jedes Pieptons (in den Zeiteinheiten des Druckersummers, je ca. 100 ms)",
+          "name": "Dauer"
+        },
+        "times": {
+          "description": "Anzahl der Pieptöne",
+          "name": "Anzahl"
+        }
+      },
+      "name": "Piepton"
+    },
+    "calibration_print": {
+      "description": "Druckt ein Kalibrierblatt – ein Pixellineal plus einen Schwellenwert-Streifen – zum Abstimmen von Dither und Schwellenwert bei Bildern (nicht der Drucker-Kalibrierungsassistent – siehe die Seite zur Kalibrierung in der Dokumentation). Verbraucht ca. 10 cm Papier. Ohne Ziel wird auf allen eingerichteten Druckern gedruckt (veralteter Rückfall).",
+      "fields": {
+        "broadcast": {
+          "description": "Druckt ausdrücklich auf allen eingerichteten Druckern. Schließt jedes Ziel (Gerät, Entität, Bereich, Etage oder Label) aus. Auch ohne Ziel und ohne Broadcast wird auf allen Druckern gedruckt, dieser stillschweigende Rückfall ist aber veraltet und entfällt in 2.0.0 – wähle ein Ziel oder setze broadcast: true.",
+          "name": "Broadcast"
+        },
+        "cut": {
+          "description": "Papierschnitt nach dem Drucken (Standard ist der eingestellte Schnittmodus des Druckers).",
+          "name": "Schnitt"
+        },
+        "feed": {
+          "description": "Anzahl der Zeilen, die nach dem Drucken vorgeschoben werden.",
+          "name": "Vorschubzeilen"
+        }
+      },
+      "name": "Dither-Testblatt drucken"
+    },
+    "cut": {
+      "description": "Schneidet das Papier. Wähle ein Ziel – Druckergerät, Entität, Bereich, Etage oder Label. Ohne Ziel wird auf allen eingerichteten Druckern gedruckt (veralteter Rückfall).",
+      "fields": {
+        "broadcast": {
+          "description": "Druckt ausdrücklich auf allen eingerichteten Druckern. Schließt jedes Ziel (Gerät, Entität, Bereich, Etage oder Label) aus. Auch ohne Ziel und ohne Broadcast wird auf allen Druckern gedruckt, dieser stillschweigende Rückfall ist aber veraltet und entfällt in 2.0.0 – wähle ein Ziel oder setze broadcast: true.",
+          "name": "Broadcast"
+        },
+        "feed_before_cut": {
+          "description": "Vor dem Schnitt einige Zeilen vorschieben (Eigenverhalten des Druckers). Deaktiviere es, wenn du bereits genug Papier vorgeschoben hast und der Schnitt genau dort erfolgen soll, wo das Papier gerade liegt.",
+          "name": "Vorschub vor dem Schnitt"
+        },
+        "mode": {
+          "description": "Schnittart (voll oder teilweise)",
+          "name": "Modus"
+        }
+      },
+      "name": "Papier schneiden"
+    },
+    "feed": {
+      "description": "Schiebt das Papier um eine Anzahl Zeilen vor. Wähle ein Ziel – Druckergerät, Entität, Bereich, Etage oder Label. Ohne Ziel wird auf allen eingerichteten Druckern gedruckt (veralteter Rückfall).",
+      "fields": {
+        "broadcast": {
+          "description": "Druckt ausdrücklich auf allen eingerichteten Druckern. Schließt jedes Ziel (Gerät, Entität, Bereich, Etage oder Label) aus. Auch ohne Ziel und ohne Broadcast wird auf allen Druckern gedruckt, dieser stillschweigende Rückfall ist aber veraltet und entfällt in 2.0.0 – wähle ein Ziel oder setze broadcast: true.",
+          "name": "Broadcast"
+        },
+        "lines": {
+          "description": "Anzahl der Zeilen, die vorgeschoben werden",
+          "name": "Zeilen"
+        }
+      },
+      "name": "Papier vorschieben"
+    },
+    "preview_box": {
+      "description": "Führt die Layout-Verarbeitung von print_box aus und schreibt den gerenderten Text in eine .txt-Datei, OHNE zu drucken. So kannst du Rahmen, Abstände und Breite ausprobieren, ohne Papier zu verbrauchen. Die Felder für Schnitt und Vorschub fehlen absichtlich – eine Textdatei hat kein Papier. Gibt path, width, line_count und codepage als Antwortdaten des Dienstes zurück – aktiviere in den Entwicklerwerkzeugen „Antwortdaten zurückgeben“, um die Werte zu sehen.",
+      "fields": {
+        "align": {
+          "description": "Textausrichtung innerhalb des Rahmens.",
+          "name": "Ausrichtung"
+        },
+        "device_id": {
+          "description": "Wähle den Drucker, dessen Codepage und Zeilenbreite die Vorschau bestimmen. Sind mehrere Geräte gewählt, wird nur das erste verwendet.",
+          "name": "Gerät"
+        },
+        "output_path": {
+          "description": "Wohin der gerenderte Text gespeichert wird. Muss im temporären Systemverzeichnis liegen (meist /tmp). Standard ist /tmp/escpos_preview_box_[entry].txt. Um die Vorschau woanders abzulegen, kopiere den zurückgegebenen `path` in einem Folgeschritt.",
+          "name": "Ausgabepfad"
+        },
+        "padding": {
+          "description": "Leere Zeilen über und unter dem Inhalt (0–4).",
+          "name": "Innenabstand"
+        },
+        "style": {
+          "description": "Dieselben Optionen wie bei print_box.",
+          "name": "Rahmenstil"
+        },
+        "text": {
+          "description": "Der Text, der mit einem Rahmen umgeben wird. Unterstützt Zeilenumbrüche.",
+          "name": "Text"
+        },
+        "total_width": {
+          "description": "Gesamte gedruckte Breite in Zeichen einschließlich Rahmen.",
+          "name": "Gesamtbreite"
+        }
+      },
+      "name": "Rahmen-Vorschau (ohne Papier)"
+    },
+    "preview_image": {
+      "description": "Führt die komplette Bildverarbeitung (Dithering, Skalierung usw.) aus und schreibt das 1-Bit-PNG auf die Festplatte, OHNE zu drucken. Gibt den Ausgabepfad zurück, damit Automationen eine Benachrichtigung anschließen können. Optionen zur Druckerkommunikation (hohe Dichte, Methode, Fragmenthöhe, Blockpause, Zentrieren, Schnitt, Vorschub) gibt es hier nicht, da sie keinen Einfluss auf die geschriebene Datei haben – sie spielen nur beim Senden an einen echten Drucker eine Rolle.",
+      "fields": {
+        "align": {
+          "description": "Ausrichtung des Bildes auf dem Papier.",
+          "name": "Ausrichtung"
+        },
+        "auto_resize": {
+          "description": "Erlaubt Quellbilder bis 40 MB und verkleinert sie vor der Verarbeitung. Aktiviere das für Handyfotos, hochauflösende Kameras oder jede Quelle, die sonst an die 10-MB-Grenze stößt.",
+          "name": "Große Quellen automatisch verkleinern"
+        },
+        "autocontrast": {
+          "description": "Kontrast vor der S/W-Umwandlung strecken (hilft bei Fotos).",
+          "name": "Autokontrast"
+        },
+        "device_id": {
+          "description": "Wähle ein oder mehrere Druckergeräte (ohne Auswahl wird an alle Drucker gesendet).",
+          "name": "Gerät"
+        },
+        "dither": {
+          "description": "Wie in 1-Bit-Schwarzweiß umgewandelt wird. floyd-steinberg eignet sich gut für Fotos, threshold liefert scharfe Logos und Text, none schaltet das Dithering ab.",
+          "name": "Dither-Modus"
+        },
+        "fallback_image": {
+          "description": "Optionale URL / Pfad / Kamera-Entität, die gedruckt wird, wenn sich die Hauptquelle nicht auflösen lässt. Für beide gelten dieselben Verarbeitungsoptionen.",
+          "name": "Ersatzbild"
+        },
+        "image": {
+          "description": "Dieselben Quellformen wie bei print_image – URL, Dateipfad, camera.[id], image.[id] oder Base64-Daten-URI.",
+          "name": "Bild"
+        },
+        "image_width": {
+          "description": "Zielbreite in Pixeln. Standard ist die maximale Pixelbreite des Druckerprofils (oder 512, falls unbekannt – im Log steht dann eine WARNUNG). Das Bild wird proportional skaliert und nie vergrößert.",
+          "name": "Breite (Pixel)"
+        },
+        "invert": {
+          "description": "Vertauscht Schwarz und Weiß vor der S/W-Umwandlung. Nützlich für Bilder im Dunkelmodus, weiße Logos auf Schwarz oder gespiegelte QR-Codes.",
+          "name": "Farben invertieren"
+        },
+        "mirror": {
+          "description": "Spiegelt das Bild vor dem Druck von links nach rechts. Nützlich für Belegfenster, bei denen der Druck durch die Rückseite des Papiers gelesen wird.",
+          "name": "Horizontal spiegeln"
+        },
+        "output_path": {
+          "description": "Wohin das PNG gespeichert wird. Muss im temporären Systemverzeichnis liegen (meist /tmp). Standard ist /tmp/escpos_preview_[entry].png. Um die Vorschau für eine Lovelace-Karte nach /config/www/ zu legen, füge einer Automation einen Folgeschritt hinzu, der den zurückgegebenen `path` kopiert.",
+          "name": "Ausgabepfad"
+        },
+        "rotation": {
+          "description": "Bild vor dem Druck drehen (Grad, im Uhrzeigersinn).",
+          "name": "Drehung"
+        },
+        "threshold": {
+          "description": "Schwellenwert (1–254), wenn das Dithering „threshold“ ist. Für Strichzeichnungen sind 100–180 üblich.",
+          "name": "Schwellenwert"
+        }
+      },
+      "name": "Bild-Vorschau (ohne Papier)",
+      "sections": {
+        "advanced_options": {
+          "description": "Feinabstimmung von Übertragung und Zuverlässigkeit. Leer lassen, um das Zuverlässigkeitsprofil des Druckers zu verwenden.",
+          "name": "Erweiterte Optionen"
+        },
+        "image_options": {
+          "description": "Optionale Verarbeitung vor dem Drucken des Bildes.",
+          "name": "Bildoptionen"
+        }
+      }
+    },
+    "preview_table": {
+      "description": "Führt die Layout-Verarbeitung von print_table aus und schreibt den gerenderten Text in eine .txt-Datei, OHNE zu drucken. So kannst du Spaltenbreiten, Ausrichtung und Rahmen ausprobieren, ohne Papier zu verbrauchen. Die Felder für Schnitt und Vorschub fehlen absichtlich – eine Textdatei hat kein Papier. Gibt path, width, line_count und codepage als Antwortdaten des Dienstes zurück – aktiviere in den Entwicklerwerkzeugen „Antwortdaten zurückgeben“, um die Werte zu sehen.",
+      "fields": {
+        "column_aligns": {
+          "description": "Optionale Liste der Ausrichtungen pro Spalte (left/center/right).",
+          "name": "Spaltenausrichtung"
+        },
+        "column_widths": {
+          "description": "Optionale Liste der Breiten pro Spalte (Zeichen).",
+          "name": "Spaltenbreiten"
+        },
+        "device_id": {
+          "description": "Wähle den Drucker, dessen Codepage und Zeilenbreite die Vorschau bestimmen. Sind mehrere Geräte gewählt, wird nur das erste verwendet.",
+          "name": "Gerät"
+        },
+        "header": {
+          "description": "Behandelt die erste Zeile als Kopfzeile (durch eine waagerechte Linie abgetrennt).",
+          "name": "Kopfzeile"
+        },
+        "output_path": {
+          "description": "Wohin der gerenderte Text gespeichert wird. Muss im temporären Systemverzeichnis liegen (meist /tmp). Standard ist /tmp/escpos_preview_table_[entry].txt. Um die Vorschau woanders abzulegen, kopiere den zurückgegebenen `path` in einem Folgeschritt.",
+          "name": "Ausgabepfad"
+        },
+        "row_separators": {
+          "description": "Fügt zwischen allen Tabellenzeilen eine waagerechte Linie ein.",
+          "name": "Zeilentrenner"
+        },
+        "rows": {
+          "description": "Eine YAML-Liste, deren Einträge jeweils Listen von Zellen (eine pro Spalte) sind. Beispiel: [[\"Artikel\", \"Menge\", \"Preis\"], [\"Apfel\", \"2\", \"1,00 €\"], [\"Brot\", \"1\", \"3,50 €\"]]. Jede Zeile sollte gleich viele Zellen haben. Ist „Kopfzeile“ aktiviert, wird die erste Zeile als Kopf dargestellt.",
+          "name": "Zeilen"
+        },
+        "style": {
+          "description": "Dieselben Optionen wie bei print_table.",
+          "name": "Rahmenstil"
+        },
+        "total_width": {
+          "description": "Gesamte gedruckte Breite in Zeichen.",
+          "name": "Gesamtbreite"
+        }
+      },
+      "name": "Tabellen-Vorschau (ohne Papier)"
+    },
+    "print_barcode": {
+      "description": "Druckt einen Barcode. Wähle ein Ziel – Druckergerät, Entität, Bereich, Etage oder Label. Ohne Ziel wird auf allen eingerichteten Druckern gedruckt (veralteter Rückfall).",
+      "fields": {
+        "align": {
+          "description": "Ausrichtung des Barcodes",
+          "name": "Ausrichtung"
+        },
+        "bc": {
+          "description": "Art des zu druckenden Barcodes",
+          "name": "Barcode-Typ"
+        },
+        "broadcast": {
+          "description": "Druckt ausdrücklich auf allen eingerichteten Druckern. Schließt jedes Ziel (Gerät, Entität, Bereich, Etage oder Label) aus. Auch ohne Ziel und ohne Broadcast wird auf allen Druckern gedruckt, dieser stillschweigende Rückfall ist aber veraltet und entfällt in 2.0.0 – wähle ein Ziel oder setze broadcast: true.",
+          "name": "Broadcast"
+        },
+        "check": {
+          "description": "Prüfsummenkontrolle aktivieren",
+          "name": "Prüfsumme"
+        },
+        "code": {
+          "description": "Barcode-Daten",
+          "name": "Code"
+        },
+        "cut": {
+          "description": "Papierschnitt nach dem Drucken (Standard ist der eingestellte Schnittmodus des Druckers)",
+          "name": "Schnitt"
+        },
+        "feed": {
+          "description": "Anzahl der Zeilen, die nach dem Drucken vorgeschoben werden",
+          "name": "Vorschubzeilen"
+        },
+        "font": {
+          "description": "Schrift für den lesbaren Text",
+          "name": "Schrift"
+        },
+        "force_software": {
+          "description": "Erzwingt einen per Software gerenderten Barcode (Bild) statt des nativen Barcode-Befehls des Druckers. Wähle einen bestimmten Bildbefehl, wenn die Standarddarstellung falsch aussieht.",
+          "name": "Darstellungsmodus"
+        },
+        "height": {
+          "description": "Höhe des Barcodes in Punkten",
+          "name": "Höhe"
+        },
+        "pos": {
+          "description": "Position des lesbaren Textes",
+          "name": "Textposition"
+        },
+        "width": {
+          "description": "Breite des Barcodes (2–6)",
+          "name": "Breite"
+        }
+      },
+      "name": "Barcode drucken",
+      "sections": {
+        "advanced_options": {
+          "description": "Ausweichdarstellungen für Drucker, deren native Barcode-Ausgabe fehlerhaft ist.",
+          "name": "Erweiterte Optionen"
+        },
+        "barcode_options": {
+          "description": "Symbolgröße und Optionen für den lesbaren Text.",
+          "name": "Barcode-Optionen"
+        }
+      }
+    },
+    "print_box": {
+      "description": "Druckt Text mit druckbarem Rahmen (einfache/doppelte/ASCII-Zeichen). Ohne Ziel wird auf allen eingerichteten Druckern gedruckt (veralteter Rückfall).",
+      "fields": {
+        "align": {
+          "description": "Textausrichtung innerhalb des Rahmens.",
+          "name": "Ausrichtung"
+        },
+        "broadcast": {
+          "description": "Druckt ausdrücklich auf allen eingerichteten Druckern. Schließt jedes Ziel (Gerät, Entität, Bereich, Etage oder Label) aus. Auch ohne Ziel und ohne Broadcast wird auf allen Druckern gedruckt, dieser stillschweigende Rückfall ist aber veraltet und entfällt in 2.0.0 – wähle ein Ziel oder setze broadcast: true.",
+          "name": "Broadcast"
+        },
+        "cut": {
+          "description": "Papierschnitt nach dem Drucken (Standard ist der eingestellte Schnittmodus des Druckers).",
+          "name": "Schnitt"
+        },
+        "feed": {
+          "description": "Anzahl der Zeilen, die nach dem Drucken vorgeschoben werden.",
+          "name": "Vorschubzeilen"
+        },
+        "padding": {
+          "description": "Leere Zeilen über und unter dem Inhalt (0–4).",
+          "name": "Innenabstand"
+        },
+        "style": {
+          "description": "Familie der Rahmenzeichen. „auto“ wählt die einfachen cp437-Linien bei Codepages, die sie unterstützen (CP437, CP850, CP852, CP858, CP860, CP863, CP865, CP866), und fällt sonst auf ASCII zurück.",
+          "name": "Rahmenstil"
+        },
+        "text": {
+          "description": "Der Text, der mit einem Rahmen umgeben wird. Unterstützt Zeilenumbrüche. ASCII / Latin-1 passen pro Spalte auf einen Thermodrucker; CJK, Emoji und kombinierende Zeichen können verrutschen (jede Spalte ist eine Zeichenzelle).",
+          "name": "Text"
+        },
+        "total_width": {
+          "description": "Gesamte gedruckte Breite in Zeichen einschließlich Rahmen. Standard ist die eingestellte Zeilenbreite des Druckers.",
+          "name": "Gesamtbreite"
+        }
+      },
+      "name": "Rahmen drucken"
+    },
+    "print_camera_snapshot": {
+      "description": "Druckt eine Live-Aufnahme einer Kamera-Entität. Komfortabler Aufsatz auf print_image mit einer Kameraauswahl für eine freundlichere Oberfläche. Ohne Ziel wird auf allen eingerichteten Druckern gedruckt (veralteter Rückfall).",
+      "fields": {
+        "align": {
+          "description": "Ausrichtung des Bildes auf dem Papier.",
+          "name": "Ausrichtung"
+        },
+        "auto_resize": {
+          "description": "Erlaubt Quellbilder bis 40 MB und verkleinert sie vor der Verarbeitung. Aktiviere das für Handyfotos, hochauflösende Kameras oder jede Quelle, die sonst an die 10-MB-Grenze stößt.",
+          "name": "Große Quellen automatisch verkleinern"
+        },
+        "autocontrast": {
+          "description": "Kontrast vor der S/W-Umwandlung strecken (hilft bei Fotos).",
+          "name": "Autokontrast"
+        },
+        "broadcast": {
+          "description": "Druckt ausdrücklich auf allen eingerichteten Druckern. Schließt jedes Ziel (Gerät, Entität, Bereich, Etage oder Label) aus. Auch ohne Ziel und ohne Broadcast wird auf allen Druckern gedruckt, dieser stillschweigende Rückfall ist aber veraltet und entfällt in 2.0.0 – wähle ein Ziel oder setze broadcast: true.",
+          "name": "Broadcast"
+        },
+        "camera_entity": {
+          "description": "Kamera-Entität für die Aufnahme.",
+          "name": "Kamera"
+        },
+        "chunk_delay_ms": {
+          "description": "Millisekunden Pause zwischen Bildblöcken. Leer lassen, um das Zuverlässigkeitsprofil des Druckers zu verwenden (0 bei Netzwerk/USB, 50 bei Bluetooth). Erhöhe den Wert (z. B. 100–200), wenn dein Drucker bei hohen Bildern einfriert oder Zeichen ausgibt.",
+          "name": "Blockpause (ms)"
+        },
+        "cut": {
+          "description": "Papierschnitt nach dem Drucken (Standard ist der eingestellte Schnittmodus des Druckers).",
+          "name": "Schnitt"
+        },
+        "dither": {
+          "description": "Wie in 1-Bit-Schwarzweiß umgewandelt wird. floyd-steinberg eignet sich gut für Fotos, threshold liefert scharfe Logos und Text, none schaltet das Dithering ab.",
+          "name": "Dither-Modus"
+        },
+        "fallback_image": {
+          "description": "Optionale URL / Pfad / Kamera-Entität, die gedruckt wird, wenn sich die Hauptquelle nicht auflösen lässt. Für beide gelten dieselben Verarbeitungsoptionen.",
+          "name": "Ersatzbild"
+        },
+        "feed": {
+          "description": "Anzahl der Zeilen, die nach dem Drucken vorgeschoben werden.",
+          "name": "Vorschubzeilen"
+        },
+        "fragment_height": {
+          "description": "Zeilen pro Block beim Senden des Bildes. Kleinere Werte verringern das Risiko von Pufferüberläufen bei billigen Druckern, größere sind schneller. Leer lassen, um das Zuverlässigkeitsprofil des Druckers zu verwenden.",
+          "name": "Fragmenthöhe"
+        },
+        "high_density": {
+          "description": "Verwendet den Druckmodus mit hoher Dichte, sofern unterstützt.",
+          "name": "Hohe Dichte"
+        },
+        "image_width": {
+          "description": "Zielbreite in Pixeln. Standard ist die maximale Pixelbreite des Druckerprofils (oder 512, falls unbekannt – im Log steht dann eine WARNUNG). Das Bild wird proportional skaliert und nie vergrößert.",
+          "name": "Breite (Pixel)"
+        },
+        "impl": {
+          "description": "Bildmethode. Leer lassen, um dem Druckerprofil zu folgen. Raster (bitImageRaster) funktioniert auf den meisten Druckern; Spalten (bitImageColumn) passt zu älteren Nadel- bzw. Impact-Druckern – probiere es, wenn Bilder als verzerrter Text erscheinen; Graphics ist für moderne Epson-Drucker.",
+          "name": "Druckmethode"
+        },
+        "invert": {
+          "description": "Vertauscht Schwarz und Weiß vor der S/W-Umwandlung. Nützlich für Bilder im Dunkelmodus, weiße Logos auf Schwarz oder gespiegelte QR-Codes.",
+          "name": "Farben invertieren"
+        },
+        "mirror": {
+          "description": "Spiegelt das Bild vor dem Druck von links nach rechts. Nützlich für Belegfenster, bei denen der Druck durch die Rückseite des Papiers gelesen wird.",
+          "name": "Horizontal spiegeln"
+        },
+        "rotation": {
+          "description": "Bild vor dem Druck drehen (Grad, im Uhrzeigersinn).",
+          "name": "Drehung"
+        },
+        "threshold": {
+          "description": "Schwellenwert (1–254), wenn das Dithering „threshold“ ist. Für Strichzeichnungen sind 100–180 üblich.",
+          "name": "Schwellenwert"
+        }
+      },
+      "name": "Kamera-Aufnahme drucken",
+      "sections": {
+        "advanced_options": {
+          "description": "Feinabstimmung von Übertragung und Zuverlässigkeit. Leer lassen, um das Zuverlässigkeitsprofil des Druckers zu verwenden.",
+          "name": "Erweiterte Optionen"
+        },
+        "image_options": {
+          "description": "Optionale Verarbeitung vor dem Drucken des Bildes.",
+          "name": "Bildoptionen"
+        }
+      }
+    },
+    "print_image": {
+      "description": "Druckt ein Bild aus einer URL, einem Dateipfad, camera.[id], image.[id] oder einer Base64-Daten-URI. Automationen können für dieses Feld weiterhin eine Jinja-Vorlage verwenden – HA rendert sie vor dem Dienstaufruf –, das Feld selbst ist aber eine einfache Zeichenkette und wird serverseitig nicht ausgewertet. Für eine freundlichere Oberfläche nutze die spezialisierten Dienste (Bild von URL, von Pfad, Kamera-Aufnahme, Bild-Entität) – siehe docs/images.md. Ohne Ziel wird auf allen eingerichteten Druckern gedruckt (veralteter Rückfall).",
+      "fields": {
+        "align": {
+          "description": "Ausrichtung des Bildes auf dem Papier.",
+          "name": "Ausrichtung"
+        },
+        "auto_resize": {
+          "description": "Erlaubt Quellbilder bis 40 MB und verkleinert sie vor der Verarbeitung. Aktiviere das für Handyfotos, hochauflösende Kameras oder jede Quelle, die sonst an die 10-MB-Grenze stößt.",
+          "name": "Große Quellen automatisch verkleinern"
+        },
+        "autocontrast": {
+          "description": "Kontrast vor der S/W-Umwandlung strecken (hilft bei Fotos).",
+          "name": "Autokontrast"
+        },
+        "broadcast": {
+          "description": "Druckt ausdrücklich auf allen eingerichteten Druckern. Schließt jedes Ziel (Gerät, Entität, Bereich, Etage oder Label) aus. Auch ohne Ziel und ohne Broadcast wird auf allen Druckern gedruckt, dieser stillschweigende Rückfall ist aber veraltet und entfällt in 2.0.0 – wähle ein Ziel oder setze broadcast: true.",
+          "name": "Broadcast"
+        },
+        "chunk_delay_ms": {
+          "description": "Millisekunden Pause zwischen Bildblöcken. Leer lassen, um das Zuverlässigkeitsprofil des Druckers zu verwenden (0 bei Netzwerk/USB, 50 bei Bluetooth). Erhöhe den Wert (z. B. 100–200), wenn dein Drucker bei hohen Bildern einfriert oder Zeichen ausgibt.",
+          "name": "Blockpause (ms)"
+        },
+        "cut": {
+          "description": "Papierschnitt nach dem Drucken (Standard ist der eingestellte Schnittmodus des Druckers).",
+          "name": "Schnitt"
+        },
+        "dither": {
+          "description": "Wie in 1-Bit-Schwarzweiß umgewandelt wird. floyd-steinberg eignet sich gut für Fotos, threshold liefert scharfe Logos und Text, none schaltet das Dithering ab.",
+          "name": "Dither-Modus"
+        },
+        "fallback_image": {
+          "description": "Optionale URL / Pfad / Kamera-Entität, die gedruckt wird, wenn sich die Hauptquelle nicht auflösen lässt. Für beide gelten dieselben Verarbeitungsoptionen.",
+          "name": "Ersatzbild"
+        },
+        "feed": {
+          "description": "Anzahl der Zeilen, die nach dem Drucken vorgeschoben werden.",
+          "name": "Vorschubzeilen"
+        },
+        "fragment_height": {
+          "description": "Zeilen pro Block beim Senden des Bildes. Kleinere Werte verringern das Risiko von Pufferüberläufen bei billigen Druckern, größere sind schneller. Leer lassen, um das Zuverlässigkeitsprofil des Druckers zu verwenden.",
+          "name": "Fragmenthöhe"
+        },
+        "high_density": {
+          "description": "Verwendet den Druckmodus mit hoher Dichte, sofern unterstützt.",
+          "name": "Hohe Dichte"
+        },
+        "image": {
+          "description": "URL (http/https), lokaler Dateipfad, camera.[Entität], image.[Entität] oder data:image/...;base64,.... Eine einfache Zeichenkette (z. B. „/config/www/logo.png“) funktioniert wie bisher.",
+          "name": "Bild"
+        },
+        "image_width": {
+          "description": "Zielbreite in Pixeln. Standard ist die maximale Pixelbreite des Druckerprofils (oder 512, falls unbekannt – im Log steht dann eine WARNUNG). Das Bild wird proportional skaliert und nie vergrößert.",
+          "name": "Breite (Pixel)"
+        },
+        "impl": {
+          "description": "Bildmethode. Leer lassen, um dem Druckerprofil zu folgen. Raster (bitImageRaster) funktioniert auf den meisten Druckern; Spalten (bitImageColumn) passt zu älteren Nadel- bzw. Impact-Druckern – probiere es, wenn Bilder als verzerrter Text erscheinen; Graphics ist für moderne Epson-Drucker.",
+          "name": "Druckmethode"
+        },
+        "invert": {
+          "description": "Vertauscht Schwarz und Weiß vor der S/W-Umwandlung. Nützlich für Bilder im Dunkelmodus, weiße Logos auf Schwarz oder gespiegelte QR-Codes.",
+          "name": "Farben invertieren"
+        },
+        "mirror": {
+          "description": "Spiegelt das Bild vor dem Druck von links nach rechts. Nützlich für Belegfenster, bei denen der Druck durch die Rückseite des Papiers gelesen wird.",
+          "name": "Horizontal spiegeln"
+        },
+        "rotation": {
+          "description": "Bild vor dem Druck drehen (Grad, im Uhrzeigersinn).",
+          "name": "Drehung"
+        },
+        "threshold": {
+          "description": "Schwellenwert (1–254), wenn das Dithering „threshold“ ist. Für Strichzeichnungen sind 100–180 üblich.",
+          "name": "Schwellenwert"
+        }
+      },
+      "name": "Bild drucken (gemischte Quelle)",
+      "sections": {
+        "advanced_options": {
+          "description": "Feinabstimmung von Übertragung und Zuverlässigkeit. Leer lassen, um das Zuverlässigkeitsprofil des Druckers zu verwenden.",
+          "name": "Erweiterte Optionen"
+        },
+        "image_options": {
+          "description": "Optionale Verarbeitung vor dem Drucken des Bildes.",
+          "name": "Bildoptionen"
+        }
+      }
+    },
+    "print_image_entity": {
+      "description": "Druckt das aktuelle Bild einer HA-Bild-Entität (Wetterradar, ML-Overlay, erzeugtes Diagramm usw.). Ohne Ziel wird auf allen eingerichteten Druckern gedruckt (veralteter Rückfall).",
+      "fields": {
+        "align": {
+          "description": "Ausrichtung des Bildes auf dem Papier.",
+          "name": "Ausrichtung"
+        },
+        "auto_resize": {
+          "description": "Erlaubt Quellbilder bis 40 MB und verkleinert sie vor der Verarbeitung. Aktiviere das für Handyfotos, hochauflösende Kameras oder jede Quelle, die sonst an die 10-MB-Grenze stößt.",
+          "name": "Große Quellen automatisch verkleinern"
+        },
+        "autocontrast": {
+          "description": "Kontrast vor der S/W-Umwandlung strecken (hilft bei Fotos).",
+          "name": "Autokontrast"
+        },
+        "broadcast": {
+          "description": "Druckt ausdrücklich auf allen eingerichteten Druckern. Schließt jedes Ziel (Gerät, Entität, Bereich, Etage oder Label) aus. Auch ohne Ziel und ohne Broadcast wird auf allen Druckern gedruckt, dieser stillschweigende Rückfall ist aber veraltet und entfällt in 2.0.0 – wähle ein Ziel oder setze broadcast: true.",
+          "name": "Broadcast"
+        },
+        "chunk_delay_ms": {
+          "description": "Millisekunden Pause zwischen Bildblöcken. Leer lassen, um das Zuverlässigkeitsprofil des Druckers zu verwenden (0 bei Netzwerk/USB, 50 bei Bluetooth). Erhöhe den Wert (z. B. 100–200), wenn dein Drucker bei hohen Bildern einfriert oder Zeichen ausgibt.",
+          "name": "Blockpause (ms)"
+        },
+        "cut": {
+          "description": "Papierschnitt nach dem Drucken (Standard ist der eingestellte Schnittmodus des Druckers).",
+          "name": "Schnitt"
+        },
+        "dither": {
+          "description": "Wie in 1-Bit-Schwarzweiß umgewandelt wird. floyd-steinberg eignet sich gut für Fotos, threshold liefert scharfe Logos und Text, none schaltet das Dithering ab.",
+          "name": "Dither-Modus"
+        },
+        "fallback_image": {
+          "description": "Optionale URL / Pfad / Kamera-Entität, die gedruckt wird, wenn sich die Hauptquelle nicht auflösen lässt. Für beide gelten dieselben Verarbeitungsoptionen.",
+          "name": "Ersatzbild"
+        },
+        "feed": {
+          "description": "Anzahl der Zeilen, die nach dem Drucken vorgeschoben werden.",
+          "name": "Vorschubzeilen"
+        },
+        "fragment_height": {
+          "description": "Zeilen pro Block beim Senden des Bildes. Kleinere Werte verringern das Risiko von Pufferüberläufen bei billigen Druckern, größere sind schneller. Leer lassen, um das Zuverlässigkeitsprofil des Druckers zu verwenden.",
+          "name": "Fragmenthöhe"
+        },
+        "high_density": {
+          "description": "Verwendet den Druckmodus mit hoher Dichte, sofern unterstützt.",
+          "name": "Hohe Dichte"
+        },
+        "image_entity": {
+          "description": "Zu druckende Bild-Entität.",
+          "name": "Bild-Entität"
+        },
+        "image_width": {
+          "description": "Zielbreite in Pixeln. Standard ist die maximale Pixelbreite des Druckerprofils (oder 512, falls unbekannt – im Log steht dann eine WARNUNG). Das Bild wird proportional skaliert und nie vergrößert.",
+          "name": "Breite (Pixel)"
+        },
+        "impl": {
+          "description": "Bildmethode. Leer lassen, um dem Druckerprofil zu folgen. Raster (bitImageRaster) funktioniert auf den meisten Druckern; Spalten (bitImageColumn) passt zu älteren Nadel- bzw. Impact-Druckern – probiere es, wenn Bilder als verzerrter Text erscheinen; Graphics ist für moderne Epson-Drucker.",
+          "name": "Druckmethode"
+        },
+        "invert": {
+          "description": "Vertauscht Schwarz und Weiß vor der S/W-Umwandlung. Nützlich für Bilder im Dunkelmodus, weiße Logos auf Schwarz oder gespiegelte QR-Codes.",
+          "name": "Farben invertieren"
+        },
+        "mirror": {
+          "description": "Spiegelt das Bild vor dem Druck von links nach rechts. Nützlich für Belegfenster, bei denen der Druck durch die Rückseite des Papiers gelesen wird.",
+          "name": "Horizontal spiegeln"
+        },
+        "rotation": {
+          "description": "Bild vor dem Druck drehen (Grad, im Uhrzeigersinn).",
+          "name": "Drehung"
+        },
+        "threshold": {
+          "description": "Schwellenwert (1–254), wenn das Dithering „threshold“ ist. Für Strichzeichnungen sind 100–180 üblich.",
+          "name": "Schwellenwert"
+        }
+      },
+      "name": "Bild-Entität drucken",
+      "sections": {
+        "advanced_options": {
+          "description": "Feinabstimmung von Übertragung und Zuverlässigkeit. Leer lassen, um das Zuverlässigkeitsprofil des Druckers zu verwenden.",
+          "name": "Erweiterte Optionen"
+        },
+        "image_options": {
+          "description": "Optionale Verarbeitung vor dem Drucken des Bildes.",
+          "name": "Bildoptionen"
+        }
+      }
+    },
+    "print_image_path": {
+      "description": "Druckt ein Bild von einem lokalen Dateipfad. Der Pfad muss in einem der allowlist_external_dirs von Home Assistant liegen (meist /config oder /media – ergänze bei Bedarf Verzeichnisse unter homeassistant → allowlist_external_dirs in der configuration.yaml). Ohne Ziel wird auf allen eingerichteten Druckern gedruckt (veralteter Rückfall).",
+      "fields": {
+        "align": {
+          "description": "Ausrichtung des Bildes auf dem Papier.",
+          "name": "Ausrichtung"
+        },
+        "auto_resize": {
+          "description": "Erlaubt Quellbilder bis 40 MB und verkleinert sie vor der Verarbeitung. Aktiviere das für Handyfotos, hochauflösende Kameras oder jede Quelle, die sonst an die 10-MB-Grenze stößt.",
+          "name": "Große Quellen automatisch verkleinern"
+        },
+        "autocontrast": {
+          "description": "Kontrast vor der S/W-Umwandlung strecken (hilft bei Fotos).",
+          "name": "Autokontrast"
+        },
+        "broadcast": {
+          "description": "Druckt ausdrücklich auf allen eingerichteten Druckern. Schließt jedes Ziel (Gerät, Entität, Bereich, Etage oder Label) aus. Auch ohne Ziel und ohne Broadcast wird auf allen Druckern gedruckt, dieser stillschweigende Rückfall ist aber veraltet und entfällt in 2.0.0 – wähle ein Ziel oder setze broadcast: true.",
+          "name": "Broadcast"
+        },
+        "chunk_delay_ms": {
+          "description": "Millisekunden Pause zwischen Bildblöcken. Leer lassen, um das Zuverlässigkeitsprofil des Druckers zu verwenden (0 bei Netzwerk/USB, 50 bei Bluetooth). Erhöhe den Wert (z. B. 100–200), wenn dein Drucker bei hohen Bildern einfriert oder Zeichen ausgibt.",
+          "name": "Blockpause (ms)"
+        },
+        "cut": {
+          "description": "Papierschnitt nach dem Drucken (Standard ist der eingestellte Schnittmodus des Druckers).",
+          "name": "Schnitt"
+        },
+        "dither": {
+          "description": "Wie in 1-Bit-Schwarzweiß umgewandelt wird. floyd-steinberg eignet sich gut für Fotos, threshold liefert scharfe Logos und Text, none schaltet das Dithering ab.",
+          "name": "Dither-Modus"
+        },
+        "fallback_image": {
+          "description": "Optionale URL / Pfad / Kamera-Entität, die gedruckt wird, wenn sich die Hauptquelle nicht auflösen lässt. Für beide gelten dieselben Verarbeitungsoptionen.",
+          "name": "Ersatzbild"
+        },
+        "feed": {
+          "description": "Anzahl der Zeilen, die nach dem Drucken vorgeschoben werden.",
+          "name": "Vorschubzeilen"
+        },
+        "fragment_height": {
+          "description": "Zeilen pro Block beim Senden des Bildes. Kleinere Werte verringern das Risiko von Pufferüberläufen bei billigen Druckern, größere sind schneller. Leer lassen, um das Zuverlässigkeitsprofil des Druckers zu verwenden.",
+          "name": "Fragmenthöhe"
+        },
+        "high_density": {
+          "description": "Verwendet den Druckmodus mit hoher Dichte, sofern unterstützt.",
+          "name": "Hohe Dichte"
+        },
+        "image_width": {
+          "description": "Zielbreite in Pixeln. Standard ist die maximale Pixelbreite des Druckerprofils (oder 512, falls unbekannt – im Log steht dann eine WARNUNG). Das Bild wird proportional skaliert und nie vergrößert.",
+          "name": "Breite (Pixel)"
+        },
+        "impl": {
+          "description": "Bildmethode. Leer lassen, um dem Druckerprofil zu folgen. Raster (bitImageRaster) funktioniert auf den meisten Druckern; Spalten (bitImageColumn) passt zu älteren Nadel- bzw. Impact-Druckern – probiere es, wenn Bilder als verzerrter Text erscheinen; Graphics ist für moderne Epson-Drucker.",
+          "name": "Druckmethode"
+        },
+        "invert": {
+          "description": "Vertauscht Schwarz und Weiß vor der S/W-Umwandlung. Nützlich für Bilder im Dunkelmodus, weiße Logos auf Schwarz oder gespiegelte QR-Codes.",
+          "name": "Farben invertieren"
+        },
+        "mirror": {
+          "description": "Spiegelt das Bild vor dem Druck von links nach rechts. Nützlich für Belegfenster, bei denen der Druck durch die Rückseite des Papiers gelesen wird.",
+          "name": "Horizontal spiegeln"
+        },
+        "path": {
+          "description": "Lokaler Dateipfad des Bildes (muss in allowlist_external_dirs liegen, z. B. /config oder /media).",
+          "name": "Pfad"
+        },
+        "rotation": {
+          "description": "Bild vor dem Druck drehen (Grad, im Uhrzeigersinn).",
+          "name": "Drehung"
+        },
+        "threshold": {
+          "description": "Schwellenwert (1–254), wenn das Dithering „threshold“ ist. Für Strichzeichnungen sind 100–180 üblich.",
+          "name": "Schwellenwert"
+        }
+      },
+      "name": "Bild von Pfad drucken",
+      "sections": {
+        "advanced_options": {
+          "description": "Feinabstimmung von Übertragung und Zuverlässigkeit. Leer lassen, um das Zuverlässigkeitsprofil des Druckers zu verwenden.",
+          "name": "Erweiterte Optionen"
+        },
+        "image_options": {
+          "description": "Optionale Verarbeitung vor dem Drucken des Bildes.",
+          "name": "Bildoptionen"
+        }
+      }
+    },
+    "print_image_url": {
+      "description": "Druckt ein per HTTP(S)-URL abgerufenes Bild. SSRF-geschützt – private, Loopback- und Link-Local-Adressen werden abgelehnt. Ohne Ziel wird auf allen eingerichteten Druckern gedruckt (veralteter Rückfall).",
+      "fields": {
+        "align": {
+          "description": "Ausrichtung des Bildes auf dem Papier.",
+          "name": "Ausrichtung"
+        },
+        "auto_resize": {
+          "description": "Erlaubt Quellbilder bis 40 MB und verkleinert sie vor der Verarbeitung. Aktiviere das für Handyfotos, hochauflösende Kameras oder jede Quelle, die sonst an die 10-MB-Grenze stößt.",
+          "name": "Große Quellen automatisch verkleinern"
+        },
+        "autocontrast": {
+          "description": "Kontrast vor der S/W-Umwandlung strecken (hilft bei Fotos).",
+          "name": "Autokontrast"
+        },
+        "broadcast": {
+          "description": "Druckt ausdrücklich auf allen eingerichteten Druckern. Schließt jedes Ziel (Gerät, Entität, Bereich, Etage oder Label) aus. Auch ohne Ziel und ohne Broadcast wird auf allen Druckern gedruckt, dieser stillschweigende Rückfall ist aber veraltet und entfällt in 2.0.0 – wähle ein Ziel oder setze broadcast: true.",
+          "name": "Broadcast"
+        },
+        "chunk_delay_ms": {
+          "description": "Millisekunden Pause zwischen Bildblöcken. Leer lassen, um das Zuverlässigkeitsprofil des Druckers zu verwenden (0 bei Netzwerk/USB, 50 bei Bluetooth). Erhöhe den Wert (z. B. 100–200), wenn dein Drucker bei hohen Bildern einfriert oder Zeichen ausgibt.",
+          "name": "Blockpause (ms)"
+        },
+        "cut": {
+          "description": "Papierschnitt nach dem Drucken (Standard ist der eingestellte Schnittmodus des Druckers).",
+          "name": "Schnitt"
+        },
+        "dither": {
+          "description": "Wie in 1-Bit-Schwarzweiß umgewandelt wird. floyd-steinberg eignet sich gut für Fotos, threshold liefert scharfe Logos und Text, none schaltet das Dithering ab.",
+          "name": "Dither-Modus"
+        },
+        "fallback_image": {
+          "description": "Optionale URL / Pfad / Kamera-Entität, die gedruckt wird, wenn sich die Hauptquelle nicht auflösen lässt. Für beide gelten dieselben Verarbeitungsoptionen.",
+          "name": "Ersatzbild"
+        },
+        "feed": {
+          "description": "Anzahl der Zeilen, die nach dem Drucken vorgeschoben werden.",
+          "name": "Vorschubzeilen"
+        },
+        "fragment_height": {
+          "description": "Zeilen pro Block beim Senden des Bildes. Kleinere Werte verringern das Risiko von Pufferüberläufen bei billigen Druckern, größere sind schneller. Leer lassen, um das Zuverlässigkeitsprofil des Druckers zu verwenden.",
+          "name": "Fragmenthöhe"
+        },
+        "high_density": {
+          "description": "Verwendet den Druckmodus mit hoher Dichte, sofern unterstützt.",
+          "name": "Hohe Dichte"
+        },
+        "image_width": {
+          "description": "Zielbreite in Pixeln. Standard ist die maximale Pixelbreite des Druckerprofils (oder 512, falls unbekannt – im Log steht dann eine WARNUNG). Das Bild wird proportional skaliert und nie vergrößert.",
+          "name": "Breite (Pixel)"
+        },
+        "impl": {
+          "description": "Bildmethode. Leer lassen, um dem Druckerprofil zu folgen. Raster (bitImageRaster) funktioniert auf den meisten Druckern; Spalten (bitImageColumn) passt zu älteren Nadel- bzw. Impact-Druckern – probiere es, wenn Bilder als verzerrter Text erscheinen; Graphics ist für moderne Epson-Drucker.",
+          "name": "Druckmethode"
+        },
+        "invert": {
+          "description": "Vertauscht Schwarz und Weiß vor der S/W-Umwandlung. Nützlich für Bilder im Dunkelmodus, weiße Logos auf Schwarz oder gespiegelte QR-Codes.",
+          "name": "Farben invertieren"
+        },
+        "mirror": {
+          "description": "Spiegelt das Bild vor dem Druck von links nach rechts. Nützlich für Belegfenster, bei denen der Druck durch die Rückseite des Papiers gelesen wird.",
+          "name": "Horizontal spiegeln"
+        },
+        "rotation": {
+          "description": "Bild vor dem Druck drehen (Grad, im Uhrzeigersinn).",
+          "name": "Drehung"
+        },
+        "threshold": {
+          "description": "Schwellenwert (1–254), wenn das Dithering „threshold“ ist. Für Strichzeichnungen sind 100–180 üblich.",
+          "name": "Schwellenwert"
+        },
+        "url": {
+          "description": "HTTP(S)-URL des Bildes (max. 10 MB, 40 MB mit auto_resize).",
+          "name": "URL"
+        }
+      },
+      "name": "Bild von URL drucken",
+      "sections": {
+        "advanced_options": {
+          "description": "Feinabstimmung von Übertragung und Zuverlässigkeit. Leer lassen, um das Zuverlässigkeitsprofil des Druckers zu verwenden.",
+          "name": "Erweiterte Optionen"
+        },
+        "image_options": {
+          "description": "Optionale Verarbeitung vor dem Drucken des Bildes.",
+          "name": "Bildoptionen"
+        }
+      }
+    },
+    "print_kvtable": {
+      "description": "Druckt eine zweispaltige Beschriftungs-/Werte-Tabelle – Belegsummen, Sensorwerte, Zutatenlisten. Beschriftungen linksbündig, Werte nach „value_align“ (Standard rechts). Ohne Ziel wird auf allen eingerichteten Druckern gedruckt (veralteter Rückfall).",
+      "fields": {
+        "broadcast": {
+          "description": "Druckt ausdrücklich auf allen eingerichteten Druckern. Schließt jedes Ziel (Gerät, Entität, Bereich, Etage oder Label) aus. Auch ohne Ziel und ohne Broadcast wird auf allen Druckern gedruckt, dieser stillschweigende Rückfall ist aber veraltet und entfällt in 2.0.0 – wähle ein Ziel oder setze broadcast: true.",
+          "name": "Broadcast"
+        },
+        "cut": {
+          "description": "Papierschnitt nach dem Drucken (Standard ist der eingestellte Schnittmodus des Druckers).",
+          "name": "Schnitt"
+        },
+        "feed": {
+          "description": "Anzahl der Zeilen, die nach dem Drucken vorgeschoben werden.",
+          "name": "Vorschubzeilen"
+        },
+        "items": {
+          "description": "Liste von [Beschriftung, Wert]-Paaren. Beispiel [[\"Zwischensumme\",\"10,00 €\"], [\"MwSt.\",\"0,80 €\"], [\"Summe\",\"10,80 €\"]].",
+          "name": "Einträge"
+        },
+        "label_width": {
+          "description": "Zeichen, die für die Beschriftungsspalte reserviert sind. Ohne Angabe richtet sich die Breite nach der längsten Beschriftung, höchstens ca. 60 % der Gesamtbreite.",
+          "name": "Breite der Beschriftung"
+        },
+        "style": {
+          "description": "Familie der Rahmenzeichen. Standard ist „none“ (ohne Rahmen), das übliche Aussehen von Belegsummen.",
+          "name": "Rahmenstil"
+        },
+        "total_width": {
+          "description": "Gesamte gedruckte Breite in Zeichen. Standard ist die Zeilenbreite des Druckers.",
+          "name": "Gesamtbreite"
+        },
+        "value_align": {
+          "description": "Ausrichtung der Wertespalte. Standard ist rechts (typisch für Summen).",
+          "name": "Ausrichtung der Werte"
+        }
+      },
+      "name": "Schlüssel-/Werte-Tabelle drucken"
+    },
+    "print_message": {
+      "description": "Druckt eine Nachricht mit voller Textformatierung (fett, unterstrichen, Größe, Ausrichtung) plus optionalem Bildanhang, der als ein durchgehender Beleg gedruckt wird. Zielt auf eine ESC/POS-Benachrichtigungs-Entität. Siehe docs/images.md.",
+      "fields": {
+        "align": {
+          "description": "Textausrichtung",
+          "name": "Ausrichtung"
+        },
+        "bold": {
+          "description": "Fettdruck aktivieren",
+          "name": "Fett"
+        },
+        "cut": {
+          "description": "Papierschnitt nach dem Drucken (Standard ist der eingestellte Schnittmodus des Druckers)",
+          "name": "Schnitt"
+        },
+        "density": {
+          "description": "Druckdichte (0–8). 5 ist am dunkelsten; höhere Werte gehen wieder zurück. Der Drucker behält den Wert, bis er geändert wird.",
+          "name": "Dichte"
+        },
+        "emoji": {
+          "description": "Wie Emoji gedruckt werden, wenn der UTF-8-Modus aktiv ist und kein Bild angehängt ist. `auto` druckt Zeilen mit Emoji als kleine Bilder (mit der mitgelieferten Noto-Emoji-Schrift) und alles andere als normalen Text. `strip` entfernt Emoji. `off` behält das alte Verhalten bei, bei dem jedes Emoji als `?` gedruckt wird. Emoji-Zeilen beachten Ausrichtung, Schrift und Größe, aber nicht Fett, Unterstrichen oder Invertiert.",
+          "name": "Emoji"
+        },
+        "encoding": {
+          "description": "Überschreibt die Codepage – ein python-escpos-Codepage-Name wie CP437 oder CP858 (kein Python-Codec-Name). Wird ignoriert, wenn der UTF-8-Modus aktiv ist.",
+          "name": "Kodierung"
+        },
+        "feed": {
+          "description": "Anzahl der Zeilen, die nach dem Drucken vorgeschoben werden",
+          "name": "Vorschubzeilen"
+        },
+        "font": {
+          "description": "Druckerschrift. Schrift B ist kleiner und bietet mehr Spalten pro Zeile – erhöhe die eingestellte Zeilenbreite des Druckers, um die zusätzlichen Spalten zu nutzen.",
+          "name": "Schrift"
+        },
+        "height": {
+          "description": "Schrifthöhe (`normal`, `double`, `triple` oder `1-8`)",
+          "name": "Höhe"
+        },
+        "image": {
+          "description": "Optionales Bild, das nach der Nachricht gedruckt wird. Akzeptiert dieselben Quellformen wie print_image (URL, Dateipfad, camera.[id], image.[id] oder Base64-Daten-URI). Siehe docs/images.md.",
+          "name": "Bild"
+        },
+        "image_align": {
+          "description": "Ausrichtung des Bildes auf der Seite.",
+          "name": "Bildausrichtung"
+        },
+        "image_auto_resize": {
+          "description": "Erlaubt Quellbilder bis 40 MB und verkleinert sie vor der Verarbeitung.",
+          "name": "Bild automatisch verkleinern"
+        },
+        "image_autocontrast": {
+          "description": "Kontrast vor der S/W-Umwandlung strecken.",
+          "name": "Bild-Autokontrast"
+        },
+        "image_chunk_delay_ms": {
+          "description": "Millisekunden Pause zwischen Bildblöcken. Leer lassen, um das Zuverlässigkeitsprofil des Druckers zu verwenden. Siehe die Hinweise zu print_image.",
+          "name": "Bild-Blockpause (ms)"
+        },
+        "image_dither": {
+          "description": "Dither-Modus für das Bild (siehe print_image).",
+          "name": "Bild-Dither"
+        },
+        "image_fallback_image": {
+          "description": "Optionale Ersatz-Bildquelle, falls die Hauptquelle fehlschlägt.",
+          "name": "Bild-Ersatz"
+        },
+        "image_fragment_height": {
+          "description": "Zeilen pro Block beim Senden des Bildes. Leer lassen, um das Zuverlässigkeitsprofil des Druckers zu verwenden. Siehe die Hinweise zu print_image.",
+          "name": "Bild-Fragmenthöhe"
+        },
+        "image_high_density": {
+          "description": "Verwendet den Druckmodus mit hoher Dichte, sofern unterstützt.",
+          "name": "Bild mit hoher Dichte"
+        },
+        "image_impl": {
+          "description": "ESC/POS-Bildbefehl (siehe print_image). Leer lassen, um dem Druckerprofil zu folgen.",
+          "name": "Bildmethode"
+        },
+        "image_invert": {
+          "description": "Schwarz und Weiß vor der S/W-Umwandlung vertauschen.",
+          "name": "Bild invertieren"
+        },
+        "image_mirror": {
+          "description": "Bild von links nach rechts spiegeln.",
+          "name": "Bild spiegeln"
+        },
+        "image_rotation": {
+          "description": "Bild drehen (Grad, im Uhrzeigersinn).",
+          "name": "Bilddrehung"
+        },
+        "image_threshold": {
+          "description": "Schwellenwert (1–254), wenn image_dither „threshold“ ist.",
+          "name": "Bild-Schwellenwert"
+        },
+        "image_width": {
+          "description": "Zielbreite des Bildes; Standard ist die Breite des Druckerprofils.",
+          "name": "Bildbreite (Pixel)"
+        },
+        "invert": {
+          "description": "Druck in Weiß auf Schwarz",
+          "name": "Invertieren"
+        },
+        "message": {
+          "description": "Der zu druckende Text",
+          "name": "Nachricht"
+        },
+        "title": {
+          "description": "Optionaler Titel, der vor der Nachricht gedruckt wird",
+          "name": "Titel"
+        },
+        "underline": {
+          "description": "Unterstreichungsart",
+          "name": "Unterstrichen"
+        },
+        "utf8": {
+          "description": "UTF-8-Umwandlung aktivieren (wandelt Sonderzeichen in eine druckerkompatible Kodierung um)",
+          "name": "UTF-8-Modus"
+        },
+        "width": {
+          "description": "Schriftbreite (`normal`, `double`, `triple` oder `1-8`)",
+          "name": "Breite"
+        }
+      },
+      "name": "Formatierte Nachricht drucken",
+      "sections": {
+        "advanced_options": {
+          "description": "Feinabstimmung von Übertragung und Zuverlässigkeit. Leer lassen, um das Zuverlässigkeitsprofil des Druckers zu verwenden.",
+          "name": "Erweiterte Optionen"
+        },
+        "image_options": {
+          "description": "Optionales Bild, das nach der Nachricht gedruckt wird, samt Verarbeitungsoptionen.",
+          "name": "Bildanhang"
+        }
+      }
+    },
+    "print_qr": {
+      "description": "Druckt einen QR-Code. Wähle ein Ziel – Druckergerät, Entität, Bereich, Etage oder Label. Ohne Ziel wird auf allen eingerichteten Druckern gedruckt (veralteter Rückfall).",
+      "fields": {
+        "align": {
+          "description": "Ausrichtung des QR-Codes",
+          "name": "Ausrichtung"
+        },
+        "broadcast": {
+          "description": "Druckt ausdrücklich auf allen eingerichteten Druckern. Schließt jedes Ziel (Gerät, Entität, Bereich, Etage oder Label) aus. Auch ohne Ziel und ohne Broadcast wird auf allen Druckern gedruckt, dieser stillschweigende Rückfall ist aber veraltet und entfällt in 2.0.0 – wähle ein Ziel oder setze broadcast: true.",
+          "name": "Broadcast"
+        },
+        "cut": {
+          "description": "Papierschnitt nach dem Drucken (Standard ist der eingestellte Schnittmodus des Druckers)",
+          "name": "Schnitt"
+        },
+        "data": {
+          "description": "Daten, die im QR-Code kodiert werden",
+          "name": "Daten"
+        },
+        "ec": {
+          "description": "Fehlerkorrekturstufe",
+          "name": "Fehlerkorrektur"
+        },
+        "feed": {
+          "description": "Anzahl der Zeilen, die nach dem Drucken vorgeschoben werden",
+          "name": "Vorschubzeilen"
+        },
+        "size": {
+          "description": "Größe des QR-Codes (1–16)",
+          "name": "Größe"
+        }
+      },
+      "name": "QR-Code drucken"
+    },
+    "print_separator": {
+      "description": "Druckt eine einzelne Zierlinie aus einem wiederholten Zeichen, das die Zeilenbreite des Druckers füllt. Beispiele – „-“ für eine einfache Linie, „=“ für eine kräftige Linie, „*“ oder „_“ für Zierbalken. Ohne Ziel wird auf allen eingerichteten Druckern gedruckt (veralteter Rückfall).",
+      "fields": {
+        "broadcast": {
+          "description": "Druckt ausdrücklich auf allen eingerichteten Druckern. Schließt jedes Ziel (Gerät, Entität, Bereich, Etage oder Label) aus. Auch ohne Ziel und ohne Broadcast wird auf allen Druckern gedruckt, dieser stillschweigende Rückfall ist aber veraltet und entfällt in 2.0.0 – wähle ein Ziel oder setze broadcast: true.",
+          "name": "Broadcast"
+        },
+        "char": {
+          "description": "Einzelnes druckbares ASCII-Zeichen, das wiederholt wird. Standard ist „-“.",
+          "name": "Zeichen"
+        },
+        "cut": {
+          "description": "Papierschnitt nach dem Drucken (Standard ist der eingestellte Schnittmodus des Druckers).",
+          "name": "Schnitt"
+        },
+        "feed": {
+          "description": "Anzahl der Zeilen, die nach dem Drucken vorgeschoben werden.",
+          "name": "Vorschubzeilen"
+        },
+        "repeat": {
+          "description": "Anzahl aufeinanderfolgender Zeilen. Verwende 2 für eine Doppellinie.",
+          "name": "Wiederholung"
+        },
+        "width": {
+          "description": "Wie oft das Zeichen wiederholt wird. Standard ist die Zeilenbreite des Druckers.",
+          "name": "Breite"
+        }
+      },
+      "name": "Trennlinie drucken"
+    },
+    "print_table": {
+      "description": "Druckt eine mehrspaltige Tabelle (im Belegstil) mit optionalem Rahmen und Kopfzeile. Ohne Ziel wird auf allen eingerichteten Druckern gedruckt (veralteter Rückfall).",
+      "fields": {
+        "broadcast": {
+          "description": "Druckt ausdrücklich auf allen eingerichteten Druckern. Schließt jedes Ziel (Gerät, Entität, Bereich, Etage oder Label) aus. Auch ohne Ziel und ohne Broadcast wird auf allen Druckern gedruckt, dieser stillschweigende Rückfall ist aber veraltet und entfällt in 2.0.0 – wähle ein Ziel oder setze broadcast: true.",
+          "name": "Broadcast"
+        },
+        "column_aligns": {
+          "description": "Optionale Liste der Ausrichtungen pro Spalte (z. B. [\"left\",\"right\",\"right\"]). Standard ist „left“ für jede Spalte.",
+          "name": "Spaltenausrichtung"
+        },
+        "column_widths": {
+          "description": "Optionale feste Spaltenbreiten in Zeichen. Ohne Angabe wird total_width gleichmäßig auf die Spalten verteilt. Die Summe plus Trennzeichen muss in total_width passen.",
+          "name": "Spaltenbreiten"
+        },
+        "cut": {
+          "description": "Papierschnitt nach dem Drucken (Standard ist der eingestellte Schnittmodus des Druckers).",
+          "name": "Schnitt"
+        },
+        "feed": {
+          "description": "Anzahl der Zeilen, die nach dem Drucken vorgeschoben werden.",
+          "name": "Vorschubzeilen"
+        },
+        "header": {
+          "description": "Behandelt die erste Zeile als Kopfzeile (durch eine waagerechte Linie vom Rumpf getrennt).",
+          "name": "Kopfzeile"
+        },
+        "row_separators": {
+          "description": "Fügt zwischen allen Tabellenzeilen eine waagerechte Linie ein.",
+          "name": "Zeilentrenner"
+        },
+        "rows": {
+          "description": "Eine YAML-Liste, deren Einträge jeweils Listen von Zellen (eine pro Spalte) sind. Beispiel: [[\"Artikel\", \"Menge\", \"Preis\"], [\"Kaffee\", \"2\", \"6,00 €\"], [\"Brezel\", \"1\", \"3,50 €\"]]. Jede Zeile sollte gleich viele Zellen haben. Ist „Kopfzeile“ aktiviert, wird die erste Zeile als Kopf dargestellt.",
+          "name": "Zeilen"
+        },
+        "style": {
+          "description": "Rahmenzeichen. Dieselben Optionen wie bei print_box. Verwende „none“ für ein rahmenloses Raster, das die Spalten trotzdem ausrichtet.",
+          "name": "Rahmenstil"
+        },
+        "total_width": {
+          "description": "Gesamte gedruckte Breite in Zeichen. Standard ist die eingestellte Zeilenbreite des Druckers.",
+          "name": "Gesamtbreite"
+        }
+      },
+      "name": "Tabelle drucken"
+    },
+    "print_text": {
+      "description": "Druckt Text mit Rohkodierung auf dem ESC/POS-Drucker. Wähle ein Ziel – Druckergerät, Entität, Bereich, Etage oder Label. Ohne Ziel wird auf allen eingerichteten Druckern gedruckt (veralteter Rückfall).",
+      "fields": {
+        "align": {
+          "description": "Textausrichtung",
+          "name": "Ausrichtung"
+        },
+        "bold": {
+          "description": "Fettdruck aktivieren",
+          "name": "Fett"
+        },
+        "broadcast": {
+          "description": "Druckt ausdrücklich auf allen eingerichteten Druckern. Schließt jedes Ziel (Gerät, Entität, Bereich, Etage oder Label) aus. Auch ohne Ziel und ohne Broadcast wird auf allen Druckern gedruckt, dieser stillschweigende Rückfall ist aber veraltet und entfällt in 2.0.0 – wähle ein Ziel oder setze broadcast: true.",
+          "name": "Broadcast"
+        },
+        "cut": {
+          "description": "Papierschnitt nach dem Drucken (Standard ist der eingestellte Schnittmodus des Druckers)",
+          "name": "Schnitt"
+        },
+        "density": {
+          "description": "Druckdichte (0–8). 5 ist am dunkelsten; höhere Werte gehen wieder zurück. Der Drucker behält den Wert, bis er geändert wird.",
+          "name": "Dichte"
+        },
+        "encoding": {
+          "description": "Überschreibt die Codepage für diesen Druck – ein python-escpos-Codepage-Name wie CP437, CP850 oder CP858 (kein Python-Codec-Name). Leer lassen, um die eingestellte Codepage des Druckers zu verwenden.",
+          "name": "Kodierung"
+        },
+        "feed": {
+          "description": "Anzahl der Zeilen, die nach dem Drucken vorgeschoben werden",
+          "name": "Vorschubzeilen"
+        },
+        "font": {
+          "description": "Druckerschrift. Schrift B ist kleiner und bietet mehr Spalten pro Zeile – erhöhe die eingestellte Zeilenbreite des Druckers, um die zusätzlichen Spalten zu nutzen.",
+          "name": "Schrift"
+        },
+        "height": {
+          "description": "Schrifthöhe (`normal`, `double`, `triple` oder `1-8`)",
+          "name": "Höhe"
+        },
+        "invert": {
+          "description": "Druck in Weiß auf Schwarz",
+          "name": "Invertieren"
+        },
+        "text": {
+          "description": "Der zu druckende Text",
+          "name": "Text"
+        },
+        "underline": {
+          "description": "Unterstreichungsart",
+          "name": "Unterstrichen"
+        },
+        "width": {
+          "description": "Schriftbreite (`normal`, `double`, `triple` oder `1-8`)",
+          "name": "Breite"
+        }
+      },
+      "name": "Text drucken (Rohkodierung)"
+    },
+    "print_text_image": {
+      "description": "Rendert Text als Bitmap mit einer eigenen TTF-/OTF-Schrift, optionaler Drehung und beliebiger Punktgröße. Das Bild wird mit derselben Dither-/Schwellenwert-Verarbeitung wie print_image gedruckt. Nutze das, wenn du größeren oder gestalteten Text brauchst, als es die eingebaute 32-Spalten-Schrift des Druckers erlaubt. Ohne Ziel wird auf allen eingerichteten Druckern gedruckt (veralteter Rückfall).",
+      "fields": {
+        "align": {
+          "description": "Horizontale Ausrichtung jeder gerenderten Zeile innerhalb der Zeichenfläche.",
+          "name": "Ausrichtung"
+        },
+        "broadcast": {
+          "description": "Druckt ausdrücklich auf allen eingerichteten Druckern. Schließt jedes Ziel (Gerät, Entität, Bereich, Etage oder Label) aus. Auch ohne Ziel und ohne Broadcast wird auf allen Druckern gedruckt, dieser stillschweigende Rückfall ist aber veraltet und entfällt in 2.0.0 – wähle ein Ziel oder setze broadcast: true.",
+          "name": "Broadcast"
+        },
+        "cut": {
+          "description": "Papierschnitt nach dem Drucken (Standard ist der eingestellte Schnittmodus des Druckers).",
+          "name": "Schnitt"
+        },
+        "feed": {
+          "description": "Anzahl der Zeilen, die nach dem Drucken vorgeschoben werden.",
+          "name": "Vorschubzeilen"
+        },
+        "font": {
+          "description": "Mitgelieferte Schriftfamilie. Wird ignoriert, wenn „font_path“ gesetzt ist.",
+          "name": "Schrift"
+        },
+        "font_path": {
+          "description": "Lege eine .ttf- oder .otf-Datei in /config/fonts/ ab und verweise hier darauf. Pfade unter allowlist_external_dirs funktionieren ebenfalls. Überschreibt das Feld „Schrift“, wenn angegeben.",
+          "name": "Eigener Schriftpfad"
+        },
+        "font_size": {
+          "description": "Punktgröße des gerenderten Textes (8 bis 96).",
+          "name": "Schriftgröße (pt)"
+        },
+        "image_auto_resize": {
+          "description": "Erlaubt, eine zu große gerenderte Zeichenfläche zu verkleinern, statt mit einem Fehler abzubrechen.",
+          "name": "Automatisch verkleinern"
+        },
+        "image_autocontrast": {
+          "description": "Tonwertumfang vor der Binarisierung strecken (bei Text selten nützlich).",
+          "name": "Autokontrast"
+        },
+        "image_chunk_delay_ms": {
+          "description": "Pause zwischen Raster-Abschnitten (Standard ist der Wert der jeweiligen Verbindungsart des Druckers).",
+          "name": "Blockpause (ms)"
+        },
+        "image_dither": {
+          "description": "Dither-Modus für den gerenderten Text vor dem Drucken.",
+          "name": "Dither"
+        },
+        "image_fragment_height": {
+          "description": "Höhe pro Abschnitt bei gepufferter Rasterausgabe.",
+          "name": "Fragmenthöhe (Pixel)"
+        },
+        "image_high_density": {
+          "description": "Vertikalen Druck mit doppelter Dichte verwenden (kleiner, schärfer).",
+          "name": "Hohe Dichte"
+        },
+        "image_impl": {
+          "description": "ESC/POS-Bildbefehlsfamilie (siehe print_image).",
+          "name": "Bildmethode"
+        },
+        "image_invert": {
+          "description": "Druckt weißen Text auf schwarzer Tinte.",
+          "name": "Invertieren"
+        },
+        "image_mirror": {
+          "description": "Spiegelt die Zeichenfläche horizontal.",
+          "name": "Spiegeln"
+        },
+        "image_threshold": {
+          "description": "Schwellenwert (1–254), wenn image_dither „threshold“ ist.",
+          "name": "Schwellenwert"
+        },
+        "image_width": {
+          "description": "Zielbreite des Bildes; Standard ist die Breite des Druckerprofils.",
+          "name": "Bildbreite (Pixel)"
+        },
+        "line_spacing": {
+          "description": "Faktor für die natürliche Zeilenhöhe der Schrift.",
+          "name": "Zeilenabstand"
+        },
+        "rotation": {
+          "description": "Drehung im Uhrzeigersinn in Grad vor der Binarisierung.",
+          "name": "Drehung"
+        },
+        "text": {
+          "description": "Der zu rendernde Text. Unterstützt Zeilenumbrüche.",
+          "name": "Text"
+        }
+      },
+      "name": "Text als Bild drucken",
+      "sections": {
+        "advanced_options": {
+          "description": "Feinabstimmung von Übertragung und Zuverlässigkeit. Leer lassen, um das Zuverlässigkeitsprofil des Druckers zu verwenden.",
+          "name": "Erweiterte Optionen"
+        },
+        "image_options": {
+          "description": "Optionale Verarbeitung vor dem Drucken des Bildes.",
+          "name": "Bildoptionen"
+        }
+      }
+    },
+    "print_text_utf8": {
+      "description": "Druckt UTF-8-Text mit automatischer Umwandlung in die Codepage des Druckers. Wähle ein Ziel – Druckergerät, Entität, Bereich, Etage oder Label. Ohne Ziel wird auf allen eingerichteten Druckern gedruckt (veralteter Rückfall).",
+      "fields": {
+        "align": {
+          "description": "Textausrichtung",
+          "name": "Ausrichtung"
+        },
+        "bold": {
+          "description": "Fettdruck aktivieren",
+          "name": "Fett"
+        },
+        "broadcast": {
+          "description": "Druckt ausdrücklich auf allen eingerichteten Druckern. Schließt jedes Ziel (Gerät, Entität, Bereich, Etage oder Label) aus. Auch ohne Ziel und ohne Broadcast wird auf allen Druckern gedruckt, dieser stillschweigende Rückfall ist aber veraltet und entfällt in 2.0.0 – wähle ein Ziel oder setze broadcast: true.",
+          "name": "Broadcast"
+        },
+        "cut": {
+          "description": "Papierschnitt nach dem Drucken (Standard ist der eingestellte Schnittmodus des Druckers)",
+          "name": "Schnitt"
+        },
+        "density": {
+          "description": "Druckdichte (0–8). 5 ist am dunkelsten; höhere Werte gehen wieder zurück. Der Drucker behält den Wert, bis er geändert wird.",
+          "name": "Dichte"
+        },
+        "emoji": {
+          "description": "Wie Emoji gedruckt werden. `auto` druckt Zeilen mit Emoji als kleine Bilder (mit der mitgelieferten Noto-Emoji-Schrift) und alles andere als normalen Text. `strip` entfernt Emoji. `off` behält das alte Verhalten bei, bei dem jedes Emoji als `?` gedruckt wird. Emoji-Zeilen beachten Ausrichtung, Schrift und Größe, aber nicht Fett, Unterstrichen oder Invertiert.",
+          "name": "Emoji"
+        },
+        "feed": {
+          "description": "Anzahl der Zeilen, die nach dem Drucken vorgeschoben werden",
+          "name": "Vorschubzeilen"
+        },
+        "font": {
+          "description": "Druckerschrift. Schrift B ist kleiner und bietet mehr Spalten pro Zeile – erhöhe die eingestellte Zeilenbreite des Druckers, um die zusätzlichen Spalten zu nutzen.",
+          "name": "Schrift"
+        },
+        "height": {
+          "description": "Schrifthöhe (`normal`, `double`, `triple` oder `1-8`)",
+          "name": "Höhe"
+        },
+        "invert": {
+          "description": "Druck in Weiß auf Schwarz",
+          "name": "Invertieren"
+        },
+        "text": {
+          "description": "Der zu druckende Text (UTF-8-Zeichen werden in eine druckerkompatible Kodierung umgewandelt)",
+          "name": "Text"
+        },
+        "underline": {
+          "description": "Unterstreichungsart",
+          "name": "Unterstrichen"
+        },
+        "width": {
+          "description": "Schriftbreite (`normal`, `double`, `triple` oder `1-8`)",
+          "name": "Breite"
+        }
+      },
+      "name": "Text drucken (UTF-8)"
+    }
+  }
+}

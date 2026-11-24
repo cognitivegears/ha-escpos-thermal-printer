@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final, Literal
 
 from ..security import MAX_RENDER_HEIGHT_PX, MAX_RENDER_PIXELS, open_local_font_no_follow
+from ..text_utils.emoji import contains_emoji, render_form, split_runs
 
 if TYPE_CHECKING:
     from PIL.Image import Image as PILImage
@@ -35,6 +36,11 @@ _BUILTIN_FONT_FILES: Final[dict[str, str]] = {
     "dejavu_sans": "DejaVuSans.ttf",
     "dejavu_serif": "DejaVuSerif.ttf",
 }
+
+
+# Monochrome Noto Emoji, drawn for any emoji the text font has no glyph for.
+# Deliberately not part of ``BUILTIN_FONTS``: it is a fallback, not a choice.
+_EMOJI_FONT_FILE: Final[str] = "NotoEmoji-Regular.ttf"
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,6 +90,50 @@ def _cached_custom_font(path: str, mtime_ns: int, font_size: int) -> Any:
 
     font_data = open_local_font_no_follow(Path(path))
     return ImageFont.truetype(BytesIO(font_data), font_size)
+
+
+class _FontStack:
+    """A text font plus the emoji font, behaving like one Pillow font.
+
+    Exposes just the parts of the ``ImageFont`` interface the wrapping and
+    layout code uses (``getlength``, ``getbbox``, ``getmetrics``) and adds
+    :meth:`draw`. Text runs go through the text font, emoji clusters through
+    the emoji font, both on one shared baseline.
+    """
+
+    def __init__(self, text_font: Any, emoji_font: Any) -> None:
+        self._text_font = text_font
+        self._emoji_font = emoji_font
+
+    def _runs(self, text: str) -> list[tuple[str, Any]]:
+        return [
+            (render_form(run.text), self._emoji_font) if run.emoji else (run.text, self._text_font)
+            for run in split_runs(text)
+        ]
+
+    def getlength(self, text: str) -> float:
+        return float(sum(font.getlength(run) for run, font in self._runs(text)))
+
+    def getmetrics(self) -> tuple[int, int]:
+        return tuple(self._text_font.getmetrics())
+
+    def getbbox(self, text: str) -> tuple[int, int, int, int]:
+        ascent, descent = self.getmetrics()
+        return (0, 0, math.ceil(self.getlength(text)), ascent + descent)
+
+    def draw(self, draw: Any, xy: tuple[int, int], text: str) -> None:
+        """Draw ``text`` with its top-left at ``xy``."""
+        x, top = xy
+        baseline = top + self.getmetrics()[0]
+        for run, font in self._runs(text):
+            draw.text((x, baseline), run, fill=0, font=font, anchor="ls")
+            x += font.getlength(run)
+
+
+def _load_emoji_font(font_size: int) -> Any:
+    from PIL import ImageFont  # noqa: PLC0415
+
+    return ImageFont.truetype(str(_FONTS_DIR / _EMOJI_FONT_FILE), font_size)
 
 
 def _measure(font: Any, text: str) -> tuple[int, int]:
@@ -273,6 +323,9 @@ def render_text_image(
     except OSError as exc:
         raise ValueError(f"Could not load font {resolved.name!r}: {exc}") from exc
 
+    if contains_emoji(text):
+        font = _FontStack(font, _load_emoji_font(font_size))
+
     rotated = rotation in (90, 270)
     # For 90/270 the canvas's width axis runs along the paper feed (long
     # axis), so wrap to MAX_RENDER_HEIGHT_PX rather than paper width.
@@ -328,7 +381,10 @@ def render_text_image(
             x = max(0, (canvas_w - w) // 2)
         else:
             x = 0
-        draw.text((x, i * line_h), line, fill=0, font=font)
+        if isinstance(font, _FontStack):
+            font.draw(draw, (x, i * line_h), line)
+        else:
+            draw.text((x, i * line_h), line, fill=0, font=font)
 
     if rotation:
         # PIL rotates counter-clockwise; convert user-facing clockwise.

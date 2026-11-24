@@ -28,6 +28,7 @@ from ..capabilities import (
 )
 from ..const import (
     CONF_ALLOW_LOCAL_IMAGE_URLS,
+    CONF_BLE_PROFILE,
     CONF_CODEPAGE,
     CONF_CONNECTION_TYPE,
     CONF_DEFAULT_ALIGN,
@@ -109,7 +110,45 @@ class EscposOptionsFlowHandler(CalibrationFlowMixin, config_entries.OptionsFlowW
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Entry menu: regular settings or the calibration wizard."""
+        if CONF_BLE_PROFILE in self.config_entry.data:
+            return await self.async_step_ble_settings(user_input)
         return self.async_show_menu(step_id="init", menu_options=["settings", "calibrate"])
+
+    async def async_step_ble_settings(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Show options supported by a raster printer."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            if 0 < user_input[CONF_STATUS_INTERVAL] < _MIN_BT_STATUS_INTERVAL:
+                errors["base"] = "bt_status_interval_too_low"
+            else:
+                return self.async_create_entry(title="Options", data=user_input)
+        data = self.config_entry.data
+        opts = self.config_entry.options
+        return self.async_show_form(
+            step_id="ble_settings",
+            data_schema=self.add_suggested_values_to_schema(
+                vol.Schema(
+                    {
+                        vol.Required(CONF_TIMEOUT, default=data[CONF_TIMEOUT]): vol.All(
+                            vol.Coerce(float), vol.Range(min=1, max=300)
+                        ),
+                        vol.Required(CONF_DEFAULT_ALIGN, default=DEFAULT_ALIGN): vol.In(
+                            ["left", "center", "right"]
+                        ),
+                        vol.Required(CONF_STATUS_INTERVAL, default=0): vol.All(
+                            int, vol.Range(min=0)
+                        ),
+                        vol.Required(
+                            CONF_ALLOW_LOCAL_IMAGE_URLS, default=DEFAULT_ALLOW_LOCAL_IMAGE_URLS
+                        ): bool,
+                    }
+                ),
+                user_input or opts,
+            ),
+            errors=errors,
+        )
 
     async def async_step_settings(  # noqa: PLR0912, PLR0915
         self, user_input: dict[str, Any] | None = None

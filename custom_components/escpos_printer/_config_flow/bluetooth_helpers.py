@@ -1,12 +1,12 @@
 """Bluetooth Classic / RFCOMM discovery and connectivity helpers for config flow.
 
-Pairing happens outside the integration (host ``bluetoothctl`` or HA OS
-Settings → System → Hardware). This module only:
+Scanning and pairing run through ``org.bluez`` on the system D-Bus (see
+:mod:`..bluez_pairing`); the flow only wraps them. This module:
 
-* Lists already-paired devices via ``org.bluez`` over the system D-Bus, when
-  reachable. If D-Bus isn't reachable (rootless Docker, missing socket
-  mount, non-Linux) we return an empty list and the flow surfaces a manual
-  MAC entry path.
+* Lists already-paired devices and, on request, the result of a discovery
+  scan. If D-Bus isn't reachable (rootless Docker, missing socket mount,
+  non-Linux) both come back empty and the flow surfaces a manual MAC entry
+  path.
 * Probes RFCOMM connectivity with a short ``AF_BLUETOOTH`` open via the
   shared transport seam (so tests can swap it for a TCP-loopback variant).
 """
@@ -21,7 +21,20 @@ from typing import Any
 from homeassistant.exceptions import HomeAssistantError
 
 from ..bluez import is_imaging_device, list_paired_bluetooth_devices
-from ..const import BT_MANUAL_ENTRY_KEY, BT_SHOW_ALL_KEY
+from ..bluez_pairing import (
+    PAIR_ERROR_AUTH_FAILED,
+    PAIR_ERROR_AUTH_REJECTED,
+    PAIR_ERROR_BUSY,
+    PAIR_ERROR_NOT_FOUND,
+    PAIR_ERROR_TIMEOUT,
+    PAIR_ERROR_UNAVAILABLE,
+    PAIR_ERROR_UNREACHABLE,
+    PairingResult,
+    discover_bluetooth_devices,
+    pair_bluetooth_device,
+)
+from ..capabilities import suggest_profile
+from ..const import BT_MANUAL_ENTRY_KEY, BT_SCAN_KEY, BT_SHOW_ALL_KEY
 from ..printer import bluetooth_transport
 from ..security import sanitize_log_message, validate_bluetooth_mac
 
@@ -146,14 +159,53 @@ async def _list_paired_bluetooth_devices() -> list[dict[str, Any]]:
     return await list_paired_bluetooth_devices()
 
 
+async def _scan_bluetooth_devices(hass: Any) -> list[dict[str, Any]]:
+    """Run a discovery scan and flag devices whose name matches a known printer."""
+    devices = await discover_bluetooth_devices()
+    for device in devices:
+        device["is_known_printer"] = bool(
+            await hass.async_add_executor_job(suggest_profile, device.get("name"), None, None)
+        )
+    return devices
+
+
+async def _pair_bluetooth_device(mac: str, pin: str | None = None) -> PairingResult:
+    """Pair and trust ``mac``; thin seam so tests can swap the D-Bus call."""
+    return await pair_bluetooth_device(mac, pin=pin)
+
+
+_PAIR_ERROR_KEY_MAP: dict[str, str] = {
+    PAIR_ERROR_AUTH_FAILED: "bt_pair_auth_failed",
+    PAIR_ERROR_AUTH_REJECTED: "bt_pair_rejected",
+    PAIR_ERROR_TIMEOUT: "bt_pair_timeout",
+    PAIR_ERROR_UNREACHABLE: "bt_pair_unreachable",
+    PAIR_ERROR_BUSY: "bt_pair_busy",
+    PAIR_ERROR_NOT_FOUND: "bt_pair_not_found",
+    PAIR_ERROR_UNAVAILABLE: "bt_pair_unavailable",
+}
+
+
+def _pair_error_to_key(error_code: str | None) -> str:
+    """Convert a pairing error code to a strings.json error key."""
+    return _PAIR_ERROR_KEY_MAP.get(error_code or "", "bt_pair_failed")
+
+
 def _is_printer_candidate(device: dict[str, Any]) -> bool:
-    """Likely a printer: imaging Class-of-Device OR a cached SPP SDP record.
+    """Likely a printer: imaging Class-of-Device, a cached SPP SDP record, or a known model name.
 
     Cheap ESC/POS printers frequently skip the imaging class but still
-    advertise Serial Port Profile — either signal keeps the device in the
-    filtered dropdown.
+    advertise Serial Port Profile — any signal keeps the device in the
+    filtered dropdown. Unpaired devices have no cached SDP record yet, so
+    for them the model-name match (``is_known_printer``) does the work.
     """
-    return bool(device.get("is_imaging") or device.get("has_spp"))
+    return bool(device.get("is_imaging") or device.get("has_spp") or device.get("is_known_printer"))
+
+
+def _device_choice_label(device: dict[str, Any]) -> str:
+    """Dropdown label; unpaired devices say they'll be paired on selection."""
+    if device.get("paired", True):
+        return str(device["label"])
+    return f"{device['label']} - not paired yet"
 
 
 def _build_bt_device_choices(
@@ -172,11 +224,12 @@ def _build_bt_device_choices(
     candidates = (
         [d for d in devices if _is_printer_candidate(d)] if printers_only else list(devices)
     )
-    choices: dict[str, str] = {d["_choice_key"]: d["label"] for d in candidates}
+    choices: dict[str, str] = {d["_choice_key"]: _device_choice_label(d) for d in candidates}
     # Surface "Show all" only when the printer filter is on AND there's
     # something the user can't currently see (avoids redundant choice when no
     # filter is in effect or when nothing is hidden).
     if printers_only and len(candidates) < len(devices):
-        choices[BT_SHOW_ALL_KEY] = "Show all paired Bluetooth devices..."
+        choices[BT_SHOW_ALL_KEY] = "Show all Bluetooth devices..."
+    choices[BT_SCAN_KEY] = "Scan for nearby devices..."
     choices[BT_MANUAL_ENTRY_KEY] = "Manual MAC entry..."
     return choices
