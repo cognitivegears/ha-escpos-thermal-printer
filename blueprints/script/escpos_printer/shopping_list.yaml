@@ -3,7 +3,8 @@ blueprint:
   description: >
     Print all open items from a Home Assistant todo entity as a
     receipt-style shopping list. Drops a bordered title at the top
-    and an itemised table below.
+    and an itemised table below. Item descriptions (if present) are
+    printed indented below the item.
   domain: script
   source_url: https://github.com/cognitivegears/ha-escpos-thermal-printer/blob/main/blueprints/script/escpos_printer/shopping_list.yaml
   input:
@@ -23,6 +24,18 @@ blueprint:
       name: List title
       description: Heading printed at the top of the list.
       default: Shopping List
+      selector:
+        text: {}
+    show_descriptions:
+      name: Print descriptions
+      description: Print the item description (if any) indented below the item.
+      default: true
+      selector:
+        boolean: {}
+    description_prefix:
+      name: Description indent
+      description: Prefix placed in front of each description line.
+      default: "  - "
       selector:
         text: {}
     style:
@@ -51,13 +64,24 @@ sequence:
       status: needs_action
     response_variable: todo_response
   - variables:
+      show_desc: !input show_descriptions
+      desc_prefix: !input description_prefix
       raw_items: >
         {{ (((todo_response | default({})).values() | list | first) or {}).get('items', []) }}
       rows: >
         {% set ns = namespace(out=[]) %}
         {% for item in raw_items %}
-          {% set summary = (item.summary | default('') | string).replace('\n', ' ').replace('\r', ' ').replace('|', '/').replace('\t', ' ') | trim %}
+          {% set summary = (item.summary | default('', true) | string).replace('\n', ' ').replace('\r', ' ').replace('|', '/').replace('\t', ' ') | trim %}
           {% set ns.out = ns.out + [[summary]] %}
+          {% if show_desc %}
+            {% set desc = item.description | default('', true) | string %}
+            {% for line in desc.replace('\r', '').split('\n') %}
+              {% set l = line.replace('|', '/').replace('\t', ' ') | trim %}
+              {% if l %}
+                {% set ns.out = ns.out + [[desc_prefix ~ l]] %}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
         {% endfor %}
         {{ ns.out }}
   - service: escpos_printer.print_box
